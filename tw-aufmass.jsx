@@ -1,4 +1,4 @@
-        function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl }) {
+        function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl, onDriveStatusChange }) {
             // ── State ──
             const [geminiConnected, setGeminiConnected] = useState(false);
             const [driveConnected, setDriveConnected] = useState(false);
@@ -27,6 +27,7 @@
                 // Drive Check
                 if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
                     setDriveConnected(true);
+                    if (onDriveStatusChange) onDriveStatusChange('online');
                 }
             }, []);
 
@@ -67,6 +68,7 @@
 
             var handleConnectDrive = async function() {
                 setDriveConnecting(true);
+                if (onDriveStatusChange) onDriveStatusChange('connecting');
                 try {
                     var service = window.GoogleDriveService;
                     if (!service.accessToken) {
@@ -75,10 +77,12 @@
                     }
                     setDriveConnected(true);
                     setDriveConnecting(false);
+                    if (onDriveStatusChange) onDriveStatusChange('online');
                 } catch(err) {
                     console.error('Drive Fehler:', err);
                     alert('Google Drive Verbindung fehlgeschlagen:\n' + err.message);
                     setDriveConnecting(false);
+                    if (onDriveStatusChange) onDriveStatusChange('offline');
                 }
             };
 
@@ -293,104 +297,151 @@
                         </div>
                     )}
 
-                    {/* ═══ FLIESENLEGER ANIMATION — SVG mit Gehbewegung ═══ */}
-                    <div style={{position:'relative', height:'75px', marginTop:'auto', width:'100%', overflow:'hidden'}}>
+                    {/* ═══ FLIESENLEGER ANIMATION — grosser SVG Charakter ═══ */}
+                    <div style={{position:'relative', height:'120px', marginTop:'auto', width:'100%', overflow:'hidden'}}>
                         {/* Boden */}
-                        <div style={{position:'absolute', bottom:'2px', left:0, right:0, height:'2px', background:'linear-gradient(90deg, transparent 5%, rgba(149,165,166,0.5) 25%, rgba(149,165,166,0.5) 75%, transparent 95%)'}} />
+                        <div style={{position:'absolute', bottom:'2px', left:0, right:0, height:'3px', background:'linear-gradient(90deg, transparent 5%, rgba(149,165,166,0.6) 20%, rgba(149,165,166,0.6) 80%, transparent 95%)', borderRadius:'2px'}} />
                         
-                        {/* Fliesenleger SVG — animiert mit CSS */}
-                        <div className="tw-walker" style={{position:'absolute', bottom:'4px'}}>
-                            <svg width="50" height="65" viewBox="0 0 50 65" xmlns="http://www.w3.org/2000/svg" style={{overflow:'visible'}}>
-                                {/* Helm */}
-                                <ellipse cx="25" cy="8" rx="9" ry="6" fill="#f1c40f">
-                                    <animate attributeName="cy" values="8;7;8" dur="0.6s" repeatCount="indefinite" />
+                        {/* Fliesenleger SVG */}
+                        <div className="tw-walker" style={{position:'absolute', bottom:'5px'}}>
+                            <svg width="80" height="110" viewBox="0 0 80 110" xmlns="http://www.w3.org/2000/svg" style={{overflow:'visible', filter:'drop-shadow(2px 3px 4px rgba(0,0,0,0.4))'}}>
+                                {/* === HELM === */}
+                                <ellipse cx="40" cy="12" rx="14" ry="9" fill="#f1c40f">
+                                    <animate attributeName="cy" values="12;10;12" dur="0.5s" repeatCount="indefinite" />
                                 </ellipse>
-                                <rect x="16" y="7" width="18" height="3" rx="1.5" fill="#f39c12">
-                                    <animate attributeName="y" values="7;6;7" dur="0.6s" repeatCount="indefinite" />
+                                <rect x="26" y="10" width="28" height="5" rx="2.5" fill="#e67e22">
+                                    <animate attributeName="y" values="10;8;10" dur="0.5s" repeatCount="indefinite" />
+                                </rect>
+                                {/* Helm-Schild */}
+                                <rect x="28" y="15" width="24" height="3" rx="1.5" fill="#d4ac0d" opacity="0.6">
+                                    <animate attributeName="y" values="15;13;15" dur="0.5s" repeatCount="indefinite" />
                                 </rect>
                                 
-                                {/* Kopf */}
-                                <circle cx="25" cy="14" r="6" fill="#fad7a0">
-                                    <animate attributeName="cy" values="14;13;14" dur="0.6s" repeatCount="indefinite" />
+                                {/* === KOPF === */}
+                                <circle cx="40" cy="24" r="10" fill="#fad7a0">
+                                    <animate attributeName="cy" values="24;22;24" dur="0.5s" repeatCount="indefinite" />
                                 </circle>
                                 {/* Augen */}
-                                <circle cx="23" cy="13" r="1" fill="#2c3e50">
-                                    <animate attributeName="cy" values="13;12;13" dur="0.6s" repeatCount="indefinite" />
-                                </circle>
-                                <circle cx="28" cy="13" r="1" fill="#2c3e50">
-                                    <animate attributeName="cy" values="13;12;13" dur="0.6s" repeatCount="indefinite" />
-                                </circle>
-                                {/* Mund — laechelt */}
-                                <path d="M23 16 Q25.5 18 28 16" stroke="#c0392b" strokeWidth="0.8" fill="none">
-                                    <animate attributeName="d" values="M23 16 Q25.5 18 28 16;M23 15 Q25.5 17 28 15;M23 16 Q25.5 18 28 16" dur="0.6s" repeatCount="indefinite" />
+                                <ellipse cx="36" cy="22" rx="1.8" ry="2" fill="#2c3e50">
+                                    <animate attributeName="cy" values="22;20;22" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
+                                <ellipse cx="44" cy="22" rx="1.8" ry="2" fill="#2c3e50">
+                                    <animate attributeName="cy" values="22;20;22" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
+                                {/* Augenbrauen */}
+                                <line x1="33" y1="19" x2="38" y2="18" stroke="#8B4513" strokeWidth="1.2" strokeLinecap="round">
+                                    <animate attributeName="y1" values="19;17;19" dur="0.5s" repeatCount="indefinite" />
+                                    <animate attributeName="y2" values="18;16;18" dur="0.5s" repeatCount="indefinite" />
+                                </line>
+                                <line x1="42" y1="18" x2="47" y2="19" stroke="#8B4513" strokeWidth="1.2" strokeLinecap="round">
+                                    <animate attributeName="y1" values="18;16;18" dur="0.5s" repeatCount="indefinite" />
+                                    <animate attributeName="y2" values="19;17;19" dur="0.5s" repeatCount="indefinite" />
+                                </line>
+                                {/* Laecheln */}
+                                <path d="M35 28 Q40 32 45 28" stroke="#c0392b" strokeWidth="1.2" fill="none" strokeLinecap="round">
+                                    <animate attributeName="d" values="M35 28 Q40 32 45 28;M35 26 Q40 30 45 26;M35 28 Q40 32 45 28" dur="0.5s" repeatCount="indefinite" />
                                 </path>
+                                {/* Nase */}
+                                <ellipse cx="40" cy="25" rx="1.5" ry="1" fill="#e8c292">
+                                    <animate attributeName="cy" values="25;23;25" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
                                 
-                                {/* Koerper — blaue Arbeitsjacke */}
-                                <rect x="19" y="20" width="12" height="16" rx="3" fill="#2980b9">
-                                    <animate attributeName="y" values="20;19;20" dur="0.6s" repeatCount="indefinite" />
-                                </rect>
-                                {/* Warnweste Streifen */}
-                                <rect x="19" y="22" width="12" height="2.5" rx="1" fill="#f39c12" opacity="0.7">
-                                    <animate attributeName="y" values="22;21;22" dur="0.6s" repeatCount="indefinite" />
-                                </rect>
-                                
-                                {/* Linker Arm — schwingt vor */}
+                                {/* === KOERPER === */}
                                 <g>
-                                    <animateTransform attributeName="transform" type="rotate" values="20,19,22;-20,19,22;20,19,22" dur="0.6s" repeatCount="indefinite" />
-                                    <rect x="10" y="22" width="10" height="4" rx="2" fill="#2980b9" />
+                                    <animate attributeName="opacity" values="1" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Blaue Arbeitsjacke */}
+                                    <rect x="28" y="34" width="24" height="26" rx="4" fill="#2471a3">
+                                        <animate attributeName="y" values="34;32;34" dur="0.5s" repeatCount="indefinite" />
+                                    </rect>
+                                    {/* Warnweste - 2 Streifen */}
+                                    <rect x="28" y="38" width="24" height="4" rx="1" fill="#f39c12" opacity="0.8">
+                                        <animate attributeName="y" values="38;36;38" dur="0.5s" repeatCount="indefinite" />
+                                    </rect>
+                                    <rect x="28" y="48" width="24" height="4" rx="1" fill="#f39c12" opacity="0.6">
+                                        <animate attributeName="y" values="48;46;48" dur="0.5s" repeatCount="indefinite" />
+                                    </rect>
+                                    {/* Reissverschluss */}
+                                    <line x1="40" y1="34" x2="40" y2="58" stroke="#1a5276" strokeWidth="1.5">
+                                        <animate attributeName="y1" values="34;32;34" dur="0.5s" repeatCount="indefinite" />
+                                        <animate attributeName="y2" values="58;56;58" dur="0.5s" repeatCount="indefinite" />
+                                    </line>
+                                </g>
+                                
+                                {/* === LINKER ARM + KELLE === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="25,30,38;-25,30,38;25,30,38" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Oberarm */}
+                                    <rect x="14" y="36" width="16" height="7" rx="3.5" fill="#2471a3" />
+                                    {/* Unterarm */}
+                                    <rect x="8" y="36" width="10" height="6" rx="3" fill="#fad7a0" />
+                                    {/* Kelle - Griff */}
+                                    <rect x="2" y="37" width="8" height="3" rx="1.5" fill="#7f8c8d" />
+                                    {/* Kelle - Blatt */}
+                                    <path d="M-2 35 L4 33 L4 41 L-2 39 Z" fill="#95a5a6" />
+                                </g>
+                                
+                                {/* === RECHTER ARM === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="-25,50,38;25,50,38;-25,50,38" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Oberarm */}
+                                    <rect x="50" y="36" width="16" height="7" rx="3.5" fill="#2471a3" />
                                     {/* Hand */}
-                                    <circle cx="11" cy="24" r="2" fill="#fad7a0" />
-                                    {/* Kelle in der Hand */}
-                                    <rect x="5" y="22" width="7" height="1.5" rx="0.75" fill="#bdc3c7" />
-                                    <rect x="2" y="20" width="4" height="4" rx="0.5" fill="#95a5a6" />
+                                    <circle cx="64" cy="39" r="3.5" fill="#fad7a0" />
                                 </g>
                                 
-                                {/* Rechter Arm — schwingt zurueck */}
+                                {/* === FLIESE UNTER RECHTEM ARM === */}
                                 <g>
-                                    <animateTransform attributeName="transform" type="rotate" values="-20,31,22;20,31,22;-20,31,22" dur="0.6s" repeatCount="indefinite" />
-                                    <rect x="30" y="22" width="10" height="4" rx="2" fill="#2980b9" />
-                                    <circle cx="39" cy="24" r="2" fill="#fad7a0" />
+                                    <animateTransform attributeName="transform" type="translate" values="0,0;0,-2;0,0" dur="0.5s" repeatCount="indefinite" />
+                                    <rect x="60" y="42" width="14" height="14" rx="2" fill="#ecf0f1" stroke="#bdc3c7" strokeWidth="1" />
+                                    {/* Fliesenmuster */}
+                                    <line x1="67" y1="42" x2="67" y2="56" stroke="#d5d8dc" strokeWidth="0.5" />
+                                    <line x1="60" y1="49" x2="74" y2="49" stroke="#d5d8dc" strokeWidth="0.5" />
+                                    {/* Zweite Fliese dahinter */}
+                                    <rect x="63" y="45" width="14" height="14" rx="2" fill="#d5dbdb" stroke="#bdc3c7" strokeWidth="0.6" opacity="0.5" />
                                 </g>
                                 
-                                {/* Linkes Bein — Schritt vor */}
+                                {/* === LINKES BEIN === */}
                                 <g>
-                                    <animateTransform attributeName="transform" type="rotate" values="25,22,36;-25,22,36;25,22,36" dur="0.6s" repeatCount="indefinite" />
-                                    <rect x="20" y="36" width="5" height="16" rx="2" fill="#2c3e50" />
+                                    <animateTransform attributeName="transform" type="rotate" values="30,35,60;-30,35,60;30,35,60" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Hose */}
+                                    <rect x="31" y="58" width="8" height="26" rx="3" fill="#2c3e50" />
+                                    {/* Knie-Highlight */}
+                                    <rect x="31" y="68" width="8" height="4" rx="2" fill="#34495e" />
                                     {/* Schuh */}
-                                    <rect x="18" y="50" width="8" height="4" rx="2" fill="#7f8c8d" />
+                                    <rect x="28" y="82" width="14" height="6" rx="3" fill="#784212" />
+                                    <rect x="28" y="82" width="14" height="3" rx="1.5" fill="#8B5A2B" />
+                                    {/* Sohle */}
+                                    <rect x="27" y="86" width="16" height="2.5" rx="1" fill="#4a2c0a" />
                                 </g>
                                 
-                                {/* Rechtes Bein — Schritt zurueck */}
+                                {/* === RECHTES BEIN === */}
                                 <g>
-                                    <animateTransform attributeName="transform" type="rotate" values="-25,28,36;25,28,36;-25,28,36" dur="0.6s" repeatCount="indefinite" />
-                                    <rect x="26" y="36" width="5" height="16" rx="2" fill="#34495e" />
+                                    <animateTransform attributeName="transform" type="rotate" values="-30,45,60;30,45,60;-30,45,60" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Hose */}
+                                    <rect x="41" y="58" width="8" height="26" rx="3" fill="#34495e" />
+                                    {/* Knie-Highlight */}
+                                    <rect x="41" y="68" width="8" height="4" rx="2" fill="#3d566e" />
                                     {/* Schuh */}
-                                    <rect x="24" y="50" width="8" height="4" rx="2" fill="#95a5a6" />
-                                </g>
-                                
-                                {/* Fliese unter rechtem Arm (wippt mit) */}
-                                <g>
-                                    <animate attributeName="opacity" values="1;1;1" dur="0.6s" repeatCount="indefinite" />
-                                    <animateTransform attributeName="transform" type="translate" values="0,0;0,-1;0,0" dur="0.6s" repeatCount="indefinite" />
-                                    <rect x="38" y="26" width="8" height="8" rx="1" fill="#ecf0f1" stroke="#bdc3c7" strokeWidth="0.6" />
-                                    <line x1="42" y1="26" x2="42" y2="34" stroke="#bdc3c7" strokeWidth="0.3" />
-                                    <line x1="38" y1="30" x2="46" y2="30" stroke="#bdc3c7" strokeWidth="0.3" />
+                                    <rect x="38" y="82" width="14" height="6" rx="3" fill="#784212" />
+                                    <rect x="38" y="82" width="14" height="3" rx="1.5" fill="#8B5A2B" />
+                                    {/* Sohle */}
+                                    <rect x="37" y="86" width="16" height="2.5" rx="1" fill="#4a2c0a" />
                                 </g>
                             </svg>
                         </div>
                         
                         {/* Gelegte Fliesen hinter ihm */}
-                        <div className="tw-tiles-laid" style={{position:'absolute', bottom:'4px', display:'flex', gap:'2px'}}>
-                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.4)', border:'1px solid rgba(77,166,255,0.25)', borderRadius:'1px'}} />
-                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.3)', border:'1px solid rgba(77,166,255,0.2)', borderRadius:'1px'}} />
-                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.2)', border:'1px solid rgba(77,166,255,0.12)', borderRadius:'1px'}} />
-                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.12)', border:'1px solid rgba(77,166,255,0.06)', borderRadius:'1px'}} />
-                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.06)', border:'1px solid rgba(77,166,255,0.03)', borderRadius:'1px'}} />
+                        <div className="tw-tiles-laid" style={{position:'absolute', bottom:'5px', display:'flex', gap:'3px', alignItems:'flex-end'}}>
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.45)', border:'1px solid rgba(77,166,255,0.3)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.35)', border:'1px solid rgba(77,166,255,0.2)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.25)', border:'1px solid rgba(77,166,255,0.15)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.15)', border:'1px solid rgba(77,166,255,0.08)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.08)', border:'1px solid rgba(77,166,255,0.04)', borderRadius:'2px'}} />
                         </div>
                     </div>
 
                     {/* ═══ CSS Animations ═══ */}
-                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-walker { animation: twWalk 14s linear infinite; }\n@keyframes twWalk { 0% { left: -60px; } 100% { left: calc(100% + 60px); } }\n.tw-tiles-laid { animation: twTilesLaid 14s linear infinite; }\n@keyframes twTilesLaid { 0% { left: -120px; } 100% { left: calc(100% + 0px); } }\n'}} />
+                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-walker { animation: twWalk 14s linear infinite; }\n@keyframes twWalk { 0% { left: -90px; } 100% { left: calc(100% + 90px); } }\n.tw-tiles-laid { animation: twTilesLaid 14s linear infinite; }\n@keyframes twTilesLaid { 0% { left: -160px; } 100% { left: calc(100% - 10px); } }\n'}} />
                 </div>
             )
         }
