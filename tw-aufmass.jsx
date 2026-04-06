@@ -293,25 +293,104 @@
                         </div>
                     )}
 
-                    {/* ═══ FLIESENLEGER ANIMATION (Pure CSS) ═══ */}
-                    <div style={{position:'relative', height:'70px', marginTop:'auto', width:'100%', overflow:'hidden'}}>
-                        {/* Boden-Linie */}
-                        <div style={{position:'absolute', bottom:'4px', left:0, right:0, height:'2px', background:'linear-gradient(90deg, transparent 5%, rgba(149,165,166,0.5) 30%, rgba(149,165,166,0.5) 70%, transparent 95%)'}} />
-                        {/* Fliesenleger - laeuft von links nach rechts */}
-                        <div className="tw-tileman-walk" style={{position:'absolute', bottom:'6px', fontSize:'42px', lineHeight:'1', filter:'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'}}>
-                            {'\uD83D\uDEB6'}
+                    {/* ═══ FLIESENLEGER ANIMATION — SVG mit Gehbewegung ═══ */}
+                    <div style={{position:'relative', height:'75px', marginTop:'auto', width:'100%', overflow:'hidden'}}>
+                        {/* Boden */}
+                        <div style={{position:'absolute', bottom:'2px', left:0, right:0, height:'2px', background:'linear-gradient(90deg, transparent 5%, rgba(149,165,166,0.5) 25%, rgba(149,165,166,0.5) 75%, transparent 95%)'}} />
+                        
+                        {/* Fliesenleger SVG — animiert mit CSS */}
+                        <div className="tw-walker" style={{position:'absolute', bottom:'4px'}}>
+                            <svg width="50" height="65" viewBox="0 0 50 65" xmlns="http://www.w3.org/2000/svg" style={{overflow:'visible'}}>
+                                {/* Helm */}
+                                <ellipse cx="25" cy="8" rx="9" ry="6" fill="#f1c40f">
+                                    <animate attributeName="cy" values="8;7;8" dur="0.6s" repeatCount="indefinite" />
+                                </ellipse>
+                                <rect x="16" y="7" width="18" height="3" rx="1.5" fill="#f39c12">
+                                    <animate attributeName="y" values="7;6;7" dur="0.6s" repeatCount="indefinite" />
+                                </rect>
+                                
+                                {/* Kopf */}
+                                <circle cx="25" cy="14" r="6" fill="#fad7a0">
+                                    <animate attributeName="cy" values="14;13;14" dur="0.6s" repeatCount="indefinite" />
+                                </circle>
+                                {/* Augen */}
+                                <circle cx="23" cy="13" r="1" fill="#2c3e50">
+                                    <animate attributeName="cy" values="13;12;13" dur="0.6s" repeatCount="indefinite" />
+                                </circle>
+                                <circle cx="28" cy="13" r="1" fill="#2c3e50">
+                                    <animate attributeName="cy" values="13;12;13" dur="0.6s" repeatCount="indefinite" />
+                                </circle>
+                                {/* Mund — laechelt */}
+                                <path d="M23 16 Q25.5 18 28 16" stroke="#c0392b" strokeWidth="0.8" fill="none">
+                                    <animate attributeName="d" values="M23 16 Q25.5 18 28 16;M23 15 Q25.5 17 28 15;M23 16 Q25.5 18 28 16" dur="0.6s" repeatCount="indefinite" />
+                                </path>
+                                
+                                {/* Koerper — blaue Arbeitsjacke */}
+                                <rect x="19" y="20" width="12" height="16" rx="3" fill="#2980b9">
+                                    <animate attributeName="y" values="20;19;20" dur="0.6s" repeatCount="indefinite" />
+                                </rect>
+                                {/* Warnweste Streifen */}
+                                <rect x="19" y="22" width="12" height="2.5" rx="1" fill="#f39c12" opacity="0.7">
+                                    <animate attributeName="y" values="22;21;22" dur="0.6s" repeatCount="indefinite" />
+                                </rect>
+                                
+                                {/* Linker Arm — schwingt vor */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="20,19,22;-20,19,22;20,19,22" dur="0.6s" repeatCount="indefinite" />
+                                    <rect x="10" y="22" width="10" height="4" rx="2" fill="#2980b9" />
+                                    {/* Hand */}
+                                    <circle cx="11" cy="24" r="2" fill="#fad7a0" />
+                                    {/* Kelle in der Hand */}
+                                    <rect x="5" y="22" width="7" height="1.5" rx="0.75" fill="#bdc3c7" />
+                                    <rect x="2" y="20" width="4" height="4" rx="0.5" fill="#95a5a6" />
+                                </g>
+                                
+                                {/* Rechter Arm — schwingt zurueck */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="-20,31,22;20,31,22;-20,31,22" dur="0.6s" repeatCount="indefinite" />
+                                    <rect x="30" y="22" width="10" height="4" rx="2" fill="#2980b9" />
+                                    <circle cx="39" cy="24" r="2" fill="#fad7a0" />
+                                </g>
+                                
+                                {/* Linkes Bein — Schritt vor */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="25,22,36;-25,22,36;25,22,36" dur="0.6s" repeatCount="indefinite" />
+                                    <rect x="20" y="36" width="5" height="16" rx="2" fill="#2c3e50" />
+                                    {/* Schuh */}
+                                    <rect x="18" y="50" width="8" height="4" rx="2" fill="#7f8c8d" />
+                                </g>
+                                
+                                {/* Rechtes Bein — Schritt zurueck */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="-25,28,36;25,28,36;-25,28,36" dur="0.6s" repeatCount="indefinite" />
+                                    <rect x="26" y="36" width="5" height="16" rx="2" fill="#34495e" />
+                                    {/* Schuh */}
+                                    <rect x="24" y="50" width="8" height="4" rx="2" fill="#95a5a6" />
+                                </g>
+                                
+                                {/* Fliese unter rechtem Arm (wippt mit) */}
+                                <g>
+                                    <animate attributeName="opacity" values="1;1;1" dur="0.6s" repeatCount="indefinite" />
+                                    <animateTransform attributeName="transform" type="translate" values="0,0;0,-1;0,0" dur="0.6s" repeatCount="indefinite" />
+                                    <rect x="38" y="26" width="8" height="8" rx="1" fill="#ecf0f1" stroke="#bdc3c7" strokeWidth="0.6" />
+                                    <line x1="42" y1="26" x2="42" y2="34" stroke="#bdc3c7" strokeWidth="0.3" />
+                                    <line x1="38" y1="30" x2="46" y2="30" stroke="#bdc3c7" strokeWidth="0.3" />
+                                </g>
+                            </svg>
                         </div>
-                        {/* Fliesen-Spur hinter ihm */}
-                        <div className="tw-tile-trail" style={{position:'absolute', bottom:'8px', display:'flex', gap:'3px'}}>
-                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.35)', border:'1px solid rgba(77,166,255,0.2)', borderRadius:'2px'}} />
-                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.25)', border:'1px solid rgba(77,166,255,0.15)', borderRadius:'2px'}} />
-                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.15)', border:'1px solid rgba(77,166,255,0.1)', borderRadius:'2px'}} />
-                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.08)', border:'1px solid rgba(77,166,255,0.05)', borderRadius:'2px'}} />
+                        
+                        {/* Gelegte Fliesen hinter ihm */}
+                        <div className="tw-tiles-laid" style={{position:'absolute', bottom:'4px', display:'flex', gap:'2px'}}>
+                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.4)', border:'1px solid rgba(77,166,255,0.25)', borderRadius:'1px'}} />
+                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.3)', border:'1px solid rgba(77,166,255,0.2)', borderRadius:'1px'}} />
+                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.2)', border:'1px solid rgba(77,166,255,0.12)', borderRadius:'1px'}} />
+                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.12)', border:'1px solid rgba(77,166,255,0.06)', borderRadius:'1px'}} />
+                            <span style={{display:'inline-block', width:'10px', height:'10px', background:'rgba(77,166,255,0.06)', border:'1px solid rgba(77,166,255,0.03)', borderRadius:'1px'}} />
                         </div>
                     </div>
 
                     {/* ═══ CSS Animations ═══ */}
-                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-tileman-walk { animation: twTilemanWalk 10s linear infinite; }\n@keyframes twTilemanWalk { 0% { left: -50px; } 100% { left: calc(100% + 50px); } }\n.tw-tile-trail { animation: twTileTrail 10s linear infinite; }\n@keyframes twTileTrail { 0% { left: -100px; } 100% { left: calc(100% + 0px); } }\n'}} />
+                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-walker { animation: twWalk 14s linear infinite; }\n@keyframes twWalk { 0% { left: -60px; } 100% { left: calc(100% + 60px); } }\n.tw-tiles-laid { animation: twTilesLaid 14s linear infinite; }\n@keyframes twTilesLaid { 0% { left: -120px; } 100% { left: calc(100% + 0px); } }\n'}} />
                 </div>
             )
         }
