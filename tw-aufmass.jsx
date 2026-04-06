@@ -114,37 +114,37 @@
                         </div>
                     </div>
 
-                    {/* ═══ UHR & DATUM — Premium Design ═══ */}
+                    {/* ═══ UHR & DATUM — Premium Design (GROSS) ═══ */}
                     <div style={{
-                        margin:'0 20px 20px', padding:'20px',
+                        margin:'0 20px 20px', padding:'24px 20px',
                         background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
                         borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
                         border:'1px solid rgba(77,166,255,0.2)',
                         boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
                     }}>
                         {/* Dekorative Elemente */}
-                        <div style={{position:'absolute', top:'-20px', right:'-20px', width:'100px', height:'100px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
                         <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
                         
                         {/* Tag */}
-                        <div style={{fontSize:'11px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'4px', textTransform:'uppercase', marginBottom:'6px'}}>
+                        <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
                             {tag}
                         </div>
                         
-                        {/* Uhrzeit */}
+                        {/* Uhrzeit — GROSS */}
                         <div style={{
-                            fontSize:'52px', fontWeight:'200', color:'#ffffff', letterSpacing:'4px',
+                            fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
                             fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
-                            lineHeight:'1', marginBottom:'8px', position:'relative'
+                            lineHeight:'1', marginBottom:'10px', position:'relative'
                         }}>
                             <span style={{fontWeight:'300'}}>{stunden}</span>
                             <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
                             <span style={{fontWeight:'300'}}>{minuten}</span>
-                            <span style={{fontSize:'24px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
+                            <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
                         </div>
                         
                         {/* Datum */}
-                        <div style={{fontSize:'14px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1px'}}>
+                        <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
                             {datum}
                         </div>
                         
@@ -152,63 +152,76 @@
                         <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
                     </div>
 
-                    {/* ═══ BUTTONS ═══ */}
-                    <div className="kunde-btn-wrapper" style={{gap:'12px'}}>
-                        
-                        {/* ── Google Gemini KI Button ── */}
-                        <button className="kunde-btn"
-                            onTouchEnd={function(e){ e.preventDefault(); setShowKiSettings(!showKiSettings); }}
-                            onClick={function(){ setShowKiSettings(!showKiSettings); }}
-                            style={{
-                                background: geminiConnected
-                                    ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
-                                    : 'linear-gradient(135deg, #8e44ad 0%, #6c3483 100%)',
-                                position:'relative',
-                        }}>
-                            <span className="kunde-btn-icon">{geminiConnected ? '\u2705' : '\uD83E\uDD16'}</span>
-                            {geminiConnected ? 'Google Gemini KI verbunden' : 'Google Gemini KI verbinden'}
-                            {geminiConnected && <span style={{position:'absolute', top:'8px', right:'12px', width:'10px', height:'10px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 8px rgba(46,204,113,0.6)'}} />}
-                        </button>
+                    {/* ═══ VERBINDUNGS-BUTTONS (nebeneinander, kompakt) ═══ */}
+                    <div style={{padding:'0 20px', marginBottom:'10px', width:'100%', maxWidth:'500px'}}>
+                        <div style={{display:'flex', gap:'8px', marginBottom:'10px'}}>
+                            {/* ── Gemini KI ── */}
+                            <button
+                                onTouchEnd={function(e){ e.preventDefault(); setShowKiSettings(!showKiSettings); }}
+                                onClick={function(){ setShowKiSettings(!showKiSettings); }}
+                                style={{
+                                    flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer',
+                                    background: geminiConnected
+                                        ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
+                                        : 'linear-gradient(135deg, #8e44ad 0%, #6c3483 100%)',
+                                    color:'white', position:'relative',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                                    boxShadow:'0 3px 10px rgba(0,0,0,0.2)', transition:'transform 0.15s ease',
+                                    WebkitTapHighlightColor:'rgba(0,0,0,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+                            }}>
+                                <span style={{fontSize:'16px'}}>{geminiConnected ? '\u2705' : '\uD83E\uDD16'}</span>
+                                <span style={{fontSize:'11px', fontWeight:'700'}}>
+                                    {geminiConnected ? 'Gemini KI' : 'Gemini KI'}
+                                </span>
+                                {geminiConnected && <span style={{position:'absolute', top:'4px', right:'4px', width:'6px', height:'6px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 4px rgba(46,204,113,0.6)'}} />}
+                            </button>
 
-                        {/* ── Google Drive Button ── */}
-                        <button className="kunde-btn" disabled={driveConnecting}
-                            onTouchEnd={function(e){ e.preventDefault(); if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
-                            onClick={function(){ if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
-                            style={{
-                                background: driveConnected
-                                    ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
-                                    : driveConnecting
-                                        ? 'linear-gradient(135deg, #d4ac0d 0%, #b7950b 100%)'
-                                        : 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
-                                position:'relative',
-                        }}>
-                            <span className="kunde-btn-icon">{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '\uD83D\uDCC2'}</span>
-                            {driveConnected ? 'Google Drive verbunden' : driveConnecting ? 'Verbinde...' : 'Google Drive verbinden'}
-                            {driveConnected && <span style={{position:'absolute', top:'8px', right:'12px', width:'10px', height:'10px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 8px rgba(46,204,113,0.6)'}} />}
-                        </button>
+                            {/* ── Google Drive ── */}
+                            <button disabled={driveConnecting}
+                                onTouchEnd={function(e){ e.preventDefault(); if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
+                                onClick={function(){ if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
+                                style={{
+                                    flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor: driveConnecting ? 'wait' : 'pointer',
+                                    background: driveConnected
+                                        ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
+                                        : driveConnecting
+                                            ? 'linear-gradient(135deg, #d4ac0d 0%, #b7950b 100%)'
+                                            : 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
+                                    color:'white', position:'relative',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                                    boxShadow:'0 3px 10px rgba(0,0,0,0.2)', transition:'transform 0.15s ease',
+                                    WebkitTapHighlightColor:'rgba(0,0,0,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+                            }}>
+                                <span style={{fontSize:'16px'}}>{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '\uD83D\uDCC2'}</span>
+                                <span style={{fontSize:'11px', fontWeight:'700'}}>
+                                    {driveConnected ? 'Google Drive' : driveConnecting ? 'Verbinde...' : 'Google Drive'}
+                                </span>
+                                {driveConnected && <span style={{position:'absolute', top:'4px', right:'4px', width:'6px', height:'6px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 4px rgba(46,204,113,0.6)'}} />}
+                            </button>
+                        </div>
 
-                        {/* ── Trennlinie ── */}
-                        <div style={{margin:'4px 0', height:'1px', background:'linear-gradient(90deg, transparent, var(--border-color), transparent)'}} />
-
-                        {/* ── KUNDENAUSWAHL Button ── */}
-                        <button className="kunde-btn"
+                        {/* ── KUNDENAUSWAHL Button (volle Breite, etwas kleiner) ── */}
+                        <button
                             disabled={!geminiConnected && !driveConnected}
                             onTouchEnd={function(e){ e.preventDefault(); handleKundenauswahlClick(); }}
                             onClick={function(){ handleKundenauswahlClick(); }}
                             style={{
+                                width:'100%', padding:'14px 20px', borderRadius:'12px', border:'none', cursor: (!geminiConnected && !driveConnected) ? 'not-allowed' : 'pointer',
                                 background: (geminiConnected || driveConnected)
                                     ? 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)'
                                     : 'linear-gradient(135deg, #555 0%, #444 100%)',
                                 opacity: (!geminiConnected && !driveConnected) ? 0.5 : 1,
-                                minHeight:'70px', fontSize:'18px',
-                                boxShadow: (geminiConnected || driveConnected) ? '0 6px 24px rgba(230,126,34,0.35)' : 'none',
+                                color:'white', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+                                boxShadow: (geminiConnected || driveConnected) ? '0 4px 16px rgba(230,126,34,0.35)' : 'none',
+                                transition:'transform 0.15s ease',
+                                WebkitTapHighlightColor:'rgba(230,126,34,0.3)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
                         }}>
-                            <span className="kunde-btn-icon" style={{fontSize:'28px'}}>{'\uD83D\uDC77'}</span>
-                            <span style={{fontWeight:'800', letterSpacing:'1px'}}>KUNDENAUSWAHL</span>
+                            <span style={{fontSize:'22px'}}>{'\uD83D\uDC77'}</span>
+                            <span style={{fontSize:'16px', fontWeight:'800', letterSpacing:'1px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase'}}>Kundenauswahl</span>
                         </button>
 
                         {(!geminiConnected && !driveConnected) && (
-                            <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', padding:'6px 16px', fontStyle:'italic'}}>
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', padding:'4px 0', fontStyle:'italic'}}>
                                 Bitte zuerst Gemini KI und/oder Google Drive verbinden
                             </div>
                         )}
