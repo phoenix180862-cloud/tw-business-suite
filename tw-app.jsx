@@ -161,7 +161,10 @@
                 setStartConnections(connections || {});
                 if (connections && connections.driveConnected) {
                     setIsDriveMode(true);
-                    setDriveStatus('online');
+                    setDriveStatus('online'); // StatusBar aktualisieren!
+                }
+                if (connections && connections.geminiConnected) {
+                    window._kiDisabled = false;
                 }
                 navigateTo('kundenModus');
             };
@@ -169,58 +172,26 @@
             // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell ──
             const handleSelectModus = async (modus) => {
                 setKundeMode(modus);
-                if (modus === 'ki') {
-                    // KI-Modus: Lade Kunden aus Google Drive "Baustellen neu"
+                // Alle 3 Modi laden zuerst die Kundenliste aus Google Drive
+                if (isDriveMode || (startConnections && startConnections.driveConnected)) {
                     setLoading(true);
-                    setLoadProgress('📂 Lade Baustellen aus Google Drive...');
+                    setLoadProgress('Lade Baustellen aus Google Drive...');
                     try {
                         var service = window.GoogleDriveService;
                         if (service && service.accessToken) {
                             const folders = await service.listKundenOrdner();
                             setDriveKunden(folders);
                             setIsDriveMode(true);
+                            setDriveStatus('online');
                         }
                     } catch(err) {
                         console.error('Drive Kunden laden:', err);
+                        alert('Fehler beim Laden der Baustellen:\n' + err.message);
                     }
                     setLoading(false);
                     setLoadProgress('');
-                    navigateTo('auswahl');
-                } else if (modus === 'gespeichert') {
-                    // Gespeicherte Daten: Lade Kunden aus Google Drive, Daten kommen aus "Kundendaten"-Ordner
-                    setLoading(true);
-                    setLoadProgress('📂 Lade Baustellen aus Google Drive...');
-                    try {
-                        var service2 = window.GoogleDriveService;
-                        if (service2 && service2.accessToken) {
-                            const folders = await service2.listKundenOrdner();
-                            setDriveKunden(folders);
-                            setIsDriveMode(true);
-                        }
-                    } catch(err) {
-                        console.error('Drive Kunden laden:', err);
-                    }
-                    setLoading(false);
-                    setLoadProgress('');
-                    navigateTo('auswahl');
-                } else if (modus === 'manuell') {
-                    // Manuell: Auch erst Kunde aus Drive wählen, dann manuell ausfüllen
-                    setLoading(true);
-                    setLoadProgress('📂 Lade Baustellen aus Google Drive...');
-                    try {
-                        var service3 = window.GoogleDriveService;
-                        if (service3 && service3.accessToken) {
-                            const folders = await service3.listKundenOrdner();
-                            setDriveKunden(folders);
-                            setIsDriveMode(true);
-                        }
-                    } catch(err) {
-                        console.error('Drive Kunden laden:', err);
-                    }
-                    setLoading(false);
-                    setLoadProgress('');
-                    navigateTo('auswahl');
                 }
+                navigateTo('auswahl');
             };
 
             const handleKundeNeu = () => {
@@ -1086,9 +1057,9 @@
                     case 'kundenModus':
                         return <KundenModusWahl onSelectModus={handleSelectModus} onBack={function(){ navigateTo('start'); }} connections={startConnections} />;
                     case 'manuellEingabe':
-                        return <ManuelleEingabe onFertig={handleManuellFertig} onBack={function(){ navigateTo('start'); }} />;
+                        return <ManuelleEingabe onFertig={handleManuellFertig} onBack={function(){ navigateTo('kundenModus'); }} kunde={selectedKunde} />;
                     case 'auswahl':
-                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} />;
+                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} />;
                     case 'akte':
                         return <KundenAkte
                             kunde={selectedKunde}

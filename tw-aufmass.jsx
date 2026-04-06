@@ -511,10 +511,10 @@
         /* ═══════════════════════════════════════════
            MANUELLE EINGABE -- LV-Positionen & Räume
            ═══════════════════════════════════════════ */
-        function ManuelleEingabe({ onFertig, onBack }) {
-            const [activeTab, setActiveTab] = useState('positionen'); // 'positionen' | 'raeume'
-            const [kundenName, setKundenName] = useState('');
-            const [bauvorhaben, setBauvorhaben] = useState('');
+        function ManuelleEingabe({ onFertig, onBack, kunde }) {
+            const [activeStep, setActiveStep] = useState(1); // 1=Kundendaten, 2=Positionen, 3=Raeume
+            const [kundenName, setKundenName] = useState((kunde && kunde.name) || '');
+            const [bauvorhaben, setBauvorhaben] = useState((kunde && kunde.adresse) || '');
             
             // ── LV-Positionen State ──
             const [positionen, setPositionen] = useState([]);
@@ -530,6 +530,12 @@
 
             // ── Upload State ──
             const [uploadStatus, setUploadStatus] = useState('');
+            // ── Erweiterte Kundendaten ──
+            const [manuelleFelder, setManuelleFelder] = useState({
+                bauleitung:'', bl_telefon:'', bl_email:'',
+                architekt:'', arch_telefon:'', arch_email:'',
+                ag_adresse:'', ag_telefon:'', ag_email:''
+            });
 
             // ── Einheiten-Optionen ──
             var einheiten = ['m²', 'm', 'Stk', 'psch', 'lfm', 'kg', 'l', 'Satz'];
@@ -771,7 +777,17 @@
                     kundenName: kundenName.trim(),
                     bauvorhaben: bauvorhaben.trim(),
                     positionen: positionen,
-                    raeume: raeume
+                    raeume: raeume,
+                    bauleitung: (manuelleFelder.bauleitung || '').trim(),
+                    bl_telefon: (manuelleFelder.bl_telefon || '').trim(),
+                    bl_email: (manuelleFelder.bl_email || '').trim(),
+                    architekt: (manuelleFelder.architekt || '').trim(),
+                    arch_telefon: (manuelleFelder.arch_telefon || '').trim(),
+                    arch_email: (manuelleFelder.arch_email || '').trim(),
+                    ag_adresse: (manuelleFelder.ag_adresse || '').trim(),
+                    ag_telefon: (manuelleFelder.ag_telefon || '').trim(),
+                    ag_email: (manuelleFelder.ag_email || '').trim(),
+                    _driveFolderId: (kunde && kunde._driveFolderId) || null,
                 });
             };
 
@@ -793,41 +809,87 @@
                         </div>
                     </div>
 
-                    {/* KUNDENDATEN */}
+                    {/* KUNDENDATEN - Schritt 1 */}
+                    {activeStep === 1 && (
                     <div style={{background:'var(--bg-secondary)', borderRadius:'16px', padding:'16px', marginBottom:'16px', border:'1px solid var(--border-color)'}}>
-                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'12px'}}>📋 Kundendaten</div>
+                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'12px'}}>Schritt 1/3: Kundendaten</div>
                         <div style={{marginBottom:'10px'}}>
                             <label style={labelStyle}>Kundenname / Auftraggeber *</label>
-                            <input type="text" value={kundenName} onChange={function(e){ setKundenName(e.target.value); }} placeholder="z.B. Müller, Max" style={inputStyle} />
+                            <input type="text" value={kundenName} onChange={function(e){ setKundenName(e.target.value); }} placeholder="z.B. Mueller, Max" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Bauvorhaben / Adresse</label>
+                            <input type="text" value={bauvorhaben} onChange={function(e){ setBauvorhaben(e.target.value); }} placeholder="z.B. Neubau EFH, Musterstrasse 1" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Bauleitung</label>
+                            <input type="text" value={manuelleFelder.bauleitung || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bauleitung: e.target.value}); }); }} placeholder="Name der Bauleitung" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Telefon Bauleitung</label>
+                            <input type="tel" value={manuelleFelder.bl_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bl_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>E-Mail Bauleitung</label>
+                            <input type="email" value={manuelleFelder.bl_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bl_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Architekt</label>
+                            <input type="text" value={manuelleFelder.architekt || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {architekt: e.target.value}); }); }} placeholder="Name Architekt" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Telefon Architekt</label>
+                            <input type="tel" value={manuelleFelder.arch_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {arch_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>E-Mail Architekt</label>
+                            <input type="email" value={manuelleFelder.arch_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {arch_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Auftraggeber Adresse</label>
+                            <input type="text" value={manuelleFelder.ag_adresse || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_adresse: e.target.value}); }); }} placeholder="Strasse, PLZ Ort" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Telefon Auftraggeber</label>
+                            <input type="tel" value={manuelleFelder.ag_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Bauvorhaben / Adresse</label>
-                            <input type="text" value={bauvorhaben} onChange={function(e){ setBauvorhaben(e.target.value); }} placeholder="z.B. Neubau EFH, Musterstraße 1" style={inputStyle} />
+                            <label style={labelStyle}>E-Mail Auftraggeber</label>
+                            <input type="email" value={manuelleFelder.ag_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
                         </div>
+                        <button {...tap(function(){ if(!kundenName.trim()){ alert('Bitte mindestens den Kundennamen eingeben.'); return; } setActiveStep(2); })} style={Object.assign({}, touchBase, {
+                            width:'100%', marginTop:'16px', padding:'14px', borderRadius:'12px', border:'none',
+                            background:'var(--accent-blue)', color:'white', fontSize:'15px', fontWeight:'700', cursor:'pointer', minHeight:'50px'
+                        })}>
+                            Weiter zu Positionen \u2192
+                        </button>
                     </div>
+                    )}
 
-                    {/* TAB-NAVIGATION */}
+                    {/* SCHRITT-NAVIGATION */}
+                    {activeStep > 1 && (
                     <div style={{display:'flex', gap:'4px', marginBottom:'16px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px', border:'1px solid var(--border-color)'}}>
-                        <button {...tap(function(){ setActiveTab('positionen'); })} style={Object.assign({}, touchBase, {
+                        <button {...tap(function(){ setActiveStep(2); })} style={Object.assign({}, touchBase, {
                             flex:1, padding:'12px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700', minHeight:'48px',
-                            background: activeTab === 'positionen' ? 'var(--accent-blue)' : 'transparent',
-                            color: activeTab === 'positionen' ? 'white' : 'var(--text-muted)',
+                            background: activeStep === 2 ? 'var(--accent-blue)' : 'transparent',
+                            color: activeStep === 2 ? 'white' : 'var(--text-muted)',
                             transition:'all 0.2s ease'
                         })}>
-                            📋 Positionen ({positionen.length})
+                            Positionen ({positionen.length})
                         </button>
-                        <button {...tap(function(){ setActiveTab('raeume'); })} style={Object.assign({}, touchBase, {
+                        <button {...tap(function(){ setActiveStep(3); })} style={Object.assign({}, touchBase, {
                             flex:1, padding:'12px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700', minHeight:'48px',
-                            background: activeTab === 'raeume' ? '#e67e22' : 'transparent',
-                            color: activeTab === 'raeume' ? 'white' : 'var(--text-muted)',
+                            background: activeStep === 3 ? '#e67e22' : 'transparent',
+                            color: activeStep === 3 ? 'white' : 'var(--text-muted)',
                             transition:'all 0.2s ease'
                         })}>
-                            🏠 Räume ({raeume.length})
+                            Raeume ({raeume.length})
                         </button>
                     </div>
+                    )}
 
-                    {/* ═══════ TAB: POSITIONEN ═══════ */}
-                    {activeTab === 'positionen' && (
+                    {/* ═══════ SCHRITT 2: POSITIONEN ═══════ */}
+                    {activeStep === 2 && (
                         <div>
                             <button {...tap(function(){ resetPosForm(); setShowPosForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed var(--accent-blue)',
@@ -932,7 +994,7 @@
                     )}
 
                     {/* ═══════ TAB: RÄUME ═══════ */}
-                    {activeTab === 'raeume' && (
+                    {activeStep === 3 && (
                         <div>
                             <button {...tap(function(){ resetRaumForm(); setShowRaumForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed #e67e22',
@@ -1858,10 +1920,18 @@
         /* ═══════════════════════════════════════════
            KUNDENAUSWAHL PAGE
            ═══════════════════════════════════════════ */
-        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde }) {
+        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde, kundeMode, onBack }) {
             const [searchTerm, setSearchTerm] = useState('');
             const [updatingId, setUpdatingId] = useState(null);
             const inputRef = React.useRef(null);
+
+            // Modus-Info
+            var modusInfo = {
+                ki: { icon: '\uD83E\uDD16', label: 'KI-Analyse', color: '#1E88E5' },
+                gespeichert: { icon: '\uD83D\uDCC2', label: 'Gespeicherte Daten', color: '#27ae60' },
+                manuell: { icon: '\uD83D\uDCDD', label: 'Manuell anlegen', color: '#e67e22' },
+            };
+            var activeModus = modusInfo[kundeMode] || modusInfo.ki;
 
             // Datenquelle: 1. Drive-Kunden  2. Lokal gespeicherte Kunden  3. Leer
             const gespeicherte = getGespeicherteKunden();
@@ -1900,9 +1970,22 @@
 
             return (
                 <div className="page-container">
+                    {/* Modus-Banner + Zurueck */}
+                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}>
+                        {onBack && (
+                            <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', whiteSpace:'nowrap'}}>
+                                \u2190
+                            </button>
+                        )}
+                        <div style={{flex:1, display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px', borderRadius:'10px', background: activeModus.color + '15', border:'1px solid ' + activeModus.color + '30'}}>
+                            <span style={{fontSize:'16px'}}>{activeModus.icon}</span>
+                            <span style={{fontSize:'12px', fontWeight:'700', color: activeModus.color}}>Modus: {activeModus.label}</span>
+                        </div>
+                    </div>
+
                     <div className="breadcrumb">
                         <span>Google Drive</span>
-                        <span>›</span>
+                        <span>\u203A</span>
                         <span className="breadcrumb-active">Baustellen neu</span>
                     </div>
                     <div className="page-title">Baustellen-Ordner</div>
