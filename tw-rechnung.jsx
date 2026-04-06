@@ -21,7 +21,7 @@
             // Positionsauswahl-State
             const [posAuswahl, setPosAuswahl] = useState({});
 
-            // LV-Positionen holen — aus ALLEN verfügbaren Quellen
+            // LV-Positionen holen -- aus ALLEN verfügbaren Quellen
             var lvPositionen = [];
             if (importResult && importResult.positionen && importResult.positionen.length > 0) {
                 lvPositionen = importResult.positionen;
@@ -228,7 +228,7 @@
                 h += '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
                 // A4 container mit festen Rändern
                 h += '.page{width:210mm;min-height:297mm;padding:20mm 18mm 25mm 22mm;margin:0 auto;position:relative;background:#fff}';
-                // Logo — 1:1 Kopie der App-Startseite
+                // Logo -- 1:1 Kopie der App-Startseite
                 h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}';
                 h += '.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
                 h += '.lt{font-family:"Source Sans 3",serif;font-style:italic;font-weight:700;color:#c41e1e;font-size:13px;margin-bottom:-14px;padding-left:1px;position:relative;z-index:2}';
@@ -282,7 +282,7 @@
                 // ═══ A4 SEITE ═══
                 h += '<div class="page">';
 
-                // Logo — EXAKT wie Startseite
+                // Logo -- EXAKT wie Startseite
                 h += '<div class="lh"><div class="lc">';
                 h += '<div class="lt">Thomas</div>';
                 h += '<div class="lw"><span class="w">w</span><span class="iw"><span class="ic">\u0131</span><span class="id"></span></span><span class="ll">LL</span><span class="wa">wacher</span></div>';
@@ -307,7 +307,7 @@
                 h += '<div><span class="l">Steuernummer:</span> <span class="v">30/220/1234/5</span></div>';
                 h += '</div>';
 
-                // Tabelle — immer gleiches Format
+                // Tabelle -- immer gleiches Format
                 h += '<table class="p"><thead><tr><th style="text-align:center;width:30px">Pos.</th><th style="text-align:right;width:55px">Menge</th><th style="text-align:center;width:35px">Einh.</th><th style="text-align:left">Bezeichnung</th><th style="text-align:right;width:65px">EP (\u20ac)</th><th style="text-align:right;width:75px">GP (\u20ac)</th></tr></thead>';
                 h += '<tbody>'+posR+'</tbody></table>';
 
@@ -799,7 +799,7 @@
                         )}
                         {!hatAufmass && (
                             <div style={{padding:'8px 12px', marginBottom:'8px', borderRadius:'8px', background:'rgba(230,126,34,0.08)', fontSize:'11px', color:'#e67e22', textAlign:'center'}}>
-                                📐 Aufmaß-Übernahme nicht verfügbar — erstelle zuerst ein Aufmaß
+                                📐 Aufmaß-Übernahme nicht verfügbar -- erstelle zuerst ein Aufmaß
                             </div>
                         )}
 
@@ -868,7 +868,7 @@
                         </div>
                     </div>
 
-                    {/* Positionen — gleiches Format für alle Rechnungstypen */}
+                    {/* Positionen -- gleiches Format für alle Rechnungstypen */}
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
                                 <div style={{fontSize:'11px', fontWeight:'700', color: typColor}}>📋 Positionen ({aktivePosn.length})</div>
@@ -1093,5 +1093,5 @@
         }
 
         /* ═══════════════════════════════════════════
-           SCHRIFTVERKEHR-MODUL — Mail & Post Korrespondenz
+           SCHRIFTVERKEHR-MODUL -- Mail & Post Korrespondenz
            ═══════════════════════════════════════════ */

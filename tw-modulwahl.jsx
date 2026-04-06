@@ -49,7 +49,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           KI-ANALYSE OVERLAY — Fortschrittsanzeige
+           KI-ANALYSE OVERLAY -- Fortschrittsanzeige
            ═══════════════════════════════════════════ */
         function KiAnalyseOverlay({ progress, currentDoc, totalDocs, details }) {
             var pct = totalDocs > 0 ? Math.round((currentDoc / totalDocs) * 100) : 0;
@@ -86,7 +86,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           KI-AKTE ANSICHT — Zentrale Analyseergebnisse
+           KI-AKTE ANSICHT -- Zentrale Analyseergebnisse
            ═══════════════════════════════════════════ */
         function KiAkteView({ kiAkte, kunde, onClose, onNeuAnalyse }) {
             const [activeTab, setActiveTab] = useState('positionen');
@@ -281,7 +281,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           KI-ORDNERANALYSE — UI-Komponenten
+           KI-ORDNERANALYSE -- UI-Komponenten
            ═══════════════════════════════════════════ */
 
         // ── Kundenübersicht: Alle Kunden mit ihren Analysen ──
@@ -292,7 +292,7 @@
             const [loading, setLoading] = useState(true);
             const [showCrossRefDetail, setShowCrossRefDetail] = useState(false);
 
-            // Lade Daten — refreshKey erzwingt Neuladen nach Analyse
+            // Lade Daten -- refreshKey erzwingt Neuladen nach Analyse
             useEffect(function() {
                 if (!kunde) return;
                 setLoading(true);
@@ -356,7 +356,7 @@
                         </div>
                     )}
 
-                    {/* Ordner-Karten — ALLE analysierten Ordner anzeigen */}
+                    {/* Ordner-Karten -- ALLE analysierten Ordner anzeigen */}
                     <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
                         {/* Erst konfigurierte Ordner (01-08) */}
                         {['01','02','03','04','05','06','07','08'].map(function(nr) {
@@ -444,7 +444,7 @@
                             </div>
                             {showCrossRefDetail && (
                                 <div style={{marginTop:'10px', borderTop:'1px solid var(--border-subtle)', paddingTop:'10px'}}>
-                                    {crossRef.zusammenfassung.nurPosNrAnders > 0 && <div style={{fontSize:'11px', color:'#f39c12', marginBottom:'4px'}}>⚠️ {crossRef.zusammenfassung.nurPosNrAnders} Positionen — nur Positionsnummer anders</div>}
+                                    {crossRef.zusammenfassung.nurPosNrAnders > 0 && <div style={{fontSize:'11px', color:'#f39c12', marginBottom:'4px'}}>⚠️ {crossRef.zusammenfassung.nurPosNrAnders} Positionen -- nur Positionsnummer anders</div>}
                                     {crossRef.zusammenfassung.abweichungen > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.abweichungen} Positionen mit Daten-Abweichungen</div>}
                                     {crossRef.zusammenfassung.nurInOrdner01 > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.nurInOrdner01} Positionen nur in Baustellenauswertung</div>}
                                     {crossRef.zusammenfassung.nurInOrdner02 > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.nurInOrdner02} Positionen nur im LV</div>}
@@ -669,6 +669,6 @@
         }
 
         /* ═══════════════════════════════════════════
-           RECHNUNGSMODUL — VOB-konforme Rechnungen
+           RECHNUNGSMODUL -- VOB-konforme Rechnungen
            §14 UStG konform · Abschlag/Schluss/Nachtrag/Stundenlohn/Einzelrechnung
            ═══════════════════════════════════════════ */

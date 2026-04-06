@@ -161,7 +161,7 @@
 
             const handleKundeAnalysiert = () => {
                 setKundeMode('analysiert');
-                // Direkt zur Kundenauswahl navigieren — nur lokale Daten laden
+                // Direkt zur Kundenauswahl navigieren -- nur lokale Daten laden
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('auswahl');
@@ -673,7 +673,7 @@
                         );
                         console.log('✅ FileProcessor abgeschlossen:', (result.positionen || []).length, 'Positionen');
                     } else {
-                        console.warn('⚠️ Kein Drive-Ordner — keine Analyse möglich');
+                        console.warn('⚠️ Kein Drive-Ordner -- keine Analyse möglich');
                         result = { positionen: [], kundendaten: {}, raeume: [], zeichnungen: [], quellenInfo: [], vertrag: {} };
                     }
 
@@ -743,7 +743,7 @@
                     }
 
                     setLoadProgress('✅ Analyse abgeschlossen!');
-                    // NICHT mehr navigateTo('geladen') — bleiben auf analyseConfig!
+                    // NICHT mehr navigateTo('geladen') -- bleiben auf analyseConfig!
 
                 } catch (err) {
                     console.error('Analyse Fehler:', err);

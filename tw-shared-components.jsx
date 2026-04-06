@@ -64,7 +64,7 @@
         /* ═══════════════════════════════════════════
            DEMO DATA – Baustellen-Ordner
            ═══════════════════════════════════════════ */
-        // ═══ Keine Demo-Kunden mehr — nur echte Baustellen aus Google Drive ═══
+        // ═══ Keine Demo-Kunden mehr -- nur echte Baustellen aus Google Drive ═══
         const DEMO_KUNDEN = [];
 
         // ═══ Lokal gespeicherte Kunden aus localStorage laden ═══
@@ -501,4 +501,4 @@
         }
 
         /* ═══════════════════════════════════════════
-           MODULWAHL — Dashboard nach Kundenauswahl
+           MODULWAHL -- Dashboard nach Kundenauswahl

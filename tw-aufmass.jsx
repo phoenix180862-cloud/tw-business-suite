@@ -81,7 +81,7 @@
                     </div>
 
                     <div className="kunde-btn-wrapper" style={{gap:'16px'}}>
-                        {/* BUTTON 1: Kunde NEU — Auswahl-Dialog öffnen */}
+                        {/* BUTTON 1: Kunde NEU -- Auswahl-Dialog öffnen */}
                         <button className="kunde-btn" disabled={!!btnLoading}
                             onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setShowNeuAuswahl(true); } }}
                             onClick={function(){ if(!btnLoading){ setShowNeuAuswahl(true); } }}
@@ -93,7 +93,7 @@
                             {btnLoading === 'neu' ? 'Wird geladen...' : 'Kunde NEU'}
                         </button>
 
-                        {/* BUTTON 2: Kunde ANGELEGT — nur lokale Daten */}
+                        {/* BUTTON 2: Kunde ANGELEGT -- nur lokale Daten */}
                         <button className="kunde-btn" disabled={!!btnLoading}
                             onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
                             onClick={function(){ if(!btnLoading){ setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
@@ -116,7 +116,7 @@
                             style={{marginTop:'12px', width:'100%', padding:'10px 16px', background: geminiKey ? 'rgba(39,174,96,0.08)' : 'rgba(230,126,34,0.08)', border: geminiKey ? '1px solid rgba(39,174,96,0.2)' : '1px solid rgba(230,126,34,0.2)', borderRadius:'10px', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color: geminiKey ? '#27ae60' : '#e67e22'}}>
                             <span style={{fontSize:'16px'}}>{geminiKey ? '🟢' : '⚙️'}</span>
                             <span style={{flex:1, textAlign:'left', fontWeight:'600'}}>
-                                {geminiKey ? 'Google Gemini KI — Verbunden' : 'Google Gemini KI — Einrichten'}
+                                {geminiKey ? 'Google Gemini KI -- Verbunden' : 'Google Gemini KI -- Einrichten'}
                             </span>
                             <span style={{fontSize:'14px'}}>{showKiSettings ? '▲' : '▼'}</span>
                         </button>
@@ -273,7 +273,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           MANUELLE EINGABE — LV-Positionen & Räume
+           MANUELLE EINGABE -- LV-Positionen & Räume
            ═══════════════════════════════════════════ */
         function ManuelleEingabe({ onFertig, onBack }) {
             const [activeTab, setActiveTab] = useState('positionen'); // 'positionen' | 'raeume'
@@ -830,7 +830,7 @@
                             fontSize:'16px', fontWeight:'800', boxShadow: (!kundenName.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'none' : '0 4px 20px rgba(39,174,96,0.3)',
                             transition:'all 0.2s ease', letterSpacing:'0.5px', minHeight:'56px'
                         })}>
-                            ✅ Liste fertiggestellt — Weiter zur Modulauswahl
+                            ✅ Liste fertiggestellt -- Weiter zur Modulauswahl
                         </button>
                     </div>
                 </div>
@@ -838,7 +838,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           ANALYSE-KONFIGURATION — Ordner-Auswahl
+           ANALYSE-KONFIGURATION -- Ordner-Auswahl
            ═══════════════════════════════════════════ */
         function AnalyseKonfiguration({ kunde, onStart, onDatenLaden, onAbbrechen, onWeiterZuModulen, onBack, loading, loadProgress, importResult }) {
             const [selectedFolders, setSelectedFolders] = useState({});
@@ -969,7 +969,7 @@
 
             // ── Daten aus ausgewählten Ordnern laden (ruft echte Drive-Lade-Logik auf) ──
             var handleDatenLaden = function() {
-                window._kiDisabled = true; // KI deaktivieren — nur Daten laden, keine KI-Analyse
+                window._kiDisabled = true; // KI deaktivieren -- nur Daten laden, keine KI-Analyse
                 if (selectedCount === 0 && !includeRootFiles) {
                     // Alle Ordner laden
                     if (onDatenLaden) {
@@ -1051,7 +1051,7 @@
                         var jsonBlob = new Blob([JSON.stringify(parsed, null, 2)], {type: 'application/json'});
                         await window.GoogleDriveService.uploadFile(syncOrdnerId, 'Offline_Sync_' + datumStr + '.json', 'application/json', jsonBlob);
 
-                        setSyncStatus('✅ Sync abgeschlossen — Daten in Drive hochgeladen!');
+                        setSyncStatus('✅ Sync abgeschlossen -- Daten in Drive hochgeladen!');
                     } else {
                         setSyncStatus('ℹ Keine lokalen Offline-Daten für diesen Kunden vorhanden.');
                     }
@@ -1098,12 +1098,12 @@
                                             border: isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent',
                                             borderBottom: isExpanded ? '1px solid var(--border-color)' : (isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent'),
                                             transition:'all 0.2s'}}>
-                                            {/* Checkbox — toggelt Auswahl */}
+                                            {/* Checkbox -- toggelt Auswahl */}
                                             <span onClick={function(e){ e.stopPropagation(); toggleFolder(folder.name); }}
                                                 style={{fontSize:'16px', width:'20px', textAlign:'center', cursor:'pointer'}}>
                                                 {isSelected ? '✅' : '⬜'}
                                             </span>
-                                            {/* Aufklapp-Pfeil + Ordner-Info — toggelt Expand */}
+                                            {/* Aufklapp-Pfeil + Ordner-Info -- toggelt Expand */}
                                             <div onClick={function(){ toggleExpand(folder.name); }}
                                                 style={{flex:1, display:'flex', alignItems:'center', gap:'6px', minWidth:0, cursor:'pointer'}}>
                                                 <span style={{fontSize:'12px', color:'var(--text-muted)', transition:'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', display:'inline-block', width:'14px', textAlign:'center'}}>▶</span>
@@ -1315,7 +1315,7 @@
                         </div>
 
                         {!vorabAkteMode ? (
-                            /* ── Button: Vorab-Akte-Modus aktivieren — Ordner aufklappen ── */
+                            /* ── Button: Vorab-Akte-Modus aktivieren -- Ordner aufklappen ── */
                             <button onClick={function() {
                                 if (folders.length === 0) {
                                     alert('Keine Ordner vorhanden. Bitte erst Kundendaten über \"Kunde NEU\" laden.');
@@ -1338,7 +1338,7 @@
                             /* ── Vorab-Akte Auswahl-Modus aktiv ── */
                             <div>
                                 {vorabAkteFile ? (
-                                    /* Datei ausgewählt — Bestätigung */
+                                    /* Datei ausgewählt -- Bestätigung */
                                     <div style={{background:'rgba(39,174,96,0.1)', borderRadius:'10px', padding:'12px', border:'1px solid rgba(39,174,96,0.3)', marginBottom:'10px'}}>
                                         <div style={{fontSize:'12px', fontWeight:'700', color:'#27ae60', marginBottom:'6px'}}>✅ Ausgewählte Datei:</div>
                                         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
@@ -1362,16 +1362,16 @@
                                         <button onClick={async function() {
                                             setVorabAkteLoading(true);
                                             try {
-                                                // WICHTIG: KI explizit deaktivieren — nur Daten laden!
+                                                // WICHTIG: KI explizit deaktivieren -- nur Daten laden!
                                                 window._kiDisabled = true;
                                                 var file = vorabAkteFile;
                                                 var folderName = file._folderName || '';
                                                 var matchFolder = folders.find(function(f) { return f.name === folderName; });
                                                 if (matchFolder && onDatenLaden) {
-                                                    // Nur den Ordner laden in dem die Datei liegt — OHNE KI
+                                                    // Nur den Ordner laden in dem die Datei liegt -- OHNE KI
                                                     onDatenLaden({ mode: 'ordner', selectedFolders: [matchFolder.name], includeRootFiles: false, vorabAkte: true, vorabAkteFileId: file.id, vorabAkteFileName: file.name });
                                                 } else if (onDatenLaden) {
-                                                    // Alle Ordner laden — OHNE KI
+                                                    // Alle Ordner laden -- OHNE KI
                                                     onDatenLaden({ mode: 'komplett', selectedFolders: null, includeRootFiles: false, vorabAkte: true, vorabAkteFileId: file.id, vorabAkteFileName: file.name });
                                                 } else {
                                                     alert('Daten-Laden Funktion nicht verfügbar.');
@@ -1728,7 +1728,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Update-Button — Drive-Akten neu laden + KI-Analyse */}
+                                    {/* Update-Button -- Drive-Akten neu laden + KI-Analyse */}
                                     {onUpdateKunde && kunde._driveFolderId && (
                                         <button
                                             onClick={function(e) {
@@ -1830,20 +1830,20 @@
                     '🧱 Die KI verlegt gerade virtuelle Fliesen...',
                     '📐 Maße werden mit Lasergenauigkeit geprüft...',
                     '🤖 Gemini liest schneller als jeder Polier...',
-                    '☕ Zeit für einen Kaffee — die KI macht das schon!',
+                    '☕ Zeit für einen Kaffee -- die KI macht das schon!',
                     '🔍 Jede Position wird unter die Lupe genommen...',
                     '📋 Das LV wird Zeile für Zeile durchgekämmt...',
                     '🏗️ Baustellendaten werden zusammengetragen...',
                     '💡 Wussten Sie? Thomas W. verlegt schneller als jede KI!',
                     '🎯 Positionsnummern werden wie Perlen aufgereiht...',
                     '🧮 EP × Menge = GP... die KI rechnet mit!',
-                    '📊 Mengen, Einheiten, Preise — alles wird erfasst!',
+                    '📊 Mengen, Einheiten, Preise -- alles wird erfasst!',
                     '✨ Die KI sortiert Daten wie Fliesen im Halbverband...',
                     '🗂️ Ordner für Ordner wird durchforstet...',
                     '🏆 Diese KI hat schon tausende LVs gelesen...',
                     '🔮 Die KI sieht Positionen, wo andere nur Text sehen...',
-                    '🎭 Fliesenleger und KI — ein unschlagbares Team!',
-                    '🍕 Fliesen sind wie Pizza — die Größe entscheidet!',
+                    '🎭 Fliesenleger und KI -- ein unschlagbares Team!',
+                    '🍕 Fliesen sind wie Pizza -- die Größe entscheidet!',
                     '🦾 Die KI liest PDFs schneller als Sie "Fugenkreuz" sagen...',
                     '🧩 Jede Position ist ein Puzzleteil des Projekts...',
                     '⚡ 200 Positionen? Kein Problem für Gemini!',
@@ -1851,10 +1851,10 @@
                     '🏋️ Diese KI stemmt auch die dicksten Leistungsverzeichnisse!',
                     '🎵 Position für Position... wie Musik in den Ohren eines Bauleiters!',
                     '🌟 Fun Fact: Die längste Fuge der Welt ist 12 km lang!',
-                    '🧊 Kühlen Kopf bewahren — die KI schwitzt nicht!',
-                    '🎩 Abrakadabra — aus PDF wird Klartext!',
-                    '📱 TW Business Suite — wo Handwerk auf Hightech trifft!',
-                    '🚀 Bald fertig — dann können Sie loslegen!',
+                    '🧊 Kühlen Kopf bewahren -- die KI schwitzt nicht!',
+                    '🎩 Abrakadabra -- aus PDF wird Klartext!',
+                    '📱 TW Business Suite -- wo Handwerk auf Hightech trifft!',
+                    '🚀 Bald fertig -- dann können Sie loslegen!',
                     '🎓 Diese KI hat in VOB/C promoviert (fast)...',
                     '🦸 Fliesenleger-Superheld activated!',
                 ];
@@ -1889,7 +1889,7 @@
                             })}
                         </div>
 
-                        {/* Emoji-Animation — wechselt je nach Phase */}
+                        {/* Emoji-Animation -- wechselt je nach Phase */}
                         <div style={{fontSize:'42px', marginBottom:'8px', animation:'bounce 1.5s ease-in-out infinite'}}>
                             {progressPct >= 100 ? '🎉' : progressPct > 80 ? '🏆' : progressPct > 60 ? '🤖' : progressPct > 40 ? '📋' : progressPct > 20 ? '🔍' : '🚀'}
                         </div>
@@ -1934,7 +1934,7 @@
 
                         {/* Bitte-nicht-schließen */}
                         <div style={{marginTop:'12px', fontSize:'10px', color:'var(--text-muted)', opacity:0.5}}>
-                            Bitte nicht schließen — Thomas' KI arbeitet hart! 💪
+                            Bitte nicht schließen -- Thomas' KI arbeitet hart! 💪
                         </div>
 
                         {/* Mini-Baustellen-Laufband */}
@@ -3692,7 +3692,7 @@
                         setTimeout(() => el.classList.remove('laser-field-highlight'), 600);
                     }
 
-                    // Nächstes Feld — erst .masse-input im Container, dann beliebiges sichtbares Input
+                    // Nächstes Feld -- erst .masse-input im Container, dann beliebiges sichtbares Input
                     const container = el.closest('.masse-section') || el.closest('.raumblatt-content') || el.closest('.page-container');
                     if (container) {
                         const masseInputs = [...container.querySelectorAll('.masse-input')];
@@ -4199,7 +4199,7 @@
                             if (a.leibungWandGefliest) parts.push(`2×${fmtDe(laibH)}×${fmtDe(a.tVal)}`);
                             // Leibung Boden wird NICHT zur Wand gerechnet (nur zum Boden!)
                             if (a.sturzGefliest && !a.tuerHoeherAlsFliese) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}(Sturz)`);
-                            const formelStr = parts.join(' + ') || '—';
+                            const formelStr = parts.join(' + ') || '--';
                             steps.push({ label: `+ Laibung ${a.name}`, formel: formelStr, ergebnis: '+' + fmtDe(a.laibFlaeche) + ' m²', type: 'zurechnung' });
                         } else if (a.typ === 'fenster') {
                             const laibH = a.fensterHoeherAlsFliese ? a.effektiveHoehe : a.hVal;
@@ -4207,7 +4207,7 @@
                             if (a.leibungWandGefliest) parts.push(`2×${fmtDe(laibH)}×${fmtDe(a.tVal)}`);
                             if (a.fensterbankGefliest) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}(Bank)`);
                             if (a.sturzGefliest && !a.fensterHoeherAlsFliese) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}(Sturz)`);
-                            const formelStr = parts.join(' + ') || '—';
+                            const formelStr = parts.join(' + ') || '--';
                             steps.push({ label: `+ Laibung ${a.name}`, formel: formelStr, ergebnis: '+' + fmtDe(a.laibFlaeche) + ' m²', type: 'zurechnung' });
                         } else {
                             steps.push({ label: `+ Laibung ${a.name}`, formel: `(2×${fmtDe(a.hVal)}+${fmtDe(a.bVal)})×${fmtDe(a.tVal)}`, ergebnis: '+' + fmtDe(a.laibFlaeche) + ' m²', type: 'zurechnung' });
@@ -4285,7 +4285,7 @@
                                 if (a.leibungWandAbgedichtet) parts.push(`2×${fmtDe(laibAH)}×${fmtDe(a.tVal)}`);
                                 if (a.leibungBodenAbgedichtet) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}`);
                                 if (a.sturzAbgedichtet && !tuerHoeherAlsAbd) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}(Sturz)`);
-                                steps.push({ label: `+ Laibung ${a.name} (Abd.)`, formel: parts.join(' + ') || '—', ergebnis: '+' + fmtDe(laibAbd) + ' m²', type: 'zurechnung' });
+                                steps.push({ label: `+ Laibung ${a.name} (Abd.)`, formel: parts.join(' + ') || '--', ergebnis: '+' + fmtDe(laibAbd) + ' m²', type: 'zurechnung' });
                                 abdZurechTotal += laibAbd;
                             }
                         } else if (a.typ === 'fenster') {
@@ -4298,7 +4298,7 @@
                                 if (a.leibungWandAbgedichtet) parts.push(`2×${fmtDe(effHAbd)}×${fmtDe(a.tVal)}`);
                                 if (a.fensterbankAbgedichtet) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}(Bank)`);
                                 if (a.sturzAbgedichtet && !fensterHoeherAlsAbd) parts.push(`${fmtDe(a.bVal)}×${fmtDe(a.tVal)}(Sturz)`);
-                                steps.push({ label: `+ Laibung ${a.name} (Abd.)`, formel: parts.join(' + ') || '—', ergebnis: '+' + fmtDe(laibAbd) + ' m²', type: 'zurechnung' });
+                                steps.push({ label: `+ Laibung ${a.name} (Abd.)`, formel: parts.join(' + ') || '--', ergebnis: '+' + fmtDe(laibAbd) + ' m²', type: 'zurechnung' });
                                 abdZurechTotal += laibAbd;
                             }
                         } else {
@@ -4481,7 +4481,7 @@
                             steps.push({ label: 'ERGEBNIS', formel: '', ergebnis: eckenTotal + ' Stk', type: 'total', value: eckenTotal });
                         } else {
                             // Dichtmanschetten → manuell
-                            steps.push({ label: 'Dichtmanschetten', formel: 'Anzahl manuell eintragen', ergebnis: '—', value: 0, sign: 0 });
+                            steps.push({ label: 'Dichtmanschetten', formel: 'Anzahl manuell eintragen', ergebnis: '--', value: 0, sign: 0 });
                         }
                     }
 
@@ -4516,7 +4516,7 @@
                         }
                     });
                     if (steps.length === 0) {
-                        steps.push({ label: 'Eckschutzschienen', formel: 'Keine Laibungen erkannt – manuell eingeben', ergebnis: '—', value: 0, sign: 0 });
+                        steps.push({ label: 'Eckschutzschienen', formel: 'Keine Laibungen erkannt – manuell eingeben', ergebnis: '--', value: 0, sign: 0 });
                     }
                     const schieneTotal = steps.filter(s => s.sign).reduce((s, st) => s + (st.value || 0) * (st.sign || 0), 0);
                     steps.push({ label: 'ERGEBNIS', formel: '', ergebnis: fmtDe(schieneTotal) + ' m', type: 'total', value: schieneTotal });
@@ -5294,7 +5294,7 @@
 
                     {/* Raumbezeichnung */}
                     <div className="raum-header">
-                        <span className="raum-nummer">{(raum && raum.nr) || '—'}</span>
+                        <span className="raum-nummer">{(raum && raum.nr) || '--'}</span>
                         <input className="raum-name-input" type="text" placeholder="Raumbezeichnung eingeben..."
                             value={raumName} onChange={e => setRaumName(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
@@ -5335,7 +5335,7 @@
                         )}
                     </div>
 
-                    {/* ═══ FOTOANALYSE-RAUMBLATT — KI-gestützte Maßermittlung ═══ */}
+                    {/* ═══ FOTOANALYSE-RAUMBLATT -- KI-gestützte Maßermittlung ═══ */}
                     <input type="file" accept="image/*" capture="environment" ref={fotoAnalyseInputRef}
                         style={{display:'none'}} onChange={e => {
                             var file = e.target.files && e.target.files[0];
@@ -5354,7 +5354,7 @@
 
                                 {/* Header */}
                                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px'}}>
-                                    <div style={{fontWeight:'700', fontSize:'15px', color:'var(--text-primary)'}}>📷 Fotoanalyse — Wand {wandMasse[fotoAnalyse.wandIdx] ? wandMasse[fotoAnalyse.wandIdx].id : ''}</div>
+                                    <div style={{fontWeight:'700', fontSize:'15px', color:'var(--text-primary)'}}>📷 Fotoanalyse -- Wand {wandMasse[fotoAnalyse.wandIdx] ? wandMasse[fotoAnalyse.wandIdx].id : ''}</div>
                                     <button onClick={() => setFotoAnalyse(null)} style={{background:'none', border:'none', fontSize:'18px', cursor:'pointer', color:'var(--text-muted)'}}>✕</button>
                                 </div>
 
@@ -5530,7 +5530,7 @@
                                         </div>
                                         <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'10px'}}>Gemessene Wandlänge oder -höhe (mm):</div>
                                         <div style={{marginBottom:'14px'}}>
-                                            <label style={{fontSize:'10px', color:'var(--text-muted)'}}>Zu messende Strecke (mm) — geschätzt aus Foto</label>
+                                            <label style={{fontSize:'10px', color:'var(--text-muted)'}}>Zu messende Strecke (mm) -- geschätzt aus Foto</label>
                                             <input type="number" value={fotoAnalyse.measuredMm || ''} onChange={e => setFotoAnalyse(prev => ({...prev, measuredMm: e.target.value}))}
                                                 placeholder="z.B. 3500" style={{width:'100%', padding:'8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'14px'}} />
                                         </div>
@@ -5600,7 +5600,7 @@
                                             <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', fontSize:'12px'}}>
                                                 <span>{confIcon}</span>
                                                 <span style={{color: confColor, fontWeight:'700'}}>Konfidenz: {conf}%</span>
-                                                {conf < 70 && <span style={{color:'#e74c3c', fontSize:'10px'}}>— Manuelle Kontrolle empfohlen</span>}
+                                                {conf < 70 && <span style={{color:'#e74c3c', fontSize:'10px'}}>-- Manuelle Kontrolle empfohlen</span>}
                                             </div>
                                             {/* Hinweise */}
                                             {r.hinweise && r.hinweise.length > 0 && (
@@ -5963,7 +5963,7 @@
                                 </div>
                                 {fliesenDeckenhoch && (
                                     <div className="umlaufend-hint" style={{background:'rgba(39,174,96,0.06)', borderColor:'rgba(39,174,96,0.2)', color:'var(--success)'}}>
-                                        ✓ Raumhoch – Fliesenhöhe = Raumhöhe ({masse.raumhoehe || '—'} m)
+                                        ✓ Raumhoch – Fliesenhöhe = Raumhöhe ({masse.raumhoehe || '--'} m)
                                     </div>
                                 )}
                                 {!fliesenUmlaufend && (
@@ -6010,7 +6010,7 @@
                                 )}
                                 {hatWandabdichtung && abdichtungDeckenhoch && (
                                     <div className="umlaufend-hint" style={{background:'rgba(39,174,96,0.06)', borderColor:'rgba(39,174,96,0.2)', color:'var(--success)'}}>
-                                        ✓ Raumhoch – Abdichtungshöhe = Raumhöhe ({masse.raumhoehe || '—'} m)
+                                        ✓ Raumhoch – Abdichtungshöhe = Raumhöhe ({masse.raumhoehe || '--'} m)
                                     </div>
                                 )}
                                 {hatWandabdichtung && !abdichtungUmlaufend && (
@@ -6150,7 +6150,7 @@
                                 </div>
                                 {fliesenDeckenhoch && (
                                     <div className="umlaufend-hint" style={{background:'rgba(39,174,96,0.06)', borderColor:'rgba(39,174,96,0.2)', color:'var(--success)'}}>
-                                        ✓ Raumhoch – Fliesenhöhe = Raumhöhe ({masse.raumhoehe || '—'} m)
+                                        ✓ Raumhoch – Fliesenhöhe = Raumhöhe ({masse.raumhoehe || '--'} m)
                                     </div>
                                 )}
                                 {!fliesenUmlaufend && (
@@ -6193,7 +6193,7 @@
                                 )}
                                 {hatWandabdichtung && abdichtungDeckenhoch && (
                                     <div className="umlaufend-hint" style={{background:'rgba(39,174,96,0.06)', borderColor:'rgba(39,174,96,0.2)', color:'var(--success)'}}>
-                                        ✓ Raumhoch – Abdichtungshöhe = Raumhöhe ({masse.raumhoehe || '—'} m)
+                                        ✓ Raumhoch – Abdichtungshöhe = Raumhöhe ({masse.raumhoehe || '--'} m)
                                     </div>
                                 )}
                                 {hatWandabdichtung && !abdichtungUmlaufend && (
@@ -6693,7 +6693,7 @@
                                         <div style={{display:'flex', flexWrap:'wrap', gap:'4px', paddingLeft:'28px'}}>
                                             {plusPosNr.map(nr => {
                                                 const rw = zuordnungen[nr].manualRW;
-                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '—');
+                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '--');
                                                 return (
                                                     <span key={nr} style={{fontSize:'11px', padding:'2px 6px', borderRadius:'3px',
                                                         background:'rgba(39,174,96,0.12)', color:'#27ae60', fontWeight:600}}>
@@ -6703,7 +6703,7 @@
                                             })}
                                             {minusPosNr.map(nr => {
                                                 const rw = zuordnungen[nr].manualRW;
-                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '—');
+                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '--');
                                                 return (
                                                     <span key={nr} style={{fontSize:'11px', padding:'2px 6px', borderRadius:'3px',
                                                         background:'rgba(231,76,60,0.12)', color:'#e74c3c', fontWeight:600}}>
@@ -6807,7 +6807,7 @@
                                                     <div className="rechenweg-container" style={{borderLeftColor:'var(--accent-orange)'}}>
                                                         <div className="rechenweg-header">
                                                             <span className="rechenweg-badge" style={{background:'rgba(230,126,34,0.12)', color:'var(--accent-orange)'}}>✏️ Rechenweg bearbeiten</span>
-                                                            <span style={{fontSize:'11px', color:'var(--text-muted)'}}>{(pos.kategorie && pos.kategorie.toUpperCase()) || '—'}</span>
+                                                            <span style={{fontSize:'11px', color:'var(--text-muted)'}}>{(pos.kategorie && pos.kategorie.toUpperCase()) || '--'}</span>
                                                         </div>
                                                         {editSteps.map((step, idx) => {
                                                             const stepVal = parseFormel(step.formel);
@@ -6885,7 +6885,7 @@
                                                     <div className="rechenweg-container">
                                                         <div className="rechenweg-header">
                                                             <span className="rechenweg-badge">VOB/C DIN 18352</span>
-                                                            <span style={{fontSize:'11px', color:'var(--text-muted)'}}>{(pos.kategorie && pos.kategorie.toUpperCase()) || '—'}</span>
+                                                            <span style={{fontSize:'11px', color:'var(--text-muted)'}}>{(pos.kategorie && pos.kategorie.toUpperCase()) || '--'}</span>
                                                         </div>
                                                         {rwSteps.map((step, idx) => (
                                                             <div key={idx} className={`rechenweg-step ${step.type || ''}`}>
@@ -7188,7 +7188,7 @@
                                         <div>
                                             <div style={{fontSize:'11px', color:'var(--accent-orange)', textTransform:'uppercase', letterSpacing:'1px', fontWeight:600}}>Manueller Rechenweg</div>
                                             <div style={{fontSize:'16px', fontWeight:700, color:'var(--text-white)', marginTop:'2px'}}>
-                                                Pos. {rwModalPos} — {(modalPosCard && modalPosCard.bez) || ''}
+                                                Pos. {rwModalPos} -- {(modalPosCard && modalPosCard.bez) || ''}
                                             </div>
                                         </div>
                                         <button style={{background:'none', border:'none', color:'var(--text-muted)', fontSize:'24px', cursor:'pointer'}}
@@ -7215,7 +7215,7 @@
                                                                 <span className={z.vorzeichen === 'minus' ? 'minus' : 'plus'}>
                                                                     {z.vorzeichen === 'minus' ? '−' : ''}{fmtDe(val)}
                                                                 </span>
-                                                            ) : <span style={{color:'var(--text-muted)'}}>—</span>}
+                                                            ) : <span style={{color:'var(--text-muted)'}}>--</span>}
                                                         </div>
                                                         <button className="rw-remove-btn" onClick={() => removeRWModalZeile(z.id)}>✕</button>
                                                     </div>
@@ -7975,7 +7975,7 @@
                             <h2 style={{margin:0, fontSize:'20px', color:'var(--text-white)'}}>📋 Gesamtliste – Aufmaß</h2>
                             <div style={{fontSize:'13px', color:'var(--text-muted)', marginTop:'4px'}}>
                                 {gesamtliste.length} {gesamtliste.length === 1 ? 'Raum' : 'Räume'} aufgemessen
-                                {kunde && ` — ${kunde.name || ''}`}
+                                {kunde && ` -- ${kunde.name || ''}`}
                             </div>
                         </div>
                         <button className="gl-room-btn" onClick={onClose}>✕ Schließen</button>
@@ -8070,7 +8070,7 @@
                                                     <div className="gl-pos-body">
                                                         <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'6px', display:'flex', gap:'6px', alignItems:'center'}}>
                                                             <span style={{padding:'1px 6px', borderRadius:'3px', background:'rgba(230,126,34,0.1)', color:'var(--accent-orange)', fontSize:'10px', fontWeight:600}}>
-                                                                {(pos.kategorie && pos.kategorie.toUpperCase()) || '—'}
+                                                                {(pos.kategorie && pos.kategorie.toUpperCase()) || '--'}
                                                             </span>
                                                             {isManual && <span style={{padding:'1px 6px', borderRadius:'3px', background:'rgba(155,89,182,0.12)', color:'#9b59b6', fontSize:'10px', fontWeight:600}}>✏️ Manuell</span>}
                                                             {hasEditedRW && <span style={{padding:'1px 6px', borderRadius:'3px', background:'rgba(230,126,34,0.12)', color:'var(--accent-orange)', fontSize:'10px', fontWeight:600}}>✏️ Bearbeitet</span>}

@@ -69,7 +69,7 @@
                 try {
                     var ok = window.FirebaseService.init(fbConfig);
                     if (ok) { setFbOk(true); addLog('Verbunden: ' + fbConfig.projectId); await doLogin(); setTab('kunde'); }
-                    else { alert('Verbindung fehlgeschlagen — Config prüfen.'); }
+                    else { alert('Verbindung fehlgeschlagen -- Config prüfen.'); }
                 } catch(e) { alert('Fehler: ' + e.message); }
                 setBusy(false);
             }
@@ -123,7 +123,7 @@
             }
             async function handleSync() {
                 setBusy(true); addLog('Sync...'); await reload();
-                addLog('Fertig — ' + syncStatus.projects + ' Projekte, ' + syncStatus.users + ' User'); setBusy(false);
+                addLog('Fertig -- ' + syncStatus.projects + ' Projekte, ' + syncStatus.users + ' User'); setBusy(false);
             }
 
             // ════════════════════════ RENDER ════════════════════════
@@ -366,7 +366,7 @@
                     <div style={{fontSize:'20px', fontWeight:'700', color: color, marginBottom:'8px'}}>{name}</div>
                     <div style={{fontSize:'14px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.6', maxWidth:'300px', marginBottom:'24px'}}>
                         Dieses Modul wird in einer kommenden Version freigeschaltet.
-                        Die Grundstruktur ist vorbereitet — stay tuned! 🚀
+                        Die Grundstruktur ist vorbereitet -- stay tuned! 🚀
                     </div>
                     <button onClick={onBack} style={{padding:'12px 32px', background: color, color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:'600', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)'}}>
                         ← Zurück zur Modulwahl

@@ -22,19 +22,19 @@
 
             // ── Vorlagen ──
             var vorlagen = [
-                { id: 'aufmass', name: 'Aufmaßankündigung', betreff: 'Aufmaß-Termin — ' + bauvorhaben,
+                { id: 'aufmass', name: 'Aufmaßankündigung', betreff: 'Aufmaß-Termin -- ' + bauvorhaben,
                   text: 'bezugnehmend auf den oben genannten Bauvertrag möchte ich Ihnen mitteilen, dass ich beabsichtige, ein Aufmaß der bisher erbrachten Leistungen durchzuführen.\n\nIch bitte Sie, einen Vertreter zu diesem Termin zu entsenden, um das Aufmaß gemeinsam vorzunehmen.\n\nSollte der vorgeschlagene Termin nicht passen, bitte ich um kurzfristige Rückmeldung, damit wir einen Alternativtermin vereinbaren können.' },
-                { id: 'bedenken', name: 'Bedenkenanmeldung (VOB/B §4)', betreff: 'Bedenkenanmeldung gemäß VOB/B §4 Abs. 3 — ' + bauvorhaben,
+                { id: 'bedenken', name: 'Bedenkenanmeldung (VOB/B §4)', betreff: 'Bedenkenanmeldung gemäß VOB/B §4 Abs. 3 -- ' + bauvorhaben,
                   text: 'hiermit melde ich gemäß VOB/B §4 Abs. 3 Bedenken an gegen:\n\n☐ die vorgesehene Art der Ausführung\n☐ die Güte der vom Auftraggeber gelieferten Stoffe oder Bauteile\n☐ die Leistung anderer Unternehmer\n\nBegründung:\n[Hier die konkreten Bedenken beschreiben]\n\nIch weise darauf hin, dass ich bei Ausführung der Arbeiten trotz der angemeldeten Bedenken keine Gewähr für die betroffenen Leistungsteile übernehmen kann, sofern die Bedenken nicht ausgeräumt werden.\n\nIch bitte um schriftliche Stellungnahme bis zum [Datum].' },
-                { id: 'behinderung', name: 'Behinderungsanzeige (VOB/B §6)', betreff: 'Behinderungsanzeige gemäß VOB/B §6 Abs. 1 — ' + bauvorhaben,
+                { id: 'behinderung', name: 'Behinderungsanzeige (VOB/B §6)', betreff: 'Behinderungsanzeige gemäß VOB/B §6 Abs. 1 -- ' + bauvorhaben,
                   text: 'hiermit zeige ich Ihnen gemäß VOB/B §6 Abs. 1 an, dass ich in der Ausführung meiner vertraglichen Leistungen behindert bin.\n\nArt der Behinderung:\n[Hier die Behinderung beschreiben]\n\nBeginn der Behinderung: [Datum]\n\nIch bitte um unverzügliche Beseitigung der Behinderung. Gleichzeitig weise ich darauf hin, dass sich die Ausführungsfristen gemäß VOB/B §6 Abs. 2 um die Dauer der Behinderung verlängern.\n\nEtwaige Mehrkosten, die durch die Behinderung entstehen, werde ich gesondert geltend machen.' },
-                { id: 'rechnung', name: 'Rechnung übersenden', betreff: 'Rechnung — ' + bauvorhaben,
+                { id: 'rechnung', name: 'Rechnung übersenden', betreff: 'Rechnung -- ' + bauvorhaben,
                   text: 'anbei übersende ich Ihnen meine Rechnung für die erbrachten Leistungen im oben genannten Bauvorhaben.\n\nIch bitte um Überweisung des Betrages innerhalb der angegebenen Zahlungsfrist auf das in der Rechnung angegebene Konto.\n\nBei Rückfragen stehe ich Ihnen gerne zur Verfügung.' },
-                { id: 'nachtrag', name: 'Nachtragsangebot (VOB/B §2)', betreff: 'Nachtragsangebot — ' + bauvorhaben,
+                { id: 'nachtrag', name: 'Nachtragsangebot (VOB/B §2)', betreff: 'Nachtragsangebot -- ' + bauvorhaben,
                   text: 'bei der Ausführung der Arbeiten im oben genannten Bauvorhaben haben sich zusätzliche/geänderte Leistungen ergeben, die nicht im ursprünglichen Leistungsverzeichnis enthalten sind.\n\nGemäß VOB/B §2 Abs. 5/6 unterbreite ich Ihnen hiermit folgendes Nachtragsangebot:\n\n[Beschreibung der Zusatzleistungen]\n\nIch bitte um schriftliche Beauftragung vor Ausführung der Arbeiten.' },
-                { id: 'maengelruege', name: 'Mängelrüge', betreff: 'Mängelrüge — ' + bauvorhaben,
+                { id: 'maengelruege', name: 'Mängelrüge', betreff: 'Mängelrüge -- ' + bauvorhaben,
                   text: 'bei der Ausführung meiner Arbeiten habe ich festgestellt, dass die Vorleistungen Mängel aufweisen, die eine ordnungsgemäße Ausführung meiner Arbeiten beeinträchtigen.\n\nFestgestellte Mängel:\n[Hier die Mängel beschreiben]\n\nIch fordere Sie auf, die genannten Mängel bis zum [Datum] zu beseitigen. Bis zur Beseitigung der Mängel sehe ich mich nicht in der Lage, meine Arbeiten fortzuführen.' },
-                { id: 'abnahme', name: 'Abnahme anfordern (VOB/B §12)', betreff: 'Fertigstellungsanzeige und Abnahmeverlangen — ' + bauvorhaben,
+                { id: 'abnahme', name: 'Abnahme anfordern (VOB/B §12)', betreff: 'Fertigstellungsanzeige und Abnahmeverlangen -- ' + bauvorhaben,
                   text: 'hiermit zeige ich Ihnen an, dass ich meine vertraglichen Leistungen im oben genannten Bauvorhaben fertiggestellt habe.\n\nGemäß VOB/B §12 Abs. 1 fordere ich Sie auf, innerhalb von 12 Werktagen nach Zugang dieses Schreibens die Abnahme durchzuführen.\n\nIch schlage folgenden Termin für die Abnahme vor: [Datum]\n\nSollte dieser Termin nicht passen, bitte ich um zeitnahe Mitteilung eines Alternativtermins.' },
             ];
 
@@ -118,7 +118,7 @@
                 h += '</style></head><body>';
 
                 h += '<div class="page">';
-                // Logo — identisch zum Rechnungsmodul
+                // Logo -- identisch zum Rechnungsmodul
                 h += '<div class="lh"><div class="lc">';
                 h += '<div class="lt">Thomas</div>';
                 h += '<div class="lw"><span class="w">w</span><span class="iw"><span class="ic">\u0131</span><span class="id"></span></span><span class="ll">LL</span><span class="wa">wacher</span></div>';
@@ -189,7 +189,7 @@
                     }
 
                     // HTML-Mail bauen
-                    var vollBetreff = betreff || ('Schreiben — ' + bauvorhaben);
+                    var vollBetreff = betreff || ('Schreiben -- ' + bauvorhaben);
                     var htmlMail = '<html><body style="font-family:\'Segoe UI\',Arial,sans-serif;font-size:10.5pt;color:#222;line-height:1.6;">';
                     htmlMail += '<p>' + anrede + '</p>';
                     htmlMail += '<p>' + textBody.replace(/\n/g, '<br>') + '</p>';
@@ -265,7 +265,7 @@
                 } catch(err) {
                     console.error('Sende-Fehler:', err);
                     // Fallback: mailto
-                    var vollBetreff2 = betreff || ('Schreiben — ' + bauvorhaben);
+                    var vollBetreff2 = betreff || ('Schreiben -- ' + bauvorhaben);
                     var mailtoLink2 = 'mailto:' + encodeURIComponent(empfEmail)
                         + '?subject=' + encodeURIComponent(vollBetreff2)
                         + '&body=' + encodeURIComponent(anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.');
@@ -394,7 +394,7 @@
                         <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'6px'}}>📋 Vorlage (optional)</div>
                         <select value={vorlage} onChange={function(e){ applyVorlage(e.target.value); }}
                             style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}>
-                            <option value="">— Freitext (keine Vorlage) —</option>
+                            <option value="">-- Freitext (keine Vorlage) --</option>
                             {vorlagen.map(function(v) { return <option key={v.id} value={v.id}>{v.name}</option>; })}
                         </select>
                     </div>
@@ -480,6 +480,6 @@
         }
 
         /* ═══════════════════════════════════════════
-           RECHNUNGSAUSGANGSBUCH — Alle Rechnungen auf einen Blick
+           RECHNUNGSAUSGANGSBUCH -- Alle Rechnungen auf einen Blick
            Auto-Save · Alarm bei Zahlungsziel · Umsatzanalyse · Editierbar
            ═══════════════════════════════════════════ */

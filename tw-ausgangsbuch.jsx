@@ -300,7 +300,7 @@
                             <span style={{fontSize:'20px'}}>🚨</span>
                             <div>
                                 <div style={{fontWeight:'700', fontSize:'13px', color:'#e74c3c'}}>{ueberfaelligeCount} überfällige Rechnung{ueberfaelligeCount > 1 ? 'en' : ''}!</div>
-                                <div style={{fontSize:'11px', color:'var(--text-muted)'}}>Zahlungsziel überschritten — Klicken zum Filtern</div>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)'}}>Zahlungsziel überschritten -- Klicken zum Filtern</div>
                             </div>
                         </div>
                     )}
@@ -345,7 +345,7 @@
                     <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
                         {filtered.length === 0 && (
                             <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px'}}>
-                                {eintraege.length === 0 ? 'Noch keine Rechnungen im Ausgangsbuch.\nErstelle eine Rechnung im Rechnungsmodul — sie wird automatisch hier gespeichert!' : 'Keine Einträge für diesen Filter.'}
+                                {eintraege.length === 0 ? 'Noch keine Rechnungen im Ausgangsbuch.\nErstelle eine Rechnung im Rechnungsmodul -- sie wird automatisch hier gespeichert!' : 'Keine Einträge für diesen Filter.'}
                             </div>
                         )}
                         {filtered.map(function(entry) {
@@ -414,6 +414,6 @@
         }
 
         /* ═══════════════════════════════════════════
-           BAUSTELLEN-APP ADMIN — Firebase-Anbindung
+           BAUSTELLEN-APP ADMIN -- Firebase-Anbindung
            Kunden an Baustellen-App pushen, Mitarbeiter freigeben
            ═══════════════════════════════════════════ */
