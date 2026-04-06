@@ -294,23 +294,24 @@
                     )}
 
                     {/* ═══ FLIESENLEGER ANIMATION (Pure CSS) ═══ */}
-                    <div style={{position:'relative', height:'80px', marginTop:'10px', overflow:'hidden'}}>
+                    <div style={{position:'relative', height:'70px', marginTop:'auto', width:'100%', overflow:'hidden'}}>
                         {/* Boden-Linie */}
-                        <div style={{position:'absolute', bottom:'6px', left:0, right:0, height:'2px', background:'linear-gradient(90deg, transparent, rgba(149,165,166,0.4), transparent)'}} />
-                        {/* Fliesenleger - CSS Animation */}
-                        <div className="tw-tileman-walk" style={{position:'absolute', bottom:'8px', fontSize:'48px', lineHeight:'1'}}>
-                            {'\uD83E\uDDD1\u200D\uD83D\uDD27'}
+                        <div style={{position:'absolute', bottom:'4px', left:0, right:0, height:'2px', background:'linear-gradient(90deg, transparent 5%, rgba(149,165,166,0.5) 30%, rgba(149,165,166,0.5) 70%, transparent 95%)'}} />
+                        {/* Fliesenleger - laeuft von links nach rechts */}
+                        <div className="tw-tileman-walk" style={{position:'absolute', bottom:'6px', fontSize:'42px', lineHeight:'1', filter:'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'}}>
+                            {'\uD83D\uDEB6'}
                         </div>
-                        {/* Fliesen-Spur */}
-                        <div className="tw-tile-trail" style={{position:'absolute', bottom:'10px'}}>
-                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(236,240,241,0.5)', border:'1px solid rgba(149,165,166,0.3)', borderRadius:'2px', marginRight:'3px'}} />
-                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(189,195,199,0.4)', border:'1px solid rgba(149,165,166,0.2)', borderRadius:'2px', marginRight:'3px'}} />
-                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(236,240,241,0.3)', border:'1px solid rgba(149,165,166,0.15)', borderRadius:'2px', marginRight:'3px'}} />
+                        {/* Fliesen-Spur hinter ihm */}
+                        <div className="tw-tile-trail" style={{position:'absolute', bottom:'8px', display:'flex', gap:'3px'}}>
+                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.35)', border:'1px solid rgba(77,166,255,0.2)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.25)', border:'1px solid rgba(77,166,255,0.15)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.15)', border:'1px solid rgba(77,166,255,0.1)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'12px', height:'12px', background:'rgba(77,166,255,0.08)', border:'1px solid rgba(77,166,255,0.05)', borderRadius:'2px'}} />
                         </div>
                     </div>
 
                     {/* ═══ CSS Animations ═══ */}
-                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-tileman-walk { animation: twTilemanWalk 12s linear infinite; }\n@keyframes twTilemanWalk { 0% { left: -60px; } 100% { left: calc(100% + 60px); } }\n.tw-tile-trail { animation: twTileTrail 12s linear infinite; }\n@keyframes twTileTrail { 0% { left: -120px; } 100% { left: calc(100% + 10px); } }\n'}} />
+                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-tileman-walk { animation: twTilemanWalk 10s linear infinite; }\n@keyframes twTilemanWalk { 0% { left: -50px; } 100% { left: calc(100% + 50px); } }\n.tw-tile-trail { animation: twTileTrail 10s linear infinite; }\n@keyframes twTileTrail { 0% { left: -100px; } 100% { left: calc(100% + 0px); } }\n'}} />
                 </div>
             )
         }
