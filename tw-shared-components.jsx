@@ -500,5 +500,3 @@
             }
         }
 
-        /* ═══════════════════════════════════════════
-           MODULWAHL -- Dashboard nach Kundenauswahl

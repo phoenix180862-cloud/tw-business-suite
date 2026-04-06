@@ -868,7 +868,7 @@
                         </div>
                     </div>
 
-                    {/* Positionen -- gleiches Format für alle Rechnungstypen */}
+                    {/* Positionen - gleiches Format für alle Rechnungstypen */}
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
                                 <div style={{fontSize:'11px', fontWeight:'700', color: typColor}}>📋 Positionen ({aktivePosn.length})</div>

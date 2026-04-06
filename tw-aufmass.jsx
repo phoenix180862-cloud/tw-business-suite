@@ -81,7 +81,7 @@
                     </div>
 
                     <div className="kunde-btn-wrapper" style={{gap:'16px'}}>
-                        {/* BUTTON 1: Kunde NEU -- Auswahl-Dialog öffnen */}
+                        {/* BUTTON 1: Kunde NEU - Auswahl-Dialog öffnen */}
                         <button className="kunde-btn" disabled={!!btnLoading}
                             onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setShowNeuAuswahl(true); } }}
                             onClick={function(){ if(!btnLoading){ setShowNeuAuswahl(true); } }}
@@ -93,7 +93,7 @@
                             {btnLoading === 'neu' ? 'Wird geladen...' : 'Kunde NEU'}
                         </button>
 
-                        {/* BUTTON 2: Kunde ANGELEGT -- nur lokale Daten */}
+                        {/* BUTTON 2: Kunde ANGELEGT - nur lokale Daten */}
                         <button className="kunde-btn" disabled={!!btnLoading}
                             onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
                             onClick={function(){ if(!btnLoading){ setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
@@ -1098,12 +1098,12 @@
                                             border: isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent',
                                             borderBottom: isExpanded ? '1px solid var(--border-color)' : (isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent'),
                                             transition:'all 0.2s'}}>
-                                            {/* Checkbox -- toggelt Auswahl */}
+                                            {/* Checkbox - toggelt Auswahl */}
                                             <span onClick={function(e){ e.stopPropagation(); toggleFolder(folder.name); }}
                                                 style={{fontSize:'16px', width:'20px', textAlign:'center', cursor:'pointer'}}>
                                                 {isSelected ? '✅' : '⬜'}
                                             </span>
-                                            {/* Aufklapp-Pfeil + Ordner-Info -- toggelt Expand */}
+                                            {/* Aufklapp-Pfeil + Ordner-Info - toggelt Expand */}
                                             <div onClick={function(){ toggleExpand(folder.name); }}
                                                 style={{flex:1, display:'flex', alignItems:'center', gap:'6px', minWidth:0, cursor:'pointer'}}>
                                                 <span style={{fontSize:'12px', color:'var(--text-muted)', transition:'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', display:'inline-block', width:'14px', textAlign:'center'}}>▶</span>
@@ -1728,7 +1728,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Update-Button -- Drive-Akten neu laden + KI-Analyse */}
+                                    {/* Update-Button - Drive-Akten neu laden + KI-Analyse */}
                                     {onUpdateKunde && kunde._driveFolderId && (
                                         <button
                                             onClick={function(e) {
@@ -1889,7 +1889,7 @@
                             })}
                         </div>
 
-                        {/* Emoji-Animation -- wechselt je nach Phase */}
+                        {/* Emoji-Animation - wechselt je nach Phase */}
                         <div style={{fontSize:'42px', marginBottom:'8px', animation:'bounce 1.5s ease-in-out infinite'}}>
                             {progressPct >= 100 ? '🎉' : progressPct > 80 ? '🏆' : progressPct > 60 ? '🤖' : progressPct > 40 ? '📋' : progressPct > 20 ? '🔍' : '🚀'}
                         </div>
@@ -5335,7 +5335,7 @@
                         )}
                     </div>
 
-                    {/* ═══ FOTOANALYSE-RAUMBLATT -- KI-gestützte Maßermittlung ═══ */}
+                    {/* ═══ FOTOANALYSE-RAUMBLATT - KI-gestützte Maßermittlung ═══ */}
                     <input type="file" accept="image/*" capture="environment" ref={fotoAnalyseInputRef}
                         style={{display:'none'}} onChange={e => {
                             var file = e.target.files && e.target.files[0];
