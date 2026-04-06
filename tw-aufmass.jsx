@@ -1,62 +1,58 @@
-        function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell }) {
-            // Prüfe ob gespeicherte Kunden in localStorage existieren
-            var gespeicherteKunden = [];
-            try {
-                var keys = Object.keys(localStorage);
-                for (var i = 0; i < keys.length; i++) {
-                    if (keys[i].indexOf('aufmass_kunde_') === 0) {
-                        var data = JSON.parse(localStorage.getItem(keys[i]));
-                        if (data && data.name) {
-                            gespeicherteKunden.push({ key: keys[i], name: data.name, datum: data._gespeichertAm || '' });
-                        }
-                    }
-                }
-            } catch(e) {}
-
-            // Gemini API-Key State
+        function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl }) {
+            // ── State ──
+            const [geminiConnected, setGeminiConnected] = useState(false);
+            const [driveConnected, setDriveConnected] = useState(false);
             const [showKiSettings, setShowKiSettings] = useState(false);
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-            const [geminiStatus, setGeminiStatus] = useState(geminiKey ? 'saved' : 'none'); // none|saved|testing|ok|error
+            const [geminiStatus, setGeminiStatus] = useState(geminiKey ? 'saved' : 'none');
             const [showKey, setShowKey] = useState(false);
-            // ── NEU: KI-Modell als React-State (statt nur localStorage) ──
             const [geminiModelPref, setGeminiModelPref] = useState(localStorage.getItem('gemini_model_pref') || 'pro');
-            // ── NEU: Button-Loading-State ──
-            const [btnLoading, setBtnLoading] = useState(null); // null | 'neu' | 'analysiert'
-            const [showNeuAuswahl, setShowNeuAuswahl] = useState(false); // Modal für Kunde NEU Auswahl
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [driveConnecting, setDriveConnecting] = useState(false);
+
+            // ── Uhr aktualisieren ──
+            useEffect(function() {
+                var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
+                return function() { clearInterval(timer); };
+            }, []);
+
+            // ── Gemini Check bei Mount ──
+            useEffect(function() {
+                var key = localStorage.getItem('gemini_api_key');
+                if (key) {
+                    setGeminiConnected(true);
+                    setGeminiStatus('saved');
+                    GEMINI_CONFIG.API_KEY = key;
+                }
+                // Drive Check
+                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
+                    setDriveConnected(true);
+                }
+            }, []);
 
             var testGeminiKey = async function() {
                 if (!geminiKey) return;
                 setGeminiStatus('testing');
-                // Probiere mehrere Modelle durch (neuestes zuerst)
                 var modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
                     try {
                         var testModel = modelsToTry[mi];
                         var res = await fetch(
                             GEMINI_CONFIG.BASE_URL + '/models/' + testModel + ':generateContent?key=' + geminiKey,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    contents: [{ parts: [{ text: 'Sage nur: OK' }] }]
-                                })
-                            }
+                            { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ contents: [{ parts: [{ text: 'Sage nur: OK' }] }] }) }
                         );
                         if (res.ok) {
                             GEMINI_CONFIG.MODEL = testModel;
                             setGeminiStatus('ok');
+                            setGeminiConnected(true);
                             localStorage.setItem('gemini_api_key', geminiKey);
                             localStorage.setItem('gemini_model', testModel);
                             GEMINI_CONFIG.API_KEY = geminiKey;
                             window._kiDisabled = false;
-                            console.log('Gemini verbunden! Modell:', testModel);
                             return;
                         }
-                        var errBody = await res.json().catch(function(){ return {}; });
-                        console.warn('Modell ' + testModel + ' Fehler ' + res.status + ':', errBody.error ? errBody.error.message : '');
-                    } catch(e) {
-                        console.warn('Modell ' + testModel + ' Netzwerkfehler:', e.message);
-                    }
+                    } catch(e) {}
                 }
                 setGeminiStatus('error');
             };
@@ -66,10 +62,48 @@
                 GEMINI_CONFIG.API_KEY = geminiKey;
                 window._kiDisabled = false;
                 setGeminiStatus('saved');
+                setGeminiConnected(true);
             };
 
+            var handleConnectDrive = async function() {
+                setDriveConnecting(true);
+                try {
+                    var service = window.GoogleDriveService;
+                    if (!service.accessToken) {
+                        await service.init();
+                        await service.requestAuth();
+                    }
+                    setDriveConnected(true);
+                    setDriveConnecting(false);
+                } catch(err) {
+                    console.error('Drive Fehler:', err);
+                    alert('Google Drive Verbindung fehlgeschlagen:\n' + err.message);
+                    setDriveConnecting(false);
+                }
+            };
+
+            var handleKundenauswahlClick = function() {
+                if (!geminiConnected && !driveConnected) {
+                    alert('Bitte zuerst Google Gemini KI und/oder Google Drive verbinden!');
+                    return;
+                }
+                if (onKundenauswahl) {
+                    onKundenauswahl({ geminiConnected: geminiConnected, driveConnected: driveConnected });
+                }
+            };
+
+            // ── Datum/Uhrzeit formatieren ──
+            var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            var tag = tage[currentTime.getDay()];
+            var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
+            var stunden = String(currentTime.getHours()).padStart(2,'0');
+            var minuten = String(currentTime.getMinutes()).padStart(2,'0');
+            var sekunden = String(currentTime.getSeconds()).padStart(2,'0');
+
             return (
-                <div className="startseite">
+                <div className="startseite" style={{position:'relative', overflow:'hidden', minHeight:'100vh'}}>
+                    {/* ═══ FIRMEN-HEADER ═══ */}
                     <div className="logo-section">
                         <FirmenLogo size="large" />
                         <div className="logo-address">
@@ -80,196 +114,305 @@
                         </div>
                     </div>
 
-                    <div className="kunde-btn-wrapper" style={{gap:'16px'}}>
-                        {/* BUTTON 1: Kunde NEU - Auswahl-Dialog öffnen */}
-                        <button className="kunde-btn" disabled={!!btnLoading}
-                            onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setShowNeuAuswahl(true); } }}
-                            onClick={function(){ if(!btnLoading){ setShowNeuAuswahl(true); } }}
-                            style={{
-                            background: btnLoading === 'neu' ? 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)' : 'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)',
-                            opacity: btnLoading && btnLoading !== 'neu' ? 0.5 : 1,
+                    {/* ═══ UHR & DATUM — Premium Design ═══ */}
+                    <div style={{
+                        margin:'0 20px 20px', padding:'20px',
+                        background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
+                        borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
+                        border:'1px solid rgba(77,166,255,0.2)',
+                        boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+                    }}>
+                        {/* Dekorative Elemente */}
+                        <div style={{position:'absolute', top:'-20px', right:'-20px', width:'100px', height:'100px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        
+                        {/* Tag */}
+                        <div style={{fontSize:'11px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'4px', textTransform:'uppercase', marginBottom:'6px'}}>
+                            {tag}
+                        </div>
+                        
+                        {/* Uhrzeit */}
+                        <div style={{
+                            fontSize:'52px', fontWeight:'200', color:'#ffffff', letterSpacing:'4px',
+                            fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+                            lineHeight:'1', marginBottom:'8px', position:'relative'
                         }}>
-                            <span className="kunde-btn-icon">{btnLoading === 'neu' ? '⏳' : '➕'}</span>
-                            {btnLoading === 'neu' ? 'Wird geladen...' : 'Kunde NEU'}
-                        </button>
+                            <span style={{fontWeight:'300'}}>{stunden}</span>
+                            <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
+                            <span style={{fontWeight:'300'}}>{minuten}</span>
+                            <span style={{fontSize:'24px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
+                        </div>
+                        
+                        {/* Datum */}
+                        <div style={{fontSize:'14px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1px'}}>
+                            {datum}
+                        </div>
+                        
+                        {/* Trennlinie */}
+                        <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
+                    </div>
 
-                        {/* BUTTON 2: Kunde ANGELEGT - nur lokale Daten */}
-                        <button className="kunde-btn" disabled={!!btnLoading}
-                            onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
-                            onClick={function(){ if(!btnLoading){ setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
+                    {/* ═══ BUTTONS ═══ */}
+                    <div className="kunde-btn-wrapper" style={{gap:'12px'}}>
+                        
+                        {/* ── Google Gemini KI Button ── */}
+                        <button className="kunde-btn"
+                            onTouchEnd={function(e){ e.preventDefault(); setShowKiSettings(!showKiSettings); }}
+                            onClick={function(){ setShowKiSettings(!showKiSettings); }}
                             style={{
-                            background: btnLoading === 'analysiert' ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)' : 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
-                            opacity: btnLoading && btnLoading !== 'analysiert' ? 0.5 : 1,
+                                background: geminiConnected
+                                    ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
+                                    : 'linear-gradient(135deg, #8e44ad 0%, #6c3483 100%)',
+                                position:'relative',
                         }}>
-                            <span className="kunde-btn-icon">{btnLoading === 'analysiert' ? '⏳' : '💾'}</span>
-                            {btnLoading === 'analysiert' ? 'Wird geladen...' : 'Kunde ANGELEGT'}
+                            <span className="kunde-btn-icon">{geminiConnected ? '\u2705' : '\uD83E\uDD16'}</span>
+                            {geminiConnected ? 'Google Gemini KI verbunden' : 'Google Gemini KI verbinden'}
+                            {geminiConnected && <span style={{position:'absolute', top:'8px', right:'12px', width:'10px', height:'10px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 8px rgba(46,204,113,0.6)'}} />}
                         </button>
 
-                        {gespeicherteKunden.length > 0 && (
-                            <div style={{marginTop:'12px', fontSize:'12px', color:'var(--accent-blue)', textAlign:'center', padding:'8px 16px', background:'rgba(30,136,229,0.08)', borderRadius:'10px', border:'1px solid rgba(30,136,229,0.15)'}}>
-                                💾 {gespeicherteKunden.length} Kunde{gespeicherteKunden.length > 1 ? 'n' : ''} lokal gespeichert
-                            </div>
-                        )}
-
-                        {/* ── Gemini KI-Einstellungen ── */}
-                        <button onClick={function(){ setShowKiSettings(!showKiSettings); }}
-                            style={{marginTop:'12px', width:'100%', padding:'10px 16px', background: geminiKey ? 'rgba(39,174,96,0.08)' : 'rgba(230,126,34,0.08)', border: geminiKey ? '1px solid rgba(39,174,96,0.2)' : '1px solid rgba(230,126,34,0.2)', borderRadius:'10px', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color: geminiKey ? '#27ae60' : '#e67e22'}}>
-                            <span style={{fontSize:'16px'}}>{geminiKey ? '🟢' : '⚙️'}</span>
-                            <span style={{flex:1, textAlign:'left', fontWeight:'600'}}>
-                                {geminiKey ? 'Google Gemini KI -- Verbunden' : 'Google Gemini KI -- Einrichten'}
-                            </span>
-                            <span style={{fontSize:'14px'}}>{showKiSettings ? '▲' : '▼'}</span>
+                        {/* ── Google Drive Button ── */}
+                        <button className="kunde-btn" disabled={driveConnecting}
+                            onTouchEnd={function(e){ e.preventDefault(); if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
+                            onClick={function(){ if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
+                            style={{
+                                background: driveConnected
+                                    ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
+                                    : driveConnecting
+                                        ? 'linear-gradient(135deg, #d4ac0d 0%, #b7950b 100%)'
+                                        : 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
+                                position:'relative',
+                        }}>
+                            <span className="kunde-btn-icon">{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '\uD83D\uDCC2'}</span>
+                            {driveConnected ? 'Google Drive verbunden' : driveConnecting ? 'Verbinde...' : 'Google Drive verbinden'}
+                            {driveConnected && <span style={{position:'absolute', top:'8px', right:'12px', width:'10px', height:'10px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 8px rgba(46,204,113,0.6)'}} />}
                         </button>
 
-                        {showKiSettings && (
-                            <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'14px', border:'1px solid var(--border-color)', boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-                                <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'8px'}}>🤖 Google Gemini KI-Einstellungen</div>
-                                <div style={{fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.5', marginBottom:'10px'}}>
-                                    Die KI analysiert Kundendokumente automatisch (LV, Verträge, Pläne).<br/>
-                                    Kostenlos für bis zu 250 Analysen/Tag mit Gemini Flash.
-                                </div>
-                                <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block', marginBottom:'3px'}}>Gemini API-Key</label>
-                                <div style={{display:'flex', gap:'4px'}}>
-                                    <input
-                                        type={showKey ? 'text' : 'password'}
-                                        value={geminiKey}
-                                        onChange={function(e){ setGeminiKey(e.target.value); setGeminiStatus('none'); }}
-                                        placeholder="AIzaSy..."
-                                        style={{flex:1, padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box', fontFamily:'monospace'}}
-                                    />
-                                    <button onClick={function(){ setShowKey(!showKey); }} style={{padding:'6px 8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-color)', borderRadius:'8px', cursor:'pointer', fontSize:'14px'}}>{showKey ? '🙈' : '👁️'}</button>
-                                </div>
-                                <div style={{display:'flex', gap:'6px', marginTop:'8px'}}>
-                                    <button onClick={testGeminiKey}
-                                        style={{flex:1, padding:'8px', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'700', cursor:'pointer'}}>
-                                        {geminiStatus === 'testing' ? '⏳ Teste...' : '✅ Verbindung testen'}
-                                    </button>
-                                    <button onClick={saveGeminiKey}
-                                        style={{flex:1, padding:'8px', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'700', cursor:'pointer'}}>
-                                        💾 Speichern
-                                    </button>
-                                </div>
-                                {geminiStatus === 'ok' && <div style={{marginTop:'6px', fontSize:'11px', color:'#27ae60', fontWeight:'600'}}>🟢 Verbindung erfolgreich! Modell: {GEMINI_CONFIG.MODEL}</div>}
-                                {geminiStatus === 'error' && <div style={{marginTop:'6px', fontSize:'11px', color:'#e74c3c', fontWeight:'600'}}>🔴 Verbindung fehlgeschlagen. Mögliche Ursachen:<br/>• API-Key ungültig oder Tages-Quota aufgebraucht<br/>• Keine Internetverbindung<br/>Prüfe Konsole (F12) für Details.</div>}
-                                {geminiStatus === 'saved' && <div style={{marginTop:'6px', fontSize:'11px', color:'#27ae60', fontWeight:'600'}}>💾 Gespeichert! Drücke "Verbindung testen" zum Prüfen.</div>}
-                                <div style={{marginTop:'8px', fontSize:'10px', color:'var(--text-muted)', lineHeight:'1.5'}}>
-                                    <strong>Key holen:</strong> <a href="https://aistudio.google.com/apikey" target="_blank" style={{color:'var(--accent-blue)'}}>aistudio.google.com/apikey</a><br/>
-                                    → "Create API Key" → Key kopieren → hier einfügen
-                                </div>
+                        {/* ── Trennlinie ── */}
+                        <div style={{margin:'4px 0', height:'1px', background:'linear-gradient(90deg, transparent, var(--border-color), transparent)'}} />
 
-                                {/* Modell-Auswahl */}
-                                <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
-                                    <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>🧠 KI-Modell für Dokumentenanalyse</div>
-                                    <div style={{display:'flex', gap:'4px'}}>
-                                        {Object.keys(GEMINI_CONFIG.MODELS).map(function(key) {
-                                            var m = GEMINI_CONFIG.MODELS[key];
-                                            var isActive = geminiModelPref === key;
-                                            return (
-                                                <button key={key} onClick={function(){
-                                                    setGeminiModelPref(key);
-                                                    localStorage.setItem('gemini_model_pref', key);
-                                                }} style={{
-                                                    flex:1, padding:'8px 4px', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700', textAlign:'center',
-                                                    background: isActive ? m.color + '18' : 'var(--bg-tertiary)',
-                                                    border: isActive ? '2px solid ' + m.color : '1px solid var(--border-color)',
-                                                    color: isActive ? m.color : 'var(--text-muted)',
-                                                    transition:'all 0.15s ease',
-                                                    WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation'
-                                                }}>
-                                                    {m.icon} {m.name.replace('Gemini ', '')}<br/>
-                                                    <span style={{fontSize:'8px', fontWeight:'400'}}>{m.desc}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    <div style={{fontSize:'9px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                        Aktiv: <strong>{(GEMINI_CONFIG.MODELS[geminiModelPref] || {}).name || 'Gemini 2.5 Pro'}</strong>
-                                    </div>
-                                </div>
+                        {/* ── KUNDENAUSWAHL Button ── */}
+                        <button className="kunde-btn"
+                            disabled={!geminiConnected && !driveConnected}
+                            onTouchEnd={function(e){ e.preventDefault(); handleKundenauswahlClick(); }}
+                            onClick={function(){ handleKundenauswahlClick(); }}
+                            style={{
+                                background: (geminiConnected || driveConnected)
+                                    ? 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)'
+                                    : 'linear-gradient(135deg, #555 0%, #444 100%)',
+                                opacity: (!geminiConnected && !driveConnected) ? 0.5 : 1,
+                                minHeight:'70px', fontSize:'18px',
+                                boxShadow: (geminiConnected || driveConnected) ? '0 6px 24px rgba(230,126,34,0.35)' : 'none',
+                        }}>
+                            <span className="kunde-btn-icon" style={{fontSize:'28px'}}>{'\uD83D\uDC77'}</span>
+                            <span style={{fontWeight:'800', letterSpacing:'1px'}}>KUNDENAUSWAHL</span>
+                        </button>
 
-                                {/* Gmail-Absender Einstellung */}
-                                <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
-                                    <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>✉️ Gmail-Absender für Mailversand</div>
-                                    <input
-                                        type="email"
-                                        value={localStorage.getItem('gmail_absender') || 'phoenix180862@gmail.com'}
-                                        onChange={function(e){ localStorage.setItem('gmail_absender', e.target.value); GMAIL_CONFIG.ABSENDER_EMAIL = e.target.value; }}
-                                        placeholder="meine@gmail.com"
-                                        style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}
-                                    />
-                                    <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                        Diese Adresse wird für Rechnungs- und Schriftverkehr-Versand via Gmail API verwendet.
-                                    </div>
-                                </div>
+                        {(!geminiConnected && !driveConnected) && (
+                            <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', padding:'6px 16px', fontStyle:'italic'}}>
+                                Bitte zuerst Gemini KI und/oder Google Drive verbinden
                             </div>
                         )}
                     </div>
 
-                    {/* ═══ AUSWAHL-MODAL: Kunde analysieren oder manuell eingeben ═══ */}
-                    {showNeuAuswahl && (
-                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
-                            onTouchEnd={function(e){ e.preventDefault(); setShowNeuAuswahl(false); }}
-                            onClick={function(){ setShowNeuAuswahl(false); }}>
-                            <div style={{background:'var(--bg-primary)', borderRadius:'20px', padding:'28px 24px', maxWidth:'400px', width:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}
-                                onTouchEnd={function(e){ e.stopPropagation(); }}
-                                onClick={function(e){ e.stopPropagation(); }}>
-                                <div style={{textAlign:'center', marginBottom:'24px'}}>
-                                    <div style={{fontSize:'28px', marginBottom:'8px'}}>➕</div>
-                                    <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>Neuer Kunde</div>
-                                    <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'6px'}}>Wie möchtest du den Kunden anlegen?</div>
+                    {/* ═══ GEMINI SETTINGS (ausklappbar) ═══ */}
+                    {showKiSettings && (
+                        <div style={{margin:'0 20px 16px', padding:'16px', background:'var(--bg-secondary)', borderRadius:'16px', border:'1px solid var(--border-color)'}}>
+                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'10px'}}>Gemini API Konfiguration</div>
+                            <div style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
+                                <input
+                                    type={showKey ? 'text' : 'password'}
+                                    value={geminiKey}
+                                    onChange={function(e){ setGeminiKey(e.target.value); }}
+                                    placeholder="Gemini API Key eingeben..."
+                                    style={{flex:1, padding:'10px 12px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)'}}
+                                />
+                                <button onClick={function(){ setShowKey(!showKey); }} style={{padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'16px'}}>
+                                    {showKey ? '\uD83D\uDE48' : '\uD83D\uDC41'}
+                                </button>
+                            </div>
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button onClick={saveGeminiKey} style={{flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'var(--accent-blue)', color:'white', fontWeight:'700', cursor:'pointer', fontSize:'13px'}}>
+                                    Speichern
+                                </button>
+                                <button onClick={testGeminiKey} style={{flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'#8e44ad', color:'white', fontWeight:'700', cursor:'pointer', fontSize:'13px'}}>
+                                    Testen
+                                </button>
+                            </div>
+                            {geminiStatus === 'testing' && <div style={{marginTop:'8px', fontSize:'12px', color:'#f39c12', textAlign:'center'}}>Verbindung wird getestet...</div>}
+                            {geminiStatus === 'ok' && <div style={{marginTop:'8px', fontSize:'12px', color:'#2ecc71', textAlign:'center'}}>Gemini verbunden! Modell: {GEMINI_CONFIG.MODEL}</div>}
+                            {geminiStatus === 'error' && <div style={{marginTop:'8px', fontSize:'12px', color:'#e74c3c', textAlign:'center'}}>Verbindung fehlgeschlagen</div>}
+
+                            {/* Modellauswahl */}
+                            <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
+                                <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>KI-Modell:</div>
+                                <div style={{display:'flex', gap:'4px'}}>
+                                    {Object.keys(GEMINI_CONFIG.MODELS || {}).map(function(key) {
+                                        var m = GEMINI_CONFIG.MODELS[key];
+                                        var isActive = geminiModelPref === key;
+                                        return (
+                                            <button key={key} onClick={function() {
+                                                setGeminiModelPref(key);
+                                                localStorage.setItem('gemini_model_pref', key);
+                                            }} style={{
+                                                flex:1, padding:'8px 4px', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700', textAlign:'center',
+                                                background: isActive ? (m.color || '#4da6ff') + '18' : 'var(--bg-tertiary)',
+                                                border: isActive ? '2px solid ' + (m.color || '#4da6ff') : '1px solid var(--border-color)',
+                                                color: isActive ? (m.color || '#4da6ff') : 'var(--text-muted)',
+                                            }}>
+                                                {m.icon || ''} {(m.name || key).replace('Gemini ', '')}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            </div>
 
-                                <button
-                                    onTouchEnd={function(e){ e.preventDefault(); e.stopPropagation(); setShowNeuAuswahl(false); setBtnLoading('neu'); setTimeout(function(){ onKundeNeu(); }, 50); }}
-                                    onClick={function(){
-                                    setShowNeuAuswahl(false);
-                                    setBtnLoading('neu');
-                                    setTimeout(function(){ onKundeNeu(); }, 50);
-                                }} style={{
-                                    width:'100%', padding:'18px 20px', borderRadius:'14px', border:'none', cursor:'pointer', marginBottom:'12px',
-                                    background:'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)', color:'white',
-                                    display:'flex', alignItems:'center', gap:'14px', textAlign:'left', minHeight:'60px',
-                                    boxShadow:'0 4px 15px rgba(30,136,229,0.3)', transition:'transform 0.15s ease',
-                                    WebkitTapHighlightColor:'rgba(30,136,229,0.3)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none'
-                                }}>
-                                    <span style={{fontSize:'28px'}}>🤖</span>
-                                    <div>
-                                        <div style={{fontSize:'16px', fontWeight:'700'}}>Kunde analysieren</div>
-                                        <div style={{fontSize:'12px', opacity:0.85, marginTop:'3px'}}>Google Drive verbinden & KI-Analyse starten</div>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onTouchEnd={function(e){ e.preventDefault(); e.stopPropagation(); setShowNeuAuswahl(false); onKundeManuell(); }}
-                                    onClick={function(){
-                                    setShowNeuAuswahl(false);
-                                    onKundeManuell();
-                                }} style={{
-                                    width:'100%', padding:'18px 20px', borderRadius:'14px', border:'none', cursor:'pointer',
-                                    background:'linear-gradient(135deg, #e67e22 0%, #d35400 100%)', color:'white',
-                                    display:'flex', alignItems:'center', gap:'14px', textAlign:'left', minHeight:'60px',
-                                    boxShadow:'0 4px 15px rgba(230,126,34,0.3)', transition:'transform 0.15s ease',
-                                    WebkitTapHighlightColor:'rgba(230,126,34,0.3)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none'
-                                }}>
-                                    <span style={{fontSize:'28px'}}>📝</span>
-                                    <div>
-                                        <div style={{fontSize:'16px', fontWeight:'700'}}>Kunde manuell eingeben</div>
-                                        <div style={{fontSize:'12px', opacity:0.85, marginTop:'3px'}}>LV-Positionen & Räume selbst eintragen oder hochladen</div>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onTouchEnd={function(e){ e.preventDefault(); e.stopPropagation(); setShowNeuAuswahl(false); }}
-                                    onClick={function(){ setShowNeuAuswahl(false); }} style={{
-                                    width:'100%', padding:'14px', marginTop:'12px', borderRadius:'10px', border:'1px solid var(--border-color)',
-                                    background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', minHeight:'48px',
-                                    WebkitTapHighlightColor:'rgba(0,0,0,0.1)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none'
-                                }}>Abbrechen</button>
+                            {/* Gmail-Absender */}
+                            <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
+                                <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>Gmail-Absender</div>
+                                <input
+                                    type="email"
+                                    value={localStorage.getItem('gmail_absender') || 'phoenix180862@gmail.com'}
+                                    onChange={function(e){ localStorage.setItem('gmail_absender', e.target.value); if(typeof GMAIL_CONFIG !== 'undefined') GMAIL_CONFIG.ABSENDER_EMAIL = e.target.value; }}
+                                    placeholder="meine@gmail.com"
+                                    style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}
+                                />
                             </div>
                         </div>
                     )}
+
+                    {/* ═══ FLIESENLEGER ANIMATION (Pure CSS) ═══ */}
+                    <div style={{position:'relative', height:'80px', marginTop:'10px', overflow:'hidden'}}>
+                        {/* Boden-Linie */}
+                        <div style={{position:'absolute', bottom:'6px', left:0, right:0, height:'2px', background:'linear-gradient(90deg, transparent, rgba(149,165,166,0.4), transparent)'}} />
+                        {/* Fliesenleger - CSS Animation */}
+                        <div className="tw-tileman-walk" style={{position:'absolute', bottom:'8px', fontSize:'48px', lineHeight:'1'}}>
+                            {'\uD83E\uDDD1\u200D\uD83D\uDD27'}
+                        </div>
+                        {/* Fliesen-Spur */}
+                        <div className="tw-tile-trail" style={{position:'absolute', bottom:'10px'}}>
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(236,240,241,0.5)', border:'1px solid rgba(149,165,166,0.3)', borderRadius:'2px', marginRight:'3px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(189,195,199,0.4)', border:'1px solid rgba(149,165,166,0.2)', borderRadius:'2px', marginRight:'3px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(236,240,241,0.3)', border:'1px solid rgba(149,165,166,0.15)', borderRadius:'2px', marginRight:'3px'}} />
+                        </div>
+                    </div>
+
+                    {/* ═══ CSS Animations ═══ */}
+                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-tileman-walk { animation: twTilemanWalk 12s linear infinite; }\n@keyframes twTilemanWalk { 0% { left: -60px; } 100% { left: calc(100% + 60px); } }\n.tw-tile-trail { animation: twTileTrail 12s linear infinite; }\n@keyframes twTileTrail { 0% { left: -120px; } 100% { left: calc(100% + 10px); } }\n'}} />
                 </div>
             )
+        }
+        /* ═══════════════════════════════════════════
+           KUNDEN-MODUS-WAHL — Wie soll der Kunde bearbeitet werden?
+           ═══════════════════════════════════════════ */
+        function KundenModusWahl({ onSelectModus, onBack, connections }) {
+            var modi = [
+                {
+                    id: 'ki',
+                    icon: '🤖',
+                    title: 'KI-Analyse',
+                    desc: 'Alle Kundenordner werden von der KI analysiert. Positionen, Kundendaten und Raumlisten werden automatisch erkannt.',
+                    color: '#1E88E5',
+                    gradient: 'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)',
+                    shadow: 'rgba(30,136,229,0.35)',
+                    badge: 'EMPFOHLEN',
+                    disabled: !(connections && connections.geminiConnected && connections.driveConnected),
+                    disabledHint: 'Benötigt Gemini KI + Google Drive',
+                },
+                {
+                    id: 'gespeichert',
+                    icon: '📂',
+                    title: 'Gespeicherte Daten laden',
+                    desc: 'Bereits aufbereitete Kundendaten aus dem Ordner "Kundendaten" werden geladen und der Akte zugewiesen.',
+                    color: '#27ae60',
+                    gradient: 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
+                    shadow: 'rgba(39,174,96,0.35)',
+                    badge: null,
+                    disabled: !(connections && connections.driveConnected),
+                    disabledHint: 'Benötigt Google Drive',
+                },
+                {
+                    id: 'manuell',
+                    icon: '📝',
+                    title: 'Manuell anlegen',
+                    desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
+                    color: '#e67e22',
+                    gradient: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
+                    shadow: 'rgba(230,126,34,0.35)',
+                    badge: null,
+                    disabled: false,
+                    disabledHint: null,
+                },
+            ];
+
+            return (
+                <div style={{padding:'20px', minHeight:'100vh', background:'var(--bg-primary)'}}>
+                    {/* Header */}
+                    <div style={{textAlign:'center', marginBottom:'28px'}}>
+                        <div style={{fontSize:'36px', marginBottom:'8px'}}>👷</div>
+                        <div style={{fontSize:'22px', fontWeight:'800', color:'var(--text-primary)', letterSpacing:'-0.5px'}}>
+                            Kundenauswahl
+                        </div>
+                        <div style={{fontSize:'13px', color:'var(--text-muted)', marginTop:'6px', lineHeight:'1.5'}}>
+                            Wie möchtest du den Kunden bearbeiten?
+                        </div>
+                    </div>
+
+                    {/* Modus-Karten */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'14px', maxWidth:'500px', margin:'0 auto'}}>
+                        {modi.map(function(m) {
+                            return (
+                                <button key={m.id}
+                                    disabled={m.disabled}
+                                    onTouchEnd={function(e){ if(!m.disabled){ e.preventDefault(); onSelectModus(m.id); } }}
+                                    onClick={function(){ if(!m.disabled) onSelectModus(m.id); }}
+                                    style={{
+                                        width:'100%', padding:'20px', borderRadius:'16px', border:'none', cursor: m.disabled ? 'not-allowed' : 'pointer',
+                                        background: m.disabled ? 'var(--bg-secondary)' : m.gradient, color: m.disabled ? 'var(--text-muted)' : 'white',
+                                        display:'flex', alignItems:'flex-start', gap:'16px', textAlign:'left',
+                                        boxShadow: m.disabled ? 'none' : '0 6px 20px ' + m.shadow,
+                                        opacity: m.disabled ? 0.5 : 1,
+                                        transition:'transform 0.15s ease, box-shadow 0.15s ease',
+                                        WebkitTapHighlightColor: m.shadow, touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+                                        position:'relative', overflow:'hidden',
+                                    }}
+                                >
+                                    {/* Badge */}
+                                    {m.badge && !m.disabled && (
+                                        <div style={{position:'absolute', top:'0', right:'0', background:'rgba(255,255,255,0.25)', padding:'3px 10px', borderRadius:'0 16px 0 10px', fontSize:'9px', fontWeight:'800', letterSpacing:'1px'}}>
+                                            {m.badge}
+                                        </div>
+                                    )}
+                                    <span style={{fontSize:'32px', marginTop:'2px'}}>{m.icon}</span>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'17px', fontWeight:'700', marginBottom:'4px'}}>{m.title}</div>
+                                        <div style={{fontSize:'12px', opacity: m.disabled ? 0.7 : 0.9, lineHeight:'1.5'}}>{m.desc}</div>
+                                        {m.disabled && m.disabledHint && (
+                                            <div style={{fontSize:'10px', marginTop:'6px', padding:'3px 8px', background:'rgba(231,76,60,0.15)', borderRadius:'6px', display:'inline-block', color:'#e74c3c', fontWeight:'600'}}>
+                                                ⚠ {m.disabledHint}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {!m.disabled && <span style={{fontSize:'20px', opacity:0.7, marginTop:'4px'}}>→</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Zurück-Button */}
+                    <div style={{textAlign:'center', marginTop:'28px'}}>
+                        <button
+                            onTouchEnd={function(e){ e.preventDefault(); onBack(); }}
+                            onClick={onBack}
+                            style={{
+                                padding:'12px 32px', borderRadius:'12px', border:'1px solid var(--border-color)',
+                                background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600',
+                                WebkitTapHighlightColor:'rgba(0,0,0,0.1)', touchAction:'manipulation',
+                        }}>
+                            ← Zurück
+                        </button>
+                    </div>
+                </div>
+            );
         }
 
         /* ═══════════════════════════════════════════
@@ -1098,12 +1241,12 @@
                                             border: isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent',
                                             borderBottom: isExpanded ? '1px solid var(--border-color)' : (isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent'),
                                             transition:'all 0.2s'}}>
-                                            {/* Checkbox - toggelt Auswahl */}
+                                            {/* Checkbox -- toggelt Auswahl */}
                                             <span onClick={function(e){ e.stopPropagation(); toggleFolder(folder.name); }}
                                                 style={{fontSize:'16px', width:'20px', textAlign:'center', cursor:'pointer'}}>
                                                 {isSelected ? '✅' : '⬜'}
                                             </span>
-                                            {/* Aufklapp-Pfeil + Ordner-Info - toggelt Expand */}
+                                            {/* Aufklapp-Pfeil + Ordner-Info -- toggelt Expand */}
                                             <div onClick={function(){ toggleExpand(folder.name); }}
                                                 style={{flex:1, display:'flex', alignItems:'center', gap:'6px', minWidth:0, cursor:'pointer'}}>
                                                 <span style={{fontSize:'12px', color:'var(--text-muted)', transition:'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', display:'inline-block', width:'14px', textAlign:'center'}}>▶</span>
@@ -1728,7 +1871,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Update-Button - Drive-Akten neu laden + KI-Analyse */}
+                                    {/* Update-Button -- Drive-Akten neu laden + KI-Analyse */}
                                     {onUpdateKunde && kunde._driveFolderId && (
                                         <button
                                             onClick={function(e) {
@@ -1889,7 +2032,7 @@
                             })}
                         </div>
 
-                        {/* Emoji-Animation - wechselt je nach Phase */}
+                        {/* Emoji-Animation -- wechselt je nach Phase */}
                         <div style={{fontSize:'42px', marginBottom:'8px', animation:'bounce 1.5s ease-in-out infinite'}}>
                             {progressPct >= 100 ? '🎉' : progressPct > 80 ? '🏆' : progressPct > 60 ? '🤖' : progressPct > 40 ? '📋' : progressPct > 20 ? '🔍' : '🚀'}
                         </div>
@@ -5335,7 +5478,7 @@
                         )}
                     </div>
 
-                    {/* ═══ FOTOANALYSE-RAUMBLATT - KI-gestützte Maßermittlung ═══ */}
+                    {/* ═══ FOTOANALYSE-RAUMBLATT -- KI-gestützte Maßermittlung ═══ */}
                     <input type="file" accept="image/*" capture="environment" ref={fotoAnalyseInputRef}
                         style={{display:'none'}} onChange={e => {
                             var file = e.target.files && e.target.files[0];

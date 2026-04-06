@@ -1,5 +1,5 @@
         function App() {
-            // Pages: 'start' | 'auswahl' | 'akte' | 'geladen' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail'
+            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail'
             const [page, setPage] = useState('start');
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
@@ -21,7 +21,9 @@
             const [importResult, setImportResult] = useState(null);
             const [kundeMode, setKundeMode] = useState('neu'); // 'neu' | 'analysiert' | 'manuell'
             const [analyseConfig, setAnalyseConfig] = useState(null);
-            // ── NEU: KI-Ordneranalyse State ──
+            // ── NEU: Verbindungsstatus von Startseite ──
+            const [startConnections, setStartConnections] = useState({ geminiConnected: false, driveConnected: false });
+            // ── KI-Ordneranalyse State ──
             const [ordnerAnalyseMeta, setOrdnerAnalyseMeta] = useState(null);
             const [ordnerAnalyseProgress, setOrdnerAnalyseProgress] = useState({ phase: '', message: '', current: 0, total: 0 });
             const [isOrdnerAnalyseRunning, setIsOrdnerAnalyseRunning] = useState(false);
@@ -154,6 +156,73 @@
             };
 
             // ── NEU: Zwei getrennte Kunden-Handler ──
+            // ── NEU: Kundenauswahl von Startseite (Gemini/Drive bereits verbunden) ──
+            const handleKundenauswahl = (connections) => {
+                setStartConnections(connections || {});
+                if (connections && connections.driveConnected) {
+                    setIsDriveMode(true);
+                    setDriveStatus('online');
+                }
+                navigateTo('kundenModus');
+            };
+
+            // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell ──
+            const handleSelectModus = async (modus) => {
+                setKundeMode(modus);
+                if (modus === 'ki') {
+                    // KI-Modus: Lade Kunden aus Google Drive "Baustellen neu"
+                    setLoading(true);
+                    setLoadProgress('📂 Lade Baustellen aus Google Drive...');
+                    try {
+                        var service = window.GoogleDriveService;
+                        if (service && service.accessToken) {
+                            const folders = await service.listKundenOrdner();
+                            setDriveKunden(folders);
+                            setIsDriveMode(true);
+                        }
+                    } catch(err) {
+                        console.error('Drive Kunden laden:', err);
+                    }
+                    setLoading(false);
+                    setLoadProgress('');
+                    navigateTo('auswahl');
+                } else if (modus === 'gespeichert') {
+                    // Gespeicherte Daten: Lade Kunden aus Google Drive, Daten kommen aus "Kundendaten"-Ordner
+                    setLoading(true);
+                    setLoadProgress('📂 Lade Baustellen aus Google Drive...');
+                    try {
+                        var service2 = window.GoogleDriveService;
+                        if (service2 && service2.accessToken) {
+                            const folders = await service2.listKundenOrdner();
+                            setDriveKunden(folders);
+                            setIsDriveMode(true);
+                        }
+                    } catch(err) {
+                        console.error('Drive Kunden laden:', err);
+                    }
+                    setLoading(false);
+                    setLoadProgress('');
+                    navigateTo('auswahl');
+                } else if (modus === 'manuell') {
+                    // Manuell: Auch erst Kunde aus Drive wählen, dann manuell ausfüllen
+                    setLoading(true);
+                    setLoadProgress('📂 Lade Baustellen aus Google Drive...');
+                    try {
+                        var service3 = window.GoogleDriveService;
+                        if (service3 && service3.accessToken) {
+                            const folders = await service3.listKundenOrdner();
+                            setDriveKunden(folders);
+                            setIsDriveMode(true);
+                        }
+                    } catch(err) {
+                        console.error('Drive Kunden laden:', err);
+                    }
+                    setLoading(false);
+                    setLoadProgress('');
+                    navigateTo('auswahl');
+                }
+            };
+
             const handleKundeNeu = () => {
                 setKundeMode('neu');
                 setShowAuth(true);
@@ -161,7 +230,6 @@
 
             const handleKundeAnalysiert = () => {
                 setKundeMode('analysiert');
-                // Direkt zur Kundenauswahl navigieren -- nur lokale Daten laden
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('auswahl');
@@ -541,34 +609,125 @@
 
                 var localKey = 'aufmass_kunde_' + (kunde.id || kunde.name || 'unknown');
 
-                // ═══ WENN "Kunde ANALYSIERT": Versuche gespeicherte Daten zu laden ═══
+                // ═══ MODUS: GESPEICHERTE DATEN LADEN ═══
+                if (kundeMode === 'gespeichert') {
+                    // Lade Daten aus dem Unterordner "Kundendaten" des Kunden
+                    setLoading(true);
+                    setLoadProgress('📂 Lade Kundendaten...');
+                    navigateTo('akte');
+                    try {
+                        var service = window.GoogleDriveService;
+                        if (service && service.accessToken && kunde.id) {
+                            const contents = await service.listFolderContents(kunde.id);
+                            var kundendatenFolder = (contents.folders || []).find(function(f) {
+                                return f.name.toLowerCase().indexOf('kundendaten') >= 0;
+                            });
+                            var enriched = {
+                                ...kunde,
+                                auftraggeber: kunde.name,
+                                adresse: '',
+                                folders: contents.folders,
+                                files: contents.files,
+                                dateien: contents.files.length + contents.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0),
+                                _driveFolderId: kunde.id,
+                                _loadFromKundendaten: true,
+                            };
+                            setSelectedKunde(enriched);
+
+                            if (kundendatenFolder && kundendatenFolder.files && kundendatenFolder.files.length > 0) {
+                                setLoadProgress('📥 Lade ' + kundendatenFolder.files.length + ' Dateien aus Kundendaten...');
+                                // Dateien laden und als Import-Result aufbereiten
+                                var geladene = [];
+                                for (var di = 0; di < kundendatenFolder.files.length; di++) {
+                                    var file = kundendatenFolder.files[di];
+                                    setLoadProgress('📥 ' + (di+1) + '/' + kundendatenFolder.files.length + ': ' + file.name);
+                                    try {
+                                        var blob = await service.downloadFile(file.id);
+                                        geladene.push({ name: file.name, blob: blob, folder: 'Kundendaten' });
+                                    } catch(dlErr) {
+                                        geladene.push({ name: file.name, error: dlErr.message });
+                                    }
+                                }
+                                setLoadProgress('✅ ' + geladene.filter(function(d){ return !d.error; }).length + ' Dateien geladen!');
+                                enriched._fullyLoaded = true;
+                                setSelectedKunde(enriched);
+                            } else {
+                                setLoadProgress('⚠ Kein "Kundendaten"-Ordner gefunden.');
+                            }
+                        }
+                    } catch(err) {
+                        console.error('Kundendaten laden:', err);
+                        setLoadProgress('❌ Fehler: ' + err.message);
+                    }
+                    setLoading(false);
+                    navigateTo('geladen');
+                    return;
+                }
+
+                // ═══ MODUS: MANUELL ANLEGEN ═══
+                if (kundeMode === 'manuell') {
+                    // Kunde ausgewählt, jetzt manuelles Eingabeformular
+                    setSelectedKunde({
+                        ...kunde,
+                        _driveFolderId: kunde.id,
+                        auftraggeber: kunde.name,
+                    });
+                    navigateTo('manuellEingabe');
+                    return;
+                }
+
+                // ═══ MODUS: KI-ANALYSE ═══
+                if (kundeMode === 'ki' || kundeMode === 'neu') {
+                    // Ordnerstruktur laden → analyseConfig zeigen
+                    if (isDriveMode && kunde.id && !kunde.files) {
+                        setLoading(true);
+                        setLoadProgress('📂 Ordnerinhalt wird geladen...');
+                        navigateTo('akte');
+                        try {
+                            const contents = await window.GoogleDriveService.listFolderContents(kunde.id);
+                            var enrichedKi = {
+                                ...kunde,
+                                auftraggeber: kunde.name,
+                                adresse: '',
+                                folders: contents.folders,
+                                files: contents.files,
+                                dateien: contents.files.length + contents.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0),
+                                _driveFolderId: kunde.id,
+                            };
+                            setSelectedKunde(enrichedKi);
+                            setLoading(false);
+                            setLoadProgress('');
+                            navigateTo('analyseConfig');
+                            return;
+                        } catch (err) {
+                            console.error('Ordner laden:', err);
+                            setLoadProgress('Fehler: ' + err.message);
+                        }
+                        setLoading(false);
+                    }
+                    return;
+                }
+
+                // ═══ FALLBACK: Alte "analysiert" Logik für Kompatibilität ═══
                 if (kundeMode === 'analysiert') {
                     try {
                         var cached = localStorage.getItem(localKey);
                         if (cached) {
                             var cachedData = JSON.parse(cached);
-
-                            // LV-Positionen wiederherstellen
                             if (cachedData._lvPositionen && cachedData._lvPositionen.length > 0) {
-                                var kundeKey = kunde.id || 'cached_import';
-                                LV_POSITIONEN[kundeKey] = cachedData._lvPositionen;
-                                cachedData._lvPositionenKey = kundeKey;
+                                var kundeKeyC = kunde.id || 'cached_import';
+                                LV_POSITIONEN[kundeKeyC] = cachedData._lvPositionen;
+                                cachedData._lvPositionenKey = kundeKeyC;
                             }
-
-                            // ImportResult wiederherstellen
-                            if (cachedData._importResult) {
-                                setImportResult(cachedData._importResult);
-                            }
-
+                            if (cachedData._importResult) setImportResult(cachedData._importResult);
                             cachedData._fullyLoaded = true;
                             setSelectedKunde(cachedData);
                             setLoadProgress('');
                             setLoading(false);
-                            navigateTo('geladen'); // Ergebnis-Seite zeigen!
-                            return; // FERTIG – keine Drive-Verbindung nötig
+                            navigateTo('geladen');
+                            return;
                         } else {
-                            setLoadProgress('Keine gespeicherten Daten gefunden.');
-                            alert('Keine lokal gespeicherten Daten für diesen Kunden. Bitte über "Kunde NEU" erst analysieren oder manuell anlegen.');
+                            alert('Keine lokal gespeicherten Daten für diesen Kunden.');
                             navigateTo('start');
                             return;
                         }
@@ -577,30 +736,27 @@
                     }
                 }
 
-                // ═══ AUS DRIVE LADEN: Ordnerstruktur laden → Ordner-Auswahl zeigen ═══
+                // ═══ AUS DRIVE LADEN (Legacy) ═══
                 if (isDriveMode && kunde.id && !kunde.files) {
                     setLoading(true);
                     setLoadProgress('📂 Ordnerinhalt wird geladen...');
                     navigateTo('akte');
                     try {
                         const contents = await window.GoogleDriveService.listFolderContents(kunde.id);
-                        var enriched = {
+                        var enrichedL = {
                             ...kunde,
                             auftraggeber: kunde.name,
                             adresse: '',
                             folders: contents.folders,
                             files: contents.files,
-                            dateien: contents.files.length + contents.folders.reduce((s, f) => s + f.files.length, 0),
+                            dateien: contents.files.length + contents.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0),
                             _driveFolderId: kunde.id,
                         };
-                        setSelectedKunde(enriched);
+                        setSelectedKunde(enrichedL);
                         setLoading(false);
                         setLoadProgress('');
-
-                        // → Ordner-Auswahl zeigen (User wählt welche Ordner analysiert werden)
                         navigateTo('analyseConfig');
                         return;
-
                     } catch (err) {
                         console.error('Ordner laden:', err);
                         setLoadProgress('Fehler: ' + err.message);
@@ -926,7 +1082,9 @@
             const renderPage = () => {
                 switch(page) {
                     case 'start':
-                        return <Startseite onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} />;
+                        return <Startseite onKundenauswahl={handleKundenauswahl} onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} />;
+                    case 'kundenModus':
+                        return <KundenModusWahl onSelectModus={handleSelectModus} onBack={function(){ navigateTo('start'); }} connections={startConnections} />;
                     case 'manuellEingabe':
                         return <ManuelleEingabe onFertig={handleManuellFertig} onBack={function(){ navigateTo('start'); }} />;
                     case 'auswahl':
@@ -1085,7 +1243,7 @@
                     case 'baustelle':
                         return <BaustellenAppAdmin kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
                     default:
-                        return <Startseite onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} />;
+                        return <Startseite onKundenauswahl={handleKundenauswahl} onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} />;
                 }
             };
 
@@ -1150,3 +1308,6 @@
             );
         }
 
+        /* ═══════════════════════════════════════════
+           MOUNT
+           ═══════════════════════════════════════════ */
