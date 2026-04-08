@@ -356,7 +356,7 @@
                         </div>
                     )}
 
-                    {/* Ordner-Karten - ALLE analysierten Ordner anzeigen */}
+                    {/* Ordner-Karten -- ALLE analysierten Ordner anzeigen */}
                     <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
                         {/* Erst konfigurierte Ordner (01-08) */}
                         {['01','02','03','04','05','06','07','08'].map(function(nr) {
