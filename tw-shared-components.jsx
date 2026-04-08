@@ -245,9 +245,12 @@
 
         // Duplikate erkennen: NUR Positionen mit EXAKT gleicher Bezeichnung aber unterschiedlicher Pos-Nr
         function findDuplicatePositions(positionen) {
+            if (!positionen || !Array.isArray(positionen)) return {};
             const groups = {};
             positionen.forEach(p => {
-                const key = p.bez.trim();
+                if (!p) return;
+                const key = (p.bez || '').trim();
+                if (!key) return;
                 if (!groups[key]) groups[key] = [];
                 groups[key].push(p);
             });
@@ -500,3 +503,5 @@
             }
         }
 
+        /* ═══════════════════════════════════════════
+           MODULWAHL -- Dashboard nach Kundenauswahl

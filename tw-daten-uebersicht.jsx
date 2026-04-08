@@ -140,7 +140,7 @@
                                     <div style={{display:'flex', gap:'4px', alignItems:'center'}}>
                                         <input value={stammFelder[f[0]] || ''} readOnly={!editMode} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={inputStyle({flex:1})} />
                                         {editMode && (
-                                            <button {...tap(function(){ startSpeech('stamm_' + f[0], function(text){ updateStammFeld(f[0], text); }); })}
+                                            <button {...tap(function(){ var feldKey = f[0]; var vorher = stammFelder[feldKey] || ''; startSpeech('stamm_' + feldKey, function(text){ updateStammFeld(feldKey, vorher ? vorher + ' ' + text : text); }); })}
                                                 style={micBtnStyle('stamm_' + f[0])}>
                                                 {sprachAktiv && sprachTarget === 'stamm_' + f[0] ? '\uD83D\uDD34' : '\uD83C\uDFA4'}
                                             </button>
@@ -243,7 +243,7 @@
                                         {editMode ? (
                                             <div style={{display:'flex', gap:'3px', alignItems:'center'}}>
                                                 <input value={p.bez} onChange={function(e){ updatePosition(idx, 'bez', e.target.value); }} style={inputSmall({textAlign:'left', fontSize:'11px', flex:1})} />
-                                                <button {...tap(function(){ var ii = idx; startSpeech('pos_' + ii + '_bez', function(text){ updatePosition(ii, 'bez', text); }); })}
+                                                <button {...tap(function(){ var ii = idx; var vorher = p.bez || ''; startSpeech('pos_' + ii + '_bez', function(text){ updatePosition(ii, 'bez', vorher ? vorher + ' ' + text : text); }); })}
                                                     style={micBtnStyle('pos_' + idx + '_bez')}>
                                                     {sprachAktiv && sprachTarget === 'pos_' + idx + '_bez' ? '\uD83D\uDD34' : '\uD83C\uDFA4'}
                                                 </button>
@@ -332,7 +332,7 @@
                                             <div style={{display:'flex', flexDirection:'column', gap:'2px'}}>
                                                 <div style={{display:'flex', gap:'3px', alignItems:'center'}}>
                                                     <input value={r.bez} onChange={function(e){ updateRaum(idx, 'bez', e.target.value); }} placeholder="Bezeichnung" style={inputSmall({textAlign:'left', fontSize:'12px', fontWeight:'600', flex:1})} />
-                                                    <button {...tap(function(){ var ii = idx; startSpeech('raum_' + ii + '_bez', function(text){ updateRaum(ii, 'bez', text); }); })}
+                                                    <button {...tap(function(){ var ii = idx; var vorher = r.bez || ''; startSpeech('raum_' + ii + '_bez', function(text){ updateRaum(ii, 'bez', vorher ? vorher + ' ' + text : text); }); })}
                                                         style={micBtnStyle('raum_' + idx + '_bez')}>
                                                         {sprachAktiv && sprachTarget === 'raum_' + idx + '_bez' ? '\uD83D\uDD34' : '\uD83C\uDFA4'}
                                                     </button>
