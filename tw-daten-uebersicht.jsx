@@ -86,26 +86,21 @@
 
             // ── Zahl-Input: type=text, beim Focus leeren wenn 0, beim Blur formatieren ──
             var zahlInput = function(value, onChange, extra) {
-                var [focused, setFocused] = useState(false);
-                var [localVal, setLocalVal] = useState(String(value));
-                useEffect(function() { if (!focused) setLocalVal(String(value)); }, [value, focused]);
                 return React.createElement('input', Object.assign({
                     type: 'text',
                     inputMode: 'decimal',
-                    value: focused ? localVal : fmtZahl(value),
+                    defaultValue: (parseFloat(value) || 0) === 0 ? '' : fmtZahl(value),
                     onFocus: function(e) {
-                        setFocused(true);
-                        var v = String(value);
-                        if (v === '0' || v === '0.00' || v === '0,00') { setLocalVal(''); }
-                        else { setLocalVal(v.replace('.', ',')); }
-                        setTimeout(function() { e.target.select(); }, 50);
+                        var v = parseFloat(value) || 0;
+                        if (v === 0) { e.target.value = ''; }
+                        else { e.target.value = String(v).replace('.', ','); }
+                        setTimeout(function() { try { e.target.select(); } catch(x){} }, 50);
                     },
-                    onBlur: function() {
-                        setFocused(false);
-                        var parsed = parseFloat(localVal.replace(',', '.')) || 0;
+                    onBlur: function(e) {
+                        var parsed = parseFloat(e.target.value.replace(/\s/g, '').replace(',', '.')) || 0;
+                        e.target.value = parsed === 0 ? '' : fmtZahl(parsed);
                         onChange(parsed);
                     },
-                    onChange: function(e) { setLocalVal(e.target.value); },
                     style: Object.assign({ width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', textAlign:'right', color:'var(--text-primary)', boxSizing:'border-box' }, extra || {})
                 }));
             };
