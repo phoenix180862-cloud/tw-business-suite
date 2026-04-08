@@ -1,5 +1,5 @@
         function App() {
-            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail'
+            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail'
             const [page, setPage] = useState('start');
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
@@ -212,6 +212,89 @@
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('manuellEingabe');
+            };
+
+            // ── NEU: Daten-Uebersicht: Bearbeitete Daten in Module uebertragen ──
+            const handleDatenUebersichtSave = (result) => {
+                if (!result) return;
+                var kunde = selectedKunde || {};
+                var kundeId = kunde.id || kunde._driveFolderId || kunde._lvPositionenKey || 'edit_' + Date.now();
+
+                // Positionen aktualisieren
+                if (result.positionen) {
+                    var lvPos = result.positionen.map(function(p) {
+                        return {
+                            pos: p.pos, bez: p.bez, einheit: p.einheit, menge: p.menge,
+                            einzelpreis: p.einzelpreis, bereich: p.bereich || '', kategorie: p.kategorie || '',
+                            tags: p.tags || [], _epPreis: p.einzelpreis || null, _gpPreis: (p.menge * p.einzelpreis) || null,
+                            _istNachtrag: p._istNachtrag || false
+                        };
+                    });
+                    LV_POSITIONEN[kundeId] = lvPos;
+                    kunde._lvPositionen = lvPos;
+                    kunde._lvPositionenKey = kundeId;
+                }
+
+                // Raeume aktualisieren
+                if (result.raeume) {
+                    kunde._raeume = result.raeume;
+                    kunde.raeume = result.raeume;
+                }
+
+                // Stammdaten aktualisieren
+                if (result.stammFelder) {
+                    var sf = result.stammFelder;
+                    kunde.auftraggeber = sf.bauherr_firma || kunde.auftraggeber;
+                    kunde.adresse = sf.objekt_baustelle || kunde.adresse;
+                    kunde.baumassnahme = sf.objekt_bauvorhaben || kunde.baumassnahme;
+
+                    // ImportResult mit aktualisierten Kundendaten
+                    var updatedKd = {
+                        auftraggeber: sf.bauherr_firma || '',
+                        auftraggeber_strasse: sf.bauherr_strasse || '',
+                        auftraggeber_plzOrt: sf.bauherr_plzOrt || '',
+                        auftraggeber_ansprechpartner: sf.bauherr_ansprechpartner || '',
+                        auftraggeber_telefon: sf.bauherr_telefon || '',
+                        auftraggeber_email: sf.bauherr_email || '',
+                        bauleitung: sf.bauleiter_firma || '',
+                        bauleitung_telefon: sf.bauleiter_telefon || '',
+                        bauleitung_email: sf.bauleiter_email || '',
+                        architekt: sf.architekt_buero || '',
+                        architekt_telefon: sf.architekt_telefon || '',
+                        architekt_email: sf.architekt_email || '',
+                        adresse: sf.objekt_baustelle || '',
+                        plzOrt: sf.objekt_plzOrt || '',
+                        baumassnahme: sf.objekt_bauvorhaben || '',
+                        gewerk: sf.objekt_gewerk || '',
+                        auftragsdatum: sf.objekt_auftragsdatum || '',
+                        auftragssummeNetto: sf.objekt_netto || '',
+                        auftragssummeBrutto: sf.objekt_brutto || '',
+                        projekt: sf.projekt || ''
+                    };
+
+                    // ImportResult aktualisieren
+                    var newIR = Object.assign({}, importResult || {}, {
+                        positionen: result.positionen || (importResult && importResult.positionen) || [],
+                        raeume: result.raeume || (importResult && importResult.raeume) || [],
+                        kundendaten: updatedKd
+                    });
+                    setImportResult(newIR);
+                    kunde._importResult = newIR;
+                }
+
+                // Lokal speichern
+                var localKey = 'aufmass_kunde_' + kundeId;
+                try {
+                    var toSave = Object.assign({}, kunde);
+                    delete toSave.folders;
+                    delete toSave.files;
+                    toSave._bearbeitetAm = new Date().toLocaleString('de-DE');
+                    localStorage.setItem(localKey, JSON.stringify(toSave));
+                    console.log('Daten-Uebersicht gespeichert:', localKey);
+                } catch(e) { console.warn('Speicherfehler:', e); }
+
+                setSelectedKunde(Object.assign({}, kunde));
+                navigateTo('modulwahl');
             };
 
             // ── NEU: Manuelle Eingabe fertiggestellt ──
@@ -706,7 +789,7 @@
                     // Kurz warten damit User die Erfolgsmeldung sieht
                     await new Promise(function(r){ setTimeout(r, 1200); });
                     setKundeMode('analysiert'); // Ab jetzt wie angelegter Kunde behandeln
-                    navigateTo('modulwahl'); // Direkt zur Modulwahl!
+                    navigateTo('datenUebersicht'); // Erst Daten pruefen, dann Module!
                     return;
                 }
 
@@ -1256,7 +1339,15 @@
                             onBack={function(){ navigateTo('auswahl'); }}
                         />;
                     case 'modulwahl':
-                        return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} />;
+                        return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} />;
+                    case 'datenUebersicht':
+                        return <DatenUebersicht
+                            kunde={selectedKunde}
+                            importResult={importResult}
+                            onSave={handleDatenUebersichtSave}
+                            onBack={function(){ navigateTo('modulwahl'); }}
+                            onWeiterZuModulen={function(){ navigateTo('modulwahl'); }}
+                        />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}
