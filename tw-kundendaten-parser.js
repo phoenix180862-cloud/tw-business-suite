@@ -134,18 +134,14 @@
                     continue;
                 }
 
-                // Sektions-Header erkennen (beide Formate: mit/ohne BLOCK-Prefix, mit/ohne Unicode-Pfeile)
-                var cleanKey = keyLower.replace(/^.*block\s*\d+\s*:\s*/i, '').replace(/^[^a-z]*/i, '').trim();
-                if (cleanKey.match(/auftraggeber|bauherr/)) { sektion = 'bauherr'; continue; }
-                if (cleanKey.match(/bauleitung|bauleiter|bau.berwachung|bauaufsicht/)) { sektion = 'bauleiter'; continue; }
-                if (cleanKey.match(/architekt|planer/) && !val) { sektion = 'architekt'; continue; }
-                if (cleanKey.match(/auftragnehmer.*willwacher|willwacher.*auftragnehmer/i)) { sektion = 'auftragnehmer'; continue; }
-                if (cleanKey.match(/objektdaten|projektdaten|projektkennzahlen/)) { sektion = 'objektdaten'; continue; }
-                if (cleanKey.match(/ausf.hrungsfrist|vertragskonditionen/)) { sektion = 'objektdaten'; continue; }
-                if (cleanKey.match(/auftragssumm|zahlungsbedingungen/) && !val) { sektion = 'objektdaten'; continue; }
-                if (cleanKey.match(/leistungsumfang/)) { sektion = 'leistungsumfang'; continue; }
-                if (cleanKey.match(/materialangebot/)) { sektion = 'material'; continue; }
-                if (cleanKey.match(/weitere planungsbeteiligte|rechts.*nachpr|nachpr.fstelle/)) { sektion = 'planungsbeteiligte'; continue; }
+                // Sektions-Header erkennen
+                if (key === 'BAUHERR / AUFTRAGGEBER' || keyLower === 'bauherr / auftraggeber') { sektion = 'bauherr'; continue; }
+                if (keyLower.indexOf('bauleiter') >= 0 && keyLower.indexOf('bauaufsicht') >= 0) { sektion = 'bauleiter'; continue; }
+                if (keyLower.indexOf('architekt') >= 0 || keyLower.indexOf('planer') >= 0) {
+                    if (!val && rows[i].length <= 2) { sektion = 'architekt'; continue; }
+                }
+                if (keyLower.indexOf('objektdaten') >= 0 || keyLower.indexOf('projektkennzahlen') >= 0) { sektion = 'objektdaten'; continue; }
+                if (keyLower.indexOf('weitere planungsbeteiligte') >= 0) { sektion = 'planungsbeteiligte'; continue; }
 
                 if (!val) continue;
 
@@ -154,8 +150,7 @@
                     if (keyLower.match(/^firma|^name/)) result.bauherr.firma = val;
                     else if (keyLower.match(/vertreten/)) result.bauherr.vertreter = val;
                     else if (keyLower.match(/referat/)) result.bauherr.referat = val;
-                    else if (keyLower.match(/stra/) && !keyLower.match(/plz/)) result.bauherr.strasse = val;
-                    else if (keyLower.match(/plz.*ort/)) { result.bauherr.plzOrt = val; var parts = val.match(/^(\d+)\s+(.+)/); if (parts) { result.bauherr.plz = parts[1]; result.bauherr.ort = parts[2]; } }
+                    else if (keyLower.match(/stra/)) result.bauherr.strasse = val;
                     else if (keyLower === 'plz') result.bauherr.plz = val;
                     else if (keyLower === 'ort') result.bauherr.ort = val;
                     else if (keyLower.match(/ansprechpartner/)) result.bauherr.ansprechpartner = val;
@@ -163,19 +158,13 @@
                     else if (keyLower.match(/mobil/)) result.bauherr.mobil = val;
                     else if (keyLower.match(/fax/)) result.bauherr.fax = val;
                     else if (keyLower.match(/e-?mail/)) result.bauherr.email = val;
-                    else if (keyLower.match(/leitweg/)) result.bauherr.leitwegId = val;
                 }
                 else if (sektion === 'bauleiter') {
-                    if (keyLower === 'name' || keyLower.match(/^firma.*name/)) {
-                        if (!result.bauleiter.firma) result.bauleiter.firma = val;
-                        else if (!result.bauleiter.name) result.bauleiter.name = val;
-                    }
-                    else if (keyLower.match(/^funktion/)) result.bauleiter.funktion = val;
-                    else if (keyLower.match(/firma|dienststelle/) && !keyLower.match(/^firma.*name/)) result.bauleiter.firma = val;
+                    if (keyLower === 'name') result.bauleiter.name = val;
+                    else if (keyLower.match(/firma|dienststelle/)) result.bauleiter.firma = val;
                     else if (keyLower.match(/referat/)) result.bauleiter.referat = val;
                     else if (keyLower.match(/stra/)) result.bauleiter.strasse = val;
                     else if (keyLower.match(/plz/)) result.bauleiter.plzOrt = val;
-                    else if (keyLower.match(/ansprechpartner/)) result.bauleiter.name = val;
                     else if (keyLower.match(/telefon/)) result.bauleiter.telefon = val;
                     else if (keyLower.match(/mobil/)) result.bauleiter.mobil = val;
                     else if (keyLower.match(/fax/)) result.bauleiter.fax = val;
@@ -199,25 +188,23 @@
                     else if (keyLower.match(/e-?mail/) && !result.architekt.emailBearbeiter) result.architekt.emailBearbeiter = val;
                 }
                 else if (sektion === 'objektdaten') {
-                    if (keyLower.match(/bauvorhaben|bezeichnung/)) result.objektdaten.bauvorhaben = val;
-                    else if (keyLower === 'gewerk' || keyLower.match(/leistungsart/)) result.objektdaten.gewerk = val;
-                    else if (keyLower.match(/baustellenadresse.*stra|baustellenstra/)) result.objektdaten.baustelleStrasse = val;
-                    else if (keyLower.match(/baustelle.*plz|plz.*ort.*baustelle/)) result.objektdaten.baustellePlzOrt = val;
+                    if (keyLower.match(/bauvorhaben/)) result.objektdaten.bauvorhaben = val;
+                    else if (keyLower === 'gewerk') result.objektdaten.gewerk = val;
+                    else if (keyLower.match(/baustellenadresse|baustellenstra/)) result.objektdaten.baustelleStrasse = val;
+                    else if (keyLower.match(/plz.*ort.*baustelle|baustelle.*plz/)) result.objektdaten.baustellePlzOrt = val;
                     else if (keyLower.match(/projekt-?nr/)) result.objektdaten.projektNr = val;
-                    else if (keyLower.match(/vergabe-?nr|vergabenummer/)) result.objektdaten.vergabeNr = val;
-                    else if (keyLower.match(/auftrags-?nr|auftrags.*nummer|ma.nahmen.*nummer/)) result.objektdaten.auftragsNr = val;
+                    else if (keyLower.match(/vergabe-?nr/)) result.objektdaten.vergabeNr = val;
+                    else if (keyLower.match(/auftrags-?nr/)) result.objektdaten.auftragsNr = val;
                     else if (keyLower.match(/vergabeart/)) result.objektdaten.vergabeart = val;
                     else if (keyLower.match(/auftragsdatum/)) result.objektdaten.auftragsdatum = val;
                     else if (keyLower.match(/ausf.hrungsbeginn/)) result.objektdaten.ausfuehrungsbeginn = val;
-                    else if (keyLower.match(/ausf.hrungsende|fertigstellung/)) result.objektdaten.ausfuehrungsende = val;
+                    else if (keyLower.match(/ausf.hrungsende/)) result.objektdaten.ausfuehrungsende = val;
                     else if (keyLower.match(/abnahme/)) result.objektdaten.abnahmedatum = val;
-                    else if (keyLower.match(/angebots.*summe.*netto|auftragssumme.*netto/)) result.objektdaten.auftragssummeNetto = val;
-                    else if (keyLower.match(/angebots.*summe.*brutto|auftragssumme.*brutto/)) result.objektdaten.auftragssummeBrutto = val;
-                    else if (keyLower.match(/mwst|mehrwert/)) result.objektdaten.mwst = val;
-                    else if (keyLower.match(/nachlass|preisnachlass/)) result.objektdaten.nachlass = val;
+                    else if (keyLower.match(/auftragssumme.*netto/)) result.objektdaten.auftragssummeNetto = val;
+                    else if (keyLower.match(/mwst/)) result.objektdaten.mwst = val;
+                    else if (keyLower.match(/auftragssumme.*brutto/)) result.objektdaten.auftragssummeBrutto = val;
+                    else if (keyLower.match(/nachlass/)) result.objektdaten.nachlass = val;
                     else if (keyLower.match(/zahlungs/)) result.objektdaten.zahlungsbedingungen = val;
-                    else if (keyLower.match(/gew.hrleistung/)) result.objektdaten.gewaehrleistung = val;
-                    else if (keyLower.match(/objekt/) && !result.objektdaten.bauvorhaben) result.objektdaten.bauvorhaben = val;
                 }
                 else if (sektion === 'planungsbeteiligte') {
                     if (val) result.planungsbeteiligte.push({ rolle: key, details: val });
@@ -298,17 +285,8 @@
 
                 // ═══ POSITION GEFUNDEN ═══
                 var menge = typeof colB === 'number' ? colB : parseFloat(String(colB).replace(',', '.')) || 0;
-                // EP: Nur numerische Werte, Formeln (=...) ignorieren
-                var epRaw = colE;
-                var ep = 0;
-                if (typeof epRaw === 'number') { ep = epRaw; }
-                else if (epRaw && typeof epRaw === 'string' && epRaw.charAt(0) !== '=') { ep = parseFloat(epRaw.replace(',', '.')) || 0; }
-                // GP: Nur numerische Werte, Formeln ignorieren, sonst berechnen
-                var gpRaw = colF;
-                var gp = 0;
-                if (typeof gpRaw === 'number') { gp = gpRaw; }
-                else if (gpRaw && typeof gpRaw === 'string' && gpRaw.charAt(0) !== '=') { gp = parseFloat(gpRaw.replace(',', '.')) || 0; }
-                if (gp === 0 && ep > 0 && menge > 0) { gp = Math.round(menge * ep * 100) / 100; }
+                var ep = typeof colE === 'number' ? colE : parseFloat(String(colE).replace(',', '.')) || 0;
+                var gp = typeof colF === 'number' ? colF : parseFloat(String(colF).replace(',', '.')) || 0;
 
                 var pos = {
                     pos: colA,
@@ -390,32 +368,25 @@
                 var colE = String(row[4] || '').trim();
                 var colF = String(row[5] || '').trim();
 
-                // Header ueberspringen (Zeile 7 oder 8)
+                // Header ueberspringen
                 if (colA === 'Raum-Nr.' || colA === 'Raum-Nr') continue;
                 // Firmen-Header ueberspringen
-                if (colA.match(/^Thomas Willwacher|^Flurweg|^RAUMLISTE|^Projekt:|^Objekt:/i)) continue;
+                if (colA.match(/^Thomas Willwacher|^Flurweg|^RAUMLISTE|^Projekt:/i)) continue;
                 // Legende/Hinweise ueberspringen
-                if (colA.match(/^LEGENDE|^GESAMTFL|^\u2022|^Quelle:|^R.ume mit|^R.ume ohne|^R.ume unklar|LV-FL/i)) continue;
-                if (colA.match(/^Stand:|^Datum:/i)) continue;
-                // Emoji-Legende ueberspringen
-                if (colA.match(/^\uD83D\uDFE2|^\u2705|^\u2B1C|^\u2753|Fliesen JA|Fliesen NEIN/)) continue;
+                if (colA.match(/^LEGENDE|^GESAMTFL|^\u2022/i)) continue;
+                if (colA.match(/^Stand:/i)) continue;
 
                 // Bereichs-Header erkennen (nur Spalte A, kein Geschoss in C)
-                if (colA && !colC && !colE && colA.length > 10 && !colA.match(/^\w\.\d|^\w+-\d/)) {
-                    aktuellerBereich = colA.replace(/^[^a-zA-Z]*/, '').trim();
+                if (colA && !colC && !colE && colA.length > 10 && !colA.match(/^\w\.\d/)) {
+                    aktuellerBereich = colA;
                     continue;
                 }
 
                 // Leere Zeilen
-                if (!colA) continue;
+                if (!colA || !colE) continue;
 
-                // Fliesen-Erkennung: flexibel (Ja, ✅ JA, ja, JA, etc.)
-                var fliesenRaw = colE.toLowerCase().replace(/[^a-z]/g, '');
-                var hatFliesen = fliesenRaw === 'ja';
-                var istUnklar = colE.match(/unklar|\u2753|\?/i);
-
-                // Nur Zeilen mit Fliesen-Kennzeichnung oder unklar
-                if (!hatFliesen && !istUnklar) continue;
+                // Nur Zeilen mit Fliesen-Kennzeichnung
+                if (colE.toLowerCase() !== 'ja') continue;
 
                 // ═══ RAUM GEFUNDEN ═══
                 var raumNrClean = colA.replace(/\s*\/\s*.+$/, '').trim(); // "E.001 / Windfang" -> "E.001"

@@ -1,62 +1,59 @@
-        function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell }) {
-            // Prüfe ob gespeicherte Kunden in localStorage existieren
-            var gespeicherteKunden = [];
-            try {
-                var keys = Object.keys(localStorage);
-                for (var i = 0; i < keys.length; i++) {
-                    if (keys[i].indexOf('aufmass_kunde_') === 0) {
-                        var data = JSON.parse(localStorage.getItem(keys[i]));
-                        if (data && data.name) {
-                            gespeicherteKunden.push({ key: keys[i], name: data.name, datum: data._gespeichertAm || '' });
-                        }
-                    }
-                }
-            } catch(e) {}
-
-            // Gemini API-Key State
+        function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl, onDriveStatusChange }) {
+            // ── State ──
+            const [geminiConnected, setGeminiConnected] = useState(false);
+            const [driveConnected, setDriveConnected] = useState(false);
             const [showKiSettings, setShowKiSettings] = useState(false);
             const [geminiKey, setGeminiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-            const [geminiStatus, setGeminiStatus] = useState(geminiKey ? 'saved' : 'none'); // none|saved|testing|ok|error
+            const [geminiStatus, setGeminiStatus] = useState(geminiKey ? 'saved' : 'none');
             const [showKey, setShowKey] = useState(false);
-            // ── NEU: KI-Modell als React-State (statt nur localStorage) ──
             const [geminiModelPref, setGeminiModelPref] = useState(localStorage.getItem('gemini_model_pref') || 'pro');
-            // ── NEU: Button-Loading-State ──
-            const [btnLoading, setBtnLoading] = useState(null); // null | 'neu' | 'analysiert'
-            const [showNeuAuswahl, setShowNeuAuswahl] = useState(false); // Modal für Kunde NEU Auswahl
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [driveConnecting, setDriveConnecting] = useState(false);
+
+            // ── Uhr aktualisieren ──
+            useEffect(function() {
+                var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
+                return function() { clearInterval(timer); };
+            }, []);
+
+            // ── Gemini Check bei Mount ──
+            useEffect(function() {
+                var key = localStorage.getItem('gemini_api_key');
+                if (key) {
+                    setGeminiConnected(true);
+                    setGeminiStatus('saved');
+                    GEMINI_CONFIG.API_KEY = key;
+                }
+                // Drive Check
+                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
+                    setDriveConnected(true);
+                    if (onDriveStatusChange) onDriveStatusChange('online');
+                }
+            }, []);
 
             var testGeminiKey = async function() {
                 if (!geminiKey) return;
                 setGeminiStatus('testing');
-                // Probiere mehrere Modelle durch (neuestes zuerst)
                 var modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
                     try {
                         var testModel = modelsToTry[mi];
                         var res = await fetch(
                             GEMINI_CONFIG.BASE_URL + '/models/' + testModel + ':generateContent?key=' + geminiKey,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    contents: [{ parts: [{ text: 'Sage nur: OK' }] }]
-                                })
-                            }
+                            { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ contents: [{ parts: [{ text: 'Sage nur: OK' }] }] }) }
                         );
                         if (res.ok) {
                             GEMINI_CONFIG.MODEL = testModel;
                             setGeminiStatus('ok');
+                            setGeminiConnected(true);
                             localStorage.setItem('gemini_api_key', geminiKey);
                             localStorage.setItem('gemini_model', testModel);
                             GEMINI_CONFIG.API_KEY = geminiKey;
                             window._kiDisabled = false;
-                            console.log('Gemini verbunden! Modell:', testModel);
                             return;
                         }
-                        var errBody = await res.json().catch(function(){ return {}; });
-                        console.warn('Modell ' + testModel + ' Fehler ' + res.status + ':', errBody.error ? errBody.error.message : '');
-                    } catch(e) {
-                        console.warn('Modell ' + testModel + ' Netzwerkfehler:', e.message);
-                    }
+                    } catch(e) {}
                 }
                 setGeminiStatus('error');
             };
@@ -66,10 +63,51 @@
                 GEMINI_CONFIG.API_KEY = geminiKey;
                 window._kiDisabled = false;
                 setGeminiStatus('saved');
+                setGeminiConnected(true);
             };
 
+            var handleConnectDrive = async function() {
+                setDriveConnecting(true);
+                if (onDriveStatusChange) onDriveStatusChange('connecting');
+                try {
+                    var service = window.GoogleDriveService;
+                    if (!service.accessToken) {
+                        await service.init();
+                        await service.requestAuth();
+                    }
+                    setDriveConnected(true);
+                    setDriveConnecting(false);
+                    if (onDriveStatusChange) onDriveStatusChange('online');
+                } catch(err) {
+                    console.error('Drive Fehler:', err);
+                    alert('Google Drive Verbindung fehlgeschlagen:\n' + err.message);
+                    setDriveConnecting(false);
+                    if (onDriveStatusChange) onDriveStatusChange('offline');
+                }
+            };
+
+            var handleKundenauswahlClick = function() {
+                if (!geminiConnected && !driveConnected) {
+                    alert('Bitte zuerst Google Gemini KI und/oder Google Drive verbinden!');
+                    return;
+                }
+                if (onKundenauswahl) {
+                    onKundenauswahl({ geminiConnected: geminiConnected, driveConnected: driveConnected });
+                }
+            };
+
+            // ── Datum/Uhrzeit formatieren ──
+            var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            var tag = tage[currentTime.getDay()];
+            var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
+            var stunden = String(currentTime.getHours()).padStart(2,'0');
+            var minuten = String(currentTime.getMinutes()).padStart(2,'0');
+            var sekunden = String(currentTime.getSeconds()).padStart(2,'0');
+
             return (
-                <div className="startseite">
+                <div className="startseite" style={{position:'relative', overflow:'hidden', minHeight:'100vh'}}>
+                    {/* ═══ FIRMEN-HEADER ═══ */}
                     <div className="logo-section">
                         <FirmenLogo size="large" />
                         <div className="logo-address">
@@ -80,205 +118,454 @@
                         </div>
                     </div>
 
-                    <div className="kunde-btn-wrapper" style={{gap:'16px'}}>
-                        {/* BUTTON 1: Kunde NEU -- Auswahl-Dialog öffnen */}
-                        <button className="kunde-btn" disabled={!!btnLoading}
-                            onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setShowNeuAuswahl(true); } }}
-                            onClick={function(){ if(!btnLoading){ setShowNeuAuswahl(true); } }}
-                            style={{
-                            background: btnLoading === 'neu' ? 'linear-gradient(135deg, #1565C0 0%, #0D47A1 100%)' : 'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)',
-                            opacity: btnLoading && btnLoading !== 'neu' ? 0.5 : 1,
+                    {/* ═══ UHR & DATUM — Premium Design (GROSS) ═══ */}
+                    <div style={{
+                        margin:'0 20px 20px', padding:'24px 20px',
+                        background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
+                        borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
+                        border:'1px solid rgba(77,166,255,0.2)',
+                        boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+                    }}>
+                        {/* Dekorative Elemente */}
+                        <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        
+                        {/* Tag */}
+                        <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
+                            {tag}
+                        </div>
+                        
+                        {/* Uhrzeit — GROSS */}
+                        <div style={{
+                            fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
+                            fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+                            lineHeight:'1', marginBottom:'10px', position:'relative'
                         }}>
-                            <span className="kunde-btn-icon">{btnLoading === 'neu' ? '⏳' : '➕'}</span>
-                            {btnLoading === 'neu' ? 'Wird geladen...' : 'Kunde NEU'}
-                        </button>
+                            <span style={{fontWeight:'300'}}>{stunden}</span>
+                            <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
+                            <span style={{fontWeight:'300'}}>{minuten}</span>
+                            <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
+                        </div>
+                        
+                        {/* Datum */}
+                        <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
+                            {datum}
+                        </div>
+                        
+                        {/* Trennlinie */}
+                        <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
+                    </div>
 
-                        {/* BUTTON 2: Kunde ANGELEGT -- nur lokale Daten */}
-                        <button className="kunde-btn" disabled={!!btnLoading}
-                            onTouchEnd={function(e){ if(!btnLoading){ e.preventDefault(); setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
-                            onClick={function(){ if(!btnLoading){ setBtnLoading('analysiert'); setTimeout(function(){ onKundeAnalysiert(); }, 50); } }}
+                    {/* ═══ VERBINDUNGS-BUTTONS (nebeneinander, kompakt) ═══ */}
+                    <div style={{padding:'0 20px', marginBottom:'10px', width:'100%', maxWidth:'500px'}}>
+                        <div style={{display:'flex', gap:'8px', marginBottom:'10px'}}>
+                            {/* ── Gemini KI ── */}
+                            <button
+                                onTouchEnd={function(e){ e.preventDefault(); setShowKiSettings(!showKiSettings); }}
+                                onClick={function(){ setShowKiSettings(!showKiSettings); }}
+                                style={{
+                                    flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer',
+                                    background: geminiConnected
+                                        ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
+                                        : 'linear-gradient(135deg, #8e44ad 0%, #6c3483 100%)',
+                                    color:'white', position:'relative',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                                    boxShadow:'0 3px 10px rgba(0,0,0,0.2)', transition:'transform 0.15s ease',
+                                    WebkitTapHighlightColor:'rgba(0,0,0,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+                            }}>
+                                <span style={{fontSize:'16px'}}>{geminiConnected ? '\u2705' : '\uD83E\uDD16'}</span>
+                                <span style={{fontSize:'11px', fontWeight:'700'}}>
+                                    {geminiConnected ? 'Gemini KI' : 'Gemini KI'}
+                                </span>
+                                {geminiConnected && <span style={{position:'absolute', top:'4px', right:'4px', width:'6px', height:'6px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 4px rgba(46,204,113,0.6)'}} />}
+                            </button>
+
+                            {/* ── Google Drive ── */}
+                            <button disabled={driveConnecting}
+                                onTouchEnd={function(e){ e.preventDefault(); if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
+                                onClick={function(){ if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
+                                style={{
+                                    flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor: driveConnecting ? 'wait' : 'pointer',
+                                    background: driveConnected
+                                        ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)'
+                                        : driveConnecting
+                                            ? 'linear-gradient(135deg, #d4ac0d 0%, #b7950b 100%)'
+                                            : 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
+                                    color:'white', position:'relative',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                                    boxShadow:'0 3px 10px rgba(0,0,0,0.2)', transition:'transform 0.15s ease',
+                                    WebkitTapHighlightColor:'rgba(0,0,0,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+                            }}>
+                                <span style={{fontSize:'16px'}}>{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '\uD83D\uDCC2'}</span>
+                                <span style={{fontSize:'11px', fontWeight:'700'}}>
+                                    {driveConnected ? 'Google Drive' : driveConnecting ? 'Verbinde...' : 'Google Drive'}
+                                </span>
+                                {driveConnected && <span style={{position:'absolute', top:'4px', right:'4px', width:'6px', height:'6px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 4px rgba(46,204,113,0.6)'}} />}
+                            </button>
+                        </div>
+
+                        {/* ── KUNDENAUSWAHL Button (volle Breite, etwas kleiner) ── */}
+                        <button
+                            disabled={!geminiConnected && !driveConnected}
+                            onTouchEnd={function(e){ e.preventDefault(); handleKundenauswahlClick(); }}
+                            onClick={function(){ handleKundenauswahlClick(); }}
                             style={{
-                            background: btnLoading === 'analysiert' ? 'linear-gradient(135deg, #1e8449 0%, #145a32 100%)' : 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
-                            opacity: btnLoading && btnLoading !== 'analysiert' ? 0.5 : 1,
+                                width:'100%', padding:'14px 20px', borderRadius:'12px', border:'none', cursor: (!geminiConnected && !driveConnected) ? 'not-allowed' : 'pointer',
+                                background: (geminiConnected || driveConnected)
+                                    ? 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)'
+                                    : 'linear-gradient(135deg, #555 0%, #444 100%)',
+                                opacity: (!geminiConnected && !driveConnected) ? 0.5 : 1,
+                                color:'white', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+                                boxShadow: (geminiConnected || driveConnected) ? '0 4px 16px rgba(230,126,34,0.35)' : 'none',
+                                transition:'transform 0.15s ease',
+                                WebkitTapHighlightColor:'rgba(230,126,34,0.3)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
                         }}>
-                            <span className="kunde-btn-icon">{btnLoading === 'analysiert' ? '⏳' : '💾'}</span>
-                            {btnLoading === 'analysiert' ? 'Wird geladen...' : 'Kunde ANGELEGT'}
+                            <span style={{fontSize:'22px'}}>{'\uD83D\uDC77'}</span>
+                            <span style={{fontSize:'16px', fontWeight:'800', letterSpacing:'1px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase'}}>Kundenauswahl</span>
                         </button>
 
-                        {gespeicherteKunden.length > 0 && (
-                            <div style={{marginTop:'12px', fontSize:'12px', color:'var(--accent-blue)', textAlign:'center', padding:'8px 16px', background:'rgba(30,136,229,0.08)', borderRadius:'10px', border:'1px solid rgba(30,136,229,0.15)'}}>
-                                💾 {gespeicherteKunden.length} Kunde{gespeicherteKunden.length > 1 ? 'n' : ''} lokal gespeichert
-                            </div>
-                        )}
-
-                        {/* ── Gemini KI-Einstellungen ── */}
-                        <button onClick={function(){ setShowKiSettings(!showKiSettings); }}
-                            style={{marginTop:'12px', width:'100%', padding:'10px 16px', background: geminiKey ? 'rgba(39,174,96,0.08)' : 'rgba(230,126,34,0.08)', border: geminiKey ? '1px solid rgba(39,174,96,0.2)' : '1px solid rgba(230,126,34,0.2)', borderRadius:'10px', cursor:'pointer', display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color: geminiKey ? '#27ae60' : '#e67e22'}}>
-                            <span style={{fontSize:'16px'}}>{geminiKey ? '🟢' : '⚙️'}</span>
-                            <span style={{flex:1, textAlign:'left', fontWeight:'600'}}>
-                                {geminiKey ? 'Google Gemini KI -- Verbunden' : 'Google Gemini KI -- Einrichten'}
-                            </span>
-                            <span style={{fontSize:'14px'}}>{showKiSettings ? '▲' : '▼'}</span>
-                        </button>
-
-                        {showKiSettings && (
-                            <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'14px', border:'1px solid var(--border-color)', boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-                                <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'8px'}}>🤖 Google Gemini KI-Einstellungen</div>
-                                <div style={{fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.5', marginBottom:'10px'}}>
-                                    Die KI analysiert Kundendokumente automatisch (LV, Verträge, Pläne).<br/>
-                                    Kostenlos für bis zu 250 Analysen/Tag mit Gemini Flash.
-                                </div>
-                                <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block', marginBottom:'3px'}}>Gemini API-Key</label>
-                                <div style={{display:'flex', gap:'4px'}}>
-                                    <input
-                                        type={showKey ? 'text' : 'password'}
-                                        value={geminiKey}
-                                        onChange={function(e){ setGeminiKey(e.target.value); setGeminiStatus('none'); }}
-                                        placeholder="AIzaSy..."
-                                        style={{flex:1, padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box', fontFamily:'monospace'}}
-                                    />
-                                    <button onClick={function(){ setShowKey(!showKey); }} style={{padding:'6px 8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-color)', borderRadius:'8px', cursor:'pointer', fontSize:'14px'}}>{showKey ? '🙈' : '👁️'}</button>
-                                </div>
-                                <div style={{display:'flex', gap:'6px', marginTop:'8px'}}>
-                                    <button onClick={testGeminiKey}
-                                        style={{flex:1, padding:'8px', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'700', cursor:'pointer'}}>
-                                        {geminiStatus === 'testing' ? '⏳ Teste...' : '✅ Verbindung testen'}
-                                    </button>
-                                    <button onClick={saveGeminiKey}
-                                        style={{flex:1, padding:'8px', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'700', cursor:'pointer'}}>
-                                        💾 Speichern
-                                    </button>
-                                </div>
-                                {geminiStatus === 'ok' && <div style={{marginTop:'6px', fontSize:'11px', color:'#27ae60', fontWeight:'600'}}>🟢 Verbindung erfolgreich! Modell: {GEMINI_CONFIG.MODEL}</div>}
-                                {geminiStatus === 'error' && <div style={{marginTop:'6px', fontSize:'11px', color:'#e74c3c', fontWeight:'600'}}>🔴 Verbindung fehlgeschlagen. Mögliche Ursachen:<br/>• API-Key ungültig oder Tages-Quota aufgebraucht<br/>• Keine Internetverbindung<br/>Prüfe Konsole (F12) für Details.</div>}
-                                {geminiStatus === 'saved' && <div style={{marginTop:'6px', fontSize:'11px', color:'#27ae60', fontWeight:'600'}}>💾 Gespeichert! Drücke "Verbindung testen" zum Prüfen.</div>}
-                                <div style={{marginTop:'8px', fontSize:'10px', color:'var(--text-muted)', lineHeight:'1.5'}}>
-                                    <strong>Key holen:</strong> <a href="https://aistudio.google.com/apikey" target="_blank" style={{color:'var(--accent-blue)'}}>aistudio.google.com/apikey</a><br/>
-                                    → "Create API Key" → Key kopieren → hier einfügen
-                                </div>
-
-                                {/* Modell-Auswahl */}
-                                <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
-                                    <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>🧠 KI-Modell für Dokumentenanalyse</div>
-                                    <div style={{display:'flex', gap:'4px'}}>
-                                        {Object.keys(GEMINI_CONFIG.MODELS).map(function(key) {
-                                            var m = GEMINI_CONFIG.MODELS[key];
-                                            var isActive = geminiModelPref === key;
-                                            return (
-                                                <button key={key} onClick={function(){
-                                                    setGeminiModelPref(key);
-                                                    localStorage.setItem('gemini_model_pref', key);
-                                                }} style={{
-                                                    flex:1, padding:'8px 4px', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700', textAlign:'center',
-                                                    background: isActive ? m.color + '18' : 'var(--bg-tertiary)',
-                                                    border: isActive ? '2px solid ' + m.color : '1px solid var(--border-color)',
-                                                    color: isActive ? m.color : 'var(--text-muted)',
-                                                    transition:'all 0.15s ease',
-                                                    WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation'
-                                                }}>
-                                                    {m.icon} {m.name.replace('Gemini ', '')}<br/>
-                                                    <span style={{fontSize:'8px', fontWeight:'400'}}>{m.desc}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                    <div style={{fontSize:'9px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                        Aktiv: <strong>{(GEMINI_CONFIG.MODELS[geminiModelPref] || {}).name || 'Gemini 2.5 Pro'}</strong>
-                                    </div>
-                                </div>
-
-                                {/* Gmail-Absender Einstellung */}
-                                <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
-                                    <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>✉️ Gmail-Absender für Mailversand</div>
-                                    <input
-                                        type="email"
-                                        value={localStorage.getItem('gmail_absender') || 'phoenix180862@gmail.com'}
-                                        onChange={function(e){ localStorage.setItem('gmail_absender', e.target.value); GMAIL_CONFIG.ABSENDER_EMAIL = e.target.value; }}
-                                        placeholder="meine@gmail.com"
-                                        style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}
-                                    />
-                                    <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                        Diese Adresse wird für Rechnungs- und Schriftverkehr-Versand via Gmail API verwendet.
-                                    </div>
-                                </div>
+                        {(!geminiConnected && !driveConnected) && (
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', padding:'4px 0', fontStyle:'italic'}}>
+                                Bitte zuerst Gemini KI und/oder Google Drive verbinden
                             </div>
                         )}
                     </div>
 
-                    {/* ═══ AUSWAHL-MODAL: Kunde analysieren oder manuell eingeben ═══ */}
-                    {showNeuAuswahl && (
-                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
-                            onTouchEnd={function(e){ e.preventDefault(); setShowNeuAuswahl(false); }}
-                            onClick={function(){ setShowNeuAuswahl(false); }}>
-                            <div style={{background:'var(--bg-primary)', borderRadius:'20px', padding:'28px 24px', maxWidth:'400px', width:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.4)'}}
-                                onTouchEnd={function(e){ e.stopPropagation(); }}
-                                onClick={function(e){ e.stopPropagation(); }}>
-                                <div style={{textAlign:'center', marginBottom:'24px'}}>
-                                    <div style={{fontSize:'28px', marginBottom:'8px'}}>➕</div>
-                                    <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>Neuer Kunde</div>
-                                    <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'6px'}}>Wie möchtest du den Kunden anlegen?</div>
+                    {/* ═══ GEMINI SETTINGS (ausklappbar) ═══ */}
+                    {showKiSettings && (
+                        <div style={{margin:'0 20px 16px', padding:'16px', background:'var(--bg-secondary)', borderRadius:'16px', border:'1px solid var(--border-color)'}}>
+                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'10px'}}>Gemini API Konfiguration</div>
+                            <div style={{display:'flex', gap:'8px', marginBottom:'8px'}}>
+                                <input
+                                    type={showKey ? 'text' : 'password'}
+                                    value={geminiKey}
+                                    onChange={function(e){ setGeminiKey(e.target.value); }}
+                                    placeholder="Gemini API Key eingeben..."
+                                    style={{flex:1, padding:'10px 12px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)'}}
+                                />
+                                <button onClick={function(){ setShowKey(!showKey); }} style={{padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'16px'}}>
+                                    {showKey ? '\uD83D\uDE48' : '\uD83D\uDC41'}
+                                </button>
+                            </div>
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button onClick={saveGeminiKey} style={{flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'var(--accent-blue)', color:'white', fontWeight:'700', cursor:'pointer', fontSize:'13px'}}>
+                                    Speichern
+                                </button>
+                                <button onClick={testGeminiKey} style={{flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'#8e44ad', color:'white', fontWeight:'700', cursor:'pointer', fontSize:'13px'}}>
+                                    Testen
+                                </button>
+                            </div>
+                            {geminiStatus === 'testing' && <div style={{marginTop:'8px', fontSize:'12px', color:'#f39c12', textAlign:'center'}}>Verbindung wird getestet...</div>}
+                            {geminiStatus === 'ok' && <div style={{marginTop:'8px', fontSize:'12px', color:'#2ecc71', textAlign:'center'}}>Gemini verbunden! Modell: {GEMINI_CONFIG.MODEL}</div>}
+                            {geminiStatus === 'error' && <div style={{marginTop:'8px', fontSize:'12px', color:'#e74c3c', textAlign:'center'}}>Verbindung fehlgeschlagen</div>}
+
+                            {/* Modellauswahl */}
+                            <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
+                                <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>KI-Modell:</div>
+                                <div style={{display:'flex', gap:'4px'}}>
+                                    {Object.keys(GEMINI_CONFIG.MODELS || {}).map(function(key) {
+                                        var m = GEMINI_CONFIG.MODELS[key];
+                                        var isActive = geminiModelPref === key;
+                                        return (
+                                            <button key={key} onClick={function() {
+                                                setGeminiModelPref(key);
+                                                localStorage.setItem('gemini_model_pref', key);
+                                            }} style={{
+                                                flex:1, padding:'8px 4px', borderRadius:'8px', cursor:'pointer', fontSize:'10px', fontWeight:'700', textAlign:'center',
+                                                background: isActive ? (m.color || '#4da6ff') + '18' : 'var(--bg-tertiary)',
+                                                border: isActive ? '2px solid ' + (m.color || '#4da6ff') : '1px solid var(--border-color)',
+                                                color: isActive ? (m.color || '#4da6ff') : 'var(--text-muted)',
+                                            }}>
+                                                {m.icon || ''} {(m.name || key).replace('Gemini ', '')}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
+                            </div>
 
-                                <button
-                                    onTouchEnd={function(e){ e.preventDefault(); e.stopPropagation(); setShowNeuAuswahl(false); setBtnLoading('neu'); setTimeout(function(){ onKundeNeu(); }, 50); }}
-                                    onClick={function(){
-                                    setShowNeuAuswahl(false);
-                                    setBtnLoading('neu');
-                                    setTimeout(function(){ onKundeNeu(); }, 50);
-                                }} style={{
-                                    width:'100%', padding:'18px 20px', borderRadius:'14px', border:'none', cursor:'pointer', marginBottom:'12px',
-                                    background:'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)', color:'white',
-                                    display:'flex', alignItems:'center', gap:'14px', textAlign:'left', minHeight:'60px',
-                                    boxShadow:'0 4px 15px rgba(30,136,229,0.3)', transition:'transform 0.15s ease',
-                                    WebkitTapHighlightColor:'rgba(30,136,229,0.3)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none'
-                                }}>
-                                    <span style={{fontSize:'28px'}}>🤖</span>
-                                    <div>
-                                        <div style={{fontSize:'16px', fontWeight:'700'}}>Kunde analysieren</div>
-                                        <div style={{fontSize:'12px', opacity:0.85, marginTop:'3px'}}>Google Drive verbinden & KI-Analyse starten</div>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onTouchEnd={function(e){ e.preventDefault(); e.stopPropagation(); setShowNeuAuswahl(false); onKundeManuell(); }}
-                                    onClick={function(){
-                                    setShowNeuAuswahl(false);
-                                    onKundeManuell();
-                                }} style={{
-                                    width:'100%', padding:'18px 20px', borderRadius:'14px', border:'none', cursor:'pointer',
-                                    background:'linear-gradient(135deg, #e67e22 0%, #d35400 100%)', color:'white',
-                                    display:'flex', alignItems:'center', gap:'14px', textAlign:'left', minHeight:'60px',
-                                    boxShadow:'0 4px 15px rgba(230,126,34,0.3)', transition:'transform 0.15s ease',
-                                    WebkitTapHighlightColor:'rgba(230,126,34,0.3)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none'
-                                }}>
-                                    <span style={{fontSize:'28px'}}>📝</span>
-                                    <div>
-                                        <div style={{fontSize:'16px', fontWeight:'700'}}>Kunde manuell eingeben</div>
-                                        <div style={{fontSize:'12px', opacity:0.85, marginTop:'3px'}}>LV-Positionen & Räume selbst eintragen oder hochladen</div>
-                                    </div>
-                                </button>
-
-                                <button
-                                    onTouchEnd={function(e){ e.preventDefault(); e.stopPropagation(); setShowNeuAuswahl(false); }}
-                                    onClick={function(){ setShowNeuAuswahl(false); }} style={{
-                                    width:'100%', padding:'14px', marginTop:'12px', borderRadius:'10px', border:'1px solid var(--border-color)',
-                                    background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', minHeight:'48px',
-                                    WebkitTapHighlightColor:'rgba(0,0,0,0.1)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none'
-                                }}>Abbrechen</button>
+                            {/* Gmail-Absender */}
+                            <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
+                                <div style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>Gmail-Absender</div>
+                                <input
+                                    type="email"
+                                    value={localStorage.getItem('gmail_absender') || 'phoenix180862@gmail.com'}
+                                    onChange={function(e){ localStorage.setItem('gmail_absender', e.target.value); if(typeof GMAIL_CONFIG !== 'undefined') GMAIL_CONFIG.ABSENDER_EMAIL = e.target.value; }}
+                                    placeholder="meine@gmail.com"
+                                    style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}
+                                />
                             </div>
                         </div>
                     )}
+
+                    {/* ═══ FLIESENLEGER ANIMATION — grosser SVG Charakter ═══ */}
+                    <div style={{position:'relative', height:'120px', marginTop:'auto', width:'100%', overflow:'hidden'}}>
+                        {/* Boden */}
+                        <div style={{position:'absolute', bottom:'2px', left:0, right:0, height:'3px', background:'linear-gradient(90deg, transparent 5%, rgba(149,165,166,0.6) 20%, rgba(149,165,166,0.6) 80%, transparent 95%)', borderRadius:'2px'}} />
+                        
+                        {/* Fliesenleger SVG */}
+                        <div className="tw-walker" style={{position:'absolute', bottom:'5px'}}>
+                            <svg width="80" height="110" viewBox="0 0 80 110" xmlns="http://www.w3.org/2000/svg" style={{overflow:'visible', filter:'drop-shadow(2px 3px 4px rgba(0,0,0,0.4))'}}>
+                                {/* === HELM === */}
+                                <ellipse cx="40" cy="12" rx="14" ry="9" fill="#f1c40f">
+                                    <animate attributeName="cy" values="12;10;12" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
+                                <rect x="26" y="10" width="28" height="5" rx="2.5" fill="#e67e22">
+                                    <animate attributeName="y" values="10;8;10" dur="0.5s" repeatCount="indefinite" />
+                                </rect>
+                                {/* Helm-Schild */}
+                                <rect x="28" y="15" width="24" height="3" rx="1.5" fill="#d4ac0d" opacity="0.6">
+                                    <animate attributeName="y" values="15;13;15" dur="0.5s" repeatCount="indefinite" />
+                                </rect>
+                                
+                                {/* === KOPF === */}
+                                <circle cx="40" cy="24" r="10" fill="#fad7a0">
+                                    <animate attributeName="cy" values="24;22;24" dur="0.5s" repeatCount="indefinite" />
+                                </circle>
+                                {/* Augen */}
+                                <ellipse cx="36" cy="22" rx="1.8" ry="2" fill="#2c3e50">
+                                    <animate attributeName="cy" values="22;20;22" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
+                                <ellipse cx="44" cy="22" rx="1.8" ry="2" fill="#2c3e50">
+                                    <animate attributeName="cy" values="22;20;22" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
+                                {/* Augenbrauen */}
+                                <line x1="33" y1="19" x2="38" y2="18" stroke="#8B4513" strokeWidth="1.2" strokeLinecap="round">
+                                    <animate attributeName="y1" values="19;17;19" dur="0.5s" repeatCount="indefinite" />
+                                    <animate attributeName="y2" values="18;16;18" dur="0.5s" repeatCount="indefinite" />
+                                </line>
+                                <line x1="42" y1="18" x2="47" y2="19" stroke="#8B4513" strokeWidth="1.2" strokeLinecap="round">
+                                    <animate attributeName="y1" values="18;16;18" dur="0.5s" repeatCount="indefinite" />
+                                    <animate attributeName="y2" values="19;17;19" dur="0.5s" repeatCount="indefinite" />
+                                </line>
+                                {/* Laecheln */}
+                                <path d="M35 28 Q40 32 45 28" stroke="#c0392b" strokeWidth="1.2" fill="none" strokeLinecap="round">
+                                    <animate attributeName="d" values="M35 28 Q40 32 45 28;M35 26 Q40 30 45 26;M35 28 Q40 32 45 28" dur="0.5s" repeatCount="indefinite" />
+                                </path>
+                                {/* Nase */}
+                                <ellipse cx="40" cy="25" rx="1.5" ry="1" fill="#e8c292">
+                                    <animate attributeName="cy" values="25;23;25" dur="0.5s" repeatCount="indefinite" />
+                                </ellipse>
+                                
+                                {/* === KOERPER === */}
+                                <g>
+                                    <animate attributeName="opacity" values="1" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Blaue Arbeitsjacke */}
+                                    <rect x="28" y="34" width="24" height="26" rx="4" fill="#2471a3">
+                                        <animate attributeName="y" values="34;32;34" dur="0.5s" repeatCount="indefinite" />
+                                    </rect>
+                                    {/* Warnweste - 2 Streifen */}
+                                    <rect x="28" y="38" width="24" height="4" rx="1" fill="#f39c12" opacity="0.8">
+                                        <animate attributeName="y" values="38;36;38" dur="0.5s" repeatCount="indefinite" />
+                                    </rect>
+                                    <rect x="28" y="48" width="24" height="4" rx="1" fill="#f39c12" opacity="0.6">
+                                        <animate attributeName="y" values="48;46;48" dur="0.5s" repeatCount="indefinite" />
+                                    </rect>
+                                    {/* Reissverschluss */}
+                                    <line x1="40" y1="34" x2="40" y2="58" stroke="#1a5276" strokeWidth="1.5">
+                                        <animate attributeName="y1" values="34;32;34" dur="0.5s" repeatCount="indefinite" />
+                                        <animate attributeName="y2" values="58;56;58" dur="0.5s" repeatCount="indefinite" />
+                                    </line>
+                                </g>
+                                
+                                {/* === LINKER ARM + KELLE === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="25,30,38;-25,30,38;25,30,38" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Oberarm */}
+                                    <rect x="14" y="36" width="16" height="7" rx="3.5" fill="#2471a3" />
+                                    {/* Unterarm */}
+                                    <rect x="8" y="36" width="10" height="6" rx="3" fill="#fad7a0" />
+                                    {/* Kelle - Griff */}
+                                    <rect x="2" y="37" width="8" height="3" rx="1.5" fill="#7f8c8d" />
+                                    {/* Kelle - Blatt */}
+                                    <path d="M-2 35 L4 33 L4 41 L-2 39 Z" fill="#95a5a6" />
+                                </g>
+                                
+                                {/* === RECHTER ARM === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="-25,50,38;25,50,38;-25,50,38" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Oberarm */}
+                                    <rect x="50" y="36" width="16" height="7" rx="3.5" fill="#2471a3" />
+                                    {/* Hand */}
+                                    <circle cx="64" cy="39" r="3.5" fill="#fad7a0" />
+                                </g>
+                                
+                                {/* === FLIESE UNTER RECHTEM ARM === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="translate" values="0,0;0,-2;0,0" dur="0.5s" repeatCount="indefinite" />
+                                    <rect x="60" y="42" width="14" height="14" rx="2" fill="#ecf0f1" stroke="#bdc3c7" strokeWidth="1" />
+                                    {/* Fliesenmuster */}
+                                    <line x1="67" y1="42" x2="67" y2="56" stroke="#d5d8dc" strokeWidth="0.5" />
+                                    <line x1="60" y1="49" x2="74" y2="49" stroke="#d5d8dc" strokeWidth="0.5" />
+                                    {/* Zweite Fliese dahinter */}
+                                    <rect x="63" y="45" width="14" height="14" rx="2" fill="#d5dbdb" stroke="#bdc3c7" strokeWidth="0.6" opacity="0.5" />
+                                </g>
+                                
+                                {/* === LINKES BEIN === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="30,35,60;-30,35,60;30,35,60" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Hose */}
+                                    <rect x="31" y="58" width="8" height="26" rx="3" fill="#2c3e50" />
+                                    {/* Knie-Highlight */}
+                                    <rect x="31" y="68" width="8" height="4" rx="2" fill="#34495e" />
+                                    {/* Schuh */}
+                                    <rect x="28" y="82" width="14" height="6" rx="3" fill="#784212" />
+                                    <rect x="28" y="82" width="14" height="3" rx="1.5" fill="#8B5A2B" />
+                                    {/* Sohle */}
+                                    <rect x="27" y="86" width="16" height="2.5" rx="1" fill="#4a2c0a" />
+                                </g>
+                                
+                                {/* === RECHTES BEIN === */}
+                                <g>
+                                    <animateTransform attributeName="transform" type="rotate" values="-30,45,60;30,45,60;-30,45,60" dur="0.5s" repeatCount="indefinite" />
+                                    {/* Hose */}
+                                    <rect x="41" y="58" width="8" height="26" rx="3" fill="#34495e" />
+                                    {/* Knie-Highlight */}
+                                    <rect x="41" y="68" width="8" height="4" rx="2" fill="#3d566e" />
+                                    {/* Schuh */}
+                                    <rect x="38" y="82" width="14" height="6" rx="3" fill="#784212" />
+                                    <rect x="38" y="82" width="14" height="3" rx="1.5" fill="#8B5A2B" />
+                                    {/* Sohle */}
+                                    <rect x="37" y="86" width="16" height="2.5" rx="1" fill="#4a2c0a" />
+                                </g>
+                            </svg>
+                        </div>
+                        
+                        {/* Gelegte Fliesen hinter ihm */}
+                        <div className="tw-tiles-laid" style={{position:'absolute', bottom:'5px', display:'flex', gap:'3px', alignItems:'flex-end'}}>
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.45)', border:'1px solid rgba(77,166,255,0.3)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.35)', border:'1px solid rgba(77,166,255,0.2)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.25)', border:'1px solid rgba(77,166,255,0.15)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.15)', border:'1px solid rgba(77,166,255,0.08)', borderRadius:'2px'}} />
+                            <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.08)', border:'1px solid rgba(77,166,255,0.04)', borderRadius:'2px'}} />
+                        </div>
+                    </div>
+
+                    {/* ═══ CSS Animations ═══ */}
+                    <style dangerouslySetInnerHTML={{__html: '\n.tw-clock-pulse { animation: twClockPulse 1s ease-in-out infinite; }\n@keyframes twClockPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }\n.tw-walker { animation: twWalk 14s linear infinite; }\n@keyframes twWalk { 0% { left: -90px; } 100% { left: calc(100% + 90px); } }\n.tw-tiles-laid { animation: twTilesLaid 14s linear infinite; }\n@keyframes twTilesLaid { 0% { left: -160px; } 100% { left: calc(100% - 10px); } }\n'}} />
                 </div>
             )
+        }
+        /* ═══════════════════════════════════════════
+           KUNDEN-MODUS-WAHL — Wie soll der Kunde bearbeitet werden?
+           ═══════════════════════════════════════════ */
+        function KundenModusWahl({ onSelectModus, onBack, connections }) {
+            var modi = [
+                {
+                    id: 'ki',
+                    icon: '🤖',
+                    title: 'KI-Analyse',
+                    desc: 'Alle Kundenordner werden von der KI analysiert. Positionen, Kundendaten und Raumlisten werden automatisch erkannt.',
+                    color: '#1E88E5',
+                    gradient: 'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)',
+                    shadow: 'rgba(30,136,229,0.35)',
+                    badge: 'EMPFOHLEN',
+                    disabled: !(connections && connections.geminiConnected && connections.driveConnected),
+                    disabledHint: 'Benötigt Gemini KI + Google Drive',
+                },
+                {
+                    id: 'gespeichert',
+                    icon: '📂',
+                    title: 'Gespeicherte Daten laden',
+                    desc: 'Bereits aufbereitete Kundendaten aus dem Ordner "Kundendaten" werden geladen und der Akte zugewiesen.',
+                    color: '#27ae60',
+                    gradient: 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
+                    shadow: 'rgba(39,174,96,0.35)',
+                    badge: null,
+                    disabled: !(connections && connections.driveConnected),
+                    disabledHint: 'Benötigt Google Drive',
+                },
+                {
+                    id: 'manuell',
+                    icon: '📝',
+                    title: 'Manuell anlegen',
+                    desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
+                    color: '#e67e22',
+                    gradient: 'linear-gradient(135deg, #e67e22 0%, #d35400 100%)',
+                    shadow: 'rgba(230,126,34,0.35)',
+                    badge: null,
+                    disabled: false,
+                    disabledHint: null,
+                },
+            ];
+
+            return (
+                <div style={{padding:'20px', minHeight:'100vh', background:'var(--bg-primary)'}}>
+                    {/* Header */}
+                    <div style={{textAlign:'center', marginBottom:'28px'}}>
+                        <div style={{fontSize:'36px', marginBottom:'8px'}}>👷</div>
+                        <div style={{fontSize:'22px', fontWeight:'800', color:'var(--text-primary)', letterSpacing:'-0.5px'}}>
+                            Kundenauswahl
+                        </div>
+                        <div style={{fontSize:'13px', color:'var(--text-muted)', marginTop:'6px', lineHeight:'1.5'}}>
+                            Wie möchtest du den Kunden bearbeiten?
+                        </div>
+                    </div>
+
+                    {/* Modus-Karten */}
+                    <div style={{display:'flex', flexDirection:'column', gap:'14px', maxWidth:'500px', margin:'0 auto'}}>
+                        {modi.map(function(m) {
+                            return (
+                                <button key={m.id}
+                                    disabled={m.disabled}
+                                    onTouchEnd={function(e){ if(!m.disabled){ e.preventDefault(); onSelectModus(m.id); } }}
+                                    onClick={function(){ if(!m.disabled) onSelectModus(m.id); }}
+                                    style={{
+                                        width:'100%', padding:'20px', borderRadius:'16px', border:'none', cursor: m.disabled ? 'not-allowed' : 'pointer',
+                                        background: m.disabled ? 'var(--bg-secondary)' : m.gradient, color: m.disabled ? 'var(--text-muted)' : 'white',
+                                        display:'flex', alignItems:'flex-start', gap:'16px', textAlign:'left',
+                                        boxShadow: m.disabled ? 'none' : '0 6px 20px ' + m.shadow,
+                                        opacity: m.disabled ? 0.5 : 1,
+                                        transition:'transform 0.15s ease, box-shadow 0.15s ease',
+                                        WebkitTapHighlightColor: m.shadow, touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
+                                        position:'relative', overflow:'hidden',
+                                    }}
+                                >
+                                    {/* Badge */}
+                                    {m.badge && !m.disabled && (
+                                        <div style={{position:'absolute', top:'0', right:'0', background:'rgba(255,255,255,0.25)', padding:'3px 10px', borderRadius:'0 16px 0 10px', fontSize:'9px', fontWeight:'800', letterSpacing:'1px'}}>
+                                            {m.badge}
+                                        </div>
+                                    )}
+                                    <span style={{fontSize:'32px', marginTop:'2px'}}>{m.icon}</span>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'17px', fontWeight:'700', marginBottom:'4px'}}>{m.title}</div>
+                                        <div style={{fontSize:'12px', opacity: m.disabled ? 0.7 : 0.9, lineHeight:'1.5'}}>{m.desc}</div>
+                                        {m.disabled && m.disabledHint && (
+                                            <div style={{fontSize:'10px', marginTop:'6px', padding:'3px 8px', background:'rgba(231,76,60,0.15)', borderRadius:'6px', display:'inline-block', color:'#e74c3c', fontWeight:'600'}}>
+                                                ⚠ {m.disabledHint}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {!m.disabled && <span style={{fontSize:'20px', opacity:0.7, marginTop:'4px'}}>→</span>}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Zurück-Button */}
+                    <div style={{textAlign:'center', marginTop:'28px'}}>
+                        <button
+                            onTouchEnd={function(e){ e.preventDefault(); onBack(); }}
+                            onClick={onBack}
+                            style={{
+                                padding:'12px 32px', borderRadius:'12px', border:'1px solid var(--border-color)',
+                                background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600',
+                                WebkitTapHighlightColor:'rgba(0,0,0,0.1)', touchAction:'manipulation',
+                        }}>
+                            ← Zurück
+                        </button>
+                    </div>
+                </div>
+            );
         }
 
         /* ═══════════════════════════════════════════
            MANUELLE EINGABE -- LV-Positionen & Räume
            ═══════════════════════════════════════════ */
-        function ManuelleEingabe({ onFertig, onBack }) {
-            const [activeTab, setActiveTab] = useState('positionen'); // 'positionen' | 'raeume'
-            const [kundenName, setKundenName] = useState('');
-            const [bauvorhaben, setBauvorhaben] = useState('');
+        function ManuelleEingabe({ onFertig, onBack, kunde }) {
+            const [activeStep, setActiveStep] = useState(1); // 1=Kundendaten, 2=Positionen, 3=Raeume
+            const [kundenName, setKundenName] = useState((kunde && kunde.name) || '');
+            const [bauvorhaben, setBauvorhaben] = useState((kunde && kunde.adresse) || '');
             
             // ── LV-Positionen State ──
             const [positionen, setPositionen] = useState([]);
@@ -294,6 +581,12 @@
 
             // ── Upload State ──
             const [uploadStatus, setUploadStatus] = useState('');
+            // ── Erweiterte Kundendaten ──
+            const [manuelleFelder, setManuelleFelder] = useState({
+                bauleitung:'', bl_telefon:'', bl_email:'',
+                architekt:'', arch_telefon:'', arch_email:'',
+                ag_adresse:'', ag_telefon:'', ag_email:''
+            });
 
             // ── Einheiten-Optionen ──
             var einheiten = ['m²', 'm', 'Stk', 'psch', 'lfm', 'kg', 'l', 'Satz'];
@@ -535,7 +828,17 @@
                     kundenName: kundenName.trim(),
                     bauvorhaben: bauvorhaben.trim(),
                     positionen: positionen,
-                    raeume: raeume
+                    raeume: raeume,
+                    bauleitung: (manuelleFelder.bauleitung || '').trim(),
+                    bl_telefon: (manuelleFelder.bl_telefon || '').trim(),
+                    bl_email: (manuelleFelder.bl_email || '').trim(),
+                    architekt: (manuelleFelder.architekt || '').trim(),
+                    arch_telefon: (manuelleFelder.arch_telefon || '').trim(),
+                    arch_email: (manuelleFelder.arch_email || '').trim(),
+                    ag_adresse: (manuelleFelder.ag_adresse || '').trim(),
+                    ag_telefon: (manuelleFelder.ag_telefon || '').trim(),
+                    ag_email: (manuelleFelder.ag_email || '').trim(),
+                    _driveFolderId: (kunde && kunde._driveFolderId) || null,
                 });
             };
 
@@ -557,41 +860,87 @@
                         </div>
                     </div>
 
-                    {/* KUNDENDATEN */}
+                    {/* KUNDENDATEN - Schritt 1 */}
+                    {activeStep === 1 && (
                     <div style={{background:'var(--bg-secondary)', borderRadius:'16px', padding:'16px', marginBottom:'16px', border:'1px solid var(--border-color)'}}>
-                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'12px'}}>📋 Kundendaten</div>
+                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'12px'}}>Schritt 1/3: Kundendaten</div>
                         <div style={{marginBottom:'10px'}}>
                             <label style={labelStyle}>Kundenname / Auftraggeber *</label>
-                            <input type="text" value={kundenName} onChange={function(e){ setKundenName(e.target.value); }} placeholder="z.B. Müller, Max" style={inputStyle} />
+                            <input type="text" value={kundenName} onChange={function(e){ setKundenName(e.target.value); }} placeholder="z.B. Mueller, Max" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Bauvorhaben / Adresse</label>
+                            <input type="text" value={bauvorhaben} onChange={function(e){ setBauvorhaben(e.target.value); }} placeholder="z.B. Neubau EFH, Musterstrasse 1" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Bauleitung</label>
+                            <input type="text" value={manuelleFelder.bauleitung || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bauleitung: e.target.value}); }); }} placeholder="Name der Bauleitung" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Telefon Bauleitung</label>
+                            <input type="tel" value={manuelleFelder.bl_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bl_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>E-Mail Bauleitung</label>
+                            <input type="email" value={manuelleFelder.bl_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bl_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Architekt</label>
+                            <input type="text" value={manuelleFelder.architekt || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {architekt: e.target.value}); }); }} placeholder="Name Architekt" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Telefon Architekt</label>
+                            <input type="tel" value={manuelleFelder.arch_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {arch_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>E-Mail Architekt</label>
+                            <input type="email" value={manuelleFelder.arch_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {arch_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Auftraggeber Adresse</label>
+                            <input type="text" value={manuelleFelder.ag_adresse || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_adresse: e.target.value}); }); }} placeholder="Strasse, PLZ Ort" style={inputStyle} />
+                        </div>
+                        <div style={{marginBottom:'10px'}}>
+                            <label style={labelStyle}>Telefon Auftraggeber</label>
+                            <input type="tel" value={manuelleFelder.ag_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Bauvorhaben / Adresse</label>
-                            <input type="text" value={bauvorhaben} onChange={function(e){ setBauvorhaben(e.target.value); }} placeholder="z.B. Neubau EFH, Musterstraße 1" style={inputStyle} />
+                            <label style={labelStyle}>E-Mail Auftraggeber</label>
+                            <input type="email" value={manuelleFelder.ag_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
                         </div>
+                        <button {...tap(function(){ if(!kundenName.trim()){ alert('Bitte mindestens den Kundennamen eingeben.'); return; } setActiveStep(2); })} style={Object.assign({}, touchBase, {
+                            width:'100%', marginTop:'16px', padding:'14px', borderRadius:'12px', border:'none',
+                            background:'var(--accent-blue)', color:'white', fontSize:'15px', fontWeight:'700', cursor:'pointer', minHeight:'50px'
+                        })}>
+                            Weiter zu Positionen \u2192
+                        </button>
                     </div>
+                    )}
 
-                    {/* TAB-NAVIGATION */}
+                    {/* SCHRITT-NAVIGATION */}
+                    {activeStep > 1 && (
                     <div style={{display:'flex', gap:'4px', marginBottom:'16px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px', border:'1px solid var(--border-color)'}}>
-                        <button {...tap(function(){ setActiveTab('positionen'); })} style={Object.assign({}, touchBase, {
+                        <button {...tap(function(){ setActiveStep(2); })} style={Object.assign({}, touchBase, {
                             flex:1, padding:'12px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700', minHeight:'48px',
-                            background: activeTab === 'positionen' ? 'var(--accent-blue)' : 'transparent',
-                            color: activeTab === 'positionen' ? 'white' : 'var(--text-muted)',
+                            background: activeStep === 2 ? 'var(--accent-blue)' : 'transparent',
+                            color: activeStep === 2 ? 'white' : 'var(--text-muted)',
                             transition:'all 0.2s ease'
                         })}>
-                            📋 Positionen ({positionen.length})
+                            Positionen ({positionen.length})
                         </button>
-                        <button {...tap(function(){ setActiveTab('raeume'); })} style={Object.assign({}, touchBase, {
+                        <button {...tap(function(){ setActiveStep(3); })} style={Object.assign({}, touchBase, {
                             flex:1, padding:'12px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700', minHeight:'48px',
-                            background: activeTab === 'raeume' ? '#e67e22' : 'transparent',
-                            color: activeTab === 'raeume' ? 'white' : 'var(--text-muted)',
+                            background: activeStep === 3 ? '#e67e22' : 'transparent',
+                            color: activeStep === 3 ? 'white' : 'var(--text-muted)',
                             transition:'all 0.2s ease'
                         })}>
-                            🏠 Räume ({raeume.length})
+                            Raeume ({raeume.length})
                         </button>
                     </div>
+                    )}
 
-                    {/* ═══════ TAB: POSITIONEN ═══════ */}
-                    {activeTab === 'positionen' && (
+                    {/* ═══════ SCHRITT 2: POSITIONEN ═══════ */}
+                    {activeStep === 2 && (
                         <div>
                             <button {...tap(function(){ resetPosForm(); setShowPosForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed var(--accent-blue)',
@@ -696,7 +1045,7 @@
                     )}
 
                     {/* ═══════ TAB: RÄUME ═══════ */}
-                    {activeTab === 'raeume' && (
+                    {activeStep === 3 && (
                         <div>
                             <button {...tap(function(){ resetRaumForm(); setShowRaumForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed #e67e22',
@@ -1622,10 +1971,18 @@
         /* ═══════════════════════════════════════════
            KUNDENAUSWAHL PAGE
            ═══════════════════════════════════════════ */
-        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde }) {
+        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde, kundeMode, onBack }) {
             const [searchTerm, setSearchTerm] = useState('');
             const [updatingId, setUpdatingId] = useState(null);
             const inputRef = React.useRef(null);
+
+            // Modus-Info
+            var modusInfo = {
+                ki: { icon: '\uD83E\uDD16', label: 'KI-Analyse', color: '#1E88E5' },
+                gespeichert: { icon: '\uD83D\uDCC2', label: 'Gespeicherte Daten', color: '#27ae60' },
+                manuell: { icon: '\uD83D\uDCDD', label: 'Manuell anlegen', color: '#e67e22' },
+            };
+            var activeModus = modusInfo[kundeMode] || modusInfo.ki;
 
             // Datenquelle: 1. Drive-Kunden  2. Lokal gespeicherte Kunden  3. Leer
             const gespeicherte = getGespeicherteKunden();
@@ -1664,9 +2021,22 @@
 
             return (
                 <div className="page-container">
+                    {/* Modus-Banner + Zurueck */}
+                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}>
+                        {onBack && (
+                            <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', whiteSpace:'nowrap'}}>
+                                \u2190
+                            </button>
+                        )}
+                        <div style={{flex:1, display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px', borderRadius:'10px', background: activeModus.color + '15', border:'1px solid ' + activeModus.color + '30'}}>
+                            <span style={{fontSize:'16px'}}>{activeModus.icon}</span>
+                            <span style={{fontSize:'12px', fontWeight:'700', color: activeModus.color}}>Modus: {activeModus.label}</span>
+                        </div>
+                    </div>
+
                     <div className="breadcrumb">
                         <span>Google Drive</span>
-                        <span>›</span>
+                        <span>\u203A</span>
                         <span className="breadcrumb-active">Baustellen neu</span>
                     </div>
                     <div className="page-title">Baustellen-Ordner</div>
@@ -2402,9 +2772,8 @@
                 }
             };
 
-            const erkannteRaeume = (kunde && kunde.raeume) || [];
-            const _lvpObj = (typeof LV_POSITIONEN !== 'undefined') ? LV_POSITIONEN : {};
-            const lvPositionen = _lvpObj[kunde._lvPositionenKey] || _lvpObj[kunde._driveFolderId] || _lvpObj[kunde.id] || [];
+            const erkannteRaeume = kunde.raeume || [];
+            const lvPositionen = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
             const duplicates = findDuplicatePositions(lvPositionen);
 
             // ═══ Auto-Fill: Wenn Vorraum-Daten existieren, Höhen-Felder automatisch vorausfüllen ═══
