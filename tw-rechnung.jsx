@@ -92,24 +92,49 @@
                 }));
             };
 
-            // Aus Aufmaß übernehmen: Positionen + Massen + EP aus LV
+            // Aus Aufmaß übernehmen: NUR Positionen die im Aufmass berechnet wurden!
             var uebernahmeAusAufmass = function() {
                 var merged = [];
                 var seen = {};
-                // Erst alle LV-Positionen nehmen
-                lvPositionen.forEach(function(lv) {
-                    var key = lv.pos || lv.posNr;
-                    var menge = aufmassMassen[key] || parseFloat(lv.menge) || 0;
-                    var ep = parseFloat(lv.einzelpreis) || parseFloat(lv.ep) || 0;
-                    merged.push({ id: merged.length, pos: key, bez: lv.bez || lv.titel || '', einheit: lv.einheit || 'm²', menge: menge, einzelpreis: ep, aktiv: menge > 0 });
+                // NUR Positionen die im Aufmass tatsaechlich berechnet wurden (aufmassMassen > 0)
+                var aufmassKeys = Object.keys(aufmassMassen).filter(function(k) { return aufmassMassen[k] > 0; });
+
+                // Zuerst: Aufmass-Positionen mit LV-Daten anreichern
+                aufmassKeys.forEach(function(key) {
+                    var lvMatch = lvPositionen.find(function(lv) {
+                        var lvPos = lv.pos || lv.posNr || '';
+                        return lvPos === key || lvPos.replace(/^0+/, '') === key.replace(/^0+/, '');
+                    });
+                    var ep = 0;
+                    var bez = 'Position ' + key;
+                    var einheit = 'm\u00b2';
+                    if (lvMatch) {
+                        ep = parseFloat(lvMatch.einzelpreis) || parseFloat(lvMatch.ep) || 0;
+                        bez = lvMatch.bez || lvMatch.titel || bez;
+                        einheit = lvMatch.einheit || einheit;
+                    }
+                    merged.push({
+                        id: merged.length,
+                        pos: key,
+                        bez: bez,
+                        einheit: einheit,
+                        menge: aufmassMassen[key],
+                        einzelpreis: ep,
+                        aktiv: true
+                    });
                     seen[key] = true;
                 });
-                // Aufmaß-Positionen die nicht im LV sind
-                Object.keys(aufmassMassen).forEach(function(key) {
-                    if (!seen[key] && aufmassMassen[key] > 0) {
-                        merged.push({ id: merged.length, pos: key, bez: 'Position ' + key, einheit: 'm²', menge: aufmassMassen[key], einzelpreis: 0, aktiv: true });
-                    }
-                });
+
+                // Falls keine Aufmass-Daten: Fallback auf alle LV-Positionen (Legacy)
+                if (merged.length === 0) {
+                    lvPositionen.forEach(function(lv) {
+                        var key = lv.pos || lv.posNr;
+                        var menge = parseFloat(lv.menge) || 0;
+                        var ep = parseFloat(lv.einzelpreis) || parseFloat(lv.ep) || 0;
+                        merged.push({ id: merged.length, pos: key, bez: lv.bez || lv.titel || '', einheit: lv.einheit || 'm\u00b2', menge: menge, einzelpreis: ep, aktiv: menge > 0 });
+                    });
+                }
+
                 setPositionen(merged);
                 setPhase('formular');
             };
@@ -208,10 +233,20 @@
                     : rechnungsTyp === 'stundenlohn' ? 'Stundenlohnrechnung' : 'Rechnung';
                 var kName = kunde.auftraggeber || kunde.name || '';
                 if (kName.indexOf('Datum') === 0 || kName.indexOf('Unterschrift') !== -1) kName = kunde.name || '';
-                var af = kunde.ag_adresse || kunde.adresse || '';
-                if (af.indexOf('Datum') !== -1 || af.indexOf('Unterschrift') !== -1) af = kunde.adresse || '';
+                // Adresse aus importResult/Stammdaten holen
+                var irKd = (importResult && importResult.kundendaten) || {};
+                var kStrasse = irKd.auftraggeber_strasse || kunde.ag_adresse || '';
+                var kPlzOrt = irKd.auftraggeber_plzOrt || '';
+                if (!kPlzOrt && irKd.auftraggeber_plz) kPlzOrt = irKd.auftraggeber_plz + ' ' + (irKd.auftraggeber_ort || '');
+                var af = kStrasse || kunde.adresse || '';
                 var aLines = [];
-                if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});} }
+                if (kStrasse) aLines.push(kStrasse);
+                if (kPlzOrt) aLines.push(kPlzOrt);
+                if (aLines.length === 0 && af) {
+                    var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/);
+                    if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}
+                    else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});}
+                }
 
                 var posR = '';
                 aktivePosn.forEach(function(p) {
@@ -222,12 +257,16 @@
                 var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+rechnungsNr+'</title>';
                 h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">';
                 h += '<style>';
-                h += '@page{size:A4;margin:0}';
+                h += '@page{size:A4;margin:20mm 18mm 28mm 22mm;@bottom-center{content:"Seite " counter(page) " von " counter(pages);font-size:8pt;color:#999}}';
                 h += '*{box-sizing:border-box;margin:0;padding:0}';
-                h += 'body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:9.5pt;color:#222;line-height:1.4;background:#fff}';
+                h += 'body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:9.5pt;color:#222;line-height:1.4;background:#fff;counter-reset:page}';
                 h += '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-                // A4 container mit festen Rändern
-                h += '.page{width:210mm;min-height:297mm;padding:20mm 18mm 25mm 22mm;margin:0 auto;position:relative;background:#fff}';
+                // A4 container
+                h += '.page{width:210mm;padding:20mm 18mm 28mm 22mm;margin:0 auto;position:relative;background:#fff}';
+                // Seitenzahl-Footer (für Screen-Ansicht)
+                h += '.page-number{text-align:center;font-size:8pt;color:#999;padding-top:4mm;margin-top:auto}';
+                // Tabelle: Zeilen nicht umbrechen
+                h += 'table.p tbody tr{page-break-inside:avoid;break-inside:avoid}';
                 // Logo -- 1:1 Kopie der App-Startseite
                 h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}';
                 h += '.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
@@ -273,7 +312,7 @@
                 // Bemerkung
                 h += '.bm{font-size:8.5pt;color:#555;margin-bottom:8mm;line-height:1.5}';
                 // Fusszeile
-                h += '.ft{position:absolute;bottom:18mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7pt;color:#999;line-height:1.6}';
+                h += '.ft{border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7pt;color:#999;line-height:1.6;margin-top:auto;page-break-inside:avoid}';
                 h += '.ft .ti{font-style:italic;color:#c41e1e;font-weight:700}';
                 h += '.ft .tn{color:#333;font-weight:700}';
                 h += '.ft .tf{color:#c41e1e}';
@@ -300,7 +339,7 @@
                 h += '<div class="rt">'+typLabel+'</div>';
                 h += '<div class="rm">';
                 h += '<div><span class="l">Rechnungs-Nr.:</span> <span class="v">'+rechnungsNr+'</span></div>';
-                h += '<div><span class="l">Bauvorhaben:</span> <span class="v">'+(kunde.adresse||kunde.name||'')+'</span></div>';
+                h += '<div><span class="l">Bauvorhaben:</span> <span class="v">'+(irKd.baumassnahme || kunde.baumassnahme || kunde.adresse || kunde.name || '')+'</span></div>';
                 if(leistungszeitraum) h += '<div><span class="l">Leistungszeitraum:</span> <span class="v">'+leistungszeitraum+'</span></div>';
                 if(auftragsnummer) h += '<div><span class="l">Auftragsnummer:</span> <span class="v">'+auftragsnummer+'</span></div>';
                 if(kostenstelle) h += '<div><span class="l">Kostenstelle:</span> <span class="v">'+kostenstelle+'</span></div>';
@@ -868,7 +907,7 @@
                         </div>
                     </div>
 
-                    {/* Positionen - gleiches Format für alle Rechnungstypen */}
+                    {/* Positionen -- gleiches Format für alle Rechnungstypen */}
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'}}>
                                 <div style={{fontSize:'11px', fontWeight:'700', color: typColor}}>📋 Positionen ({aktivePosn.length})</div>
