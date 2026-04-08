@@ -241,15 +241,14 @@
                     kunde.raeume = result.raeume;
                 }
 
-                // Stammdaten aktualisieren
+                // ImportResult IMMER aktualisieren (auch wenn nur Positionen geaendert)
+                var updatedKd = {};
                 if (result.stammFelder) {
                     var sf = result.stammFelder;
                     kunde.auftraggeber = sf.bauherr_firma || kunde.auftraggeber;
                     kunde.adresse = sf.objekt_baustelle || kunde.adresse;
                     kunde.baumassnahme = sf.objekt_bauvorhaben || kunde.baumassnahme;
-
-                    // ImportResult mit aktualisierten Kundendaten
-                    var updatedKd = {
+                    updatedKd = {
                         auftraggeber: sf.bauherr_firma || '',
                         auftraggeber_strasse: sf.bauherr_strasse || '',
                         auftraggeber_plzOrt: sf.bauherr_plzOrt || '',
@@ -271,16 +270,17 @@
                         auftragssummeBrutto: sf.objekt_brutto || '',
                         projekt: sf.projekt || ''
                     };
-
-                    // ImportResult aktualisieren
-                    var newIR = Object.assign({}, importResult || {}, {
-                        positionen: result.positionen || (importResult && importResult.positionen) || [],
-                        raeume: result.raeume || (importResult && importResult.raeume) || [],
-                        kundendaten: updatedKd
-                    });
-                    setImportResult(newIR);
-                    kunde._importResult = newIR;
+                } else {
+                    updatedKd = (importResult && importResult.kundendaten) || {};
                 }
+
+                var newIR = Object.assign({}, importResult || {}, {
+                    positionen: result.positionen || (importResult && importResult.positionen) || [],
+                    raeume: result.raeume || (importResult && importResult.raeume) || [],
+                    kundendaten: updatedKd
+                });
+                setImportResult(newIR);
+                kunde._importResult = newIR;
 
                 // Lokal speichern
                 var localKey = 'aufmass_kunde_' + kundeId;

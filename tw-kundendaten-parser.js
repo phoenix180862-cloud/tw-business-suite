@@ -298,8 +298,17 @@
 
                 // ═══ POSITION GEFUNDEN ═══
                 var menge = typeof colB === 'number' ? colB : parseFloat(String(colB).replace(',', '.')) || 0;
-                var ep = typeof colE === 'number' ? colE : parseFloat(String(colE).replace(',', '.')) || 0;
-                var gp = typeof colF === 'number' ? colF : parseFloat(String(colF).replace(',', '.')) || 0;
+                // EP: Nur numerische Werte, Formeln (=...) ignorieren
+                var epRaw = colE;
+                var ep = 0;
+                if (typeof epRaw === 'number') { ep = epRaw; }
+                else if (epRaw && typeof epRaw === 'string' && epRaw.charAt(0) !== '=') { ep = parseFloat(epRaw.replace(',', '.')) || 0; }
+                // GP: Nur numerische Werte, Formeln ignorieren, sonst berechnen
+                var gpRaw = colF;
+                var gp = 0;
+                if (typeof gpRaw === 'number') { gp = gpRaw; }
+                else if (gpRaw && typeof gpRaw === 'string' && gpRaw.charAt(0) !== '=') { gp = parseFloat(gpRaw.replace(',', '.')) || 0; }
+                if (gp === 0 && ep > 0 && menge > 0) { gp = Math.round(menge * ep * 100) / 100; }
 
                 var pos = {
                     pos: colA,
