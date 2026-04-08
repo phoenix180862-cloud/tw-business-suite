@@ -92,49 +92,32 @@
                 }));
             };
 
-            // Aus Aufmaß übernehmen: NUR Positionen die im Aufmass berechnet wurden!
+            // Aus Aufmaß übernehmen: AUSSCHLIESSLICH Positionen die im Aufmaß berechnet wurden!
+            // Nur Positionen mit aufmassMassen[key] > 0 werden übernommen.
             var uebernahmeAusAufmass = function() {
                 var merged = [];
                 var seen = {};
-                // NUR Positionen die im Aufmass tatsaechlich berechnet wurden (aufmassMassen > 0)
-                var aufmassKeys = Object.keys(aufmassMassen).filter(function(k) { return aufmassMassen[k] > 0; });
-
-                // Zuerst: Aufmass-Positionen mit LV-Daten anreichern
-                aufmassKeys.forEach(function(key) {
-                    var lvMatch = lvPositionen.find(function(lv) {
-                        var lvPos = lv.pos || lv.posNr || '';
-                        return lvPos === key || lvPos.replace(/^0+/, '') === key.replace(/^0+/, '');
-                    });
-                    var ep = 0;
-                    var bez = 'Position ' + key;
-                    var einheit = 'm\u00b2';
-                    if (lvMatch) {
-                        ep = parseFloat(lvMatch.einzelpreis) || parseFloat(lvMatch.ep) || 0;
-                        bez = lvMatch.bez || lvMatch.titel || bez;
-                        einheit = lvMatch.einheit || einheit;
-                    }
-                    merged.push({
-                        id: merged.length,
-                        pos: key,
-                        bez: bez,
-                        einheit: einheit,
-                        menge: aufmassMassen[key],
-                        einzelpreis: ep,
-                        aktiv: true
-                    });
-                    seen[key] = true;
-                });
-
-                // Falls keine Aufmass-Daten: Fallback auf alle LV-Positionen (Legacy)
-                if (merged.length === 0) {
-                    lvPositionen.forEach(function(lv) {
-                        var key = lv.pos || lv.posNr;
-                        var menge = parseFloat(lv.menge) || 0;
+                // NUR LV-Positionen übernehmen, die im Aufmaß eine berechnete Menge haben
+                lvPositionen.forEach(function(lv) {
+                    var key = lv.pos || lv.posNr;
+                    var aufmassMenge = aufmassMassen[key] || 0;
+                    // FILTER: Nur Positionen mit Aufmaß-Ergebnis > 0
+                    if (aufmassMenge > 0) {
                         var ep = parseFloat(lv.einzelpreis) || parseFloat(lv.ep) || 0;
-                        merged.push({ id: merged.length, pos: key, bez: lv.bez || lv.titel || '', einheit: lv.einheit || 'm\u00b2', menge: menge, einzelpreis: ep, aktiv: menge > 0 });
-                    });
+                        merged.push({ id: merged.length, pos: key, bez: lv.bez || lv.titel || '', einheit: lv.einheit || 'm\u00b2', menge: aufmassMenge, einzelpreis: ep, aktiv: true });
+                        seen[key] = true;
+                    }
+                });
+                // Aufmaß-Positionen die nicht im LV sind, aber berechnet wurden
+                Object.keys(aufmassMassen).forEach(function(key) {
+                    if (!seen[key] && aufmassMassen[key] > 0) {
+                        merged.push({ id: merged.length, pos: key, bez: 'Position ' + key, einheit: 'm\u00b2', menge: aufmassMassen[key], einzelpreis: 0, aktiv: true });
+                    }
+                });
+                if (merged.length === 0) {
+                    alert('Keine berechneten Positionen im Aufma\u00df gefunden.\nBitte zuerst im Aufma\u00df-Modul Positionen markieren und berechnen.');
+                    return;
                 }
-
                 setPositionen(merged);
                 setPhase('formular');
             };
@@ -159,6 +142,38 @@
             var addStundenlohnZeile = function() {
                 setStundenlohnEintraege(function(prev) { return prev.concat([{ datum: new Date().toISOString().split('T')[0], stunden: '', beschreibung: '', stundensatz: '55.00' }]); });
             };
+
+            // ── Spracheingabe ──
+            var [sprachAktiv, setSprachAktiv] = useState(false);
+            var startSpeech = function(callback) {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    alert('Spracheingabe wird von diesem Browser nicht unterst\u00fctzt. Bitte Chrome verwenden.');
+                    return;
+                }
+                var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+                var recognition = new SpeechRec();
+                recognition.lang = 'de-DE';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                setSprachAktiv(true);
+                recognition.onresult = function(event) {
+                    var text = event.results[0][0].transcript;
+                    setSprachAktiv(false);
+                    if (callback) callback(text);
+                };
+                recognition.onerror = function(event) {
+                    console.warn('Spracheingabe Fehler:', event.error);
+                    setSprachAktiv(false);
+                };
+                recognition.onend = function() {
+                    setSprachAktiv(false);
+                };
+                recognition.start();
+            };
+
+            // Mikrofon-Button Style
+            var micBtnStyle = {padding:'4px 7px', background: sprachAktiv ? 'rgba(231,76,60,0.15)' : 'rgba(30,136,229,0.1)', color: sprachAktiv ? '#e74c3c' : 'var(--accent-blue)', border:'1px solid ' + (sprachAktiv ? 'rgba(231,76,60,0.3)' : 'rgba(30,136,229,0.2)'), borderRadius:'6px', cursor:'pointer', fontSize:'12px', lineHeight:1, touchAction:'manipulation', minWidth:'28px', minHeight:'28px', display:'inline-flex', alignItems:'center', justifyContent:'center'};
+
             var fmt = function(n) { return Number(n || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 
             // Berechnungen
@@ -233,20 +248,10 @@
                     : rechnungsTyp === 'stundenlohn' ? 'Stundenlohnrechnung' : 'Rechnung';
                 var kName = kunde.auftraggeber || kunde.name || '';
                 if (kName.indexOf('Datum') === 0 || kName.indexOf('Unterschrift') !== -1) kName = kunde.name || '';
-                // Adresse aus importResult/Stammdaten holen
-                var irKd = (importResult && importResult.kundendaten) || {};
-                var kStrasse = irKd.auftraggeber_strasse || kunde.ag_adresse || '';
-                var kPlzOrt = irKd.auftraggeber_plzOrt || '';
-                if (!kPlzOrt && irKd.auftraggeber_plz) kPlzOrt = irKd.auftraggeber_plz + ' ' + (irKd.auftraggeber_ort || '');
-                var af = kStrasse || kunde.adresse || '';
+                var af = kunde.ag_adresse || kunde.adresse || '';
+                if (af.indexOf('Datum') !== -1 || af.indexOf('Unterschrift') !== -1) af = kunde.adresse || '';
                 var aLines = [];
-                if (kStrasse) aLines.push(kStrasse);
-                if (kPlzOrt) aLines.push(kPlzOrt);
-                if (aLines.length === 0 && af) {
-                    var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/);
-                    if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}
-                    else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});}
-                }
+                if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});} }
 
                 var posR = '';
                 aktivePosn.forEach(function(p) {
@@ -257,16 +262,12 @@
                 var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+rechnungsNr+'</title>';
                 h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">';
                 h += '<style>';
-                h += '@page{size:A4;margin:20mm 18mm 28mm 22mm;@bottom-center{content:"Seite " counter(page) " von " counter(pages);font-size:8pt;color:#999}}';
+                h += '@page{size:A4;margin:0}';
                 h += '*{box-sizing:border-box;margin:0;padding:0}';
-                h += 'body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:9.5pt;color:#222;line-height:1.4;background:#fff;counter-reset:page}';
+                h += 'body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:9.5pt;color:#222;line-height:1.4;background:#fff}';
                 h += '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-                // A4 container
-                h += '.page{width:210mm;padding:20mm 18mm 28mm 22mm;margin:0 auto;position:relative;background:#fff}';
-                // Seitenzahl-Footer (für Screen-Ansicht)
-                h += '.page-number{text-align:center;font-size:8pt;color:#999;padding-top:4mm;margin-top:auto}';
-                // Tabelle: Zeilen nicht umbrechen
-                h += 'table.p tbody tr{page-break-inside:avoid;break-inside:avoid}';
+                // A4 container mit festen Rändern
+                h += '.page{width:210mm;min-height:297mm;padding:20mm 18mm 25mm 22mm;margin:0 auto;position:relative;background:#fff}';
                 // Logo -- 1:1 Kopie der App-Startseite
                 h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}';
                 h += '.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
@@ -312,7 +313,7 @@
                 // Bemerkung
                 h += '.bm{font-size:8.5pt;color:#555;margin-bottom:8mm;line-height:1.5}';
                 // Fusszeile
-                h += '.ft{border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7pt;color:#999;line-height:1.6;margin-top:auto;page-break-inside:avoid}';
+                h += '.ft{position:absolute;bottom:18mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7pt;color:#999;line-height:1.6}';
                 h += '.ft .ti{font-style:italic;color:#c41e1e;font-weight:700}';
                 h += '.ft .tn{color:#333;font-weight:700}';
                 h += '.ft .tf{color:#c41e1e}';
@@ -339,7 +340,7 @@
                 h += '<div class="rt">'+typLabel+'</div>';
                 h += '<div class="rm">';
                 h += '<div><span class="l">Rechnungs-Nr.:</span> <span class="v">'+rechnungsNr+'</span></div>';
-                h += '<div><span class="l">Bauvorhaben:</span> <span class="v">'+(irKd.baumassnahme || kunde.baumassnahme || kunde.adresse || kunde.name || '')+'</span></div>';
+                h += '<div><span class="l">Bauvorhaben:</span> <span class="v">'+(kunde.adresse||kunde.name||'')+'</span></div>';
                 if(leistungszeitraum) h += '<div><span class="l">Leistungszeitraum:</span> <span class="v">'+leistungszeitraum+'</span></div>';
                 if(auftragsnummer) h += '<div><span class="l">Auftragsnummer:</span> <span class="v">'+auftragsnummer+'</span></div>';
                 if(kostenstelle) h += '<div><span class="l">Kostenstelle:</span> <span class="v">'+kostenstelle+'</span></div>';
@@ -828,13 +829,18 @@
 
                         {/* Aufmaß-Übernahme Button */}
                         {hatAufmass && (
-                            <button onClick={uebernahmeAusAufmass} style={{
-                                width:'100%', padding:'12px', marginBottom:'8px', borderRadius:'10px', border:'2px solid #27ae60',
-                                background:'rgba(39,174,96,0.08)', color:'#27ae60', fontSize:'13px', fontWeight:'700', cursor:'pointer',
-                                display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
-                            }}>
-                                📐 Positionen + Massen aus Aufmaß übernehmen
-                            </button>
+                            <div style={{marginBottom:'8px'}}>
+                                <button onClick={uebernahmeAusAufmass} style={{
+                                    width:'100%', padding:'12px', borderRadius:'10px', border:'2px solid #27ae60',
+                                    background:'rgba(39,174,96,0.08)', color:'#27ae60', fontSize:'13px', fontWeight:'700', cursor:'pointer',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                    📐 Nur berechnete Positionen aus Aufmaß übernehmen
+                                </button>
+                                <div style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', marginTop:'4px'}}>
+                                    Nur Positionen mit Aufmaß-Ergebnis &gt; 0 werden übertragen ({Object.keys(aufmassMassen).filter(function(k){ return aufmassMassen[k] > 0; }).length} von {lvPositionen.length} Positionen)
+                                </div>
+                            </div>
                         )}
                         {!hatAufmass && (
                             <div style={{padding:'8px 12px', marginBottom:'8px', borderRadius:'8px', background:'rgba(230,126,34,0.08)', fontSize:'11px', color:'#e67e22', textAlign:'center'}}>
@@ -990,7 +996,14 @@
 
                     {/* Bemerkung */}
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>📝 Bemerkung</div>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'6px'}}>
+                            <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)'}}>📝 Bemerkung</div>
+                            <button onClick={function(){ startSpeech(function(text){ setBemerkung(function(prev){ return prev ? prev + ' ' + text : text; }); }); }}
+                                onTouchEnd={function(e){ e.preventDefault(); startSpeech(function(text){ setBemerkung(function(prev){ return prev ? prev + ' ' + text : text; }); }); }}
+                                style={micBtnStyle} title="Spracheingabe">
+                                {sprachAktiv ? '🔴' : '🎤'}
+                            </button>
+                        </div>
                         <textarea value={bemerkung} onChange={function(e){setBemerkung(e.target.value);}} rows={2} placeholder="Optionaler Zusatztext auf der Rechnung..."
                             style={{width:'100%', padding:'8px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box'}} />
                     </div>
