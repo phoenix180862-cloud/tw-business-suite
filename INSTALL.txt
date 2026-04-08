@@ -1,0 +1,66 @@
+════════════════════════════════════════════════════════════
+  TW BUSINESS SUITE — UPDATE: KundenDaten-Parser
+  Erstellt am: 08.04.2026
+════════════════════════════════════════════════════════════
+
+INHALT DIESER LIEFERUNG:
+─────────────────────────
+1. tw-kundendaten-parser.js  — NEUER deterministischer Excel-Parser
+2. tw-app.jsx                — AKTUALISIERT (gespeichert-Modus mit Parser)
+3. INSTALL.txt               — Diese Datei
+
+INSTALLATION:
+─────────────
+
+SCHRITT 1: Dateien kopieren
+  → tw-kundendaten-parser.js ins Hauptverzeichnis kopieren (neben tw-app.jsx)
+  → tw-app.jsx ersetzen (alte Version ueberschreiben)
+
+SCHRITT 2: Parser in index-template.html einbinden
+  → Oeffne index-template.html
+  → Suche nach der Zeile: <link rel="stylesheet" href="tw-design.css">
+  → Fuege DIREKT DARUNTER folgende Zeile ein:
+
+    <script src="tw-kundendaten-parser.js"></script>
+
+  Das sieht dann so aus:
+
+    <link rel="stylesheet" href="tw-design.css">
+    <script src="tw-kundendaten-parser.js"></script>
+
+SCHRITT 3: Build ausfuehren
+  → build.bat ausfuehren (Doppelklick)
+  → Dadurch wird die neue index.html erstellt
+
+SCHRITT 4: Testen
+  → start-server.bat ausfuehren
+  → Browser oeffnen: http://localhost:8080
+  → Startseite: Gemini KI + Google Drive verbinden
+  → KUNDENAUSWAHL klicken
+  → "Gespeicherte Daten laden" (gruener Button) waehlen
+  → Einen Kunden auswaehlen (z.B. BBS Montabaur)
+  → Parser laedt automatisch die 3 Excel-Listen aus dem
+    Unterordner "Kunden-Daten" und zeigt die Ergebnisse
+
+WAS IST NEU:
+────────────
+- Der gruene "Gespeicherte Daten laden" Button funktioniert jetzt
+- Er greift auf den Ordner "Kunden-Daten" im Kundenordner zu
+- Die 3 Excel-Listen werden deterministisch geparst (KEINE KI)
+- Erkannte Daten: 
+  * Liste 1: Kundenstammdaten (Bauherr, Bauleiter, Architekt etc.)
+  * Liste 2: LV-Positionen + Nachtraege (mit EP/GP)
+  * Liste 3: Raumliste (mit Flaechen, Umfang, Positonsreferenzen)
+- Daten werden automatisch den Modulen zugeordnet:
+  * Aufmass: Positionsliste + Raumliste
+  * Rechnung: Positionen + Preise + Kundendaten
+  * Schriftverkehr: Adressen (Bauherr, Bauleiter, Architekt)
+- Nach erfolgreichem Laden: Direkte Navigation zur Modulwahl
+- Daten werden lokal gespeichert fuer spaetere Verwendung
+
+HINWEIS ZUR KI:
+───────────────
+Die KI-Infrastruktur (Gemini) bleibt vollstaendig erhalten und
+funktionsfaehig. Der KI-Analyse Button auf der KundenModusWahl-Seite
+ist weiterhin vorhanden fuer zukuenftige Nutzung.
+Fuer die vorbereiteten Excel-Listen wird KEINE KI benoetigt.
