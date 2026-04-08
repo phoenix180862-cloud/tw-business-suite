@@ -294,7 +294,7 @@
                 } catch(e) { console.warn('Speicherfehler:', e); }
 
                 setSelectedKunde(Object.assign({}, kunde));
-                navigateTo('modulwahl');
+                // NICHT navigieren — User bleibt auf DatenUebersicht!
             };
 
             // ── NEU: Manuelle Eingabe fertiggestellt ──
