@@ -30,6 +30,104 @@
             const [selectedOrdnerNr, setSelectedOrdnerNr] = useState(null);
 
             /* ══════════════════════════════════════════════════
+               LOKALER SPEICHER (TWStorage / IndexedDB)
+               Automatische Persistenz aller Arbeitsdaten
+               ══════════════════════════════════════════════════ */
+
+            // ── Beim App-Start: Letzten Arbeitsstand wiederherstellen ──
+            useEffect(function() {
+                if (!window.TWStorage || !window.TWStorage.isReady()) {
+                    // Warten bis Storage bereit
+                    var checkReady = setInterval(function() {
+                        if (window.TWStorage && window.TWStorage.isReady()) {
+                            clearInterval(checkReady);
+                            restoreLastSession();
+                        }
+                    }, 200);
+                    var timeout = setTimeout(function() { clearInterval(checkReady); }, 5000);
+                    return function() { clearInterval(checkReady); clearTimeout(timeout); };
+                } else {
+                    restoreLastSession();
+                }
+
+                function restoreLastSession() {
+                    // Letzten aktiven Kunden wiederherstellen
+                    TWStorage.loadAppState('lastKundeId').then(function(kundeId) {
+                        if (!kundeId) return;
+                        return TWStorage.loadKunde(kundeId).then(function(kunde) {
+                            if (kunde) {
+                                console.log('[TW-Storage] Letzten Kunden wiederhergestellt:', kunde.name || kundeId);
+                                setSelectedKunde(kunde);
+                                // Gesamtliste laden
+                                return TWStorage.loadGesamtliste(kundeId).then(function(gl) {
+                                    if (gl && gl.length > 0) {
+                                        setGesamtliste(gl);
+                                        console.log('[TW-Storage] Gesamtliste wiederhergestellt:', gl.length, 'Positionen');
+                                    }
+                                });
+                            }
+                        });
+                    }).catch(function(e) {
+                        console.warn('[TW-Storage] Session-Restore fehlgeschlagen:', e);
+                    });
+                }
+            }, []);
+
+            // ── Auto-Save: Kunde bei jeder Aenderung speichern ──
+            useEffect(function() {
+                if (!selectedKunde || !window.TWStorage || !window.TWStorage.isReady()) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                if (!kundeId) return;
+
+                // Debounce: 500ms warten
+                var timer = setTimeout(function() {
+                    TWStorage.saveKunde(selectedKunde).then(function() {
+                        TWStorage.saveAppState('lastKundeId', kundeId);
+                    }).catch(function(e) {
+                        console.warn('[TW-Storage] Auto-Save Kunde fehlgeschlagen:', e);
+                    });
+                }, 500);
+                return function() { clearTimeout(timer); };
+            }, [selectedKunde]);
+
+            // ── Auto-Save: Gesamtliste bei jeder Aenderung speichern ──
+            useEffect(function() {
+                if (!gesamtliste || gesamtliste.length === 0 || !selectedKunde) return;
+                if (!window.TWStorage || !window.TWStorage.isReady()) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                if (!kundeId) return;
+
+                var timer = setTimeout(function() {
+                    TWStorage.saveGesamtliste(kundeId, gesamtliste).then(function() {
+                        console.log('[TW-Storage] Gesamtliste gespeichert:', gesamtliste.length, 'Positionen');
+                    }).catch(function(e) {
+                        console.warn('[TW-Storage] Auto-Save Gesamtliste fehlgeschlagen:', e);
+                    });
+                }, 800);
+                return function() { clearTimeout(timer); };
+            }, [gesamtliste, selectedKunde]);
+
+            // ── Auto-Save: ImportResult speichern ──
+            useEffect(function() {
+                if (!importResult || !selectedKunde) return;
+                if (!window.TWStorage || !window.TWStorage.isReady()) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                if (!kundeId) return;
+
+                var timer = setTimeout(function() {
+                    TWStorage.put('driveCache', {
+                        id: 'importResult_' + kundeId,
+                        type: 'importResult',
+                        data: importResult,
+                        updatedAt: new Date().toISOString()
+                    }).catch(function(e) {
+                        console.warn('[TW-Storage] Auto-Save ImportResult fehlgeschlagen:', e);
+                    });
+                }, 800);
+                return function() { clearTimeout(timer); };
+            }, [importResult, selectedKunde]);
+
+            /* ══════════════════════════════════════════════════
                GLOBALER AUTO-FOCUS & ENTER-NAVIGATION
                ══════════════════════════════════════════════════ */
 
@@ -510,7 +608,20 @@
                         console.warn('Speichern fehlgeschlagen:', saveErr.message);
                     }
 
-                    setLoadProgress('✅ Update-Analyse abgeschlossen! ' + (result.positionen || []).length + ' Positionen erkannt.');
+                    // IndexedDB Persistenz
+                    if (window.TWStorage && window.TWStorage.isReady()) {
+                        var kid = kunde._driveFolderId || kunde.id || kunde.name;
+                        TWStorage.saveKunde(fullyLoaded).catch(function(){});
+                        if (result) TWStorage.put('driveCache', { id: 'importResult_' + kid, type: 'importResult', data: result, updatedAt: new Date().toISOString() }).catch(function(){});
+                        TWStorage.saveAppState('lastKundeId', kid);
+
+                        // Drive-Sync: Ordnerstruktur + Dateien im Hintergrund herunterladen
+                        if (kunde._driveFolderId) {
+                            TWStorage.DriveSync.syncKundenOrdner(kid, kunde._driveFolderId, function(info) {
+                                console.log('[DriveSync] ' + info.message);
+                            }).catch(function(e) { console.warn('[DriveSync]', e.message); });
+                        }
+                    }
                     navigateTo('geladen'); // Ergebnis anzeigen!
 
                 } catch(err) {
@@ -790,9 +901,33 @@
                                         delete toSave.folders;
                                         delete toSave.files;
                                         localStorage.setItem(localKey2, JSON.stringify(toSave));
-                                        console.log('✅ Kunde lokal gespeichert:', localKey2);
+                                        console.log('Kunde lokal gespeichert:', localKey2);
                                     } catch(saveErr) {
                                         console.warn('LocalStorage Speicherfehler:', saveErr);
+                                    }
+
+                                    // 8b. IndexedDB-Speicher (groesser, persistenter, offline-faehig)
+                                    if (window.TWStorage && window.TWStorage.isReady()) {
+                                        TWStorage.saveKunde(enriched).catch(function(e) { console.warn('TWStorage Kunde:', e); });
+                                        if (impResult) {
+                                            TWStorage.put('driveCache', { id: 'importResult_' + kundeId, type: 'importResult', data: impResult, updatedAt: new Date().toISOString() }).catch(function(){});
+                                        }
+                                        if (impResult.positionen) {
+                                            TWStorage.saveGesamtliste(kundeId, impResult.positionen).catch(function(){});
+                                        }
+                                        TWStorage.saveAppState('lastKundeId', kundeId);
+                                        console.log('[TW-Storage] Kundendaten in IndexedDB gespeichert');
+
+                                        // Drive-Sync: Komplette Ordnerstruktur + Dateien herunterladen
+                                        if (kunde.id) {
+                                            TWStorage.DriveSync.syncKundenOrdner(kundeId, kunde.id, function(info) {
+                                                console.log('[DriveSync] ' + info.message);
+                                            }).then(function(result) {
+                                                console.log('[DriveSync] Sync abgeschlossen:', result.stats.dateienSynced, 'Dateien');
+                                            }).catch(function(e) {
+                                                console.warn('[DriveSync] Sync-Fehler:', e.message);
+                                            });
+                                        }
                                     }
 
                                     setLoadProgress('✅ ' + impResult.positionen.length + ' Positionen + ' + impResult.raeume.length + ' Räume geladen!');
@@ -1053,7 +1188,21 @@
                         console.warn('Lokales Speichern fehlgeschlagen:', saveErr.message);
                     }
 
-                    setLoadProgress('✅ Analyse abgeschlossen!');
+                    // IndexedDB Persistenz
+                    if (window.TWStorage && window.TWStorage.isReady()) {
+                        var kid2 = kunde._driveFolderId || kunde.id || kunde.name;
+                        TWStorage.saveKunde(fullyLoaded).catch(function(){});
+                        if (result) TWStorage.put('driveCache', { id: 'importResult_' + kid2, type: 'importResult', data: result, updatedAt: new Date().toISOString() }).catch(function(){});
+                        if (result.positionen) TWStorage.saveGesamtliste(kid2, result.positionen).catch(function(){});
+                        TWStorage.saveAppState('lastKundeId', kid2);
+
+                        // Drive-Sync: Ordnerstruktur + Dateien im Hintergrund herunterladen
+                        if (kunde._driveFolderId) {
+                            TWStorage.DriveSync.syncKundenOrdner(kid2, kunde._driveFolderId, function(info) {
+                                console.log('[DriveSync] ' + info.message);
+                            }).catch(function(e) { console.warn('[DriveSync]', e.message); });
+                        }
+                    }
                     // NICHT mehr navigateTo('geladen') -- bleiben auf analyseConfig!
 
                 } catch (err) {

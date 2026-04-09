@@ -267,6 +267,169 @@
     Firma.load();
 
 
+    // ─── EXIT GUARD ─────────────────────────────────────────
+    // Verhindert versehentliches Schliessen der App (Zurueck-Taste, Tab schliessen, etc.)
+    // Zeigt einen Sicherheitsdialog mit 2 Optionen:
+    //   1. Zurueck zur Bearbeitung
+    //   2. App endgueltig schliessen
+
+    var ExitGuard = {
+        _active: false,
+        _overlay: null,
+
+        activate: function() {
+            if (this._active) return;
+            this._active = true;
+
+            // Browser beforeunload Event (Tab/Fenster schliessen)
+            window.addEventListener('beforeunload', this._handleBeforeUnload);
+
+            // Zurueck-Taste (Browser-History) abfangen
+            // Wir pushen einen Dummy-State und fangen popstate ab
+            this._pushGuardState();
+            window.addEventListener('popstate', this._handlePopState);
+
+            console.log('[TW ExitGuard] Aktiviert');
+        },
+
+        deactivate: function() {
+            this._active = false;
+            window.removeEventListener('beforeunload', this._handleBeforeUnload);
+            window.removeEventListener('popstate', this._handlePopState);
+            if (this._overlay) {
+                document.body.removeChild(this._overlay);
+                this._overlay = null;
+            }
+            console.log('[TW ExitGuard] Deaktiviert');
+        },
+
+        _pushGuardState: function() {
+            if (window.history && window.history.pushState) {
+                window.history.pushState({ twExitGuard: true }, '', window.location.href);
+            }
+        },
+
+        _handleBeforeUnload: function(e) {
+            // Standard-Browser-Warnung
+            e.preventDefault();
+            e.returnValue = 'Achtung: Nicht gespeicherte Daten gehen verloren!';
+            return e.returnValue;
+        },
+
+        _handlePopState: function(e) {
+            // Zurueck-Taste abgefangen -> Sicherheitsdialog zeigen
+            ExitGuard._pushGuardState(); // Guard-State erneuern
+            ExitGuard.showExitDialog();
+        },
+
+        showExitDialog: function() {
+            if (this._overlay) return; // Schon offen
+
+            var overlay = document.createElement('div');
+            overlay.id = 'tw-exit-guard-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;' +
+                'background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;' +
+                'animation:twExitFadeIn 0.2s ease;';
+
+            var dialog = document.createElement('div');
+            dialog.style.cssText = 'background:linear-gradient(135deg,#1a2332 0%,#243447 100%);' +
+                'border-radius:20px;padding:36px 32px;max-width:420px;width:90%;text-align:center;' +
+                'box-shadow:0 25px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08);' +
+                'border:1px solid rgba(255,165,0,0.3);';
+
+            // Icon
+            var icon = document.createElement('div');
+            icon.style.cssText = 'font-size:52px;margin-bottom:16px;';
+            icon.textContent = '\u26A0\uFE0F';
+            dialog.appendChild(icon);
+
+            // Titel
+            var title = document.createElement('div');
+            title.style.cssText = 'font-family:Oswald,sans-serif;font-size:22px;font-weight:600;' +
+                'color:#ffffff;margin-bottom:12px;letter-spacing:0.5px;';
+            title.textContent = 'App verlassen?';
+            dialog.appendChild(title);
+
+            // Text
+            var text = document.createElement('div');
+            text.style.cssText = 'font-family:"Source Sans 3",sans-serif;font-size:15px;' +
+                'color:rgba(255,255,255,0.7);margin-bottom:28px;line-height:1.5;';
+            text.textContent = 'Nicht gespeicherte Daten k\u00F6nnten verloren gehen. M\u00F6chten Sie die App wirklich beenden?';
+            dialog.appendChild(text);
+
+            // Button-Container
+            var btnBox = document.createElement('div');
+            btnBox.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+
+            // Zurueck-Button (primaer)
+            var btnBack = document.createElement('button');
+            btnBack.style.cssText = 'padding:14px 24px;border:none;border-radius:12px;cursor:pointer;' +
+                'font-family:Oswald,sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;' +
+                'background:linear-gradient(135deg,#1E88E5,#1565C0);color:#fff;' +
+                'box-shadow:0 4px 15px rgba(30,136,229,0.4);transition:all 0.2s;';
+            btnBack.textContent = '\u2190  Zur\u00FCck zur Bearbeitung';
+            btnBack.onclick = function() {
+                ExitGuard._closeDialog();
+            };
+            btnBox.appendChild(btnBack);
+
+            // Beenden-Button (sekundaer, gefaehrlich)
+            var btnExit = document.createElement('button');
+            btnExit.style.cssText = 'padding:12px 24px;border:1px solid rgba(231,76,60,0.4);' +
+                'border-radius:12px;cursor:pointer;font-family:Oswald,sans-serif;font-size:15px;' +
+                'font-weight:500;letter-spacing:0.3px;background:rgba(231,76,60,0.15);' +
+                'color:#e74c3c;transition:all 0.2s;';
+            btnExit.textContent = 'App beenden';
+            btnExit.onclick = function() {
+                ExitGuard.deactivate();
+                // Versuche Tab/Fenster zu schliessen
+                window.close();
+                // Falls window.close() nicht funktioniert (Browser-Beschraenkung):
+                // Leere Seite zeigen
+                setTimeout(function() {
+                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;' +
+                        'height:100vh;background:#0d1520;color:rgba(255,255,255,0.5);font-family:Oswald,sans-serif;' +
+                        'font-size:20px;text-align:center;padding:20px;">' +
+                        '<div>TW Business Suite wurde beendet.<br><br>' +
+                        '<span style="font-size:14px;color:rgba(255,255,255,0.3);">Sie k\u00F6nnen diesen Tab jetzt schlie\u00DFen.</span></div></div>';
+                }, 200);
+            };
+            btnBox.appendChild(btnExit);
+
+            dialog.appendChild(btnBox);
+            overlay.appendChild(dialog);
+
+            // Style-Animation injizieren
+            if (!document.getElementById('tw-exit-guard-styles')) {
+                var style = document.createElement('style');
+                style.id = 'tw-exit-guard-styles';
+                style.textContent = '@keyframes twExitFadeIn{from{opacity:0}to{opacity:1}}';
+                document.head.appendChild(style);
+            }
+
+            document.body.appendChild(overlay);
+            this._overlay = overlay;
+
+            // ESC = zurueck
+            this._escHandler = function(e) {
+                if (e.key === 'Escape') ExitGuard._closeDialog();
+            };
+            window.addEventListener('keydown', this._escHandler);
+        },
+
+        _closeDialog: function() {
+            if (this._overlay) {
+                document.body.removeChild(this._overlay);
+                this._overlay = null;
+            }
+            if (this._escHandler) {
+                window.removeEventListener('keydown', this._escHandler);
+                this._escHandler = null;
+            }
+        }
+    };
+
+
     // ─── EXPORT ──────────────────────────────────────────────
     // Alles über das globale TW-Objekt verfügbar
 
@@ -289,10 +452,20 @@
         // Firmendaten
         Firma: Firma,
 
+        // ExitGuard
+        ExitGuard: ExitGuard,
+
         // Version
-        VERSION: '2.1.0',
+        VERSION: '2.2.0',
         BUILD: 'modular'
     };
+
+    // ExitGuard sofort aktivieren
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        ExitGuard.activate();
+    } else {
+        document.addEventListener('DOMContentLoaded', function() { ExitGuard.activate(); });
+    }
 
     console.log('%c[TW Business Suite] Core v' + global.TW.VERSION + ' geladen', 'color: #1E88E5; font-weight: bold;');
 
