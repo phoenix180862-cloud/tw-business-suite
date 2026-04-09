@@ -926,58 +926,6 @@
                 return null;
             }
 
-            // FileType Icon
-            var fileIcon = function(type) {
-                switch(type) {
-                    case 'pdf': return '📄';
-                    case 'xlsx': case 'xls': return '📊';
-                    case 'doc': case 'docx': return '🗒';
-                    case 'gdoc': return '📃';
-                    case 'gsheet': return '📊';
-                    default: return '📁';
-                }
-            };
-
-            var formatBytes = function(bytes) {
-                if (!bytes || bytes === 0) return '-';
-                if (bytes < 1024) return bytes + ' B';
-                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-                return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-            };
-
-            // Aktuelle Ordner und Dateien
-            var displayFolders = currentFolder ? (currentFolder.subfolders || []) : (tree || []);
-            var displayFiles = currentFolder ? (currentFolder.files || []) : [];
-
-            // App-erstellte Dateien: Wenn wir im aktuellen App-Ordner sind, dessen Dateien zeigen
-            var appOrdnerNames = Object.keys(appOrdner);
-            var isInAppOrdner = currentFolder && currentFolder._isAppOrdner;
-            var currentAppFiles = isInAppOrdner ? (appOrdner[currentFolder.name] || []) : [];
-
-            // Auf Root-Ebene: App-Ordner als virtuelle Ordner hinzufuegen
-            var appVirtualFolders = [];
-            if (!currentFolder) {
-                appOrdnerNames.forEach(function(name) {
-                    // Pruefen ob nicht schon als Drive-Ordner vorhanden
-                    var exists = displayFolders.some(function(f) { return f.name === name; });
-                    if (!exists) {
-                        appVirtualFolders.push({
-                            id: 'app_ordner_' + name,
-                            name: name,
-                            _isAppOrdner: true,
-                            files: appOrdner[name] || [],
-                            subfolders: []
-                        });
-                    }
-                });
-            }
-
-            // Wenn ein Drive-Ordner denselben Namen hat wie ein App-Ordner,
-            // die App-Dateien zu den Drive-Dateien hinzufuegen
-            if (currentFolder && !isInAppOrdner && appOrdner[currentFolder.name]) {
-                displayFiles = displayFiles.concat(appOrdner[currentFolder.name]);
-            }
-
             var touchBtn = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
 
             return (
@@ -1073,21 +1021,22 @@
                         <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'12px'}}>
                             {displayFolders.concat(appVirtualFolders).map(function(folder) {
                                 var isApp = folder._isAppOrdner;
+                                var fCount = folder.files ? folder.files.length : 0;
                                 return (
-                                    <button key={folder.id} onClick={function() { navigateToFolder(folder); }}
+                                    <button key={folder.id || folder.name} onClick={function() { navigateToFolder(folder); }}
                                         style={{...touchBtn, display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border: isApp ? '1px solid rgba(39,174,96,0.3)' : '1px solid var(--border-color)', background: isApp ? 'rgba(39,174,96,0.08)' : 'var(--bg-secondary)', cursor:'pointer', textAlign:'left'}}>
-                                        <span style={{fontSize:'28px'}}>{isApp ? '📝' : '📁'}</span>
+                                        <span style={{fontSize:'28px'}}>{isApp ? '\uD83D\uDCDD' : '\uD83D\uDCC1'}</span>
                                         <div style={{flex:1, minWidth:0}}>
                                             <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                                 {folder.name}
                                                 {isApp && <span style={{fontSize:'10px', fontWeight:'600', color:'#27ae60', marginLeft:'8px', verticalAlign:'middle'}}>APP</span>}
                                             </div>
                                             <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
-                                                {folder.files ? folder.files.length : 0} Dateien
-                                                {folder.subfolders && folder.subfolders.length > 0 && (' · ' + folder.subfolders.length + ' Unterordner')}
+                                                {fCount > 0 ? (fCount + ' Dateien') : 'Ordner'}
+                                                {folder.subfolders && folder.subfolders.length > 0 && (' \u00B7 ' + folder.subfolders.length + ' Unterordner')}
                                             </div>
                                         </div>
-                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>›</span>
+                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>{'\u203A'}</span>
                                     </button>
                                 );
                             })}
@@ -1134,23 +1083,25 @@
                                 {displayFiles.map(function(datei) {
                                     var isApp = datei.isAppCreated;
                                     var liveId = liveMode ? (datei.id || datei.driveId) : null;
+                                    var fType = datei.fileType || datei.type || 'sonstige';
+                                    var fSize = datei.sizeBytes ? formatBytes(datei.sizeBytes) : (datei.size || '-');
                                     return (
                                         <button key={datei.id || datei.name} onClick={function() { handleOpenFile(datei.id, datei.name, isApp, liveId); }}
                                             style={{...touchBtn, display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px', borderRadius:'10px', border: isApp ? '1px solid rgba(39,174,96,0.25)' : '1px solid var(--border-color)', background: isApp ? 'rgba(39,174,96,0.06)' : 'var(--bg-tertiary)', cursor:'pointer', textAlign:'left'}}>
-                                            <span style={{fontSize:'22px'}}>{fileIcon(datei.fileType)}</span>
+                                            <span style={{fontSize:'22px'}}>{fileIcon(fType)}</span>
                                             <div style={{flex:1, minWidth:0}}>
                                                 <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                                     {datei.name}
                                                     {isApp && <span style={{fontSize:'9px', fontWeight:'700', color:'#27ae60', marginLeft:'6px', verticalAlign:'middle'}}>APP</span>}
                                                 </div>
                                                 <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
-                                                    {formatBytes(datei.sizeBytes)}
-                                                    {datei.syncedAt && (' · ' + new Date(datei.syncedAt).toLocaleDateString('de-DE'))}
-                                                    {isApp && datei.syncStatus === 'pending' && ' · ⏳ Sync ausstehend'}
+                                                    {fSize}
+                                                    {datei.syncedAt && (' \u00B7 ' + new Date(datei.syncedAt).toLocaleDateString('de-DE'))}
+                                                    {isApp && datei.syncStatus === 'pending' && ' \u00B7 \u23F3 Sync ausstehend'}
                                                 </div>
                                             </div>
                                             <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background: isApp ? 'rgba(39,174,96,0.15)' : 'rgba(30,136,229,0.15)', color: isApp ? '#27ae60' : 'var(--accent-blue)', fontWeight:'700'}}>
-                                                Öffnen
+                                                \u00D6ffnen
                                             </span>
                                         </button>
                                     );
