@@ -3505,10 +3505,13 @@
                                                     autoFocus />
                                             </div>
                                             <div className="manual-raum-field">
-                                                <span className="manual-raum-label">Bezeichnung</span>
-                                                <input className="manual-raum-input bez-input" placeholder="z.B. Abstellraum"
-                                                    value={manualBez} onChange={e => setManualBez(e.target.value)}
-                                                    />
+                                                <MicLabel fieldKey="aufm_raumBez" label="Bezeichnung" />
+                                                <div style={{display:'flex', gap:'3px', alignItems:'center'}}>
+                                                    <MicInput fieldKey="aufm_raumBez" className="manual-raum-input bez-input" placeholder="z.B. Abstellraum"
+                                                        value={manualBez} onChange={e => setManualBez(e.target.value)}
+                                                        style={{flex:1}} />
+                                                    <MicButton fieldKey="aufm_raumBez" size="small" onResult={function(t){ setManualBez((manualBez||'') + (manualBez?' ':'') + t); }} />
+                                                </div>
                                             </div>
                                         </div>
 
@@ -3725,10 +3728,13 @@
 
                                 {/* Bezeichnung */}
                                 <div className="manual-raum-field" style={{marginBottom:'12px'}}>
-                                    <span className="manual-raum-label">Raumbezeichnung</span>
-                                    <input className="manual-raum-input bg-bez-input" placeholder="z.B. Bad Zimmer 104"
-                                        value={bgBez} onChange={e => setBgBez(e.target.value)}
-                                        />
+                                    <MicLabel fieldKey="bg_raumBez" label="Raumbezeichnung" />
+                                    <div style={{display:'flex', gap:'3px', alignItems:'center'}}>
+                                        <MicInput fieldKey="bg_raumBez" className="manual-raum-input bg-bez-input" placeholder="z.B. Bad Zimmer 104"
+                                            value={bgBez} onChange={e => setBgBez(e.target.value)}
+                                            style={{flex:1}} />
+                                        <MicButton fieldKey="bg_raumBez" size="small" onResult={function(t){ setBgBez((bgBez||'') + (bgBez?' ':'') + t); }} />
+                                    </div>
                                 </div>
 
                                 {/* Geschoss */}
@@ -3756,11 +3762,12 @@
 
                                 {/* Sonstiges */}
                                 <div className="manual-raum-field" style={{marginBottom:'16px'}}>
-                                    <span className="manual-raum-label">Sonstiges / Anmerkungen</span>
-                                    <textarea className="bg-sonst-input" placeholder="z.B. abweichende Türbreite, anderer Bodenbelag..."
-                                        value={bgSonstiges} onChange={e => setBgSonstiges(e.target.value)}
-                                        rows={3}
-                                        style={{
+                                    <MicLabel fieldKey="bg_sonst" label="Sonstiges / Anmerkungen" />
+                                    <div style={{display:'flex', gap:'4px', alignItems:'flex-start'}}>
+                                        <textarea className="bg-sonst-input" placeholder="z.B. abweichende Türbreite, anderer Bodenbelag..."
+                                            value={bgSonstiges} onChange={e => setBgSonstiges(e.target.value)}
+                                            rows={3}
+                                            style={{
                                             width:'100%', padding:'10px 12px', background:'var(--bg-primary)',
                                             border:'1px solid var(--border-color)', borderRadius:'var(--radius-sm)',
                                             color:'var(--text-white)', fontFamily:'Source Sans 3, sans-serif',
@@ -3770,6 +3777,8 @@
                                         onFocus={e => e.target.style.borderColor = 'var(--accent-orange)'}
                                         onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
                                     />
+                                        <MicButton fieldKey="bg_sonst" size="normal" onResult={function(t){ setBgSonstiges((bgSonstiges||'') + (bgSonstiges?' ':'') + t); }} />
+                                    </div>
                                 </div>
 
                                 {/* Übernommene Maße anzeigen */}
@@ -3984,10 +3993,13 @@
                                                     onChange={e => setManualPosNr(e.target.value)} />
                                             </div>
                                             <div className="manual-pos-field">
-                                                <label>Bezeichnung</label>
-                                                <input type="text" placeholder="z.B. Zusatzleistung XY"
-                                                    value={manualPosBez}
-                                                    onChange={e => setManualPosBez(e.target.value)} />
+                                                <MicLabel fieldKey="aufm_posBez" label="Bezeichnung" />
+                                                <div style={{display:'flex', gap:'3px', alignItems:'center'}}>
+                                                    <MicInput fieldKey="aufm_posBez" type="text" placeholder="z.B. Zusatzleistung XY"
+                                                        value={manualPosBez}
+                                                        onChange={e => setManualPosBez(e.target.value)} style={{flex:1}} />
+                                                    <MicButton fieldKey="aufm_posBez" size="small" onResult={function(t){ setManualPosBez((manualPosBez||'') + (manualPosBez?' ':'') + t); }} />
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="manual-pos-row">
@@ -6068,10 +6080,12 @@
                     {/* Raumbezeichnung */}
                     <div className="raum-header">
                         <span className="raum-nummer">{(raum && raum.nr) || '--'}</span>
-                        <input className="raum-name-input" type="text" placeholder="Raumbezeichnung eingeben..."
+                        <MicInput fieldKey="rb_raumName" className="raum-name-input" type="text" placeholder="Raumbezeichnung eingeben..."
                             value={raumName} onChange={e => setRaumName(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                            style={{flex:1}}
                             autoFocus={!hasData} />
+                        <MicButton fieldKey="rb_raumName" size="small" onResult={function(t){ setRaumName((raumName||'') + (raumName?' ':'') + t); }} />
                     </div>
 
                     {/* Material-Info */}

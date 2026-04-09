@@ -505,55 +505,106 @@
            Einheitliche Spracheingabe fuer alle Module
            ═══════════════════════════════════════════ */
 
-        // CSS Animation einmalig injizieren
+        // CSS Animationen einmalig injizieren
         (function() {
             if (document.getElementById('tw-mic-pulse-css')) return;
             var s = document.createElement('style');
             s.id = 'tw-mic-pulse-css';
-            s.textContent = '@keyframes twMicPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.15); opacity:0.7; } }';
+            s.textContent = [
+                '@keyframes twMicPulse { 0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(231,76,60,0.4); } 50% { transform:scale(1.08); box-shadow:0 0 0 6px rgba(231,76,60,0); } }',
+                '@keyframes twMicIdle { 0%,100% { opacity:0.85; } 50% { opacity:1; } }',
+                '.tw-mic-btn { display:inline-flex !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; transition:all 0.15s ease !important; -webkit-tap-highlight-color:rgba(30,136,229,0.2) !important; touch-action:manipulation !important; user-select:none !important; -webkit-user-select:none !important; }',
+                '.tw-mic-btn:active { transform:scale(0.92) !important; }',
+                '.tw-mic-btn-normal { min-width:40px; min-height:40px; width:40px; height:40px; padding:0; border-radius:10px; font-size:18px; }',
+                '.tw-mic-btn-small { min-width:30px; min-height:30px; width:30px; height:30px; padding:0; border-radius:6px; font-size:14px; }',
+                '.tw-mic-btn-idle { background:rgba(30,136,229,0.08); border:1.5px solid rgba(30,136,229,0.25); color:#1E88E5; }',
+                '.tw-mic-btn-active { background:rgba(231,76,60,0.15); border:2px solid #e74c3c; color:#e74c3c; animation:twMicPulse 1.2s ease-in-out infinite; }'
+            ].join('\n');
             document.head.appendChild(s);
         })();
 
-        // Globaler State: welches Feld nimmt gerade auf?
-        var TW_SPEECH_ACTIVE_FIELD = { current: null, listeners: [] };
+        // Globaler State + aktive Recognition-Instanz tracken
+        var TW_SPEECH_STATE = { current: null, listeners: [], recognition: null };
 
         var TWSpeechService = {
             isSupported: function() {
                 return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+            },
+            stop: function() {
+                // Aktive Recognition sauber beenden
+                if (TW_SPEECH_STATE.recognition) {
+                    try { TW_SPEECH_STATE.recognition.abort(); } catch(e) {}
+                    TW_SPEECH_STATE.recognition = null;
+                }
+                TW_SPEECH_STATE.current = null;
+                TW_SPEECH_STATE.listeners.forEach(function(fn) { try { fn(null); } catch(e){} });
             },
             start: function(fieldKey, onResult) {
                 if (!this.isSupported()) {
                     alert('Spracheingabe wird von diesem Browser nicht unterstuetzt. Bitte Chrome verwenden.');
                     return;
                 }
+                // Falls bereits eine Recognition laeuft: erst sauber stoppen
+                this.stop();
+
                 var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
                 var recognition = new SpeechRec();
                 recognition.lang = 'de-DE';
                 recognition.continuous = false;
                 recognition.interimResults = false;
-                // Aktiv setzen
-                TW_SPEECH_ACTIVE_FIELD.current = fieldKey;
-                TW_SPEECH_ACTIVE_FIELD.listeners.forEach(function(fn) { fn(fieldKey); });
+                recognition.maxAlternatives = 1;
+
+                // Referenz speichern
+                TW_SPEECH_STATE.recognition = recognition;
+                TW_SPEECH_STATE.current = fieldKey;
+                TW_SPEECH_STATE.listeners.forEach(function(fn) { try { fn(fieldKey); } catch(e){} });
+
+                var hasResult = false;
                 recognition.onresult = function(event) {
-                    var text = event.results[0][0].transcript;
-                    if (onResult) onResult(text);
+                    hasResult = true;
+                    var text = '';
+                    for (var i = 0; i < event.results.length; i++) {
+                        text += event.results[i][0].transcript;
+                    }
+                    if (onResult && text) onResult(text.trim());
                 };
                 recognition.onerror = function(event) {
                     console.warn('Spracheingabe Fehler:', event.error);
+                    // Bei 'aborted' kein Reset (wird von stop() gehandelt)
+                    if (event.error !== 'aborted') {
+                        TW_SPEECH_STATE.recognition = null;
+                        TW_SPEECH_STATE.current = null;
+                        TW_SPEECH_STATE.listeners.forEach(function(fn) { try { fn(null); } catch(e){} });
+                    }
                 };
                 recognition.onend = function() {
-                    TW_SPEECH_ACTIVE_FIELD.current = null;
-                    TW_SPEECH_ACTIVE_FIELD.listeners.forEach(function(fn) { fn(null); });
+                    // Nur zuruecksetzen wenn diese Recognition noch die aktive ist
+                    if (TW_SPEECH_STATE.recognition === recognition) {
+                        TW_SPEECH_STATE.recognition = null;
+                        TW_SPEECH_STATE.current = null;
+                        TW_SPEECH_STATE.listeners.forEach(function(fn) { try { fn(null); } catch(e){} });
+                    }
                 };
-                recognition.start();
+
+                // Kurze Verzoegerung damit vorherige abort() durchkommt
+                setTimeout(function() {
+                    try {
+                        recognition.start();
+                    } catch(e) {
+                        console.warn('Speech start error:', e);
+                        TW_SPEECH_STATE.recognition = null;
+                        TW_SPEECH_STATE.current = null;
+                        TW_SPEECH_STATE.listeners.forEach(function(fn) { try { fn(null); } catch(ex){} });
+                    }
+                }, 120);
             },
             subscribe: function(fn) {
-                TW_SPEECH_ACTIVE_FIELD.listeners.push(fn);
+                TW_SPEECH_STATE.listeners.push(fn);
                 return function() {
-                    TW_SPEECH_ACTIVE_FIELD.listeners = TW_SPEECH_ACTIVE_FIELD.listeners.filter(function(f) { return f !== fn; });
+                    TW_SPEECH_STATE.listeners = TW_SPEECH_STATE.listeners.filter(function(f) { return f !== fn; });
                 };
             },
-            getActive: function() { return TW_SPEECH_ACTIVE_FIELD.current; }
+            getActive: function() { return TW_SPEECH_STATE.current; }
         };
 
         // React Hook: useSpeech
@@ -567,30 +618,30 @@
             return activeMic;
         }
 
-        // MicButton Komponente - identisches Aussehen ueberall
+        // MicButton Komponente - deutlich sichtbar, einheitlich ueberall
         function MicButton(props) {
             var fieldKey = props.fieldKey;
             var onResult = props.onResult;
-            var size = props.size || 'normal'; // 'normal' | 'small'
+            var size = props.size || 'normal';
             var activeMic = useSpeech();
             var isActive = activeMic === fieldKey;
-            var tap = { onTouchEnd: function(e){ e.preventDefault(); e.stopPropagation(); TWSpeechService.start(fieldKey, onResult); }, onClick: function(){ TWSpeechService.start(fieldKey, onResult); } };
-            var baseStyle = {
-                padding: size === 'small' ? '2px 5px' : '6px 10px',
-                borderRadius: size === 'small' ? '4px' : '8px',
-                border: isActive ? '2px solid #e74c3c' : '1px solid var(--border-color)',
-                background: isActive ? 'rgba(231,76,60,0.12)' : 'var(--bg-tertiary)',
-                cursor: 'pointer',
-                fontSize: size === 'small' ? '11px' : '14px',
-                flexShrink: 0,
-                animation: isActive ? 'twMicPulse 1s ease-in-out infinite' : 'none',
-                transition: 'all 0.2s',
-                WebkitTapHighlightColor: 'rgba(30,136,229,0.2)',
-                touchAction: 'manipulation',
-                userSelect: 'none',
-                WebkitUserSelect: 'none'
+
+            var handleTap = function() {
+                if (isActive) {
+                    // Nochmal drauf = stoppen
+                    TWSpeechService.stop();
+                } else {
+                    TWSpeechService.start(fieldKey, onResult);
+                }
             };
-            return React.createElement('button', Object.assign({}, tap, { style: baseStyle }), isActive ? '\uD83D\uDD34' : '\uD83C\uDF99');
+
+            var className = 'tw-mic-btn ' + (size === 'small' ? 'tw-mic-btn-small' : 'tw-mic-btn-normal') + ' ' + (isActive ? 'tw-mic-btn-active' : 'tw-mic-btn-idle');
+
+            return React.createElement('button', {
+                className: className,
+                onTouchEnd: function(e) { e.preventDefault(); e.stopPropagation(); handleTap(); },
+                onClick: function() { handleTap(); }
+            }, isActive ? '\uD83D\uDD34' : '\uD83C\uDF99\uFE0F');
         }
 
         // MicLabel Komponente - Label das "Spricht..." anzeigt
@@ -607,7 +658,7 @@
                     color: isActive ? '#e74c3c' : 'var(--text-muted)',
                     transition: 'color 0.2s'
                 }, style)
-            }, isActive ? '\uD83D\uDD34 Spricht...' : label);
+            }, isActive ? '\uD83D\uDD34 Aufnahme...' : label);
         }
 
         // MicInput Komponente - Input mit aktivem Rand
@@ -617,12 +668,13 @@
             var isActive = activeMic === fieldKey;
             var baseInputStyle = props.style || {};
             var mergedStyle = Object.assign({}, baseInputStyle, {
-                borderColor: isActive ? '#e74c3c' : (baseInputStyle.borderColor || 'var(--accent-blue)'),
-                boxShadow: isActive ? '0 0 0 2px rgba(231,76,60,0.2)' : 'none',
+                borderColor: isActive ? '#e74c3c' : (baseInputStyle.borderColor || 'var(--border-color)'),
+                boxShadow: isActive ? '0 0 0 2px rgba(231,76,60,0.2)' : (baseInputStyle.boxShadow || 'none'),
                 transition: 'border-color 0.2s, box-shadow 0.2s'
             });
             var inputProps = Object.assign({}, props, { style: mergedStyle });
             delete inputProps.fieldKey;
+            delete inputProps.multiline;
             return React.createElement(props.multiline ? 'textarea' : 'input', inputProps);
         }
 
