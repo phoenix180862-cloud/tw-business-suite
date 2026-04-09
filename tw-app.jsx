@@ -172,7 +172,14 @@
             // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell ──
             const handleSelectModus = async (modus) => {
                 setKundeMode(modus);
-                // Alle 3 Modi laden zuerst die Kundenliste aus Google Drive
+                // Manuell: DIREKT zu den 3 Listen, KEINE Kundenauswahl
+                if (modus === 'manuell') {
+                    setIsDriveMode(false);
+                    setDriveStatus('offline');
+                    navigateTo('manuellEingabe');
+                    return;
+                }
+                // Alle anderen Modi laden zuerst die Kundenliste aus Google Drive
                 if (isDriveMode || (startConnections && startConnections.driveConnected)) {
                     setLoading(true);
                     setLoadProgress('Lade Baustellen aus Google Drive...');

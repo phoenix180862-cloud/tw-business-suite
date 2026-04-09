@@ -604,7 +604,7 @@
             var geschosse = ['KG', 'EG', 'OG', '1.OG', '2.OG', 'DG'];
 
             // ── Styles ──
-            var inputStyle = { width:'100%', padding:'10px 12px', borderRadius:'8px', border:'2px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'14px', color:'var(--text-primary)', boxSizing:'border-box' };
+            var inputStyle = { width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', boxSizing:'border-box' };
             var labelStyle = { fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', marginBottom:'4px', display:'block', textTransform:'uppercase', letterSpacing:'0.5px' };
 
             // ═══ STAMMDATEN CRUD ═══
@@ -1077,7 +1077,7 @@
                                     <div style={{display:'flex', gap:'4px'}}>
                                         <input value={stammFelder[f[0]] || ''} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={Object.assign({}, inputStyle, {flex:1})} placeholder={f[2] || ''} />
                                         <button {...tap(function(){ var key = f[0]; startSpeech(function(text){ updateStammFeld(key, (stammFelder[key] || '') + (stammFelder[key] ? ' ' : '') + text); }); })}
-                                            style={Object.assign({padding:'6px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0, minWidth:'44px', minHeight:'44px', display:'flex', alignItems:'center', justifyContent:'center'}, touchBase)}>{'\uD83C\uDF99'}</button>
+                                            style={Object.assign({padding:'6px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0}, touchBase)}>{'\uD83C\uDF99'}</button>
                                     </div>
                                 </div>
                             ); })}
