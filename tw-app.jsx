@@ -994,23 +994,28 @@
                     setLoadProgress('Lade komplette Ordnerstruktur...');
                     navigateTo('akte');
                     try {
-                        var kundeIdK = kunde._driveFolderId || kunde.id || kunde.name;
+                        // WICHTIG: kunde.id von der Drive-Kundenliste = Drive Folder ID
+                        var driveFolderIdK = kunde.id;
+                        var kundeIdK = driveFolderIdK || kunde.name;
                         
-                        // Kunde in State und Storage speichern
-                        var enrichedK = {
-                            ...kunde,
+                        // Kunde-Objekt mit _driveFolderId anreichern
+                        var enrichedK = Object.assign({}, kunde, {
+                            id: kundeIdK,
                             auftraggeber: kunde.name,
-                            _driveFolderId: kunde.id,
-                        };
+                            _driveFolderId: driveFolderIdK,
+                        });
+                        
+                        // State SOFORT setzen (vor async Operationen)
                         setSelectedKunde(enrichedK);
+                        
                         if (window.TWStorage && window.TWStorage.isReady()) {
                             await TWStorage.saveKunde(enrichedK);
-                            TWStorage.saveAppState('lastKundeId', kundeIdK);
+                            await TWStorage.saveAppState('lastKundeId', kundeIdK);
                         }
 
                         // DriveSync starten: Alle Ordner + Dateien herunterladen
-                        if (window.TWStorage && window.TWStorage.DriveSync && kunde.id) {
-                            var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeIdK, kunde.id, function(info) {
+                        if (window.TWStorage && window.TWStorage.DriveSync && driveFolderIdK) {
+                            var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeIdK, driveFolderIdK, function(info) {
                                 setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
                             });
                             

@@ -98,7 +98,7 @@
 
             // ── Datum/Uhrzeit formatieren ──
             var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            var monate = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
             var tag = tage[currentTime.getDay()];
             var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
             var stunden = String(currentTime.getHours()).padStart(2,'0');
@@ -196,7 +196,7 @@
                                     boxShadow:'0 3px 10px rgba(0,0,0,0.2)', transition:'transform 0.15s ease',
                                     WebkitTapHighlightColor:'rgba(0,0,0,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
                             }}>
-                                <span style={{fontSize:'16px'}}>{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '\uD83D\uDCC2'}</span>
+                                <span style={{fontSize:'16px'}}>{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '📂'}</span>
                                 <span style={{fontSize:'11px', fontWeight:'700'}}>
                                     {driveConnected ? 'Google Drive' : driveConnecting ? 'Verbinde...' : 'Google Drive'}
                                 </span>
@@ -452,7 +452,7 @@
             var modi = [
                 {
                     id: 'gespeichert',
-                    icon: '\uD83D\uDCC2',
+                    icon: '📂',
                     title: 'Gespeicherte Daten laden',
                     desc: 'Bereits aufbereitete Kundendaten aus dem Ordner "Kunden-Daten" werden geladen und der Akte zugewiesen.',
                     color: '#27ae60',
@@ -460,23 +460,23 @@
                     shadow: 'rgba(39,174,96,0.35)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
-                    disabledHint: 'Ben\u00f6tigt Google Drive',
+                    disabledHint: 'Benötigt Google Drive',
                 },
                 {
                     id: 'gespeichertKomplett',
-                    icon: '\uD83D\uDCE5',
+                    icon: '📥',
                     title: 'Komplette Daten vom Kunden laden',
-                    desc: 'Alle Ordner und Dokumente (PDFs, Excel, Word, Zeichnungen) werden heruntergeladen. Ideal f\u00fcr Offline-Arbeit auf der Baustelle.',
+                    desc: 'Alle Ordner und Dokumente (PDFs, Excel, Word, Zeichnungen) werden heruntergeladen. Ideal für Offline-Arbeit auf der Baustelle.',
                     color: '#2980b9',
                     gradient: 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
                     shadow: 'rgba(41,128,185,0.35)',
                     badge: 'OFFLINE',
                     disabled: !(connections && connections.driveConnected),
-                    disabledHint: 'Ben\u00f6tigt Google Drive',
+                    disabledHint: 'Benötigt Google Drive',
                 },
                 {
                     id: 'manuell',
-                    icon: '\uD83D\uDCDD',
+                    icon: '📝',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
                     color: '#e67e22',
@@ -1025,7 +1025,7 @@
                     addFooter(page);
 
                     // PDF speichern
-                    var kundeName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df _-]/g, '');
+                    var kundeName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9äöü\u00c4\u00d6\u00dc\u00df _-]/g, '');
                     doc.save('Kundenlisten_' + kundeName + '_' + new Date().toISOString().slice(0,10) + '.pdf');
                     setPdfStatus('PDF erfolgreich erstellt und heruntergeladen!');
                     setTimeout(function() { setPdfStatus(''); }, 4000);
@@ -2394,8 +2394,8 @@
             // Modus-Info
             var modusInfo = {
                 ki: { icon: '\uD83E\uDD16', label: 'KI-Analyse', color: '#1E88E5' },
-                gespeichert: { icon: '\uD83D\uDCC2', label: 'Gespeicherte Daten', color: '#27ae60' },
-                manuell: { icon: '\uD83D\uDCDD', label: 'Manuell anlegen', color: '#e67e22' },
+                gespeichert: { icon: '📂', label: 'Gespeicherte Daten', color: '#27ae60' },
+                manuell: { icon: '📝', label: 'Manuell anlegen', color: '#e67e22' },
             };
             var activeModus = modusInfo[kundeMode] || modusInfo.ki;
 

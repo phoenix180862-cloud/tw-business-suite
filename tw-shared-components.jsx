@@ -704,32 +704,47 @@
             var kundeId = kunde ? (kunde._driveFolderId || kunde.id || kunde.name) : null;
             var kundeName = kunde ? (kunde.name || kunde.auftraggeber || 'Kunde') : 'Kunde';
 
-            // Ordnerstruktur + App-Dateien laden
+            // Ordnerstruktur + App-Dateien laden (mit Retry falls Storage noch nicht bereit)
             useEffect(function() {
-                if (!kundeId || !window.TWStorage || !window.TWStorage.isReady()) {
+                if (!kundeId) {
                     setLoading(false);
-                    setError('Kein Kunde oder Speicher nicht bereit');
+                    setError('Kein Kunde ausgew\u00e4hlt.');
                     return;
                 }
-                setLoading(true);
-                Promise.all([
-                    TWStorage.OfflineBrowser.getFullTree(kundeId),
-                    TWStorage.DriveSync.getSyncStatus(kundeId),
-                    TWStorage.getAppDateienByOrdner(kundeId)
-                ]).then(function(results) {
-                    setTree(results[0] || []);
-                    setSyncStatus(results[1]);
-                    setAppOrdner(results[2] || {});
-                    setLoading(false);
-                    var hasDrive = results[0] && results[0].length > 0;
-                    var hasApp = results[2] && Object.keys(results[2]).length > 0;
-                    if (!hasDrive && !hasApp) {
-                        setError('Keine Ordner gespeichert. Bitte zuerst "Komplette Daten laden" verwenden.');
+
+                function doLoad() {
+                    if (!window.TWStorage || !window.TWStorage.isReady()) {
+                        // Storage noch nicht bereit, kurz warten und nochmal versuchen
+                        return;
                     }
-                }).catch(function(e) {
-                    setError('Fehler: ' + e.message);
-                    setLoading(false);
-                });
+                    clearInterval(retryTimer);
+                    setLoading(true);
+                    setError(null);
+                    Promise.all([
+                        TWStorage.OfflineBrowser.getFullTree(kundeId),
+                        TWStorage.DriveSync.getSyncStatus(kundeId),
+                        TWStorage.getAppDateienByOrdner(kundeId)
+                    ]).then(function(results) {
+                        setTree(results[0] || []);
+                        setSyncStatus(results[1]);
+                        setAppOrdner(results[2] || {});
+                        setLoading(false);
+                        var hasDrive = results[0] && results[0].length > 0;
+                        var hasApp = results[2] && Object.keys(results[2]).length > 0;
+                        if (!hasDrive && !hasApp) {
+                            setError('Noch keine Ordner gespeichert. Die Daten werden geladen...');
+                        }
+                    }).catch(function(e) {
+                        setError('Fehler beim Laden: ' + e.message);
+                        setLoading(false);
+                    });
+                }
+
+                // Sofort versuchen, sonst alle 500ms retry
+                var retryTimer = setInterval(doLoad, 500);
+                doLoad();
+                var timeout = setTimeout(function() { clearInterval(retryTimer); setLoading(false); }, 10000);
+                return function() { clearInterval(retryTimer); clearTimeout(timeout); };
             }, [kundeId]);
 
             // Datei oeffnen (Drive-Datei oder App-Datei)
@@ -786,12 +801,12 @@
             // FileType Icon
             var fileIcon = function(type) {
                 switch(type) {
-                    case 'pdf': return '\uD83D\uDCC4';
-                    case 'xlsx': case 'xls': return '\uD83D\uDCCA';
-                    case 'doc': case 'docx': return '\uD83D\uDDD2';
-                    case 'gdoc': return '\uD83D\uDCC3';
-                    case 'gsheet': return '\uD83D\uDCCA';
-                    default: return '\uD83D\uDCC1';
+                    case 'pdf': return '📄';
+                    case 'xlsx': case 'xls': return '📊';
+                    case 'doc': case 'docx': return '🗒';
+                    case 'gdoc': return '📃';
+                    case 'gsheet': return '📊';
+                    default: return '📁';
                 }
             };
 
@@ -842,16 +857,16 @@
                     {/* Header */}
                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
                         <button onClick={onBack} style={{...touchBtn, padding:'8px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600'}}>
-                            \u2190
+                            ←
                         </button>
                         <div style={{flex:1}}>
                             <div style={{fontSize:'18px', fontWeight:'700', color:'var(--text-primary)'}}>
-                                \uD83D\uDCC1 Ordner: {kundeName.split(' \u2013 ')[0]}
+                                📁 Ordner: {kundeName.split(' – ')[0]}
                             </div>
                             {syncStatus && syncStatus.storage && (
                                 <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
-                                    {syncStatus.storage.fileCount} Dateien \u00B7 {syncStatus.storage.totalMB} MB gespeichert
-                                    {syncStatus.lastSync && (' \u00B7 Sync: ' + new Date(syncStatus.lastSync).toLocaleString('de-DE'))}
+                                    {syncStatus.storage.fileCount} Dateien · {syncStatus.storage.totalMB} MB gespeichert
+                                    {syncStatus.lastSync && (' · Sync: ' + new Date(syncStatus.lastSync).toLocaleString('de-DE'))}
                                 </div>
                             )}
                         </div>
@@ -860,10 +875,10 @@
                     {/* Wechsel-Buttons: Ordner / Kundendaten */}
                     <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
                         <button style={{...touchBtn, flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)', color:'#fff', fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 3px 10px rgba(41,128,185,0.3)'}}>
-                            \uD83D\uDCC1 Ordner-Ansicht
+                            📁 Ordner-Ansicht
                         </button>
                         <button onClick={onGoToDaten} style={{...touchBtn, flex:1, padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-secondary)', fontSize:'13px', fontWeight:'700', cursor:'pointer'}}>
-                            \uD83D\uDCCB Kundendaten
+                            📋 Kundendaten
                         </button>
                     </div>
 
@@ -875,7 +890,7 @@
                                 var isLast = idx === breadcrumb.length - 1;
                                 return (
                                     <React.Fragment key={crumb.id}>
-                                        <span style={{color:'var(--text-muted)', fontSize:'11px'}}>\u203A</span>
+                                        <span style={{color:'var(--text-muted)', fontSize:'11px'}}>›</span>
                                         <span
                                             onClick={isLast ? undefined : function() {
                                                 var target = findFolderInTree(tree, crumb.id);
@@ -895,8 +910,8 @@
                     {/* Zurueck-Button im Ordner */}
                     {currentFolder && (
                         <button onClick={navigateUp} style={{...touchBtn, display:'flex', alignItems:'center', gap:'8px', width:'100%', padding:'12px', marginBottom:'8px', borderRadius:'10px', border:'1px dashed var(--border-color)', background:'transparent', cursor:'pointer', color:'var(--text-muted)', fontSize:'13px', fontWeight:'600'}}>
-                            <span style={{fontSize:'18px'}}>\u2B06\uFE0F</span>
-                            \u00DCbergeordneter Ordner
+                            <span style={{fontSize:'18px'}}>⬆️</span>
+                            Übergeordneter Ordner
                         </button>
                     )}
 
@@ -923,7 +938,7 @@
                                 return (
                                     <button key={folder.id} onClick={function() { navigateToFolder(folder); }}
                                         style={{...touchBtn, display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border: isApp ? '1px solid rgba(39,174,96,0.3)' : '1px solid var(--border-color)', background: isApp ? 'rgba(39,174,96,0.08)' : 'var(--bg-secondary)', cursor:'pointer', textAlign:'left'}}>
-                                        <span style={{fontSize:'28px'}}>{isApp ? '\uD83D\uDCDD' : '\uD83D\uDCC1'}</span>
+                                        <span style={{fontSize:'28px'}}>{isApp ? '📝' : '📁'}</span>
                                         <div style={{flex:1, minWidth:0}}>
                                             <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                                 {folder.name}
@@ -931,10 +946,10 @@
                                             </div>
                                             <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
                                                 {folder.files ? folder.files.length : 0} Dateien
-                                                {folder.subfolders && folder.subfolders.length > 0 && (' \u00B7 ' + folder.subfolders.length + ' Unterordner')}
+                                                {folder.subfolders && folder.subfolders.length > 0 && (' · ' + folder.subfolders.length + ' Unterordner')}
                                             </div>
                                         </div>
-                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>\u203A</span>
+                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>›</span>
                                     </button>
                                 );
                             })}
@@ -957,12 +972,12 @@
                                                 <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{datei.name}</div>
                                                 <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
                                                     {formatBytes(datei.sizeBytes)}
-                                                    {datei.syncStatus === 'pending' && ' \u00B7 \u23F3 Nicht synchronisiert'}
-                                                    {datei.syncStatus === 'synced' && ' \u00B7 \u2705 Synchronisiert'}
+                                                    {datei.syncStatus === 'pending' && ' · ⏳ Nicht synchronisiert'}
+                                                    {datei.syncStatus === 'synced' && ' · ✅ Synchronisiert'}
                                                 </div>
                                             </div>
                                             <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background:'rgba(39,174,96,0.15)', color:'#27ae60', fontWeight:'700'}}>
-                                                \u00D6ffnen
+                                                Öffnen
                                             </span>
                                         </button>
                                     );
@@ -991,12 +1006,12 @@
                                                 </div>
                                                 <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
                                                     {formatBytes(datei.sizeBytes)}
-                                                    {datei.syncedAt && (' \u00B7 ' + new Date(datei.syncedAt).toLocaleDateString('de-DE'))}
-                                                    {isApp && datei.syncStatus === 'pending' && ' \u00B7 \u23F3 Sync ausstehend'}
+                                                    {datei.syncedAt && (' · ' + new Date(datei.syncedAt).toLocaleDateString('de-DE'))}
+                                                    {isApp && datei.syncStatus === 'pending' && ' · ⏳ Sync ausstehend'}
                                                 </div>
                                             </div>
                                             <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background: isApp ? 'rgba(39,174,96,0.15)' : 'rgba(30,136,229,0.15)', color: isApp ? '#27ae60' : 'var(--accent-blue)', fontWeight:'700'}}>
-                                                \u00D6ffnen
+                                                Öffnen
                                             </span>
                                         </button>
                                     );
@@ -1018,14 +1033,14 @@
                             <div style={{display:'flex', alignItems:'center', gap:'10px', padding:'12px 16px', background:'#1a2332', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
                                 <button onClick={function() { URL.revokeObjectURL(openFileUrl); setOpenFileUrl(null); setOpenFileName(''); }}
                                     style={{...touchBtn, padding:'8px 16px', borderRadius:'8px', border:'none', background:'#e74c3c', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'700'}}>
-                                    \u2715 Schlie\u00DFen
+                                    ✕ Schließen
                                 </button>
                                 <div style={{flex:1, fontSize:'13px', color:'rgba(255,255,255,0.8)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                     {openFileName}
                                 </div>
                                 <a href={openFileUrl} download={openFileName}
                                     style={{...touchBtn, padding:'8px 16px', borderRadius:'8px', border:'none', background:'#27ae60', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'700', textDecoration:'none'}}>
-                                    \u2B07 Download
+                                    ⬇ Download
                                 </a>
                             </div>
                             <iframe src={openFileUrl} style={{flex:1, border:'none', width:'100%'}} title={openFileName} />
