@@ -17,10 +17,17 @@
     'use strict';
 
     var DB_NAME = 'TWBusinessSuite';
-    var DB_VERSION = 3;
+    var DB_VERSION = 4;
     var _db = null;
     var _ready = false;
     var _readyCallbacks = [];
+
+    // ---- Geraete-ID (einmalig pro Geraet) ----
+    var _deviceId = localStorage.getItem('tw_device_id');
+    if (!_deviceId) {
+        _deviceId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+        localStorage.setItem('tw_device_id', _deviceId);
+    }
 
     // ---- Konfiguration ----
     var CONFIG = {
@@ -57,7 +64,9 @@
         appState:       { keyPath: 'key' },
         meta:           { keyPath: 'key' },
         driveOrdner:    { keyPath: 'id', indices: ['kundeId', 'parentId', 'updatedAt'] },
-        driveDateien:   { keyPath: 'id', indices: ['kundeId', 'ordnerId', 'fileType', 'updatedAt'] }
+        driveDateien:   { keyPath: 'id', indices: ['kundeId', 'ordnerId', 'fileType', 'updatedAt'] },
+        appDateien:     { keyPath: 'id', indices: ['kundeId', 'ordnerName', 'docType', 'updatedAt', 'deviceId'] },
+        syncLog:        { keyPath: 'id', indices: ['kundeId', 'action', 'deviceId', 'syncedAt', 'updatedAt'] }
     };
 
     // ================================================================
@@ -667,7 +676,7 @@
 
     function deleteKundeData(kundeId) {
         var storesWithKundeId = ['aufmass', 'rechnungen', 'raeume', 'gesamtlisten',
-            'positionen', 'schriftverkehr', 'kiAkten', 'driveOrdner', 'driveDateien'];
+            'positionen', 'schriftverkehr', 'kiAkten', 'driveOrdner', 'driveDateien', 'appDateien', 'syncLog'];
         var promises = storesWithKundeId.map(function(storeName) {
             return getByIndex(storeName, 'kundeId', kundeId).then(function(items) {
                 return Promise.all(items.map(function(item) { return deleteItem(storeName, item.id); }));
@@ -680,6 +689,148 @@
             return true;
         });
     }
+
+
+    // ================================================================
+    // APP-DATEIEN: In der App erstellte Dokumente speichern
+    // (Rechnungen, Aufmasse, Schriftverkehr -> im Ordner-Browser sichtbar)
+    // ================================================================
+
+    function saveAppDatei(kundeId, ordnerName, dateiName, mimeType, blobData, docType) {
+        var id = 'app_' + kundeId + '_' + ordnerName + '_' + dateiName.replace(/[^a-zA-Z0-9._-]/g, '_');
+        return new Promise(function(resolve, reject) {
+            function doSave(arrayBuf) {
+                var record = {
+                    id: id, kundeId: kundeId,
+                    ordnerName: ordnerName,
+                    name: dateiName,
+                    mimeType: mimeType || 'application/octet-stream',
+                    docType: docType || 'sonstige',
+                    fileType: mimeType === 'application/pdf' ? 'pdf'
+                        : (mimeType && mimeType.indexOf('spreadsheet') >= 0) ? 'xlsx'
+                        : (mimeType && mimeType.indexOf('html') >= 0) ? 'html' : 'sonstige',
+                    sizeBytes: arrayBuf ? arrayBuf.byteLength : 0,
+                    data: arrayBuf,
+                    deviceId: _deviceId,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    syncStatus: 'pending'
+                };
+                putItem('appDateien', record).then(function(saved) {
+                    logSyncAction(kundeId, 'create', 'appDateien', id, dateiName);
+                    resolve(saved);
+                }).catch(reject);
+            }
+            if (blobData instanceof Blob) {
+                var reader = new FileReader();
+                reader.onload = function() { doSave(reader.result); };
+                reader.onerror = function() { reject(reader.error); };
+                reader.readAsArrayBuffer(blobData);
+            } else { doSave(blobData); }
+        });
+    }
+
+    function loadAppDateien(kundeId) {
+        return getByIndex('appDateien', 'kundeId', kundeId).then(function(records) {
+            return records.map(function(r) {
+                return { id: r.id, name: r.name, mimeType: r.mimeType, fileType: r.fileType,
+                    docType: r.docType, ordnerName: r.ordnerName, sizeBytes: r.sizeBytes,
+                    syncedAt: r.updatedAt, hasData: !!(r.data), deviceId: r.deviceId,
+                    syncStatus: r.syncStatus, isAppCreated: true };
+            });
+        });
+    }
+
+    function openAppDatei(dateiId) {
+        return getItem('appDateien', dateiId).then(function(record) {
+            if (!record || !record.data) return null;
+            return { name: record.name, mimeType: record.mimeType,
+                url: URL.createObjectURL(new Blob([record.data], { type: record.mimeType })),
+                blob: new Blob([record.data], { type: record.mimeType }) };
+        });
+    }
+
+    function getAppDateienByOrdner(kundeId) {
+        return loadAppDateien(kundeId).then(function(dateien) {
+            var byOrdner = {};
+            dateien.forEach(function(d) {
+                if (!byOrdner[d.ordnerName]) byOrdner[d.ordnerName] = [];
+                byOrdner[d.ordnerName].push(d);
+            });
+            return byOrdner;
+        });
+    }
+
+
+    // ================================================================
+    // SYNC-FRAMEWORK: Multi-Geraete-Synchronisation
+    // ================================================================
+    // Jede Aenderung wird mit deviceId + Timestamp geloggt.
+    // Sync-Strategie:
+    //   1. "Last-Write-Wins" fuer einfache Daten
+    //   2. "Merge" fuer additive Daten (neue Raeume, Rechnungen)
+    //   3. "Conflict-Flag" bei gleichzeitiger Bearbeitung
+
+    function logSyncAction(kundeId, action, storeName, recordId, details) {
+        return putItem('syncLog', {
+            id: 'log_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4),
+            kundeId: kundeId, action: action, storeName: storeName,
+            recordId: recordId, details: details || '',
+            deviceId: _deviceId, timestamp: new Date().toISOString(),
+            syncedAt: null, updatedAt: new Date().toISOString()
+        }).catch(function(e) { console.warn('[TW-Sync] Log:', e); });
+    }
+
+    function getUnsyncedChanges(kundeId) {
+        return getByIndex('syncLog', 'kundeId', kundeId).then(function(logs) {
+            return logs.filter(function(l) { return !l.syncedAt; })
+                .sort(function(a, b) { return a.timestamp.localeCompare(b.timestamp); });
+        });
+    }
+
+    function markAsSynced(logIds) {
+        var now = new Date().toISOString();
+        return Promise.all(logIds.map(function(id) {
+            return getItem('syncLog', id).then(function(e) {
+                if (e) { e.syncedAt = now; return putItem('syncLog', e); }
+            });
+        }));
+    }
+
+    var DriveUploadSync = {
+        uploadAppDateien: async function(kundeId, driveFolderId, onProgress) {
+            var service = global.GoogleDriveService;
+            if (!service || !service.accessToken) throw new Error('Google Drive nicht verbunden');
+            var appDateien = await getByIndex('appDateien', 'kundeId', kundeId);
+            var pending = appDateien.filter(function(d) { return d.syncStatus === 'pending' && d.data; });
+            if (pending.length === 0) {
+                if (onProgress) onProgress({ message: 'Alles synchronisiert.', percent: 100 });
+                return { uploaded: 0 };
+            }
+            var uploaded = 0, errors = [];
+            for (var i = 0; i < pending.length; i++) {
+                var datei = pending[i];
+                if (onProgress) onProgress({ message: (i+1)+'/'+pending.length+': '+datei.name, percent: Math.round(i/pending.length*100) });
+                try {
+                    var targetFolderId = await service.findOrCreateFolder(driveFolderId, datei.ordnerName);
+                    var blob = new Blob([datei.data], { type: datei.mimeType });
+                    await service.uploadFile(targetFolderId, datei.name, datei.mimeType, blob);
+                    datei.syncStatus = 'synced'; datei.syncedAt = new Date().toISOString();
+                    await putItem('appDateien', datei);
+                    uploaded++;
+                } catch(err) { errors.push({ file: datei.name, error: err.message }); }
+            }
+            if (onProgress) onProgress({ message: uploaded+'/'+pending.length+' hochgeladen', percent: 100 });
+            return { uploaded: uploaded, errors: errors, total: pending.length };
+        },
+        getUploadStatus: async function(kundeId) {
+            var all = await getByIndex('appDateien', 'kundeId', kundeId);
+            var pend = all.filter(function(d) { return d.syncStatus === 'pending'; });
+            return { total: all.length, pending: pend.length, synced: all.length - pend.length,
+                pendingFiles: pend.map(function(d) { return { name: d.name, ordner: d.ordnerName }; }) };
+        }
+    };
+
 
     // ================================================================
     // EVENT-BUS INTEGRATION
@@ -721,6 +872,13 @@
         loadOrdnerStruktur: loadOrdnerStruktur, getKundeStorageSize: getKundeStorageSize,
         shouldSyncFile: shouldSyncFile,
         OfflineBrowser: OfflineBrowser,
+        // App-Dateien (in der App erstellte Dokumente)
+        saveAppDatei: saveAppDatei, loadAppDateien: loadAppDateien,
+        openAppDatei: openAppDatei, getAppDateienByOrdner: getAppDateienByOrdner,
+        // Sync-Framework
+        DriveUploadSync: DriveUploadSync,
+        logSyncAction: logSyncAction, getUnsyncedChanges: getUnsyncedChanges, markAsSynced: markAsSynced,
+        deviceId: _deviceId,
         getStorageInfo: getStorageInfo, requestPersistentStorage: requestPersistentStorage,
         getRecordCounts: getRecordCounts, clearAllData: clearAllData, deleteKundeData: deleteKundeData,
         setupEventListeners: setupEventListeners,

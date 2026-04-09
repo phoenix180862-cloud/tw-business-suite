@@ -699,11 +699,12 @@
             var [openFileName, setOpenFileName] = useState('');
             var [syncStatus, setSyncStatus] = useState(null);
             var [error, setError] = useState(null);
+            var [appOrdner, setAppOrdner] = useState({});
 
             var kundeId = kunde ? (kunde._driveFolderId || kunde.id || kunde.name) : null;
             var kundeName = kunde ? (kunde.name || kunde.auftraggeber || 'Kunde') : 'Kunde';
 
-            // Ordnerstruktur laden
+            // Ordnerstruktur + App-Dateien laden
             useEffect(function() {
                 if (!kundeId || !window.TWStorage || !window.TWStorage.isReady()) {
                     setLoading(false);
@@ -713,12 +714,16 @@
                 setLoading(true);
                 Promise.all([
                     TWStorage.OfflineBrowser.getFullTree(kundeId),
-                    TWStorage.DriveSync.getSyncStatus(kundeId)
+                    TWStorage.DriveSync.getSyncStatus(kundeId),
+                    TWStorage.getAppDateienByOrdner(kundeId)
                 ]).then(function(results) {
-                    setTree(results[0]);
+                    setTree(results[0] || []);
                     setSyncStatus(results[1]);
+                    setAppOrdner(results[2] || {});
                     setLoading(false);
-                    if (!results[0] || results[0].length === 0) {
+                    var hasDrive = results[0] && results[0].length > 0;
+                    var hasApp = results[2] && Object.keys(results[2]).length > 0;
+                    if (!hasDrive && !hasApp) {
                         setError('Keine Ordner gespeichert. Bitte zuerst "Komplette Daten laden" verwenden.');
                     }
                 }).catch(function(e) {
@@ -727,14 +732,15 @@
                 });
             }, [kundeId]);
 
-            // Datei oeffnen
-            var handleOpenFile = function(dateiId, fileName) {
-                TWStorage.OfflineBrowser.openFile(dateiId).then(function(result) {
+            // Datei oeffnen (Drive-Datei oder App-Datei)
+            var handleOpenFile = function(dateiId, fileName, isAppFile) {
+                var openFn = isAppFile ? TWStorage.openAppDatei : TWStorage.OfflineBrowser.openFile;
+                openFn(dateiId).then(function(result) {
                     if (result && result.url) {
                         setOpenFileUrl(result.url);
                         setOpenFileName(fileName);
                     } else {
-                        alert('Datei konnte nicht geoeffnet werden.');
+                        alert('Datei konnte nicht ge\u00f6ffnet werden.');
                     }
                 });
             };
@@ -799,6 +805,35 @@
             // Aktuelle Ordner und Dateien
             var displayFolders = currentFolder ? (currentFolder.subfolders || []) : (tree || []);
             var displayFiles = currentFolder ? (currentFolder.files || []) : [];
+
+            // App-erstellte Dateien: Wenn wir im aktuellen App-Ordner sind, dessen Dateien zeigen
+            var appOrdnerNames = Object.keys(appOrdner);
+            var isInAppOrdner = currentFolder && currentFolder._isAppOrdner;
+            var currentAppFiles = isInAppOrdner ? (appOrdner[currentFolder.name] || []) : [];
+
+            // Auf Root-Ebene: App-Ordner als virtuelle Ordner hinzufuegen
+            var appVirtualFolders = [];
+            if (!currentFolder) {
+                appOrdnerNames.forEach(function(name) {
+                    // Pruefen ob nicht schon als Drive-Ordner vorhanden
+                    var exists = displayFolders.some(function(f) { return f.name === name; });
+                    if (!exists) {
+                        appVirtualFolders.push({
+                            id: 'app_ordner_' + name,
+                            name: name,
+                            _isAppOrdner: true,
+                            files: appOrdner[name] || [],
+                            subfolders: []
+                        });
+                    }
+                });
+            }
+
+            // Wenn ein Drive-Ordner denselben Namen hat wie ein App-Ordner,
+            // die App-Dateien zu den Drive-Dateien hinzufuegen
+            if (currentFolder && !isInAppOrdner && appOrdner[currentFolder.name]) {
+                displayFiles = displayFiles.concat(appOrdner[currentFolder.name]);
+            }
 
             var touchBtn = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
 
@@ -880,17 +915,20 @@
                         </div>
                     )}
 
-                    {/* Ordner-Liste */}
-                    {!loading && displayFolders.length > 0 && (
+                    {/* Ordner-Liste (Drive + App-Ordner) */}
+                    {!loading && (displayFolders.length > 0 || appVirtualFolders.length > 0) && (
                         <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'12px'}}>
-                            {displayFolders.map(function(folder) {
-                                var fileCount = (folder.files ? folder.files.length : 0) + (folder.subfolders ? folder.subfolders.length : 0);
+                            {displayFolders.concat(appVirtualFolders).map(function(folder) {
+                                var isApp = folder._isAppOrdner;
                                 return (
                                     <button key={folder.id} onClick={function() { navigateToFolder(folder); }}
-                                        style={{...touchBtn, display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', textAlign:'left'}}>
-                                        <span style={{fontSize:'28px'}}>\uD83D\uDCC1</span>
+                                        style={{...touchBtn, display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border: isApp ? '1px solid rgba(39,174,96,0.3)' : '1px solid var(--border-color)', background: isApp ? 'rgba(39,174,96,0.08)' : 'var(--bg-secondary)', cursor:'pointer', textAlign:'left'}}>
+                                        <span style={{fontSize:'28px'}}>{isApp ? '\uD83D\uDCDD' : '\uD83D\uDCC1'}</span>
                                         <div style={{flex:1, minWidth:0}}>
-                                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{folder.name}</div>
+                                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                {folder.name}
+                                                {isApp && <span style={{fontSize:'10px', fontWeight:'600', color:'#27ae60', marginLeft:'8px', verticalAlign:'middle'}}>APP</span>}
+                                            </div>
                                             <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
                                                 {folder.files ? folder.files.length : 0} Dateien
                                                 {folder.subfolders && folder.subfolders.length > 0 && (' \u00B7 ' + folder.subfolders.length + ' Unterordner')}
@@ -903,26 +941,61 @@
                         </div>
                     )}
 
-                    {/* Dateien-Liste */}
-                    {!loading && displayFiles.length > 0 && (
+                    {/* App-Dateien im aktuellen App-Ordner */}
+                    {!loading && isInAppOrdner && currentAppFiles.length > 0 && (
+                        <div style={{marginTop:'8px'}}>
+                            <div style={{fontSize:'11px', fontWeight:'700', color:'#27ae60', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'8px', paddingLeft:'4px'}}>
+                                In der App erstellt ({currentAppFiles.length})
+                            </div>
+                            <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                                {currentAppFiles.map(function(datei) {
+                                    return (
+                                        <button key={datei.id} onClick={function() { handleOpenFile(datei.id, datei.name, true); }}
+                                            style={{...touchBtn, display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px', borderRadius:'10px', border:'1px solid rgba(39,174,96,0.25)', background:'rgba(39,174,96,0.06)', cursor:'pointer', textAlign:'left'}}>
+                                            <span style={{fontSize:'22px'}}>{fileIcon(datei.fileType)}</span>
+                                            <div style={{flex:1, minWidth:0}}>
+                                                <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{datei.name}</div>
+                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                                    {formatBytes(datei.sizeBytes)}
+                                                    {datei.syncStatus === 'pending' && ' \u00B7 \u23F3 Nicht synchronisiert'}
+                                                    {datei.syncStatus === 'synced' && ' \u00B7 \u2705 Synchronisiert'}
+                                                </div>
+                                            </div>
+                                            <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background:'rgba(39,174,96,0.15)', color:'#27ae60', fontWeight:'700'}}>
+                                                \u00D6ffnen
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Dateien-Liste (Drive-Dateien + gemischte App-Dateien) */}
+                    {!loading && !isInAppOrdner && displayFiles.length > 0 && (
                         <div style={{marginTop:'8px'}}>
                             <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'8px', paddingLeft:'4px'}}>
                                 Dateien ({displayFiles.length})
                             </div>
                             <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
                                 {displayFiles.map(function(datei) {
+                                    var isApp = datei.isAppCreated;
                                     return (
-                                        <button key={datei.id} onClick={function() { handleOpenFile(datei.id, datei.name); }}
-                                            style={{...touchBtn, display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'left'}}>
+                                        <button key={datei.id} onClick={function() { handleOpenFile(datei.id, datei.name, isApp); }}
+                                            style={{...touchBtn, display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px', borderRadius:'10px', border: isApp ? '1px solid rgba(39,174,96,0.25)' : '1px solid var(--border-color)', background: isApp ? 'rgba(39,174,96,0.06)' : 'var(--bg-tertiary)', cursor:'pointer', textAlign:'left'}}>
                                             <span style={{fontSize:'22px'}}>{fileIcon(datei.fileType)}</span>
                                             <div style={{flex:1, minWidth:0}}>
-                                                <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{datei.name}</div>
+                                                <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                    {datei.name}
+                                                    {isApp && <span style={{fontSize:'9px', fontWeight:'700', color:'#27ae60', marginLeft:'6px', verticalAlign:'middle'}}>APP</span>}
+                                                </div>
                                                 <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
                                                     {formatBytes(datei.sizeBytes)}
                                                     {datei.syncedAt && (' \u00B7 ' + new Date(datei.syncedAt).toLocaleDateString('de-DE'))}
+                                                    {isApp && datei.syncStatus === 'pending' && ' \u00B7 \u23F3 Sync ausstehend'}
                                                 </div>
                                             </div>
-                                            <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background:'rgba(30,136,229,0.15)', color:'var(--accent-blue)', fontWeight:'700'}}>
+                                            <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background: isApp ? 'rgba(39,174,96,0.15)' : 'rgba(30,136,229,0.15)', color: isApp ? '#27ae60' : 'var(--accent-blue)', fontWeight:'700'}}>
                                                 \u00D6ffnen
                                             </span>
                                         </button>
