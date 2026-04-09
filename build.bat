@@ -22,17 +22,17 @@ REM Fuege alle Module zusammen
 echo. >> index.html
 type tw-shared-components.jsx >> index.html
 echo. >> index.html
-type tw-aufmass.jsx >> index.html
+type modules\tw-aufmass.jsx >> index.html
 echo. >> index.html
 type tw-modulwahl.jsx >> index.html
 echo. >> index.html
-type tw-rechnung.jsx >> index.html
+type modules\tw-rechnung.jsx >> index.html
 echo. >> index.html
-type tw-schriftverkehr.jsx >> index.html
+type modules\tw-schriftverkehr.jsx >> index.html
 echo. >> index.html
-type tw-ausgangsbuch.jsx >> index.html
+type modules\tw-ausgangsbuch.jsx >> index.html
 echo. >> index.html
-type tw-baustelle.jsx >> index.html
+type modules\tw-baustelle.jsx >> index.html
 echo. >> index.html
 type tw-app.jsx >> index.html
 
