@@ -550,144 +550,132 @@
         /* ═══════════════════════════════════════════
            MANUELLE EINGABE -- LV-Positionen & Räume
            ═══════════════════════════════════════════ */
+        /* ManuelleEingabe v4 — Identische 3 Listen wie DatenUebersicht + PDF-Export */
         function ManuelleEingabe({ onFertig, onBack, kunde }) {
-            const [activeStep, setActiveStep] = useState(1); // 1=Kundendaten, 2=Positionen, 3=Raeume
-            const [kundenName, setKundenName] = useState((kunde && kunde.name) || '');
-            const [bauvorhaben, setBauvorhaben] = useState((kunde && kunde.adresse) || '');
-            
-            // ── LV-Positionen State ──
-            const [positionen, setPositionen] = useState([]);
-            const [editPosIdx, setEditPosIdx] = useState(null);
-            const [posForm, setPosForm] = useState({ posNr:'', menge:'', einheit:'m²', leistung:'', ep:'', gp:'' });
-            const [showPosForm, setShowPosForm] = useState(false);
-            
-            // ── Räume State ──
-            const [raeume, setRaeume] = useState([]);
-            const [editRaumIdx, setEditRaumIdx] = useState(null);
-            const [raumForm, setRaumForm] = useState({ raumNr:'', bezeichnung:'', geschoss:'', bemerkung:'' });
-            const [showRaumForm, setShowRaumForm] = useState(false);
+            var [activeTab, setActiveTab] = useState('stammdaten');
+            var [pdfStatus, setPdfStatus] = useState('');
+            var [uploadStatus, setUploadStatus] = useState('');
 
-            // ── Upload State ──
-            const [uploadStatus, setUploadStatus] = useState('');
-            // ── Erweiterte Kundendaten ──
-            const [manuelleFelder, setManuelleFelder] = useState({
-                bauleitung:'', bl_telefon:'', bl_email:'',
-                architekt:'', arch_telefon:'', arch_email:'',
-                ag_adresse:'', ag_telefon:'', ag_email:''
+            // ── Stammdaten (identisch mit DatenUebersicht) ──
+            var [stammFelder, setStammFelder] = useState({
+                bauherr_firma: '', bauherr_strasse: '', bauherr_plzOrt: '',
+                bauherr_ansprechpartner: '', bauherr_telefon: '', bauherr_fax: '',
+                bauherr_mobil: '', bauherr_email: '', bauherr_website: '',
+                bauleiter_name: '', bauleiter_firma: '', bauleiter_strasse: '',
+                bauleiter_plzOrt: '', bauleiter_telefon: '', bauleiter_mobil: '',
+                bauleiter_fax: '', bauleiter_email: '',
+                architekt_name: '', architekt_buero: '', architekt_strasse: '',
+                architekt_plzOrt: '', architekt_telefon: '', architekt_mobil: '',
+                architekt_fax: '', architekt_email: '',
+                objekt_bauvorhaben: '', objekt_strasse: '', objekt_plzOrt: '',
+                objekt_projektnr: '', objekt_vergabenr: '', objekt_auftragsnr: '',
+                objekt_vergabeart: '', objekt_auftragsdatum: '',
+                objekt_ausfuehrung_von: '', objekt_ausfuehrung_bis: '', objekt_abnahmedatum: ''
             });
 
-            // ── Einheiten-Optionen ──
-            var einheiten = ['m²', 'm', 'Stk', 'psch', 'lfm', 'kg', 'l', 'Satz'];
+            // ── LV-Positionen (identisch mit DatenUebersicht) ──
+            var [positionen, setPositionen] = useState([]);
+            var [nachtraege, setNachtraege] = useState([]);
+            var [showPosForm, setShowPosForm] = useState(false);
+            var [showNachtragForm, setShowNachtragForm] = useState(false);
+            var [editPosIdx, setEditPosIdx] = useState(null);
+            var [editNachtragIdx, setEditNachtragIdx] = useState(null);
+            var [posForm, setPosForm] = useState({ posNr:'', menge:'', einheit:'m\u00b2', leistung:'', ep:'', gp:'' });
+            var [nachtragForm, setNachtragForm] = useState({ posNr:'', menge:'', einheit:'m\u00b2', leistung:'', ep:'', gp:'', nachtragTitel:'' });
 
-            // ═══ TOUCH-HELPER: Einheitliches Touch+Click Handling ═══
-            var tap = function(fn) {
-                return {
-                    onTouchEnd: function(e) { e.preventDefault(); e.stopPropagation(); fn(); },
-                    onClick: function(e) { fn(); }
-                };
-            };
-            // Basis-Stil für Touch-optimierte Buttons
+            // ── Raeume (identisch mit DatenUebersicht) ──
+            var [raeume, setRaeume] = useState([]);
+            var [showRaumForm, setShowRaumForm] = useState(false);
+            var [editRaumIdx, setEditRaumIdx] = useState(null);
+            var [raumForm, setRaumForm] = useState({ raumNr:'', bezeichnung:'', geschoss:'EG', flaeche:'', fliesenarbeiten:'Ja' });
+
+            // ── Touch Helper ──
+            var tap = function(fn) { return { onTouchEnd: function(e){ e.preventDefault(); e.stopPropagation(); fn(); }, onClick: function(){ fn(); } }; };
             var touchBase = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
 
+            // ── Formatierung ──
+            var fmtZahl = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+            var fmtEuro = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20ac'; };
+
+            // ── Einheiten ──
+            var einheiten = ['m\u00b2', 'm', 'Stk', 'psch', 'lfm', 'kg', 'l', 'Satz', 'Std'];
+
+            // ── Geschosse ──
+            var geschosse = ['KG', 'EG', 'OG', '1.OG', '2.OG', 'DG'];
+
+            // ── Styles ──
+            var inputStyle = { width:'100%', padding:'10px 12px', borderRadius:'8px', border:'2px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'14px', color:'var(--text-primary)', boxSizing:'border-box' };
+            var labelStyle = { fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', marginBottom:'4px', display:'block', textTransform:'uppercase', letterSpacing:'0.5px' };
+
+            // ═══ STAMMDATEN CRUD ═══
+            var updateStammFeld = function(key, val) { setStammFelder(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
+
             // ═══ POSITIONEN CRUD ═══
-            var resetPosForm = function() {
-                setPosForm({ posNr:'', menge:'', einheit:'m²', leistung:'', ep:'', gp:'' });
-                setEditPosIdx(null);
-                setShowPosForm(false);
-            };
-
+            var resetPosForm = function() { setPosForm({ posNr:'', menge:'', einheit:'m\u00b2', leistung:'', ep:'', gp:'' }); setEditPosIdx(null); setShowPosForm(false); };
             var handleSavePos = function() {
-                if (!posForm.posNr || !posForm.leistung) {
-                    alert('Bitte mindestens Positionsnummer und Leistungsbeschreibung eingeben.');
-                    return;
-                }
-                var newPos = {
-                    posNr: posForm.posNr.trim(),
-                    menge: parseFloat(posForm.menge) || 0,
-                    einheit: posForm.einheit || 'm²',
-                    leistung: posForm.leistung.trim(),
-                    ep: parseFloat(posForm.ep) || 0,
-                    gp: parseFloat(posForm.gp) || 0
-                };
-                if (newPos.ep > 0 && newPos.menge > 0 && newPos.gp === 0) {
-                    newPos.gp = Math.round(newPos.ep * newPos.menge * 100) / 100;
-                }
-
-                if (editPosIdx !== null) {
-                    setPositionen(function(prev) {
-                        var copy = prev.slice();
-                        copy[editPosIdx] = newPos;
-                        return copy;
-                    });
-                } else {
-                    setPositionen(function(prev) { return prev.concat([newPos]); });
-                }
+                if (!posForm.posNr || !posForm.leistung) { alert('Bitte mindestens Pos.-Nr. und Leistungsbeschreibung eingeben.'); return; }
+                var newPos = { posNr: posForm.posNr.trim(), menge: parseFloat(posForm.menge) || 0, einheit: posForm.einheit || 'm\u00b2', leistung: posForm.leistung.trim(), ep: parseFloat(posForm.ep) || 0, gp: parseFloat(posForm.gp) || 0 };
+                if (newPos.ep > 0 && newPos.menge > 0 && newPos.gp === 0) { newPos.gp = Math.round(newPos.ep * newPos.menge * 100) / 100; }
+                if (editPosIdx !== null) { setPositionen(function(prev) { var c = prev.slice(); c[editPosIdx] = newPos; return c; }); }
+                else { setPositionen(function(prev) { return prev.concat([newPos]); }); }
                 resetPosForm();
             };
+            var handleEditPos = function(idx) { var p = positionen[idx]; setPosForm({ posNr: p.posNr, menge: String(p.menge || ''), einheit: p.einheit || 'm\u00b2', leistung: p.leistung, ep: String(p.ep || ''), gp: String(p.gp || '') }); setEditPosIdx(idx); setShowPosForm(true); };
+            var handleDeletePos = function(idx) { if (confirm('Position "' + positionen[idx].posNr + '" loeschen?')) { setPositionen(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); } };
 
-            var handleEditPos = function(idx) {
-                var p = positionen[idx];
-                setPosForm({ posNr: p.posNr, menge: String(p.menge || ''), einheit: p.einheit || 'm²', leistung: p.leistung, ep: String(p.ep || ''), gp: String(p.gp || '') });
-                setEditPosIdx(idx);
-                setShowPosForm(true);
+            // ═══ NACHTRAEGE CRUD ═══
+            var resetNachtragForm = function() { setNachtragForm({ posNr:'', menge:'', einheit:'m\u00b2', leistung:'', ep:'', gp:'', nachtragTitel:'' }); setEditNachtragIdx(null); setShowNachtragForm(false); };
+            var handleSaveNachtrag = function() {
+                if (!nachtragForm.posNr || !nachtragForm.leistung) { alert('Bitte mindestens Pos.-Nr. und Leistungsbeschreibung eingeben.'); return; }
+                var newN = { posNr: nachtragForm.posNr.trim(), menge: parseFloat(nachtragForm.menge) || 0, einheit: nachtragForm.einheit || 'm\u00b2', leistung: nachtragForm.leistung.trim(), ep: parseFloat(nachtragForm.ep) || 0, gp: parseFloat(nachtragForm.gp) || 0, nachtragTitel: nachtragForm.nachtragTitel.trim() };
+                if (newN.ep > 0 && newN.menge > 0 && newN.gp === 0) { newN.gp = Math.round(newN.ep * newN.menge * 100) / 100; }
+                if (editNachtragIdx !== null) { setNachtraege(function(prev) { var c = prev.slice(); c[editNachtragIdx] = newN; return c; }); }
+                else { setNachtraege(function(prev) { return prev.concat([newN]); }); }
+                resetNachtragForm();
             };
+            var handleEditNachtrag = function(idx) { var n = nachtraege[idx]; setNachtragForm({ posNr: n.posNr, menge: String(n.menge || ''), einheit: n.einheit || 'm\u00b2', leistung: n.leistung, ep: String(n.ep || ''), gp: String(n.gp || ''), nachtragTitel: n.nachtragTitel || '' }); setEditNachtragIdx(idx); setShowNachtragForm(true); };
+            var handleDeleteNachtrag = function(idx) { if (confirm('Nachtrag "' + nachtraege[idx].posNr + '" loeschen?')) { setNachtraege(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); } };
 
-            var handleDeletePos = function(idx) {
-                if (confirm('Position "' + positionen[idx].posNr + '" wirklich löschen?')) {
-                    setPositionen(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); });
-                }
-            };
-
-            // ═══ RÄUME CRUD ═══
-            var resetRaumForm = function() {
-                setRaumForm({ raumNr:'', bezeichnung:'', geschoss:'', bemerkung:'' });
-                setEditRaumIdx(null);
-                setShowRaumForm(false);
-            };
-
+            // ═══ RAEUME CRUD ═══
+            var resetRaumForm = function() { setRaumForm({ raumNr:'', bezeichnung:'', geschoss:'EG', flaeche:'', fliesenarbeiten:'Ja' }); setEditRaumIdx(null); setShowRaumForm(false); };
             var handleSaveRaum = function() {
-                if (!raumForm.bezeichnung) {
-                    alert('Bitte mindestens eine Raumbezeichnung eingeben.');
-                    return;
-                }
-                var newRaum = {
-                    raumNr: raumForm.raumNr.trim(),
-                    bezeichnung: raumForm.bezeichnung.trim(),
-                    geschoss: raumForm.geschoss.trim().toUpperCase(),
-                    bemerkung: raumForm.bemerkung.trim()
-                };
-
-                if (editRaumIdx !== null) {
-                    setRaeume(function(prev) {
-                        var copy = prev.slice();
-                        copy[editRaumIdx] = newRaum;
-                        return copy;
-                    });
-                } else {
-                    setRaeume(function(prev) { return prev.concat([newRaum]); });
-                }
+                if (!raumForm.bezeichnung) { alert('Bitte mindestens eine Raumbezeichnung eingeben.'); return; }
+                var newR = { raumNr: raumForm.raumNr.trim(), bezeichnung: raumForm.bezeichnung.trim(), geschoss: raumForm.geschoss || 'EG', flaeche: parseFloat(raumForm.flaeche) || 0, fliesenarbeiten: raumForm.fliesenarbeiten || 'Ja' };
+                if (editRaumIdx !== null) { setRaeume(function(prev) { var c = prev.slice(); c[editRaumIdx] = newR; return c; }); }
+                else { setRaeume(function(prev) { return prev.concat([newR]); }); }
                 resetRaumForm();
             };
-
-            var handleEditRaum = function(idx) {
-                var r = raeume[idx];
-                setRaumForm({ raumNr: r.raumNr, bezeichnung: r.bezeichnung, geschoss: r.geschoss || '', bemerkung: r.bemerkung || '' });
-                setEditRaumIdx(idx);
-                setShowRaumForm(true);
-            };
-
-            var handleDeleteRaum = function(idx) {
-                if (confirm('Raum "' + raeume[idx].bezeichnung + '" wirklich löschen?')) {
-                    setRaeume(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); });
-                }
-            };
+            var handleEditRaum = function(idx) { var r = raeume[idx]; setRaumForm({ raumNr: r.raumNr, bezeichnung: r.bezeichnung, geschoss: r.geschoss || 'EG', flaeche: String(r.flaeche || ''), fliesenarbeiten: r.fliesenarbeiten || 'Ja' }); setEditRaumIdx(idx); setShowRaumForm(true); };
+            var handleDeleteRaum = function(idx) { if (confirm('Raum "' + raeume[idx].bezeichnung + '" loeschen?')) { setRaeume(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); } };
 
             // ═══ DATEI-UPLOAD (CSV / Excel) ═══
-            var handleFileUpload = function(e) {
+            var handleFileUpload = function(e, targetType) {
                 var file = e.target.files[0];
                 if (!file) return;
                 var ext = file.name.split('.').pop().toLowerCase();
-                setUploadStatus('⏳ ' + file.name + ' wird verarbeitet...');
+                setUploadStatus('Wird verarbeitet...');
+
+                var processRows = function(rows, isRaumFile) {
+                    if (targetType === 'positionen' || (!targetType && !isRaumFile)) {
+                        var imported = [];
+                        for (var i = 0; i < rows.length; i++) {
+                            var r = rows[i];
+                            if (!r || r.length < 2) continue;
+                            imported.push({ posNr: String(r[0] || ''), menge: parseFloat(r[1]) || 0, einheit: String(r[2] || 'm\u00b2'), leistung: String(r[3] || ''), ep: parseFloat(r[4]) || 0, gp: parseFloat(r[5]) || 0 });
+                        }
+                        if (imported.length > 0) { setPositionen(function(prev) { return prev.concat(imported); }); setUploadStatus(imported.length + ' Positionen importiert'); setActiveTab('positionen'); }
+                        else { setUploadStatus('Keine Daten erkannt'); }
+                    } else {
+                        var importedR = [];
+                        for (var j = 0; j < rows.length; j++) {
+                            var rr = rows[j];
+                            if (!rr || rr.length < 2) continue;
+                            importedR.push({ raumNr: String(rr[0] || ''), bezeichnung: String(rr[1] || ''), geschoss: String(rr[2] || 'EG').toUpperCase(), flaeche: parseFloat(rr[3]) || 0, fliesenarbeiten: String(rr[4] || 'Ja') });
+                        }
+                        if (importedR.length > 0) { setRaeume(function(prev) { return prev.concat(importedR); }); setUploadStatus(importedR.length + ' Raeume importiert'); setActiveTab('raeume'); }
+                        else { setUploadStatus('Keine Daten erkannt'); }
+                    }
+                };
 
                 if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
                     var reader = new FileReader();
@@ -695,393 +683,798 @@
                         try {
                             var text = ev.target.result;
                             var lines = text.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
-                            var separator = text.indexOf('\t') >= 0 ? '\t' : (text.indexOf(';') >= 0 ? ';' : ',');
-                            var importedPos = [];
-                            var importedRaeume = [];
-                            var headerLine = lines[0].toLowerCase();
-                            var isRaumFile = headerLine.indexOf('raum') >= 0 && headerLine.indexOf('geschoss') >= 0;
-
-                            for (var i = 1; i < lines.length; i++) {
-                                var cols = lines[i].split(separator).map(function(c) { return c.replace(/^"|"$/g, '').trim(); });
-                                if (cols.length < 2) continue;
-
-                                if (isRaumFile) {
-                                    importedRaeume.push({
-                                        raumNr: cols[0] || String(importedRaeume.length + 1),
-                                        bezeichnung: cols[1] || '',
-                                        geschoss: (cols[2] || '').toUpperCase(),
-                                        bemerkung: cols[3] || ''
-                                    });
-                                } else {
-                                    importedPos.push({
-                                        posNr: cols[0] || '',
-                                        menge: parseFloat(cols[1]) || 0,
-                                        einheit: cols[2] || 'm²',
-                                        leistung: cols[3] || cols[1] || '',
-                                        ep: parseFloat(cols[4]) || 0,
-                                        gp: parseFloat(cols[5]) || 0
-                                    });
-                                }
-                            }
-
-                            if (isRaumFile && importedRaeume.length > 0) {
-                                setRaeume(function(prev) { return prev.concat(importedRaeume); });
-                                setUploadStatus('✅ ' + importedRaeume.length + ' Räume importiert aus ' + file.name);
-                                setActiveTab('raeume');
-                            } else if (importedPos.length > 0) {
-                                setPositionen(function(prev) { return prev.concat(importedPos); });
-                                setUploadStatus('✅ ' + importedPos.length + ' Positionen importiert aus ' + file.name);
-                                setActiveTab('positionen');
-                            } else {
-                                setUploadStatus('⚠️ Keine Daten erkannt in ' + file.name);
-                            }
-                        } catch(parseErr) {
-                            setUploadStatus('❌ Fehler beim Lesen: ' + parseErr.message);
-                        }
+                            var sep = text.indexOf('\t') >= 0 ? '\t' : (text.indexOf(';') >= 0 ? ';' : ',');
+                            var header = lines[0].toLowerCase();
+                            var isRaum = header.indexOf('raum') >= 0 && header.indexOf('geschoss') >= 0;
+                            var dataRows = [];
+                            for (var i = 1; i < lines.length; i++) { dataRows.push(lines[i].split(sep).map(function(c) { return c.replace(/^"|"$/g, '').trim(); })); }
+                            processRows(dataRows, isRaum);
+                        } catch(err) { setUploadStatus('Fehler: ' + err.message); }
                     };
                     reader.readAsText(file);
                 } else if (ext === 'xlsx' || ext === 'xls') {
                     var reader2 = new FileReader();
                     reader2.onload = function(ev) {
                         try {
-                            if (typeof XLSX === 'undefined') {
-                                setUploadStatus('❌ SheetJS (XLSX) nicht verfügbar. Bitte CSV verwenden.');
-                                return;
-                            }
+                            if (typeof XLSX === 'undefined') { setUploadStatus('SheetJS nicht verfuegbar'); return; }
                             var workbook = XLSX.read(ev.target.result, { type: 'array' });
                             var sheet = workbook.Sheets[workbook.SheetNames[0]];
                             var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                            if (rows.length < 2) { setUploadStatus('⚠️ Leere Excel-Datei'); return; }
-
+                            if (rows.length < 2) { setUploadStatus('Leere Datei'); return; }
                             var header = (rows[0] || []).map(function(h) { return String(h || '').toLowerCase(); });
-                            var isRaumFile2 = header.some(function(h) { return h.indexOf('raum') >= 0; }) && header.some(function(h) { return h.indexOf('geschoss') >= 0; });
-                            var importedPos2 = [];
-                            var importedRaeume2 = [];
-
-                            for (var ri = 1; ri < rows.length; ri++) {
-                                var r = rows[ri];
-                                if (!r || r.length < 2) continue;
-                                if (isRaumFile2) {
-                                    importedRaeume2.push({
-                                        raumNr: String(r[0] || importedRaeume2.length + 1),
-                                        bezeichnung: String(r[1] || ''),
-                                        geschoss: String(r[2] || '').toUpperCase(),
-                                        bemerkung: String(r[3] || '')
-                                    });
-                                } else {
-                                    importedPos2.push({
-                                        posNr: String(r[0] || ''),
-                                        menge: parseFloat(r[1]) || 0,
-                                        einheit: String(r[2] || 'm²'),
-                                        leistung: String(r[3] || r[1] || ''),
-                                        ep: parseFloat(r[4]) || 0,
-                                        gp: parseFloat(r[5]) || 0
-                                    });
-                                }
-                            }
-
-                            if (isRaumFile2 && importedRaeume2.length > 0) {
-                                setRaeume(function(prev) { return prev.concat(importedRaeume2); });
-                                setUploadStatus('✅ ' + importedRaeume2.length + ' Räume importiert aus ' + file.name);
-                                setActiveTab('raeume');
-                            } else if (importedPos2.length > 0) {
-                                setPositionen(function(prev) { return prev.concat(importedPos2); });
-                                setUploadStatus('✅ ' + importedPos2.length + ' Positionen importiert aus ' + file.name);
-                                setActiveTab('positionen');
-                            } else {
-                                setUploadStatus('⚠️ Keine Daten erkannt in ' + file.name);
-                            }
-                        } catch(xlsErr) {
-                            setUploadStatus('❌ Excel-Fehler: ' + xlsErr.message);
-                        }
+                            var isRaum = header.some(function(h) { return h.indexOf('raum') >= 0; }) && header.some(function(h) { return h.indexOf('geschoss') >= 0; });
+                            processRows(rows.slice(1), isRaum);
+                        } catch(err) { setUploadStatus('Excel-Fehler: ' + err.message); }
                     };
                     reader2.readAsArrayBuffer(file);
-                } else {
-                    setUploadStatus('⚠️ Format nicht unterstützt. Bitte CSV, TSV oder XLSX hochladen.');
-                }
+                } else { setUploadStatus('Format nicht unterstuetzt'); }
                 e.target.value = '';
             };
 
-            // ═══ FERTIGSTELLEN ═══
+            // ── Spracheingabe ──
+            var startSpeech = function(callback) {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert('Spracheingabe wird von diesem Browser nicht unterstuetzt.'); return; }
+                var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+                var recognition = new SpeechRec();
+                recognition.lang = 'de-DE'; recognition.continuous = false; recognition.interimResults = false;
+                recognition.onresult = function(event) { var text = event.results[0][0].transcript; if (callback) callback(text); };
+                recognition.start();
+            };
+
+            // ═══ SUMMEN ═══
+            var gpSummeLV = positionen.reduce(function(s, p) { return s + (p.gp || (p.ep * p.menge) || 0); }, 0);
+            var gpSummeNachtraege = nachtraege.reduce(function(s, n) { return s + (n.gp || (n.ep * n.menge) || 0); }, 0);
+            var gpGesamtNetto = gpSummeLV + gpSummeNachtraege;
+            var mwst = Math.round(gpGesamtNetto * 0.19 * 100) / 100;
+            var gesamtBrutto = Math.round((gpGesamtNetto + mwst) * 100) / 100;
+
+            // ═══ PDF GENERIERUNG (clientseitig mit jsPDF) ═══
+            var handlePdfExport = function() {
+                setPdfStatus('PDF wird erstellt...');
+                try {
+                    if (typeof window.jspdf === 'undefined' && typeof jspdf === 'undefined') {
+                        // jsPDF nachladen
+                        var script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                        script.onload = function() { generatePdf(); };
+                        script.onerror = function() { setPdfStatus('jsPDF konnte nicht geladen werden'); };
+                        document.head.appendChild(script);
+                    } else {
+                        generatePdf();
+                    }
+                } catch(err) { setPdfStatus('Fehler: ' + err.message); }
+            };
+
+            var generatePdf = function() {
+                try {
+                    var jsPDF = (window.jspdf && window.jspdf.jsPDF) || jspdf.jsPDF;
+                    var doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                    var pageW = 210; var marginL = 15; var marginR = 15; var contentW = pageW - marginL - marginR;
+                    var y = 0;
+
+                    var addHeader = function(titel) {
+                        doc.setFillColor(250, 250, 248);
+                        doc.rect(0, 0, pageW, 297, 'F');
+                        // Firmenname
+                        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17);
+                        doc.text('Thomas Willwacher Fliesenlegermeister e.K.', marginL, 15);
+                        doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(85, 85, 85);
+                        doc.text('Flurweg 14a \u00b7 56472 Nisterau', marginL, 20);
+                        // Trennlinie
+                        doc.setDrawColor(192, 57, 43); doc.setLineWidth(0.8);
+                        doc.line(marginL, 24, pageW - marginR, 24);
+                        // Titel
+                        doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(192, 57, 43);
+                        doc.text(titel, marginL, 32);
+                        // Kunde + Datum
+                        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(85, 85, 85);
+                        var kundeName = stammFelder.bauherr_firma || 'Unbekannt';
+                        doc.text('Kunde: ' + kundeName, marginL, 38);
+                        doc.text('Datum: ' + new Date().toLocaleDateString('de-DE'), pageW - marginR - 40, 38);
+                        return 44;
+                    };
+
+                    var addFooter = function(pageNum) {
+                        doc.setDrawColor(85, 85, 85); doc.setLineWidth(0.3);
+                        doc.line(marginL, 282, pageW - marginR, 282);
+                        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(85, 85, 85);
+                        doc.text('Thomas Willwacher Fliesenlegermeister e.K. | Flurweg 14a | 56472 Nisterau', marginL, 286);
+                        doc.text('Seite ' + pageNum, pageW - marginR - 15, 286);
+                    };
+
+                    var checkPage = function(neededH, currentY, pageNum, titel) {
+                        if (currentY + neededH > 278) {
+                            addFooter(pageNum);
+                            doc.addPage();
+                            pageNum++;
+                            currentY = addHeader(titel);
+                        }
+                        return { y: currentY, page: pageNum };
+                    };
+
+                    // ════════════════════════════════════════════
+                    // SEITE 1: KUNDENSTAMMDATEN
+                    // ════════════════════════════════════════════
+                    var page = 1;
+                    y = addHeader('KUNDENSTAMMDATEN');
+
+                    var addStammBlock = function(blockTitle, fields) {
+                        var check = checkPage(8 + fields.length * 5.5, y, page, 'KUNDENSTAMMDATEN');
+                        y = check.y; page = check.page;
+                        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(192, 57, 43);
+                        doc.text(blockTitle, marginL, y); y += 1;
+                        doc.setDrawColor(192, 57, 43); doc.setLineWidth(0.3);
+                        doc.line(marginL, y, marginL + contentW * 0.5, y); y += 4;
+                        doc.setFontSize(8); doc.setTextColor(17, 17, 17);
+                        for (var i = 0; i < fields.length; i++) {
+                            doc.setFont('helvetica', 'normal'); doc.setTextColor(85, 85, 85);
+                            doc.text(fields[i][0], marginL, y);
+                            doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17);
+                            doc.text(fields[i][1] || '\u2014', marginL + 50, y);
+                            y += 5.5;
+                        }
+                        y += 4;
+                    };
+
+                    addStammBlock('BAUHERR / AUFTRAGGEBER', [
+                        ['Firma/Name', stammFelder.bauherr_firma], ['Ansprechpartner', stammFelder.bauherr_ansprechpartner],
+                        ['Strasse', stammFelder.bauherr_strasse], ['PLZ / Ort', stammFelder.bauherr_plzOrt],
+                        ['Telefon', stammFelder.bauherr_telefon], ['Fax', stammFelder.bauherr_fax],
+                        ['Mobil', stammFelder.bauherr_mobil], ['E-Mail', stammFelder.bauherr_email]
+                    ]);
+                    addStammBlock('BAULEITER', [
+                        ['Name', stammFelder.bauleiter_name], ['Firma/Dienststelle', stammFelder.bauleiter_firma],
+                        ['Strasse', stammFelder.bauleiter_strasse], ['PLZ / Ort', stammFelder.bauleiter_plzOrt],
+                        ['Telefon', stammFelder.bauleiter_telefon], ['Mobil', stammFelder.bauleiter_mobil],
+                        ['E-Mail', stammFelder.bauleiter_email]
+                    ]);
+                    addStammBlock('ARCHITEKT / PLANER', [
+                        ['Name', stammFelder.architekt_name], ['Buero/Firma', stammFelder.architekt_buero],
+                        ['Strasse', stammFelder.architekt_strasse], ['PLZ / Ort', stammFelder.architekt_plzOrt],
+                        ['Telefon', stammFelder.architekt_telefon], ['Mobil', stammFelder.architekt_mobil],
+                        ['E-Mail', stammFelder.architekt_email]
+                    ]);
+                    addStammBlock('OBJEKTDATEN', [
+                        ['Bauvorhaben', stammFelder.objekt_bauvorhaben], ['Baustelle', stammFelder.objekt_strasse],
+                        ['PLZ / Ort', stammFelder.objekt_plzOrt], ['Projektnummer', stammFelder.objekt_projektnr],
+                        ['Vergabenummer', stammFelder.objekt_vergabenr], ['Auftragsnummer', stammFelder.objekt_auftragsnr],
+                        ['Vergabeart', stammFelder.objekt_vergabeart], ['Auftragsdatum', stammFelder.objekt_auftragsdatum],
+                        ['Ausfuehrung von', stammFelder.objekt_ausfuehrung_von], ['Ausfuehrung bis', stammFelder.objekt_ausfuehrung_bis],
+                        ['Abnahmedatum', stammFelder.objekt_abnahmedatum]
+                    ]);
+                    addFooter(page);
+
+                    // ════════════════════════════════════════════
+                    // SEITE 2+: LV-POSITIONEN + NACHTRAEGE
+                    // ════════════════════════════════════════════
+                    doc.addPage(); page++;
+                    y = addHeader('LV-POSITIONSLISTE + NACHTRAEGE');
+
+                    // Spaltenbreiten: PosNr(12%) Menge(10%) Einheit(6%) Beschreibung(44%) EP(14%) GP(14%)
+                    var colX = [marginL, marginL+21, marginL+39, marginL+49, marginL+128, marginL+153];
+                    var colW = [21, 18, 10, 79, 25, 27];
+
+                    // Tabellenkopf
+                    var drawTableHeader = function() {
+                        doc.setFillColor(240, 240, 240);
+                        doc.rect(marginL, y - 3.5, contentW, 5.5, 'F');
+                        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17);
+                        doc.text('Pos.-Nr.', colX[0] + 1, y);
+                        doc.text('Menge', colX[1] + colW[1] - 1, y, { align: 'right' });
+                        doc.text('Einh.', colX[2] + colW[2]/2, y, { align: 'center' });
+                        doc.text('Leistungsbeschreibung', colX[3] + 1, y);
+                        doc.text('EP (netto)', colX[4] + colW[4] - 1, y, { align: 'right' });
+                        doc.text('GP (netto)', colX[5] + colW[5] - 1, y, { align: 'right' });
+                        y += 4;
+                    };
+                    drawTableHeader();
+
+                    // Positionen
+                    var drawPosRow = function(p, isNachtrag) {
+                        var check = checkPage(7, y, page, 'LV-POSITIONSLISTE + NACHTRAEGE');
+                        y = check.y; page = check.page;
+                        var gp = p.gp || Math.round((p.menge || 0) * (p.ep || 0) * 100) / 100;
+                        // Abwechselnde Zeilen
+                        if (!isNachtrag) {
+                            doc.setFillColor(250, 250, 250);
+                        } else {
+                            doc.setFillColor(255, 248, 240);
+                        }
+                        doc.rect(marginL, y - 3, contentW, 5, 'F');
+                        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(17, 17, 17);
+                        doc.text(String(p.posNr || ''), colX[0] + 1, y);
+                        doc.text(fmtZahl(p.menge), colX[1] + colW[1] - 1, y, { align: 'right' });
+                        doc.setFontSize(6);
+                        doc.text(p.einheit || '', colX[2] + colW[2]/2, y, { align: 'center' });
+                        doc.setFontSize(7);
+                        // Beschreibung kuerzen wenn noetig
+                        var beschr = p.leistung || '';
+                        if (beschr.length > 85) beschr = beschr.substring(0, 82) + '...';
+                        doc.text(beschr, colX[3] + 1, y);
+                        doc.text(p.ep > 0 ? fmtZahl(p.ep) : '\u2014', colX[4] + colW[4] - 1, y, { align: 'right' });
+                        doc.text(gp > 0 ? fmtZahl(gp) : '\u2014', colX[5] + colW[5] - 1, y, { align: 'right' });
+                        y += 5;
+                    };
+
+                    for (var pi = 0; pi < positionen.length; pi++) { drawPosRow(positionen[pi], false); }
+
+                    // Zwischensumme LV
+                    if (positionen.length > 0) {
+                        var chk1 = checkPage(8, y, page, 'LV-POSITIONSLISTE + NACHTRAEGE'); y = chk1.y; page = chk1.page;
+                        doc.setDrawColor(17, 17, 17); doc.setLineWidth(0.5);
+                        doc.line(colX[4], y - 1, colX[5] + colW[5], y - 1);
+                        y += 2;
+                        doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+                        doc.text('Zwischensumme LV-Positionen (netto)', colX[3] + 1, y);
+                        doc.text(fmtZahl(gpSummeLV), colX[5] + colW[5] - 1, y, { align: 'right' });
+                        y += 6;
+                    }
+
+                    // Nachtraege
+                    if (nachtraege.length > 0) {
+                        var chk2 = checkPage(10, y, page, 'LV-POSITIONSLISTE + NACHTRAEGE'); y = chk2.y; page = chk2.page;
+                        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(230, 126, 34);
+                        doc.text('\u25bc NACHTRAEGE \u25bc', marginL, y); y += 5;
+                        doc.setTextColor(17, 17, 17);
+                        drawTableHeader();
+                        var lastNTitle = '';
+                        for (var ni = 0; ni < nachtraege.length; ni++) {
+                            if (nachtraege[ni].nachtragTitel && nachtraege[ni].nachtragTitel !== lastNTitle) {
+                                lastNTitle = nachtraege[ni].nachtragTitel;
+                                var chkN = checkPage(7, y, page, 'LV-POSITIONSLISTE + NACHTRAEGE'); y = chkN.y; page = chkN.page;
+                                doc.setFillColor(255, 235, 205); doc.rect(marginL, y - 3, contentW, 5, 'F');
+                                doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(230, 126, 34);
+                                doc.text(lastNTitle, marginL + 1, y); y += 5;
+                                doc.setTextColor(17, 17, 17);
+                            }
+                            drawPosRow(nachtraege[ni], true);
+                        }
+                        // Zwischensumme Nachtraege
+                        var chk3 = checkPage(8, y, page, 'LV-POSITIONSLISTE + NACHTRAEGE'); y = chk3.y; page = chk3.page;
+                        doc.setDrawColor(230, 126, 34); doc.setLineWidth(0.5);
+                        doc.line(colX[4], y - 1, colX[5] + colW[5], y - 1);
+                        y += 2;
+                        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(230, 126, 34);
+                        doc.text('Zwischensumme Nachtraege (netto)', colX[3] + 1, y);
+                        doc.text(fmtZahl(gpSummeNachtraege), colX[5] + colW[5] - 1, y, { align: 'right' });
+                        y += 6;
+                    }
+
+                    // Gesamtsummen
+                    var chk4 = checkPage(18, y, page, 'LV-POSITIONSLISTE + NACHTRAEGE'); y = chk4.y; page = chk4.page;
+                    doc.setDrawColor(17, 17, 17); doc.setLineWidth(1);
+                    doc.line(marginL, y, pageW - marginR, y); y += 5;
+                    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17);
+                    doc.text('Gesamt Netto (LV + Nachtraege)', marginL, y);
+                    doc.text(fmtZahl(gpGesamtNetto), colX[5] + colW[5] - 1, y, { align: 'right' }); y += 5;
+                    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+                    doc.text('zzgl. MwSt. 19%', marginL, y);
+                    doc.text(fmtZahl(mwst), colX[5] + colW[5] - 1, y, { align: 'right' }); y += 5;
+                    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+                    doc.text('Gesamt Brutto', marginL, y);
+                    doc.text(fmtZahl(gesamtBrutto), colX[5] + colW[5] - 1, y, { align: 'right' });
+                    addFooter(page);
+
+                    // ════════════════════════════════════════════
+                    // SEITE 3+: RAUMLISTE
+                    // ════════════════════════════════════════════
+                    doc.addPage(); page++;
+                    y = addHeader('RAUMLISTE');
+
+                    // Raeume nach Geschoss gruppieren
+                    var geschossOrder = { 'KG': 0, 'EG': 1, 'OG': 2, '1.OG': 3, '2.OG': 4, 'DG': 5 };
+                    var sortedRaeume = raeume.slice().sort(function(a, b) {
+                        var gA = geschossOrder[a.geschoss] !== undefined ? geschossOrder[a.geschoss] : 99;
+                        var gB = geschossOrder[b.geschoss] !== undefined ? geschossOrder[b.geschoss] : 99;
+                        if (gA !== gB) return gA - gB;
+                        return (a.raumNr || '').localeCompare(b.raumNr || '');
+                    });
+
+                    // Raumliste Header
+                    var rColX = [marginL, marginL + 27, marginL + 90, marginL + 117, marginL + 145];
+                    var drawRaumHeader = function() {
+                        doc.setFillColor(240, 240, 240);
+                        doc.rect(marginL, y - 3.5, contentW, 5.5, 'F');
+                        doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17);
+                        doc.text('Raum-Nr.', rColX[0] + 1, y);
+                        doc.text('Bezeichnung', rColX[1] + 1, y);
+                        doc.text('Geschoss', rColX[2] + 1, y);
+                        doc.text('Flaeche (m\u00b2)', rColX[3] + 1, y);
+                        doc.text('Fliesen', rColX[4] + 1, y);
+                        y += 4;
+                    };
+                    drawRaumHeader();
+
+                    var lastGeschoss = '';
+                    for (var ri = 0; ri < sortedRaeume.length; ri++) {
+                        var rm = sortedRaeume[ri];
+                        // Geschoss-Gruppenueberschrift
+                        if (rm.geschoss !== lastGeschoss) {
+                            lastGeschoss = rm.geschoss;
+                            var chkR = checkPage(10, y, page, 'RAUMLISTE'); y = chkR.y; page = chkR.page;
+                            doc.setFillColor(230, 230, 230); doc.rect(marginL, y - 3, contentW, 5, 'F');
+                            doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(17, 17, 17);
+                            var geschossLabel = rm.geschoss === 'KG' ? 'KELLERGESCHOSS' : rm.geschoss === 'EG' ? 'ERDGESCHOSS' : rm.geschoss === 'OG' ? 'OBERGESCHOSS' : rm.geschoss === 'DG' ? 'DACHGESCHOSS' : rm.geschoss;
+                            doc.text(geschossLabel, marginL + 2, y); y += 5;
+                        }
+                        var chkR2 = checkPage(6, y, page, 'RAUMLISTE'); y = chkR2.y; page = chkR2.page;
+                        // Zeilenhintergrund
+                        if (rm.fliesenarbeiten === 'Ja') { doc.setFillColor(232, 245, 233); }
+                        else { doc.setFillColor(250, 250, 250); }
+                        doc.rect(marginL, y - 3, contentW, 5, 'F');
+                        doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(17, 17, 17);
+                        doc.text(rm.raumNr || '', rColX[0] + 1, y);
+                        doc.text(rm.bezeichnung || '', rColX[1] + 1, y);
+                        doc.text(rm.geschoss || '', rColX[2] + 1, y);
+                        doc.text(rm.flaeche > 0 ? fmtZahl(rm.flaeche) : '\u2014', rColX[3] + 1, y);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(rm.fliesenarbeiten === 'Ja' ? 39 : 17, rm.fliesenarbeiten === 'Ja' ? 174 : 17, rm.fliesenarbeiten === 'Ja' ? 96 : 17);
+                        doc.text(rm.fliesenarbeiten || '\u2014', rColX[4] + 1, y);
+                        y += 5;
+                    }
+
+                    // Hinweis
+                    y += 4;
+                    doc.setFontSize(7); doc.setFont('helvetica', 'italic'); doc.setTextColor(85, 85, 85);
+                    doc.text('Hinweis: Flaechen bitte aus Aufmass ergaenzen.', marginL, y);
+                    addFooter(page);
+
+                    // PDF speichern
+                    var kundeName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df _-]/g, '');
+                    doc.save('Kundenlisten_' + kundeName + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+                    setPdfStatus('PDF erfolgreich erstellt und heruntergeladen!');
+                    setTimeout(function() { setPdfStatus(''); }, 4000);
+                } catch(err) {
+                    setPdfStatus('PDF-Fehler: ' + err.message);
+                    console.error('PDF-Fehler:', err);
+                }
+            };
+
+            // ═══ FERTIGSTELLEN (Weiter zur Modulauswahl) ═══
             var handleFertig = function() {
-                if (!kundenName.trim()) {
-                    alert('Bitte gib einen Kundennamen ein.');
-                    return;
-                }
-                if (positionen.length === 0 && raeume.length === 0) {
-                    alert('Bitte mindestens eine Position oder einen Raum eintragen.');
-                    return;
-                }
+                if (!stammFelder.bauherr_firma.trim()) { alert('Bitte mindestens den Kundennamen (Bauherr) eingeben.'); return; }
+                if (positionen.length === 0 && raeume.length === 0) { alert('Bitte mindestens eine Position oder einen Raum eintragen.'); return; }
+                // Alle Positionen + Nachtraege zusammenfuehren
+                var allPos = positionen.concat(nachtraege.map(function(n) { return Object.assign({}, n, { _istNachtrag: true }); }));
                 onFertig({
-                    kundenName: kundenName.trim(),
-                    bauvorhaben: bauvorhaben.trim(),
-                    positionen: positionen,
-                    raeume: raeume,
-                    bauleitung: (manuelleFelder.bauleitung || '').trim(),
-                    bl_telefon: (manuelleFelder.bl_telefon || '').trim(),
-                    bl_email: (manuelleFelder.bl_email || '').trim(),
-                    architekt: (manuelleFelder.architekt || '').trim(),
-                    arch_telefon: (manuelleFelder.arch_telefon || '').trim(),
-                    arch_email: (manuelleFelder.arch_email || '').trim(),
-                    ag_adresse: (manuelleFelder.ag_adresse || '').trim(),
-                    ag_telefon: (manuelleFelder.ag_telefon || '').trim(),
-                    ag_email: (manuelleFelder.ag_email || '').trim(),
+                    kundenName: stammFelder.bauherr_firma.trim(),
+                    bauvorhaben: stammFelder.objekt_bauvorhaben.trim(),
+                    positionen: allPos.map(function(p) { return { posNr: p.posNr, menge: p.menge, einheit: p.einheit, leistung: p.leistung, ep: p.ep, gp: p.gp || Math.round((p.menge||0)*(p.ep||0)*100)/100, _istNachtrag: p._istNachtrag || false }; }),
+                    raeume: raeume.map(function(r) { return { raumNr: r.raumNr, bezeichnung: r.bezeichnung, geschoss: r.geschoss, bemerkung: r.fliesenarbeiten === 'Ja' ? 'Fliesenarbeiten' : '' }; }),
+                    // Erweiterte Stammdaten
+                    bauleitung: stammFelder.bauleiter_name || stammFelder.bauleiter_firma || '',
+                    bl_telefon: stammFelder.bauleiter_telefon || '',
+                    bl_email: stammFelder.bauleiter_email || '',
+                    architekt: stammFelder.architekt_name || stammFelder.architekt_buero || '',
+                    arch_telefon: stammFelder.architekt_telefon || '',
+                    arch_email: stammFelder.architekt_email || '',
+                    ag_adresse: (stammFelder.bauherr_strasse + ', ' + stammFelder.bauherr_plzOrt).trim().replace(/^,\s*|,\s*$/g, ''),
+                    ag_telefon: stammFelder.bauherr_telefon || '',
+                    ag_email: stammFelder.bauherr_email || '',
                     _driveFolderId: (kunde && kunde._driveFolderId) || null,
+                    _stammFelder: stammFelder
                 });
             };
 
-            // ═══ GP Summe ═══
-            var gpSumme = positionen.reduce(function(s, p) { return s + (p.gp || 0); }, 0);
+            // ═══ TABS ═══
+            var tabs = [
+                { id: 'stammdaten', label: 'Kundendaten', icon: '\uD83D\uDCCB', count: null },
+                { id: 'positionen', label: 'Positionen', icon: '\uD83D\uDCCE', count: positionen.length + nachtraege.length },
+                { id: 'raeume', label: 'Raeume', icon: '\uD83C\uDFE0', count: raeume.length }
+            ];
 
-            // ── Formular-Input-Stil ──
-            var inputStyle = { width:'100%', padding:'12px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'15px', color:'var(--text-primary)', boxSizing:'border-box' };
-            var labelStyle = { fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', marginBottom:'4px', display:'block', textTransform:'uppercase', letterSpacing:'0.5px' };
+            // ═══ SECTION CARD (fuer Stammdaten) ═══
+            var sectionCard = function(icon, title, fields) {
+                return (
+                    <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'12px', border:'1px solid var(--border-color)'}}>
+                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
+                            <span style={{fontSize:'18px'}}>{icon}</span> {title}
+                        </div>
+                        <div style={{display:'grid', gap:'8px'}}>
+                            {fields.map(function(f) { return (
+                                <div key={f[0]}>
+                                    <label style={labelStyle}>{f[1]}</label>
+                                    <div style={{display:'flex', gap:'4px'}}>
+                                        <input value={stammFelder[f[0]] || ''} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={Object.assign({}, inputStyle, {flex:1})} placeholder={f[2] || ''} />
+                                        <button {...tap(function(){ var key = f[0]; startSpeech(function(text){ updateStammFeld(key, (stammFelder[key] || '') + (stammFelder[key] ? ' ' : '') + text); }); })}
+                                            style={Object.assign({padding:'6px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0, minWidth:'44px', minHeight:'44px', display:'flex', alignItems:'center', justifyContent:'center'}, touchBase)}>{'\uD83C\uDF99'}</button>
+                                    </div>
+                                </div>
+                            ); })}
+                        </div>
+                    </div>
+                );
+            };
 
+            // ═══ POS-FORMULAR (shared zwischen Positionen + Nachtraege) ═══
+            var renderPosFormular = function(form, setForm, onSave, onCancel, editIdx, isNachtrag) {
+                return (
+                    <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'16px', border: isNachtrag ? '2px solid #e67e22' : '2px solid var(--accent-blue)', boxShadow: isNachtrag ? '0 4px 20px rgba(230,126,34,0.15)' : '0 4px 20px rgba(30,136,229,0.15)'}}>
+                        <div style={{fontSize:'13px', fontWeight:'700', color: isNachtrag ? '#e67e22' : 'var(--accent-blue)', marginBottom:'12px'}}>
+                            {editIdx !== null ? 'Bearbeiten' : (isNachtrag ? 'Neuer Nachtrag' : 'Neue Position')}
+                        </div>
+                        {isNachtrag && (
+                            <div style={{marginBottom:'10px'}}>
+                                <label style={labelStyle}>Nachtrag-Titel</label>
+                                <input type="text" value={form.nachtragTitel || ''} onChange={function(e){ setForm(Object.assign({}, form, {nachtragTitel: e.target.value})); }} placeholder="z.B. Nachtrag vom 20.03.2025" style={inputStyle} />
+                            </div>
+                        )}
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
+                            <div>
+                                <label style={labelStyle}>Pos.-Nr. *</label>
+                                <input type="text" value={form.posNr} onChange={function(e){ setForm(Object.assign({}, form, {posNr: e.target.value})); }} placeholder={isNachtrag ? 'N1' : '1'} style={inputStyle} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Menge</label>
+                                <input type="number" inputMode="decimal" step="0.01" value={form.menge} onChange={function(e){ setForm(Object.assign({}, form, {menge: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                            </div>
+                        </div>
+                        <div style={{marginTop:'10px'}}>
+                            <label style={labelStyle}>Einheit</label>
+                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                                {einheiten.map(function(eh) {
+                                    var isActive = form.einheit === eh;
+                                    return <button key={eh} {...tap(function(){ setForm(Object.assign({}, form, {einheit: eh})); })} style={Object.assign({}, touchBase, {
+                                        padding:'8px 14px', borderRadius:'8px', border: isActive ? '2px solid ' + (isNachtrag ? '#e67e22' : 'var(--accent-blue)') : '1px solid var(--border-color)',
+                                        background: isActive ? (isNachtrag ? 'rgba(230,126,34,0.1)' : 'rgba(30,136,229,0.1)') : 'var(--bg-tertiary)',
+                                        color: isActive ? (isNachtrag ? '#e67e22' : 'var(--accent-blue)') : 'var(--text-muted)',
+                                        cursor:'pointer', fontSize:'13px', fontWeight:'600', minHeight:'40px'
+                                    })}>{eh}</button>;
+                                })}
+                            </div>
+                        </div>
+                        <div style={{marginTop:'10px'}}>
+                            <label style={labelStyle}>Leistungsbeschreibung *</label>
+                            <textarea value={form.leistung} onChange={function(e){ setForm(Object.assign({}, form, {leistung: e.target.value})); }}
+                                placeholder="z.B. Bodenfliesen 30x60 liefern und verlegen" rows={3}
+                                style={Object.assign({}, inputStyle, {resize:'vertical', fontFamily:'inherit'})} />
+                        </div>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginTop:'10px'}}>
+                            <div>
+                                <label style={labelStyle}>EP netto</label>
+                                <input type="number" inputMode="decimal" step="0.01" value={form.ep} onChange={function(e){ setForm(Object.assign({}, form, {ep: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>GP netto</label>
+                                <input type="number" inputMode="decimal" step="0.01" value={form.gp} onChange={function(e){ setForm(Object.assign({}, form, {gp: e.target.value})); }}
+                                    placeholder={form.ep && form.menge ? String(Math.round(parseFloat(form.ep || 0) * parseFloat(form.menge || 0) * 100) / 100) : '0.00'} style={inputStyle} />
+                            </div>
+                        </div>
+                        <div style={{display:'flex', gap:'8px', marginTop:'14px'}}>
+                            <button {...tap(onSave)} style={Object.assign({}, touchBase, {
+                                flex:1, padding:'14px', borderRadius:'10px', border:'none', cursor:'pointer',
+                                background: isNachtrag ? '#e67e22' : 'var(--accent-blue)', color:'white', fontSize:'15px', fontWeight:'700', minHeight:'50px'
+                            })}>{editIdx !== null ? 'Speichern' : 'Hinzufuegen'}</button>
+                            <button {...tap(onCancel)} style={Object.assign({}, touchBase, {
+                                padding:'14px 18px', borderRadius:'10px', border:'1px solid var(--border-color)',
+                                background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', minHeight:'50px'
+                            })}>Abbrechen</button>
+                        </div>
+                    </div>
+                );
+            };
+
+            // ═══ RENDER ═══
             return (
-                <div style={{padding:'16px', maxWidth:'600px', margin:'0 auto'}}>
+                <div style={{padding:'12px 16px', minHeight:'100vh', background:'var(--bg-primary)', paddingBottom:'200px'}}>
                     {/* HEADER */}
-                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px'}}>
-                        <button {...tap(onBack)} style={Object.assign({}, touchBase, {background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'var(--text-secondary)', padding:'8px 12px', minHeight:'44px', minWidth:'44px'})}>←</button>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
+                        <button {...tap(onBack)} style={Object.assign({}, touchBase, {background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'var(--text-secondary)', padding:'8px 12px', minHeight:'44px', minWidth:'44px'})}>
+                            \u2190
+                        </button>
                         <div>
-                            <div style={{fontSize:'20px', fontWeight:'800', color:'var(--text-primary)'}}>📝 Manuelle Eingabe</div>
-                            <div style={{fontSize:'12px', color:'var(--text-muted)'}}>LV-Positionen & Räume eintragen</div>
+                            <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>Manuell Kunde anlegen</div>
+                            <div style={{fontSize:'12px', color:'var(--text-muted)'}}>3 Listen: Kundendaten \u00b7 LV-Positionen \u00b7 Raumliste</div>
                         </div>
                     </div>
 
-                    {/* KUNDENDATEN - Schritt 1 */}
-                    {activeStep === 1 && (
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'16px', padding:'16px', marginBottom:'16px', border:'1px solid var(--border-color)'}}>
-                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'12px'}}>Schritt 1/3: Kundendaten</div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Kundenname / Auftraggeber *</label>
-                            <input type="text" value={kundenName} onChange={function(e){ setKundenName(e.target.value); }} placeholder="z.B. Mueller, Max" style={inputStyle} />
+                    {/* STATUS MESSAGES */}
+                    {pdfStatus && (
+                        <div style={{padding:'10px 16px', background: pdfStatus.indexOf('erfolgreich') >= 0 ? 'rgba(39,174,96,0.12)' : pdfStatus.indexOf('Fehler') >= 0 ? 'rgba(231,76,60,0.12)' : 'rgba(30,136,229,0.12)', border:'1px solid ' + (pdfStatus.indexOf('erfolgreich') >= 0 ? 'rgba(39,174,96,0.3)' : pdfStatus.indexOf('Fehler') >= 0 ? 'rgba(231,76,60,0.3)' : 'rgba(30,136,229,0.3)'), borderRadius:'10px', marginBottom:'12px', fontSize:'13px', fontWeight:'600', textAlign:'center', color: pdfStatus.indexOf('erfolgreich') >= 0 ? '#27ae60' : pdfStatus.indexOf('Fehler') >= 0 ? '#e74c3c' : 'var(--accent-blue)'}}>
+                            {pdfStatus}
                         </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Bauvorhaben / Adresse</label>
-                            <input type="text" value={bauvorhaben} onChange={function(e){ setBauvorhaben(e.target.value); }} placeholder="z.B. Neubau EFH, Musterstrasse 1" style={inputStyle} />
+                    )}
+                    {uploadStatus && (
+                        <div style={{padding:'8px 16px', background:'rgba(30,136,229,0.08)', borderRadius:'8px', marginBottom:'8px', fontSize:'12px', fontWeight:'600', color:'var(--accent-blue)', textAlign:'center'}}>
+                            {uploadStatus}
                         </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Bauleitung</label>
-                            <input type="text" value={manuelleFelder.bauleitung || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bauleitung: e.target.value}); }); }} placeholder="Name der Bauleitung" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Telefon Bauleitung</label>
-                            <input type="tel" value={manuelleFelder.bl_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bl_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>E-Mail Bauleitung</label>
-                            <input type="email" value={manuelleFelder.bl_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {bl_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Architekt</label>
-                            <input type="text" value={manuelleFelder.architekt || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {architekt: e.target.value}); }); }} placeholder="Name Architekt" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Telefon Architekt</label>
-                            <input type="tel" value={manuelleFelder.arch_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {arch_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>E-Mail Architekt</label>
-                            <input type="email" value={manuelleFelder.arch_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {arch_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Auftraggeber Adresse</label>
-                            <input type="text" value={manuelleFelder.ag_adresse || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_adresse: e.target.value}); }); }} placeholder="Strasse, PLZ Ort" style={inputStyle} />
-                        </div>
-                        <div style={{marginBottom:'10px'}}>
-                            <label style={labelStyle}>Telefon Auftraggeber</label>
-                            <input type="tel" value={manuelleFelder.ag_telefon || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_telefon: e.target.value}); }); }} placeholder="Telefonnummer" style={inputStyle} />
-                        </div>
-                        <div>
-                            <label style={labelStyle}>E-Mail Auftraggeber</label>
-                            <input type="email" value={manuelleFelder.ag_email || ''} onChange={function(e){ setManuelleFelder(function(p){ return Object.assign({}, p, {ag_email: e.target.value}); }); }} placeholder="email@beispiel.de" style={inputStyle} />
-                        </div>
-                        <button {...tap(function(){ if(!kundenName.trim()){ alert('Bitte mindestens den Kundennamen eingeben.'); return; } setActiveStep(2); })} style={Object.assign({}, touchBase, {
-                            width:'100%', marginTop:'16px', padding:'14px', borderRadius:'12px', border:'none',
-                            background:'var(--accent-blue)', color:'white', fontSize:'15px', fontWeight:'700', cursor:'pointer', minHeight:'50px'
-                        })}>
-                            Weiter zu Positionen \u2192
-                        </button>
-                    </div>
                     )}
 
-                    {/* SCHRITT-NAVIGATION */}
-                    {activeStep > 1 && (
-                    <div style={{display:'flex', gap:'4px', marginBottom:'16px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px', border:'1px solid var(--border-color)'}}>
-                        <button {...tap(function(){ setActiveStep(2); })} style={Object.assign({}, touchBase, {
-                            flex:1, padding:'12px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700', minHeight:'48px',
-                            background: activeStep === 2 ? 'var(--accent-blue)' : 'transparent',
-                            color: activeStep === 2 ? 'white' : 'var(--text-muted)',
-                            transition:'all 0.2s ease'
-                        })}>
-                            Positionen ({positionen.length})
-                        </button>
-                        <button {...tap(function(){ setActiveStep(3); })} style={Object.assign({}, touchBase, {
-                            flex:1, padding:'12px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'14px', fontWeight:'700', minHeight:'48px',
-                            background: activeStep === 3 ? '#e67e22' : 'transparent',
-                            color: activeStep === 3 ? 'white' : 'var(--text-muted)',
-                            transition:'all 0.2s ease'
-                        })}>
-                            Raeume ({raeume.length})
-                        </button>
+                    {/* TABS */}
+                    <div style={{display:'flex', gap:'4px', marginBottom:'12px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
+                        {tabs.map(function(tab) { var isActive = activeTab === tab.id; return (
+                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', background: isActive ? 'var(--accent-blue)' : 'transparent', color: isActive ? 'white' : 'var(--text-muted)', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease' }, touchBase)}>
+                                <span style={{fontSize:'16px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
+                                {tab.label}{tab.count !== null && <span style={{marginLeft:'4px', fontSize:'10px', opacity:0.8}}>({tab.count})</span>}
+                            </button>
+                        ); })}
                     </div>
+
+                    {/* ═══════════════════════════════════════════ */}
+                    {/* TAB: KUNDENSTAMMDATEN                      */}
+                    {/* ═══════════════════════════════════════════ */}
+                    {activeTab === 'stammdaten' && (
+                        <div>
+                            {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [
+                                ['bauherr_firma', 'Firma / Name *', 'z.B. Kurhotel Haus Klement'],
+                                ['bauherr_ansprechpartner', 'Ansprechpartner', 'Herr/Frau Nachname'],
+                                ['bauherr_strasse', 'Strasse', 'Musterstrasse 1'],
+                                ['bauherr_plzOrt', 'PLZ / Ort', '12345 Musterstadt'],
+                                ['bauherr_telefon', 'Telefon', '0123 / 456789'],
+                                ['bauherr_fax', 'Fax', ''],
+                                ['bauherr_mobil', 'Mobil', '0170 1234567'],
+                                ['bauherr_email', 'E-Mail', 'email@beispiel.de'],
+                                ['bauherr_website', 'Website', 'www.beispiel.de']
+                            ])}
+                            {sectionCard('\uD83D\uDC77', 'Bauleiter', [
+                                ['bauleiter_name', 'Name', 'Dipl.-Ing. Mustermann'],
+                                ['bauleiter_firma', 'Firma / Dienststelle', 'Architekturbuero XY'],
+                                ['bauleiter_strasse', 'Strasse', ''],
+                                ['bauleiter_plzOrt', 'PLZ / Ort', ''],
+                                ['bauleiter_telefon', 'Telefon', ''],
+                                ['bauleiter_mobil', 'Mobil', ''],
+                                ['bauleiter_email', 'E-Mail', '']
+                            ])}
+                            {sectionCard('\uD83D\uDCD0', 'Architekt / Planer', [
+                                ['architekt_name', 'Name', ''],
+                                ['architekt_buero', 'Buero / Firma', ''],
+                                ['architekt_strasse', 'Strasse', ''],
+                                ['architekt_plzOrt', 'PLZ / Ort', ''],
+                                ['architekt_telefon', 'Telefon', ''],
+                                ['architekt_mobil', 'Mobil', ''],
+                                ['architekt_email', 'E-Mail', '']
+                            ])}
+                            {sectionCard('\uD83C\uDFD7', 'Objektdaten', [
+                                ['objekt_bauvorhaben', 'Bauvorhaben', 'Sanierung EFH...'],
+                                ['objekt_strasse', 'Baustelle - Strasse', ''],
+                                ['objekt_plzOrt', 'Baustelle - PLZ / Ort', ''],
+                                ['objekt_projektnr', 'Projektnummer', ''],
+                                ['objekt_vergabenr', 'Vergabenummer', ''],
+                                ['objekt_auftragsnr', 'Auftragsnummer', ''],
+                                ['objekt_vergabeart', 'Vergabeart', ''],
+                                ['objekt_auftragsdatum', 'Auftragsdatum', 'TT.MM.JJJJ'],
+                                ['objekt_ausfuehrung_von', 'Ausfuehrungsfrist von', ''],
+                                ['objekt_ausfuehrung_bis', 'Ausfuehrungsfrist bis', ''],
+                                ['objekt_abnahmedatum', 'Abnahmedatum', '']
+                            ])}
+                        </div>
                     )}
 
-                    {/* ═══════ SCHRITT 2: POSITIONEN ═══════ */}
-                    {activeStep === 2 && (
+                    {/* ═══════════════════════════════════════════ */}
+                    {/* TAB: LV-POSITIONEN + NACHTRAEGE            */}
+                    {/* ═══════════════════════════════════════════ */}
+                    {activeTab === 'positionen' && (
                         <div>
+                            {/* Upload */}
+                            <div style={{marginBottom:'12px'}}>
+                                <label style={Object.assign({}, touchBase, {
+                                    display:'block', width:'100%', padding:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)',
+                                    background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'12px', color:'var(--text-muted)', boxSizing:'border-box'
+                                })}>
+                                    Positionsliste importieren (CSV/XLSX)
+                                    <input type="file" accept=".csv,.tsv,.xlsx,.xls" onChange={function(e){ handleFileUpload(e, 'positionen'); }} style={{display:'none'}} />
+                                </label>
+                            </div>
+
+                            {/* LV-Positionen */}
+                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'8px'}}>
+                                <span style={{color:'var(--accent-blue)'}}>\u25B6</span> LV-Positionen ({positionen.length})
+                            </div>
                             <button {...tap(function(){ resetPosForm(); setShowPosForm(true); })} style={Object.assign({}, touchBase, {
-                                width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed var(--accent-blue)',
+                                width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed var(--accent-blue)',
                                 background:'rgba(30,136,229,0.05)', color:'var(--accent-blue)', cursor:'pointer',
-                                fontSize:'15px', fontWeight:'700', marginBottom:'12px', minHeight:'50px'
-                            })}>+ Neue Position hinzufügen</button>
+                                fontSize:'14px', fontWeight:'700', marginBottom:'12px', minHeight:'48px'
+                            })}>+ Neue LV-Position</button>
 
-                            {/* Formular (Add/Edit) */}
-                            {showPosForm && (
-                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'16px', border:'2px solid var(--accent-blue)', boxShadow:'0 4px 20px rgba(30,136,229,0.15)'}}>
-                                    <div style={{fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'12px'}}>
-                                        {editPosIdx !== null ? '✏️ Position bearbeiten' : '➕ Neue Position'}
+                            {showPosForm && renderPosFormular(posForm, setPosForm, handleSavePos, resetPosForm, editPosIdx, false)}
+
+                            {/* Positionsliste */}
+                            {positionen.length > 0 && (
+                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', border:'1px solid var(--border-color)', overflow:'hidden', marginBottom:'12px'}}>
+                                    <div style={{overflowX:'auto'}}>
+                                        <div style={{minWidth:'520px'}}>
+                                            <div style={{display:'grid', gridTemplateColumns:'50px 50px 36px 1fr 65px 75px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', borderBottom:'2px solid var(--border-color)'}}>
+                                                <div>Pos-Nr.</div><div style={{textAlign:'right'}}>Menge</div><div style={{textAlign:'center'}}>Einh.</div><div>Beschreibung</div><div style={{textAlign:'right'}}>EP</div><div style={{textAlign:'right'}}>GP</div>
+                                            </div>
+                                            {positionen.map(function(p, idx) {
+                                                var gp = p.gp || Math.round((p.menge||0)*(p.ep||0)*100)/100;
+                                                return (
+                                                    <div key={idx} style={{display:'grid', gridTemplateColumns:'50px 50px 36px 1fr 65px 75px', gap:'4px', padding:'5px 8px', fontSize:'11px', alignItems:'center', background: idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent', borderBottom:'1px solid var(--border-color)'}}>
+                                                        <div style={{fontWeight:'700', fontSize:'11px'}}>{p.posNr}</div>
+                                                        <div style={{textAlign:'right'}}>{fmtZahl(p.menge)}</div>
+                                                        <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>
+                                                        <div style={{fontSize:'10px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.leistung}>{p.leistung}</div>
+                                                        <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'10px'}}>{fmtEuro(p.ep)}</div>
+                                                        <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'10px', fontWeight:'600'}}>{fmtEuro(gp)}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {/* Zwischensumme */}
+                                            <div style={{display:'grid', gridTemplateColumns:'50px 50px 36px 1fr 65px 75px', gap:'4px', padding:'8px', fontWeight:'700', borderTop:'2px solid var(--border-color)'}}>
+                                                <div></div><div></div><div></div><div style={{textAlign:'right', fontSize:'11px', color:'var(--text-muted)'}}>Zwischensumme LV:</div><div></div>
+                                                <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'12px'}}>{fmtEuro(gpSummeLV)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* Bearbeiten/Loeschen pro Zeile */}
+                                    <div style={{padding:'8px', display:'flex', gap:'4px', flexWrap:'wrap'}}>
+                                        {positionen.map(function(p, idx) {
+                                            return (
+                                                <div key={idx} style={{display:'flex', gap:'4px', alignItems:'center', background:'var(--bg-tertiary)', borderRadius:'8px', padding:'4px 8px'}}>
+                                                    <span style={{fontSize:'10px', fontWeight:'700', color:'var(--accent-blue)'}}>{p.posNr}</span>
+                                                    <button {...tap(function(){ handleEditPos(idx); })} style={Object.assign({}, touchBase, {padding:'4px 8px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'transparent', cursor:'pointer', fontSize:'12px'})}>&#9998;</button>
+                                                    <button {...tap(function(){ handleDeletePos(idx); })} style={Object.assign({}, touchBase, {padding:'4px 8px', borderRadius:'6px', border:'1px solid rgba(231,76,60,0.3)', background:'transparent', cursor:'pointer', fontSize:'12px', color:'#e74c3c'})}>&#10005;</button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* NACHTRAEGE */}
+                            <div style={{fontSize:'14px', fontWeight:'700', color:'#e67e22', marginBottom:'8px', marginTop:'16px', display:'flex', alignItems:'center', gap:'8px'}}>
+                                <span>\u25BC</span> Nachtraege ({nachtraege.length})
+                            </div>
+                            <button {...tap(function(){ resetNachtragForm(); setShowNachtragForm(true); })} style={Object.assign({}, touchBase, {
+                                width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed #e67e22',
+                                background:'rgba(230,126,34,0.05)', color:'#e67e22', cursor:'pointer',
+                                fontSize:'14px', fontWeight:'700', marginBottom:'12px', minHeight:'48px'
+                            })}>+ Neuer Nachtrag</button>
+
+                            {showNachtragForm && renderPosFormular(nachtragForm, setNachtragForm, handleSaveNachtrag, resetNachtragForm, editNachtragIdx, true)}
+
+                            {/* Nachtragsliste */}
+                            {nachtraege.length > 0 && (
+                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', border:'2px solid rgba(230,126,34,0.3)', overflow:'hidden', marginBottom:'12px'}}>
+                                    <div style={{overflowX:'auto'}}>
+                                        <div style={{minWidth:'520px'}}>
+                                            <div style={{display:'grid', gridTemplateColumns:'50px 50px 36px 1fr 65px 75px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'#e67e22', textTransform:'uppercase', borderBottom:'2px solid rgba(230,126,34,0.3)'}}>
+                                                <div>Pos-Nr.</div><div style={{textAlign:'right'}}>Menge</div><div style={{textAlign:'center'}}>Einh.</div><div>Beschreibung</div><div style={{textAlign:'right'}}>EP</div><div style={{textAlign:'right'}}>GP</div>
+                                            </div>
+                                            {nachtraege.map(function(n, idx) {
+                                                var gp = n.gp || Math.round((n.menge||0)*(n.ep||0)*100)/100;
+                                                return (
+                                                    <div key={idx}>
+                                                        {n.nachtragTitel && (idx === 0 || nachtraege[idx-1].nachtragTitel !== n.nachtragTitel) && (
+                                                            <div style={{padding:'5px 8px', background:'rgba(230,126,34,0.08)', fontSize:'11px', fontWeight:'700', color:'#e67e22', borderBottom:'1px solid rgba(230,126,34,0.2)'}}>
+                                                                {n.nachtragTitel}
+                                                            </div>
+                                                        )}
+                                                        <div style={{display:'grid', gridTemplateColumns:'50px 50px 36px 1fr 65px 75px', gap:'4px', padding:'5px 8px', fontSize:'11px', alignItems:'center', background:'rgba(230,126,34,0.03)', borderBottom:'1px solid var(--border-color)', borderLeft:'3px solid #e67e22'}}>
+                                                            <div style={{fontWeight:'700', color:'#e67e22'}}>{n.posNr}</div>
+                                                            <div style={{textAlign:'right'}}>{fmtZahl(n.menge)}</div>
+                                                            <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{n.einheit}</div>
+                                                            <div style={{fontSize:'10px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={n.leistung}>{n.leistung}</div>
+                                                            <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'10px'}}>{fmtEuro(n.ep)}</div>
+                                                            <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'10px', fontWeight:'600'}}>{fmtEuro(gp)}</div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            <div style={{display:'grid', gridTemplateColumns:'50px 50px 36px 1fr 65px 75px', gap:'4px', padding:'8px', fontWeight:'700', borderTop:'2px solid rgba(230,126,34,0.3)'}}>
+                                                <div></div><div></div><div></div><div style={{textAlign:'right', fontSize:'11px', color:'#e67e22'}}>Zwischensumme Nachtraege:</div><div></div>
+                                                <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'12px', color:'#e67e22'}}>{fmtEuro(gpSummeNachtraege)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{padding:'8px', display:'flex', gap:'4px', flexWrap:'wrap'}}>
+                                        {nachtraege.map(function(n, idx) {
+                                            return (
+                                                <div key={idx} style={{display:'flex', gap:'4px', alignItems:'center', background:'rgba(230,126,34,0.06)', borderRadius:'8px', padding:'4px 8px'}}>
+                                                    <span style={{fontSize:'10px', fontWeight:'700', color:'#e67e22'}}>{n.posNr}</span>
+                                                    <button {...tap(function(){ handleEditNachtrag(idx); })} style={Object.assign({}, touchBase, {padding:'4px 8px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'transparent', cursor:'pointer', fontSize:'12px'})}>&#9998;</button>
+                                                    <button {...tap(function(){ handleDeleteNachtrag(idx); })} style={Object.assign({}, touchBase, {padding:'4px 8px', borderRadius:'6px', border:'1px solid rgba(231,76,60,0.3)', background:'transparent', cursor:'pointer', fontSize:'12px', color:'#e74c3c'})}>&#10005;</button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* GESAMTUEBERSICHT */}
+                            {(positionen.length > 0 || nachtraege.length > 0) && (
+                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', border:'2px solid var(--border-color)', marginTop:'16px'}}>
+                                    <div style={{fontSize:'13px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'10px'}}>GESAMTUEBERSICHT</div>
+                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'13px', marginBottom:'4px'}}>
+                                        <span>Gesamt Netto (LV + Nachtraege)</span>
+                                        <span style={{fontWeight:'700', fontFamily:'monospace'}}>{fmtEuro(gpGesamtNetto)}</span>
+                                    </div>
+                                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'var(--text-muted)', marginBottom:'4px'}}>
+                                        <span>zzgl. MwSt. 19%</span>
+                                        <span style={{fontFamily:'monospace'}}>{fmtEuro(mwst)}</span>
+                                    </div>
+                                    <div style={{borderTop:'2px solid var(--text-primary)', paddingTop:'6px', display:'flex', justifyContent:'space-between', fontSize:'15px', fontWeight:'800'}}>
+                                        <span>Gesamt Brutto</span>
+                                        <span style={{fontFamily:'monospace', color:'var(--accent-blue)'}}>{fmtEuro(gesamtBrutto)}</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {positionen.length === 0 && nachtraege.length === 0 && (
+                                <div style={{textAlign:'center', padding:'40px 20px', color:'var(--text-muted)'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\uD83D\uDCCE'}</div>
+                                    <div>Noch keine Positionen. Fuege deine erste LV-Position oder einen Nachtrag hinzu.</div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ═══════════════════════════════════════════ */}
+                    {/* TAB: RAUMLISTE                             */}
+                    {/* ═══════════════════════════════════════════ */}
+                    {activeTab === 'raeume' && (
+                        <div>
+                            {/* Upload */}
+                            <div style={{marginBottom:'12px'}}>
+                                <label style={Object.assign({}, touchBase, {
+                                    display:'block', width:'100%', padding:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)',
+                                    background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'12px', color:'var(--text-muted)', boxSizing:'border-box'
+                                })}>
+                                    Raumliste importieren (CSV/XLSX)
+                                    <input type="file" accept=".csv,.tsv,.xlsx,.xls" onChange={function(e){ handleFileUpload(e, 'raeume'); }} style={{display:'none'}} />
+                                </label>
+                            </div>
+
+                            <button {...tap(function(){ resetRaumForm(); setShowRaumForm(true); })} style={Object.assign({}, touchBase, {
+                                width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed #27ae60',
+                                background:'rgba(39,174,96,0.05)', color:'#27ae60', cursor:'pointer',
+                                fontSize:'14px', fontWeight:'700', marginBottom:'12px', minHeight:'48px'
+                            })}>+ Neuer Raum</button>
+
+                            {/* Raum-Formular */}
+                            {showRaumForm && (
+                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'16px', border:'2px solid #27ae60', boxShadow:'0 4px 20px rgba(39,174,96,0.15)'}}>
+                                    <div style={{fontSize:'13px', fontWeight:'700', color:'#27ae60', marginBottom:'12px'}}>
+                                        {editRaumIdx !== null ? 'Raum bearbeiten' : 'Neuer Raum'}
                                     </div>
                                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
                                         <div>
-                                            <label style={labelStyle}>Pos.-Nr. *</label>
-                                            <input type="text" value={posForm.posNr} onChange={function(e){ setPosForm(Object.assign({}, posForm, {posNr: e.target.value})); }} placeholder="1.01" style={inputStyle} />
+                                            <label style={labelStyle}>Raum-Nr.</label>
+                                            <input type="text" value={raumForm.raumNr} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {raumNr: e.target.value})); }} placeholder="z.B. E10, KG-WC" style={inputStyle} />
                                         </div>
                                         <div>
-                                            <label style={labelStyle}>Menge</label>
-                                            <input type="number" inputMode="decimal" step="0.01" value={posForm.menge} onChange={function(e){ setPosForm(Object.assign({}, posForm, {menge: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                                            <label style={labelStyle}>Flaeche (m2)</label>
+                                            <input type="number" inputMode="decimal" step="0.01" value={raumForm.flaeche} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {flaeche: e.target.value})); }} placeholder="0.00" style={inputStyle} />
                                         </div>
                                     </div>
                                     <div style={{marginTop:'10px'}}>
-                                        <label style={labelStyle}>Einheit</label>
+                                        <label style={labelStyle}>Bezeichnung *</label>
+                                        <input type="text" value={raumForm.bezeichnung} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {bezeichnung: e.target.value})); }}
+                                            placeholder="z.B. Bad, Kueche, Flur, WC" style={inputStyle} />
+                                    </div>
+                                    <div style={{marginTop:'10px'}}>
+                                        <label style={labelStyle}>Geschoss</label>
                                         <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
-                                            {einheiten.map(function(eh) {
-                                                return <button key={eh} {...tap(function(){ setPosForm(Object.assign({}, posForm, {einheit: eh})); })} style={Object.assign({}, touchBase, {
-                                                    padding:'8px 14px', borderRadius:'8px', border: posForm.einheit === eh ? '2px solid var(--accent-blue)' : '1px solid var(--border-color)',
-                                                    background: posForm.einheit === eh ? 'rgba(30,136,229,0.1)' : 'var(--bg-tertiary)',
-                                                    color: posForm.einheit === eh ? 'var(--accent-blue)' : 'var(--text-muted)',
-                                                    cursor:'pointer', fontSize:'13px', fontWeight:'600', minHeight:'40px'
-                                                })}>{eh}</button>;
+                                            {geschosse.map(function(g) {
+                                                var isActive = raumForm.geschoss === g;
+                                                return <button key={g} {...tap(function(){ setRaumForm(Object.assign({}, raumForm, {geschoss: g})); })} style={Object.assign({}, touchBase, {
+                                                    padding:'8px 14px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer', minHeight:'40px',
+                                                    border: isActive ? '2px solid #27ae60' : '1px solid var(--border-color)',
+                                                    background: isActive ? 'rgba(39,174,96,0.1)' : 'var(--bg-tertiary)',
+                                                    color: isActive ? '#27ae60' : 'var(--text-muted)'
+                                                })}>{g}</button>;
                                             })}
                                         </div>
                                     </div>
                                     <div style={{marginTop:'10px'}}>
-                                        <label style={labelStyle}>Leistungsbeschreibung *</label>
-                                        <textarea value={posForm.leistung} onChange={function(e){ setPosForm(Object.assign({}, posForm, {leistung: e.target.value})); }}
-                                            placeholder="z.B. Bodenfliesen 30×60 liefern und verlegen"
-                                            rows={3} style={Object.assign({}, inputStyle, {resize:'vertical', fontFamily:'inherit'})} />
-                                    </div>
-                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginTop:'10px'}}>
-                                        <div>
-                                            <label style={labelStyle}>EP (€)</label>
-                                            <input type="number" inputMode="decimal" step="0.01" value={posForm.ep} onChange={function(e){ setPosForm(Object.assign({}, posForm, {ep: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                                        <label style={labelStyle}>Fliesenarbeiten</label>
+                                        <div style={{display:'flex', gap:'8px'}}>
+                                            {['Ja', 'Nein'].map(function(opt) {
+                                                var isActive = raumForm.fliesenarbeiten === opt;
+                                                return <button key={opt} {...tap(function(){ setRaumForm(Object.assign({}, raumForm, {fliesenarbeiten: opt})); })} style={Object.assign({}, touchBase, {
+                                                    flex:1, padding:'10px', borderRadius:'8px', fontSize:'13px', fontWeight:'700', cursor:'pointer', minHeight:'44px',
+                                                    border: isActive ? '2px solid ' + (opt === 'Ja' ? '#27ae60' : '#e74c3c') : '1px solid var(--border-color)',
+                                                    background: isActive ? (opt === 'Ja' ? 'rgba(39,174,96,0.1)' : 'rgba(231,76,60,0.1)') : 'var(--bg-tertiary)',
+                                                    color: isActive ? (opt === 'Ja' ? '#27ae60' : '#e74c3c') : 'var(--text-muted)'
+                                                })}>{opt}</button>;
+                                            })}
                                         </div>
-                                        <div>
-                                            <label style={labelStyle}>Gesamtpreis (€)</label>
-                                            <input type="number" inputMode="decimal" step="0.01" value={posForm.gp} onChange={function(e){ setPosForm(Object.assign({}, posForm, {gp: e.target.value})); }}
-                                                placeholder={posForm.ep && posForm.menge ? String(Math.round(parseFloat(posForm.ep || 0) * parseFloat(posForm.menge || 0) * 100) / 100) : '0.00'}
-                                                style={inputStyle} />
-                                        </div>
-                                    </div>
-                                    <div style={{display:'flex', gap:'8px', marginTop:'14px'}}>
-                                        <button {...tap(handleSavePos)} style={Object.assign({}, touchBase, {
-                                            flex:1, padding:'14px', borderRadius:'10px', border:'none', cursor:'pointer',
-                                            background:'var(--accent-blue)', color:'white', fontSize:'15px', fontWeight:'700', minHeight:'50px'
-                                        })}>{editPosIdx !== null ? '✅ Speichern' : '➕ Hinzufügen'}</button>
-                                        <button {...tap(resetPosForm)} style={Object.assign({}, touchBase, {
-                                            padding:'14px 18px', borderRadius:'10px', border:'1px solid var(--border-color)',
-                                            background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', minHeight:'50px'
-                                        })}>Abbrechen</button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Positionsliste */}
-                            {positionen.length > 0 && (
-                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', border:'1px solid var(--border-color)', overflow:'hidden'}}>
-                                    <div style={{padding:'12px 16px', borderBottom:'1px solid var(--border-color)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                                        <span style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)'}}>{positionen.length} Position{positionen.length !== 1 ? 'en' : ''}</span>
-                                        {gpSumme > 0 && <span style={{fontSize:'12px', fontWeight:'700', color:'var(--accent-blue)'}}>Σ {gpSumme.toLocaleString('de-DE', {minimumFractionDigits:2})} €</span>}
-                                    </div>
-                                    {positionen.map(function(p, idx) {
-                                        return (
-                                            <div key={idx} style={{padding:'12px 16px', borderBottom: idx < positionen.length - 1 ? '1px solid var(--border-color)' : 'none', display:'flex', gap:'10px', alignItems:'flex-start'}}>
-                                                <div style={{flex:1, minWidth:0}}>
-                                                    <div style={{display:'flex', gap:'8px', alignItems:'baseline', marginBottom:'3px', flexWrap:'wrap'}}>
-                                                        <span style={{fontSize:'13px', fontWeight:'800', color:'var(--accent-blue)', whiteSpace:'nowrap'}}>{p.posNr}</span>
-                                                        <span style={{fontSize:'11px', color:'var(--text-muted)'}}>{p.menge} {p.einheit}</span>
-                                                        {p.ep > 0 && <span style={{fontSize:'11px', color:'var(--text-muted)'}}>EP: {p.ep.toFixed(2)}€</span>}
-                                                        {p.gp > 0 && <span style={{fontSize:'11px', fontWeight:'700', color:'#27ae60'}}>GP: {p.gp.toFixed(2)}€</span>}
-                                                    </div>
-                                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', lineHeight:'1.4', wordBreak:'break-word'}}>{p.leistung}</div>
-                                                </div>
-                                                <div style={{display:'flex', gap:'6px', flexShrink:0}}>
-                                                    <button {...tap(function(){ handleEditPos(idx); })} style={Object.assign({}, touchBase, {padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'16px', minWidth:'44px', minHeight:'44px', display:'flex', alignItems:'center', justifyContent:'center'})}>✏️</button>
-                                                    <button {...tap(function(){ handleDeletePos(idx); })} style={Object.assign({}, touchBase, {padding:'8px 12px', borderRadius:'8px', border:'1px solid rgba(231,76,60,0.3)', background:'rgba(231,76,60,0.05)', cursor:'pointer', fontSize:'16px', minWidth:'44px', minHeight:'44px', display:'flex', alignItems:'center', justifyContent:'center'})}>🗑️</button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            {positionen.length === 0 && !showPosForm && (
-                                <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)', fontSize:'13px'}}>
-                                    📋 Noch keine Positionen eingetragen.<br/>Füge deine erste LV-Position hinzu oder lade eine Liste hoch.
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ═══════ TAB: RÄUME ═══════ */}
-                    {activeStep === 3 && (
-                        <div>
-                            <button {...tap(function(){ resetRaumForm(); setShowRaumForm(true); })} style={Object.assign({}, touchBase, {
-                                width:'100%', padding:'14px', borderRadius:'12px', border:'2px dashed #e67e22',
-                                background:'rgba(230,126,34,0.05)', color:'#e67e22', cursor:'pointer',
-                                fontSize:'15px', fontWeight:'700', marginBottom:'12px', minHeight:'50px'
-                            })}>+ Neuen Raum hinzufügen</button>
-
-                            {/* Formular (Add/Edit) */}
-                            {showRaumForm && (
-                                <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'16px', border:'2px solid #e67e22', boxShadow:'0 4px 20px rgba(230,126,34,0.15)'}}>
-                                    <div style={{fontSize:'13px', fontWeight:'700', color:'#e67e22', marginBottom:'12px'}}>
-                                        {editRaumIdx !== null ? '✏️ Raum bearbeiten' : '➕ Neuer Raum'}
-                                    </div>
-                                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
-                                        <div>
-                                            <label style={labelStyle}>Raumnummer</label>
-                                            <input type="text" value={raumForm.raumNr} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {raumNr: e.target.value})); }} placeholder="0.01" style={inputStyle} />
-                                        </div>
-                                        <div>
-                                            <label style={labelStyle}>Geschoss</label>
-                                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
-                                                {['KG','EG','OG','1.OG','2.OG','DG'].map(function(g) {
-                                                    return <button key={g} {...tap(function(){ setRaumForm(Object.assign({}, raumForm, {geschoss: g})); })} style={Object.assign({}, touchBase, {
-                                                        padding:'8px 12px', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer', minHeight:'40px',
-                                                        border: raumForm.geschoss === g ? '2px solid #e67e22' : '1px solid var(--border-color)',
-                                                        background: raumForm.geschoss === g ? 'rgba(230,126,34,0.1)' : 'var(--bg-tertiary)',
-                                                        color: raumForm.geschoss === g ? '#e67e22' : 'var(--text-muted)'
-                                                    })}>{g}</button>;
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div style={{marginTop:'10px'}}>
-                                        <label style={labelStyle}>Raumbezeichnung *</label>
-                                        <input type="text" value={raumForm.bezeichnung} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {bezeichnung: e.target.value})); }}
-                                            placeholder="z.B. Bad, Küche, Flur, WC" style={inputStyle} />
-                                    </div>
-                                    <div style={{marginTop:'10px'}}>
-                                        <label style={labelStyle}>Besondere Bemerkung</label>
-                                        <textarea value={raumForm.bemerkung} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {bemerkung: e.target.value})); }}
-                                            placeholder="z.B. Bodengleiche Dusche, Großformat 120x60, Mosaikfliesen..."
-                                            rows={2} style={Object.assign({}, inputStyle, {resize:'vertical', fontFamily:'inherit'})} />
                                     </div>
                                     <div style={{display:'flex', gap:'8px', marginTop:'14px'}}>
                                         <button {...tap(handleSaveRaum)} style={Object.assign({}, touchBase, {
                                             flex:1, padding:'14px', borderRadius:'10px', border:'none', cursor:'pointer',
-                                            background:'#e67e22', color:'white', fontSize:'15px', fontWeight:'700', minHeight:'50px'
-                                        })}>{editRaumIdx !== null ? '✅ Speichern' : '➕ Hinzufügen'}</button>
+                                            background:'#27ae60', color:'white', fontSize:'15px', fontWeight:'700', minHeight:'50px'
+                                        })}>{editRaumIdx !== null ? 'Speichern' : 'Hinzufuegen'}</button>
                                         <button {...tap(resetRaumForm)} style={Object.assign({}, touchBase, {
                                             padding:'14px 18px', borderRadius:'10px', border:'1px solid var(--border-color)',
                                             background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', minHeight:'50px'
@@ -1090,89 +1483,108 @@
                                 </div>
                             )}
 
-                            {/* Raumliste */}
+                            {/* Raumliste Tabelle */}
                             {raeume.length > 0 && (
                                 <div style={{background:'var(--bg-secondary)', borderRadius:'14px', border:'1px solid var(--border-color)', overflow:'hidden'}}>
-                                    <div style={{padding:'12px 16px', borderBottom:'1px solid var(--border-color)'}}>
-                                        <span style={{fontSize:'12px', fontWeight:'700', color:'var(--text-secondary)'}}>{raeume.length} Raum{raeume.length !== 1 ? '̈e' : ''}</span>
-                                    </div>
-                                    {raeume.map(function(r, idx) {
-                                        return (
-                                            <div key={idx} style={{padding:'12px 16px', borderBottom: idx < raeume.length - 1 ? '1px solid var(--border-color)' : 'none', display:'flex', gap:'10px', alignItems:'center'}}>
-                                                <div style={{flex:1, minWidth:0}}>
-                                                    <div style={{display:'flex', gap:'8px', alignItems:'baseline', marginBottom:'2px'}}>
-                                                        {r.raumNr && <span style={{fontSize:'12px', fontWeight:'800', color:'#e67e22', background:'rgba(230,126,34,0.1)', padding:'2px 8px', borderRadius:'6px'}}>{r.raumNr}</span>}
-                                                        <span style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)'}}>{r.bezeichnung}</span>
-                                                        {r.geschoss && <span style={{fontSize:'11px', color:'var(--text-muted)', background:'var(--bg-tertiary)', padding:'2px 6px', borderRadius:'4px'}}>{r.geschoss}</span>}
-                                                    </div>
-                                                    {r.bemerkung && <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>💡 {r.bemerkung}</div>}
-                                                </div>
-                                                <div style={{display:'flex', gap:'6px', flexShrink:0}}>
-                                                    <button {...tap(function(){ handleEditRaum(idx); })} style={Object.assign({}, touchBase, {padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'16px', minWidth:'44px', minHeight:'44px', display:'flex', alignItems:'center', justifyContent:'center'})}>✏️</button>
-                                                    <button {...tap(function(){ handleDeleteRaum(idx); })} style={Object.assign({}, touchBase, {padding:'8px 12px', borderRadius:'8px', border:'1px solid rgba(231,76,60,0.3)', background:'rgba(231,76,60,0.05)', cursor:'pointer', fontSize:'16px', minWidth:'44px', minHeight:'44px', display:'flex', alignItems:'center', justifyContent:'center'})}>🗑️</button>
-                                                </div>
+                                    <div style={{overflowX:'auto'}}>
+                                        <div style={{minWidth:'420px'}}>
+                                            <div style={{display:'grid', gridTemplateColumns:'65px 1fr 55px 65px 60px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', borderBottom:'2px solid var(--border-color)'}}>
+                                                <div>Raum-Nr.</div><div>Bezeichnung</div><div style={{textAlign:'center'}}>Gesch.</div><div style={{textAlign:'right'}}>Flaeche</div><div style={{textAlign:'center'}}>Fliesen</div>
                                             </div>
-                                        );
-                                    })}
+                                            {(function() {
+                                                var sorted = raeume.slice().sort(function(a, b) {
+                                                    var gO = { 'KG': 0, 'EG': 1, 'OG': 2, '1.OG': 3, '2.OG': 4, 'DG': 5 };
+                                                    var gA = gO[a.geschoss] !== undefined ? gO[a.geschoss] : 99;
+                                                    var gB = gO[b.geschoss] !== undefined ? gO[b.geschoss] : 99;
+                                                    if (gA !== gB) return gA - gB;
+                                                    return (a.raumNr || '').localeCompare(b.raumNr || '');
+                                                });
+                                                var lastG = '';
+                                                var elements = [];
+                                                for (var i = 0; i < sorted.length; i++) {
+                                                    var rm = sorted[i];
+                                                    var origIdx = raeume.indexOf(rm);
+                                                    if (rm.geschoss !== lastG) {
+                                                        lastG = rm.geschoss;
+                                                        var gLabel = rm.geschoss === 'KG' ? 'KELLERGESCHOSS' : rm.geschoss === 'EG' ? 'ERDGESCHOSS' : rm.geschoss === 'OG' ? 'OBERGESCHOSS' : rm.geschoss === 'DG' ? 'DACHGESCHOSS' : rm.geschoss;
+                                                        elements.push(
+                                                            <div key={'g-' + lastG} style={{gridColumn:'1/-1', padding:'6px 8px', background:'var(--bg-tertiary)', fontWeight:'700', fontSize:'11px', color:'var(--text-primary)', borderBottom:'1px solid var(--border-color)'}}>
+                                                                {gLabel}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    elements.push(
+                                                        <div key={'r-' + i} style={{display:'grid', gridTemplateColumns:'65px 1fr 55px 65px 60px', gap:'4px', padding:'5px 8px', fontSize:'11px', alignItems:'center', background: rm.fliesenarbeiten === 'Ja' ? 'rgba(39,174,96,0.04)' : 'transparent', borderBottom:'1px solid var(--border-color)'}}>
+                                                            <div style={{fontWeight:'700'}}>{rm.raumNr}</div>
+                                                            <div>{rm.bezeichnung}</div>
+                                                            <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{rm.geschoss}</div>
+                                                            <div style={{textAlign:'right'}}>{rm.flaeche > 0 ? fmtZahl(rm.flaeche) : '\u2014'}</div>
+                                                            <div style={{textAlign:'center', fontWeight:'700', color: rm.fliesenarbeiten === 'Ja' ? '#27ae60' : 'var(--text-muted)'}}>{rm.fliesenarbeiten}</div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return elements;
+                                            })()}
+                                        </div>
+                                    </div>
+                                    {/* Bearbeiten/Loeschen */}
+                                    <div style={{padding:'8px', display:'flex', gap:'4px', flexWrap:'wrap'}}>
+                                        {raeume.map(function(r, idx) {
+                                            return (
+                                                <div key={idx} style={{display:'flex', gap:'4px', alignItems:'center', background:'rgba(39,174,96,0.06)', borderRadius:'8px', padding:'4px 8px'}}>
+                                                    <span style={{fontSize:'10px', fontWeight:'700', color:'#27ae60'}}>{r.raumNr || r.bezeichnung}</span>
+                                                    <button {...tap(function(){ handleEditRaum(idx); })} style={Object.assign({}, touchBase, {padding:'4px 8px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'transparent', cursor:'pointer', fontSize:'12px'})}>&#9998;</button>
+                                                    <button {...tap(function(){ handleDeleteRaum(idx); })} style={Object.assign({}, touchBase, {padding:'4px 8px', borderRadius:'6px', border:'1px solid rgba(231,76,60,0.3)', background:'transparent', cursor:'pointer', fontSize:'12px', color:'#e74c3c'})}>&#10005;</button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
+
                             {raeume.length === 0 && !showRaumForm && (
-                                <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)', fontSize:'13px'}}>
-                                    🏠 Noch keine Räume eingetragen.<br/>Füge deinen ersten Raum hinzu oder lade eine Raumliste hoch.
+                                <div style={{textAlign:'center', padding:'40px 20px', color:'var(--text-muted)'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\uD83C\uDFE0'}</div>
+                                    <div>Noch keine Raeume. Fuege deinen ersten Raum hinzu oder importiere eine Liste.</div>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* ═══ DATEI-UPLOAD ═══ */}
-                    <div style={{marginTop:'16px', background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', border:'1px solid var(--border-color)'}}>
-                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'10px'}}>📁 Liste hochladen</div>
-                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'10px', lineHeight:'1.5'}}>
-                            CSV/Excel-Datei hochladen. <strong>Positionen:</strong> PosNr; Menge; Einheit; Leistung; EP; GP<br/>
-                            <strong>Räume:</strong> RaumNr; Bezeichnung; Geschoss; Bemerkung (Spalte „Raum" + „Geschoss" im Header = automatische Raum-Erkennung)
-                        </div>
-                        <label style={Object.assign({}, touchBase, {
-                            display:'block', width:'100%', padding:'16px', borderRadius:'10px', border:'2px dashed var(--border-color)',
-                            background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'14px', fontWeight:'600', color:'var(--text-muted)',
-                            transition:'border-color 0.2s', boxSizing:'border-box', minHeight:'50px'
-                        })}>
-                            📂 Datei auswählen (CSV, XLSX)
-                            <input type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onChange={handleFileUpload} style={{display:'none'}} />
-                        </label>
-                        {uploadStatus && (
-                            <div style={{marginTop:'8px', fontSize:'12px', color: uploadStatus.indexOf('✅') >= 0 ? '#27ae60' : uploadStatus.indexOf('❌') >= 0 ? '#e74c3c' : 'var(--text-muted)', fontWeight:'600'}}>
-                                {uploadStatus}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ═══ ZUSAMMENFASSUNG & FERTIG-BUTTON ═══ */}
-                    <div style={{marginTop:'20px', paddingBottom:'20px'}}>
-                        {(positionen.length > 0 || raeume.length > 0) && (
-                            <div style={{background:'rgba(39,174,96,0.05)', borderRadius:'14px', padding:'14px 16px', border:'1px solid rgba(39,174,96,0.2)', marginBottom:'14px'}}>
-                                <div style={{fontSize:'13px', fontWeight:'700', color:'#27ae60', marginBottom:'6px'}}>📊 Zusammenfassung</div>
-                                <div style={{fontSize:'12px', color:'var(--text-secondary)', lineHeight:'1.8'}}>
-                                    📋 <strong>{positionen.length}</strong> LV-Position{positionen.length !== 1 ? 'en' : ''}
-                                    {gpSumme > 0 ? ' · Σ ' + gpSumme.toLocaleString('de-DE', {minimumFractionDigits:2}) + ' €' : ''}
-                                    <br/>
-                                    🏠 <strong>{raeume.length}</strong> Raum{raeume.length !== 1 ? '̈e' : ''}
+                    {/* ═══ BOTTOM BUTTONS (FIXED) ═══ */}
+                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
+                        <div style={{maxWidth:'600px', margin:'0 auto'}}>
+                            {/* Zusammenfassung */}
+                            {(positionen.length > 0 || raeume.length > 0 || nachtraege.length > 0) && (
+                                <div style={{background:'rgba(39,174,96,0.08)', borderRadius:'10px', padding:'8px 12px', marginBottom:'8px', fontSize:'11px', color:'var(--text-secondary)', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:'4px'}}>
+                                    <span>{positionen.length} Pos. + {nachtraege.length} Nachtr. + {raeume.length} Raeume</span>
+                                    {gpGesamtNetto > 0 && <span style={{fontWeight:'700', color:'var(--accent-blue)'}}>{fmtEuro(gesamtBrutto)} brutto</span>}
                                 </div>
+                            )}
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button {...tap(handlePdfExport)} disabled={positionen.length === 0 && raeume.length === 0 && nachtraege.length === 0} style={Object.assign({}, touchBase, {
+                                    flex:'0 0 auto', padding:'12px 16px', borderRadius:'12px', border:'2px solid #c0392b', cursor:'pointer',
+                                    background: (positionen.length === 0 && raeume.length === 0 && nachtraege.length === 0) ? 'var(--bg-tertiary)' : 'rgba(192,57,43,0.08)',
+                                    color: (positionen.length === 0 && raeume.length === 0 && nachtraege.length === 0) ? 'var(--text-muted)' : '#c0392b',
+                                    fontSize:'13px', fontWeight:'700'
+                                })}>
+                                    PDF
+                                </button>
+                                <button {...tap(handleFertig)} disabled={!stammFelder.bauherr_firma.trim() || (positionen.length === 0 && raeume.length === 0)} style={Object.assign({}, touchBase, {
+                                    flex:1, padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer',
+                                    background: (!stammFelder.bauherr_firma.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'var(--bg-tertiary)' : 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
+                                    color: (!stammFelder.bauherr_firma.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'var(--text-muted)' : 'white',
+                                    fontSize:'14px', fontWeight:'700', boxShadow: (!stammFelder.bauherr_firma.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'none' : '0 4px 12px rgba(39,174,96,0.3)'
+                                })}>
+                                    Speichern & Weiter zur Modulauswahl
+                                </button>
                             </div>
-                        )}
-
-                        <button {...tap(handleFertig)} disabled={!kundenName.trim() || (positionen.length === 0 && raeume.length === 0)} style={Object.assign({}, touchBase, {
-                            width:'100%', padding:'18px 20px', borderRadius:'14px', border:'none', cursor: (!kundenName.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'not-allowed' : 'pointer',
-                            background: (!kundenName.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'var(--bg-tertiary)' : 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
-                            color: (!kundenName.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'var(--text-muted)' : 'white',
-                            fontSize:'16px', fontWeight:'800', boxShadow: (!kundenName.trim() || (positionen.length === 0 && raeume.length === 0)) ? 'none' : '0 4px 20px rgba(39,174,96,0.3)',
-                            transition:'all 0.2s ease', letterSpacing:'0.5px', minHeight:'56px'
-                        })}>
-                            ✅ Liste fertiggestellt -- Weiter zur Modulauswahl
-                        </button>
+                        </div>
                     </div>
                 </div>
             );
         }
+
 
         /* ═══════════════════════════════════════════
            ANALYSE-KONFIGURATION -- Ordner-Auswahl

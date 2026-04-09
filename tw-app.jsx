@@ -305,14 +305,15 @@
                     return {
                         pos: p.posNr,
                         bez: p.leistung,
-                        einheit: p.einheit || 'm²',
+                        einheit: p.einheit || 'm\u00b2',
                         menge: p.menge || 0,
                         einzelpreis: p.ep || 0,
                         bereich: '',
                         kategorie: '',
                         tags: [],
                         _epPreis: p.ep || null,
-                        _gpPreis: p.gp || null
+                        _gpPreis: p.gp || null,
+                        _istNachtrag: p._istNachtrag || false
                     };
                 });
 
@@ -331,7 +332,7 @@
 
                 var kundeObj = {
                     id: kundeId,
-                    name: data.kundenName + (data.bauvorhaben ? ' – ' + data.bauvorhaben : ''),
+                    name: data.kundenName + (data.bauvorhaben ? ' \u2013 ' + data.bauvorhaben : ''),
                     auftraggeber: data.kundenName,
                     adresse: data.bauvorhaben || '',
                     _fullyLoaded: true,
@@ -340,20 +341,38 @@
                     _raeume: raeumeFormatted,
                     _lvPositionenKey: kundeId,
                     _gespeichertAm: new Date().toLocaleString('de-DE'),
-                    raeume: raeumeFormatted
+                    raeume: raeumeFormatted,
+                    _stammFelder: data._stammFelder || null
                 };
 
                 // LV-Positionen in globales Objekt injizieren
                 LV_POSITIONEN[kundeId] = lvPosFormatted;
 
-                // ImportResult erstellen (für Rechnung/Module)
+                // ImportResult erstellen (fuer Rechnung/Module)
+                var stammF = data._stammFelder || {};
                 var impResult = {
                     positionen: lvPosFormatted,
                     raeume: raeumeFormatted,
                     kundendaten: {
                         auftraggeber: data.kundenName,
                         adresse: data.bauvorhaben || '',
-                        baumassnahme: data.bauvorhaben || ''
+                        baumassnahme: data.bauvorhaben || '',
+                        bauleitung: data.bauleitung || '',
+                        bauleitung_telefon: data.bl_telefon || '',
+                        bauleitung_email: data.bl_email || '',
+                        architekt: data.architekt || '',
+                        architekt_telefon: data.arch_telefon || '',
+                        architekt_email: data.arch_email || '',
+                        auftraggeber_strasse: stammF.bauherr_strasse || '',
+                        auftraggeber_telefon: data.ag_telefon || '',
+                        auftraggeber_email: data.ag_email || ''
+                    },
+                    stammdaten: {
+                        projekt: stammF.objekt_projektnr || '',
+                        bauherr: { firma: stammF.bauherr_firma || data.kundenName, ansprechpartner: stammF.bauherr_ansprechpartner || '', strasse: stammF.bauherr_strasse || '', plz: (stammF.bauherr_plzOrt || '').split(' ')[0] || '', ort: (stammF.bauherr_plzOrt || '').split(' ').slice(1).join(' ') || '', telefon: stammF.bauherr_telefon || '', email: stammF.bauherr_email || '' },
+                        bauleiter: { name: stammF.bauleiter_name || data.bauleitung || '', firma: stammF.bauleiter_firma || '', telefon: stammF.bauleiter_telefon || data.bl_telefon || '', email: stammF.bauleiter_email || data.bl_email || '' },
+                        architekt: { buero: stammF.architekt_buero || data.architekt || '', projektbearbeiter: stammF.architekt_name || '', telefon: stammF.architekt_telefon || data.arch_telefon || '', emailInhaber: stammF.architekt_email || data.arch_email || '' },
+                        objektdaten: { bauvorhaben: stammF.objekt_bauvorhaben || data.bauvorhaben || '', baustelleStrasse: stammF.objekt_strasse || '', baustellePlzOrt: stammF.objekt_plzOrt || '', gewerk: 'Fliesenarbeiten', auftragsdatum: stammF.objekt_auftragsdatum || '' }
                     }
                 };
                 setImportResult(impResult);
