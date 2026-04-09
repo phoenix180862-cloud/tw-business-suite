@@ -704,47 +704,93 @@
             var kundeId = kunde ? (kunde._driveFolderId || kunde.id || kunde.name) : null;
             var kundeName = kunde ? (kunde.name || kunde.auftraggeber || 'Kunde') : 'Kunde';
 
-            // Ordnerstruktur + App-Dateien laden (mit Retry falls Storage noch nicht bereit)
+            // Ordnerstruktur + App-Dateien laden — falls leer: automatisch von Drive syncen
+            var [syncProgress, setSyncProgress] = useState(null);
+
             useEffect(function() {
                 if (!kundeId) {
                     setLoading(false);
                     setError('Kein Kunde ausgew\u00e4hlt.');
                     return;
                 }
+                var cancelled = false;
 
                 function doLoad() {
-                    if (!window.TWStorage || !window.TWStorage.isReady()) {
-                        // Storage noch nicht bereit, kurz warten und nochmal versuchen
-                        return;
-                    }
+                    if (!window.TWStorage || !window.TWStorage.isReady()) return;
                     clearInterval(retryTimer);
                     setLoading(true);
                     setError(null);
+
                     Promise.all([
                         TWStorage.OfflineBrowser.getFullTree(kundeId),
                         TWStorage.DriveSync.getSyncStatus(kundeId),
                         TWStorage.getAppDateienByOrdner(kundeId)
                     ]).then(function(results) {
-                        setTree(results[0] || []);
-                        setSyncStatus(results[1]);
-                        setAppOrdner(results[2] || {});
-                        setLoading(false);
-                        var hasDrive = results[0] && results[0].length > 0;
-                        var hasApp = results[2] && Object.keys(results[2]).length > 0;
+                        if (cancelled) return;
+                        var driveTree = results[0] || [];
+                        var status = results[1];
+                        var appFiles = results[2] || {};
+
+                        setTree(driveTree);
+                        setSyncStatus(status);
+                        setAppOrdner(appFiles);
+
+                        var hasDrive = driveTree.length > 0;
+                        var hasApp = Object.keys(appFiles).length > 0;
+
                         if (!hasDrive && !hasApp) {
-                            setError('Noch keine Ordner gespeichert. Die Daten werden geladen...');
+                            // Keine Offline-Daten — automatisch von Drive laden
+                            var driveFolderId = kunde ? (kunde._driveFolderId || kunde.id) : null;
+                            var driveService = window.GoogleDriveService;
+
+                            if (driveFolderId && driveService && driveService.accessToken) {
+                                setError(null);
+                                setSyncProgress('Ordnerstruktur wird von Google Drive geladen...');
+
+                                TWStorage.DriveSync.syncKundenOrdner(kundeId, driveFolderId, function(info) {
+                                    if (cancelled) return;
+                                    setSyncProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
+                                }).then(function() {
+                                    if (cancelled) return;
+                                    setSyncProgress(null);
+                                    return Promise.all([
+                                        TWStorage.OfflineBrowser.getFullTree(kundeId),
+                                        TWStorage.DriveSync.getSyncStatus(kundeId),
+                                        TWStorage.getAppDateienByOrdner(kundeId)
+                                    ]);
+                                }).then(function(r2) {
+                                    if (cancelled || !r2) return;
+                                    setTree(r2[0] || []);
+                                    setSyncStatus(r2[1]);
+                                    setAppOrdner(r2[2] || {});
+                                    setLoading(false);
+                                    if ((!r2[0] || r2[0].length === 0) && (!r2[2] || Object.keys(r2[2]).length === 0)) {
+                                        setError('Keine Ordner gefunden. Der Kundenordner ist m\u00f6glicherweise leer.');
+                                    }
+                                }).catch(function(e) {
+                                    if (cancelled) return;
+                                    setSyncProgress(null);
+                                    setError('Sync-Fehler: ' + e.message);
+                                    setLoading(false);
+                                });
+                            } else {
+                                setLoading(false);
+                                setError('Keine Offline-Daten. Bitte Google Drive verbinden und "Komplette Daten laden" verwenden.');
+                            }
+                        } else {
+                            setLoading(false);
                         }
                     }).catch(function(e) {
-                        setError('Fehler beim Laden: ' + e.message);
+                        if (cancelled) return;
+                        setError('Fehler: ' + e.message);
                         setLoading(false);
                     });
                 }
 
-                // Sofort versuchen, sonst alle 500ms retry
                 var retryTimer = setInterval(doLoad, 500);
                 doLoad();
-                var timeout = setTimeout(function() { clearInterval(retryTimer); setLoading(false); }, 10000);
-                return function() { clearInterval(retryTimer); clearTimeout(timeout); };
+                var timeout = setTimeout(function() { clearInterval(retryTimer); }, 10000);
+                return function() { cancelled = true; clearInterval(retryTimer); clearTimeout(timeout); };
             }, [kundeId]);
 
             // Datei oeffnen (Drive-Datei oder App-Datei)
@@ -915,11 +961,18 @@
                         </button>
                     )}
 
-                    {/* Loading */}
-                    {loading && (
+                    {/* Loading / Sync-Fortschritt */}
+                    {(loading || syncProgress) && (
                         <div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)'}}>
                             <div style={{fontSize:'36px', marginBottom:'12px', animation:'spin 1.5s linear infinite'}}>&#x1F504;</div>
-                            Ordnerstruktur wird geladen...
+                            <div style={{fontSize:'14px', fontWeight:'600', marginBottom:'8px'}}>
+                                {syncProgress ? 'Daten werden von Google Drive geladen...' : 'Ordnerstruktur wird geladen...'}
+                            </div>
+                            {syncProgress && (
+                                <div style={{fontSize:'12px', color:'var(--accent-blue)', padding:'8px 16px', borderRadius:'8px', background:'rgba(30,136,229,0.1)', display:'inline-block', maxWidth:'90%', wordBreak:'break-word'}}>
+                                    {syncProgress}
+                                </div>
+                            )}
                         </div>
                     )}
 
