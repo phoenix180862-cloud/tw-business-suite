@@ -711,28 +711,8 @@
                 e.target.value = '';
             };
 
-            // ── Spracheingabe mit Aktiv-Anzeige ──
-            var [activeMic, setActiveMic] = useState(null); // key des aktiven Feldes
-            var startSpeech = function(fieldKey, callback) {
-                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert('Spracheingabe wird von diesem Browser nicht unterstuetzt. Bitte Chrome verwenden.'); return; }
-                var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-                var recognition = new SpeechRec();
-                recognition.lang = 'de-DE'; recognition.continuous = false; recognition.interimResults = false;
-                setActiveMic(fieldKey);
-                recognition.onresult = function(event) {
-                    var text = event.results[0][0].transcript;
-                    if (callback) callback(text);
-                    setActiveMic(null);
-                };
-                recognition.onerror = function(event) {
-                    console.warn('Spracheingabe Fehler:', event.error);
-                    setActiveMic(null);
-                };
-                recognition.onend = function() {
-                    setActiveMic(null);
-                };
-                recognition.start();
-            };
+            // ── Spracheingabe (globaler Service) ──
+            var activeMic = useSpeech();
 
             // ═══ SUMMEN ═══
             var gpSummeLV = positionen.reduce(function(s, p) { return s + (p.gp || (p.ep * p.menge) || 0); }, 0);
@@ -1085,25 +1065,12 @@
                         </div>
                         <div style={{display:'grid', gap:'8px'}}>
                             {fields.map(function(f) {
-                                var isRecording = activeMic === f[0];
                                 return (
                                 <div key={f[0]}>
-                                    <label style={{fontSize:'11px', color: isRecording ? '#e74c3c' : 'var(--text-muted)', display:'block', marginBottom:'3px', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px', transition:'color 0.2s'}}>
-                                        {isRecording ? '\uD83D\uDD34 Spricht...' : f[1]}
-                                    </label>
+                                    <MicLabel fieldKey={'me_' + f[0]} label={f[1]} />
                                     <div style={{display:'flex', gap:'4px'}}>
-                                        <input value={stammFelder[f[0]] || ''} onChange={function(e){ updateStammFeld(f[0], e.target.value); }}
-                                            style={Object.assign({}, inputStyle, {flex:1, borderColor: isRecording ? '#e74c3c' : 'var(--accent-blue)', boxShadow: isRecording ? '0 0 0 2px rgba(231,76,60,0.2)' : 'none', transition:'border-color 0.2s, box-shadow 0.2s'})}
-                                            placeholder={f[2] || ''} />
-                                        <button {...tap(function(){ var key = f[0]; startSpeech(key, function(text){ updateStammFeld(key, (stammFelder[key] || '') + (stammFelder[key] ? ' ' : '') + text); }); })}
-                                            style={Object.assign({
-                                                padding:'6px 10px', borderRadius:'8px',
-                                                border: isRecording ? '2px solid #e74c3c' : '1px solid var(--border-color)',
-                                                background: isRecording ? 'rgba(231,76,60,0.12)' : 'var(--bg-tertiary)',
-                                                cursor:'pointer', fontSize:'14px', flexShrink:0,
-                                                animation: isRecording ? 'micPulse 1s ease-in-out infinite' : 'none',
-                                                transition:'all 0.2s'
-                                            }, touchBase)}>{isRecording ? '\uD83D\uDD34' : '\uD83C\uDF99'}</button>
+                                        <MicInput fieldKey={'me_' + f[0]} value={stammFelder[f[0]] || ''} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={Object.assign({}, inputStyle, {flex:1})} placeholder={f[2] || ''} />
+                                        <MicButton fieldKey={'me_' + f[0]} size="normal" onResult={function(text){ updateStammFeld(f[0], (stammFelder[f[0]] || '') + (stammFelder[f[0]] ? ' ' : '') + text); }} />
                                     </div>
                                 </div>
                             ); })}
@@ -1121,11 +1088,10 @@
                         </div>
                         {isNachtrag && (
                             <div style={{marginBottom:'10px'}}>
-                                <label style={{fontSize:'11px', fontWeight:'700', color: activeMic === 'nachtragTitel' ? '#e74c3c' : 'var(--text-muted)', marginBottom:'4px', display:'block', textTransform:'uppercase', letterSpacing:'0.5px'}}>{activeMic === 'nachtragTitel' ? '\uD83D\uDD34 Spricht...' : 'Nachtrag-Titel'}</label>
+                                <MicLabel fieldKey="me_nachtragTitel" label="Nachtrag-Titel" />
                                 <div style={{display:'flex', gap:'4px'}}>
-                                    <input type="text" value={form.nachtragTitel || ''} onChange={function(e){ setForm(Object.assign({}, form, {nachtragTitel: e.target.value})); }} placeholder="z.B. Nachtrag vom 20.03.2025" style={Object.assign({}, inputStyle, {flex:1, borderColor: activeMic === 'nachtragTitel' ? '#e74c3c' : 'var(--accent-blue)'})} />
-                                    <button {...tap(function(){ startSpeech('nachtragTitel', function(text){ setForm(Object.assign({}, form, {nachtragTitel: (form.nachtragTitel || '') + (form.nachtragTitel ? ' ' : '') + text})); }); })}
-                                        style={Object.assign({padding:'6px 10px', borderRadius:'8px', border: activeMic === 'nachtragTitel' ? '2px solid #e74c3c' : '1px solid var(--border-color)', background: activeMic === 'nachtragTitel' ? 'rgba(231,76,60,0.12)' : 'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0, animation: activeMic === 'nachtragTitel' ? 'micPulse 1s ease-in-out infinite' : 'none'}, touchBase)}>{activeMic === 'nachtragTitel' ? '\uD83D\uDD34' : '\uD83C\uDF99'}</button>
+                                    <MicInput fieldKey="me_nachtragTitel" type="text" value={form.nachtragTitel || ''} onChange={function(e){ setForm(Object.assign({}, form, {nachtragTitel: e.target.value})); }} placeholder="z.B. Nachtrag vom 20.03.2025" style={Object.assign({}, inputStyle, {flex:1})} />
+                                    <MicButton fieldKey="me_nachtragTitel" size="normal" onResult={function(text){ setForm(Object.assign({}, form, {nachtragTitel: (form.nachtragTitel || '') + (form.nachtragTitel ? ' ' : '') + text})); }} />
                                 </div>
                             </div>
                         )}
@@ -1154,13 +1120,12 @@
                             </div>
                         </div>
                         <div style={{marginTop:'10px'}}>
-                            <label style={{fontSize:'11px', fontWeight:'700', color: activeMic === 'leistung' ? '#e74c3c' : 'var(--text-muted)', marginBottom:'4px', display:'block', textTransform:'uppercase', letterSpacing:'0.5px'}}>{activeMic === 'leistung' ? '\uD83D\uDD34 Spricht...' : 'Leistungsbeschreibung *'}</label>
+                            <MicLabel fieldKey="me_leistung" label="Leistungsbeschreibung *" />
                             <div style={{display:'flex', gap:'4px', alignItems:'flex-start'}}>
-                                <textarea value={form.leistung} onChange={function(e){ setForm(Object.assign({}, form, {leistung: e.target.value})); }}
+                                <MicInput fieldKey="me_leistung" multiline={true} value={form.leistung} onChange={function(e){ setForm(Object.assign({}, form, {leistung: e.target.value})); }}
                                     placeholder="z.B. Bodenfliesen 30x60 liefern und verlegen" rows={3}
-                                    style={Object.assign({}, inputStyle, {flex:1, resize:'vertical', fontFamily:'inherit', borderColor: activeMic === 'leistung' ? '#e74c3c' : 'var(--accent-blue)', boxShadow: activeMic === 'leistung' ? '0 0 0 2px rgba(231,76,60,0.2)' : 'none'})} />
-                                <button {...tap(function(){ startSpeech('leistung', function(text){ setForm(Object.assign({}, form, {leistung: (form.leistung || '') + (form.leistung ? ' ' : '') + text})); }); })}
-                                    style={Object.assign({padding:'6px 10px', borderRadius:'8px', border: activeMic === 'leistung' ? '2px solid #e74c3c' : '1px solid var(--border-color)', background: activeMic === 'leistung' ? 'rgba(231,76,60,0.12)' : 'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0, animation: activeMic === 'leistung' ? 'micPulse 1s ease-in-out infinite' : 'none'}, touchBase)}>{activeMic === 'leistung' ? '\uD83D\uDD34' : '\uD83C\uDF99'}</button>
+                                    style={Object.assign({}, inputStyle, {flex:1, resize:'vertical', fontFamily:'inherit'})} />
+                                <MicButton fieldKey="me_leistung" size="normal" onResult={function(text){ setForm(Object.assign({}, form, {leistung: (form.leistung || '') + (form.leistung ? ' ' : '') + text})); }} />
                             </div>
                         </div>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginTop:'10px'}}>
@@ -1189,14 +1154,6 @@
             };
 
             // ═══ RENDER ═══
-            // CSS Animation fuer pulsierende Mikrofon-Anzeige injizieren
-            React.useEffect(function() {
-                if (document.getElementById('tw-mic-pulse-style')) return;
-                var style = document.createElement('style');
-                style.id = 'tw-mic-pulse-style';
-                style.textContent = '@keyframes micPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }';
-                document.head.appendChild(style);
-            }, []);
 
             return (
                 <div style={{padding:'12px 16px', minHeight:'100vh', background:'var(--bg-primary)', paddingBottom:'200px'}}>
@@ -1481,12 +1438,11 @@
                                         </div>
                                     </div>
                                     <div style={{marginTop:'10px'}}>
-                                        <label style={{fontSize:'11px', fontWeight:'700', color: activeMic === 'raumBez' ? '#e74c3c' : 'var(--text-muted)', marginBottom:'4px', display:'block', textTransform:'uppercase', letterSpacing:'0.5px'}}>{activeMic === 'raumBez' ? '\uD83D\uDD34 Spricht...' : 'Bezeichnung *'}</label>
+                                        <MicLabel fieldKey="me_raumBez" label="Bezeichnung *" />
                                         <div style={{display:'flex', gap:'4px'}}>
-                                            <input type="text" value={raumForm.bezeichnung} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {bezeichnung: e.target.value})); }}
-                                                placeholder="z.B. Bad, Kueche, Flur, WC" style={Object.assign({}, inputStyle, {flex:1, borderColor: activeMic === 'raumBez' ? '#e74c3c' : 'var(--accent-blue)', boxShadow: activeMic === 'raumBez' ? '0 0 0 2px rgba(231,76,60,0.2)' : 'none'})} />
-                                            <button {...tap(function(){ startSpeech('raumBez', function(text){ setRaumForm(Object.assign({}, raumForm, {bezeichnung: (raumForm.bezeichnung || '') + (raumForm.bezeichnung ? ' ' : '') + text})); }); })}
-                                                style={Object.assign({padding:'6px 10px', borderRadius:'8px', border: activeMic === 'raumBez' ? '2px solid #e74c3c' : '1px solid var(--border-color)', background: activeMic === 'raumBez' ? 'rgba(231,76,60,0.12)' : 'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0, animation: activeMic === 'raumBez' ? 'micPulse 1s ease-in-out infinite' : 'none'}, touchBase)}>{activeMic === 'raumBez' ? '\uD83D\uDD34' : '\uD83C\uDF99'}</button>
+                                            <MicInput fieldKey="me_raumBez" type="text" value={raumForm.bezeichnung} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {bezeichnung: e.target.value})); }}
+                                                placeholder="z.B. Bad, Kueche, Flur, WC" style={Object.assign({}, inputStyle, {flex:1})} />
+                                            <MicButton fieldKey="me_raumBez" size="normal" onResult={function(text){ setRaumForm(Object.assign({}, raumForm, {bezeichnung: (raumForm.bezeichnung || '') + (raumForm.bezeichnung ? ' ' : '') + text})); }} />
                                         </div>
                                     </div>
                                     <div style={{marginTop:'10px'}}>

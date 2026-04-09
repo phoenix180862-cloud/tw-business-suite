@@ -501,5 +501,138 @@
         }
 
         /* ═══════════════════════════════════════════
+           GLOBALER SPEECH SERVICE + MIC BUTTON
+           Einheitliche Spracheingabe fuer alle Module
+           ═══════════════════════════════════════════ */
+
+        // CSS Animation einmalig injizieren
+        (function() {
+            if (document.getElementById('tw-mic-pulse-css')) return;
+            var s = document.createElement('style');
+            s.id = 'tw-mic-pulse-css';
+            s.textContent = '@keyframes twMicPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.15); opacity:0.7; } }';
+            document.head.appendChild(s);
+        })();
+
+        // Globaler State: welches Feld nimmt gerade auf?
+        var TW_SPEECH_ACTIVE_FIELD = { current: null, listeners: [] };
+
+        var TWSpeechService = {
+            isSupported: function() {
+                return ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+            },
+            start: function(fieldKey, onResult) {
+                if (!this.isSupported()) {
+                    alert('Spracheingabe wird von diesem Browser nicht unterstuetzt. Bitte Chrome verwenden.');
+                    return;
+                }
+                var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+                var recognition = new SpeechRec();
+                recognition.lang = 'de-DE';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                // Aktiv setzen
+                TW_SPEECH_ACTIVE_FIELD.current = fieldKey;
+                TW_SPEECH_ACTIVE_FIELD.listeners.forEach(function(fn) { fn(fieldKey); });
+                recognition.onresult = function(event) {
+                    var text = event.results[0][0].transcript;
+                    if (onResult) onResult(text);
+                };
+                recognition.onerror = function(event) {
+                    console.warn('Spracheingabe Fehler:', event.error);
+                };
+                recognition.onend = function() {
+                    TW_SPEECH_ACTIVE_FIELD.current = null;
+                    TW_SPEECH_ACTIVE_FIELD.listeners.forEach(function(fn) { fn(null); });
+                };
+                recognition.start();
+            },
+            subscribe: function(fn) {
+                TW_SPEECH_ACTIVE_FIELD.listeners.push(fn);
+                return function() {
+                    TW_SPEECH_ACTIVE_FIELD.listeners = TW_SPEECH_ACTIVE_FIELD.listeners.filter(function(f) { return f !== fn; });
+                };
+            },
+            getActive: function() { return TW_SPEECH_ACTIVE_FIELD.current; }
+        };
+
+        // React Hook: useSpeech
+        function useSpeech() {
+            var state = useState(null);
+            var activeMic = state[0];
+            var setActiveMic = state[1];
+            useEffect(function() {
+                return TWSpeechService.subscribe(function(key) { setActiveMic(key); });
+            }, []);
+            return activeMic;
+        }
+
+        // MicButton Komponente - identisches Aussehen ueberall
+        function MicButton(props) {
+            var fieldKey = props.fieldKey;
+            var onResult = props.onResult;
+            var size = props.size || 'normal'; // 'normal' | 'small'
+            var activeMic = useSpeech();
+            var isActive = activeMic === fieldKey;
+            var tap = { onTouchEnd: function(e){ e.preventDefault(); e.stopPropagation(); TWSpeechService.start(fieldKey, onResult); }, onClick: function(){ TWSpeechService.start(fieldKey, onResult); } };
+            var baseStyle = {
+                padding: size === 'small' ? '2px 5px' : '6px 10px',
+                borderRadius: size === 'small' ? '4px' : '8px',
+                border: isActive ? '2px solid #e74c3c' : '1px solid var(--border-color)',
+                background: isActive ? 'rgba(231,76,60,0.12)' : 'var(--bg-tertiary)',
+                cursor: 'pointer',
+                fontSize: size === 'small' ? '11px' : '14px',
+                flexShrink: 0,
+                animation: isActive ? 'twMicPulse 1s ease-in-out infinite' : 'none',
+                transition: 'all 0.2s',
+                WebkitTapHighlightColor: 'rgba(30,136,229,0.2)',
+                touchAction: 'manipulation',
+                userSelect: 'none',
+                WebkitUserSelect: 'none'
+            };
+            return React.createElement('button', Object.assign({}, tap, { style: baseStyle }), isActive ? '\uD83D\uDD34' : '\uD83C\uDF99');
+        }
+
+        // MicLabel Komponente - Label das "Spricht..." anzeigt
+        function MicLabel(props) {
+            var fieldKey = props.fieldKey;
+            var label = props.label;
+            var activeMic = useSpeech();
+            var isActive = activeMic === fieldKey;
+            var style = props.style || {};
+            return React.createElement('label', {
+                style: Object.assign({
+                    fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '3px',
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                    color: isActive ? '#e74c3c' : 'var(--text-muted)',
+                    transition: 'color 0.2s'
+                }, style)
+            }, isActive ? '\uD83D\uDD34 Spricht...' : label);
+        }
+
+        // MicInput Komponente - Input mit aktivem Rand
+        function MicInput(props) {
+            var fieldKey = props.fieldKey;
+            var activeMic = useSpeech();
+            var isActive = activeMic === fieldKey;
+            var baseInputStyle = props.style || {};
+            var mergedStyle = Object.assign({}, baseInputStyle, {
+                borderColor: isActive ? '#e74c3c' : (baseInputStyle.borderColor || 'var(--accent-blue)'),
+                boxShadow: isActive ? '0 0 0 2px rgba(231,76,60,0.2)' : 'none',
+                transition: 'border-color 0.2s, box-shadow 0.2s'
+            });
+            var inputProps = Object.assign({}, props, { style: mergedStyle });
+            delete inputProps.fieldKey;
+            return React.createElement(props.multiline ? 'textarea' : 'input', inputProps);
+        }
+
+        // Globale Verfuegbarkeit
+        window.TWSpeechService = TWSpeechService;
+        window.useSpeech = useSpeech;
+        window.MicButton = MicButton;
+        window.MicLabel = MicLabel;
+        window.MicInput = MicInput;
+
+        /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */

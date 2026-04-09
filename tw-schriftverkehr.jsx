@@ -356,10 +356,10 @@
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                         <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'8px'}}>📬 Empfänger</div>
                         <div style={{display:'grid', gap:'6px'}}>
-                            <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Empfänger (Firma/Person)</label>
-                                <input value={empfaenger} onChange={function(e){setEmpfaenger(e.target.value);}} placeholder="Firma oder Name" style={inputStyle} /></div>
-                            <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Adresse</label>
-                                <input value={empfAdresse} onChange={function(e){setEmpfAdresse(e.target.value);}} placeholder="Straße Nr, PLZ Ort" style={inputStyle} /></div>
+                            <div><MicLabel fieldKey="sv_empf" label="Empfänger (Firma/Person)" />
+                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_empf" value={empfaenger} onChange={function(e){setEmpfaenger(e.target.value);}} placeholder="Firma oder Name" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_empf" size="small" onResult={function(t){setEmpfaenger((empfaenger||'')+' '+t);}} /></div></div>
+                            <div><MicLabel fieldKey="sv_adr" label="Adresse" />
+                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_adr" value={empfAdresse} onChange={function(e){setEmpfAdresse(e.target.value);}} placeholder="Straße Nr, PLZ Ort" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_adr" size="small" onResult={function(t){setEmpfAdresse((empfAdresse||'')+' '+t);}} /></div></div>
                             {versandKanal === 'mail' && (
                                 <div>
                                     <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>E-Mail-Adresse</label>
@@ -375,8 +375,8 @@
                                 </div>
                             )}
                             <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px'}}>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Bauvorhaben</label>
-                                    <input value={bauvorhaben} onChange={function(e){setBauvorhaben(e.target.value);}} style={inputStyle} /></div>
+                                <div><MicLabel fieldKey="sv_bv" label="Bauvorhaben" />
+                                    <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_bv" value={bauvorhaben} onChange={function(e){setBauvorhaben(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_bv" size="small" onResult={function(t){setBauvorhaben((bauvorhaben||'')+' '+t);}} /></div></div>
                                 <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Datum</label>
                                     <input value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={inputStyle} /></div>
                             </div>
@@ -403,15 +403,18 @@
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                         <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'8px'}}>✏️ Schreiben</div>
 
-                        <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Betreff</label>
-                            <input value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff des Schreibens" style={Object.assign({}, inputStyle, {fontWeight:'700', marginBottom:'6px'})} /></div>
+                        <div><MicLabel fieldKey="sv_betr" label="Betreff" />
+                            <div style={{display:'flex', gap:'3px', marginBottom:'6px'}}><MicInput fieldKey="sv_betr" value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff des Schreibens" style={Object.assign({}, inputStyle, {flex:1, fontWeight:'700'})} /><MicButton fieldKey="sv_betr" size="small" onResult={function(t){setBetreff((betreff||'')+' '+t);}} /></div></div>
 
-                        <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Anrede</label>
-                            <input value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({}, inputStyle, {marginBottom:'6px'})} /></div>
+                        <div><MicLabel fieldKey="sv_anr" label="Anrede" />
+                            <div style={{display:'flex', gap:'3px', marginBottom:'6px'}}><MicInput fieldKey="sv_anr" value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_anr" size="small" onResult={function(t){setAnrede((anrede||'')+' '+t);}} /></div></div>
 
-                        <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Textinhalt</label>
-                            <textarea value={textBody} onChange={function(e){setTextBody(e.target.value);}} rows={8} placeholder="Hier den Brieftext eingeben..."
-                                style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box', lineHeight:'1.6', minHeight:'160px'}} /></div>
+                        <div><MicLabel fieldKey="sv_text" label="Textinhalt" />
+                            <div style={{display:'flex', gap:'4px', alignItems:'flex-start'}}>
+                                <MicInput fieldKey="sv_text" multiline={true} value={textBody} onChange={function(e){setTextBody(e.target.value);}} rows={8} placeholder="Hier den Brieftext eingeben..."
+                                    style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box', lineHeight:'1.6', minHeight:'160px'}} />
+                                <MicButton fieldKey="sv_text" size="normal" onResult={function(t){setTextBody((textBody||'')+(textBody?' ':'')+t);}} />
+                            </div></div>
 
                         {/* Bilder */}
                         {bilder.length > 0 && (
@@ -442,8 +445,8 @@
                             <input ref={bildInputRef} type="file" accept="image/*" onChange={handleBild} style={{display:'none'}} />
                         </div>
 
-                        <div style={{marginTop:'8px'}}><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Grußformel</label>
-                            <input value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={inputStyle} /></div>
+                        <div style={{marginTop:'8px'}}><MicLabel fieldKey="sv_gruss" label="Grußformel" />
+                            <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_gruss" value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_gruss" size="small" onResult={function(t){setGrussformel((grussformel||'')+' '+t);}} /></div></div>
                     </div>
 
                     {/* Versand-Status Toast */}

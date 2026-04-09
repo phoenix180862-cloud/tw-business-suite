@@ -851,20 +851,20 @@
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                         <div style={{fontSize:'11px', fontWeight:'700', color: typColor, marginBottom:'8px'}}>📋 Rechnungsdaten</div>
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px'}}>
-                            <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Rechnungs-Nr.</label>
-                                <input value={rechnungsNr} onChange={function(e){setRechnungsNr(e.target.value);}} style={inputStyle} /></div>
+                            <div><MicLabel fieldKey="re_nr" label="Rechnungs-Nr." />
+                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="re_nr" value={rechnungsNr} onChange={function(e){setRechnungsNr(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="re_nr" size="small" onResult={function(t){setRechnungsNr(rechnungsNr+t);}} /></div></div>
                             <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Datum</label>
                                 <input type="date" value={rechnungsDatum} onChange={function(e){setRechnungsDatum(e.target.value);}} style={inputStyle} /></div>
-                            <div style={{gridColumn:'span 2'}}><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Leistungszeitraum</label>
-                                <input value={leistungszeitraum} onChange={function(e){setLeistungszeitraum(e.target.value);}} placeholder="z.B. 01.01. – 31.03.2026" style={inputStyle} /></div>
+                            <div style={{gridColumn:'span 2'}}><MicLabel fieldKey="re_lz" label="Leistungszeitraum" />
+                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="re_lz" value={leistungszeitraum} onChange={function(e){setLeistungszeitraum(e.target.value);}} placeholder="z.B. 01.01. – 31.03.2026" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="re_lz" size="small" onResult={function(t){setLeistungszeitraum((leistungszeitraum||'')+' '+t);}} /></div></div>
                             {rechnungsTyp === 'abschlag' && <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Abschlags-Nr.</label>
                                 <input type="number" min="1" value={abschlagNr} onChange={function(e){setAbschlagNr(parseInt(e.target.value)||1);}} style={inputStyle} /></div>}
                             {rechnungsTyp === 'schluss' && <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Bisher abgerechnet (netto €)</label>
                                 <input type="number" step="0.01" value={bisherAbgerechnet} onChange={function(e){setBisherAbgerechnet(e.target.value);}} style={inputStyle} /></div>}
-                            <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Auftragsnummer</label>
-                                <input value={auftragsnummer} onChange={function(e){setAuftragsnummer(e.target.value);}} placeholder="z.B. A-2026-001" style={inputStyle} /></div>
-                            <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Kostenstelle</label>
-                                <input value={kostenstelle} onChange={function(e){setKostenstelle(e.target.value);}} placeholder="optional" style={inputStyle} /></div>
+                            <div><MicLabel fieldKey="re_auftr" label="Auftragsnummer" />
+                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="re_auftr" value={auftragsnummer} onChange={function(e){setAuftragsnummer(e.target.value);}} placeholder="z.B. A-2026-001" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="re_auftr" size="small" onResult={function(t){setAuftragsnummer((auftragsnummer||'')+t);}} /></div></div>
+                            <div><MicLabel fieldKey="re_kst" label="Kostenstelle" />
+                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="re_kst" value={kostenstelle} onChange={function(e){setKostenstelle(e.target.value);}} placeholder="optional" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="re_kst" size="small" onResult={function(t){setKostenstelle((kostenstelle||'')+t);}} /></div></div>
                         </div>
                     </div>
 
@@ -951,9 +951,12 @@
 
                     {/* Bemerkung */}
                     <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}}>📝 Bemerkung</div>
-                        <textarea value={bemerkung} onChange={function(e){setBemerkung(e.target.value);}} rows={2} placeholder="Optionaler Zusatztext auf der Rechnung..."
-                            style={{width:'100%', padding:'8px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box'}} />
+                        <MicLabel fieldKey="re_bem" label="Bemerkung" style={{fontSize:'11px', fontWeight:'700', color:'var(--text-secondary)', marginBottom:'6px'}} />
+                        <div style={{display:'flex', gap:'4px', alignItems:'flex-start'}}>
+                            <MicInput fieldKey="re_bem" multiline={true} value={bemerkung} onChange={function(e){setBemerkung(e.target.value);}} rows={2} placeholder="Optionaler Zusatztext auf der Rechnung..."
+                                style={{flex:1, padding:'8px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box'}} />
+                            <MicButton fieldKey="re_bem" size="normal" onResult={function(t){setBemerkung((bemerkung||'')+(bemerkung?' ':'')+t);}} />
+                        </div>
                     </div>
 
                     {/* Summenblock */}
