@@ -1,5 +1,14 @@
-        /* DatenUebersicht v3 — Fixes: kein Auto-Spring, Zahlenformat, keine Pfeile, Spracheingabe */
+        /* DatenUebersicht v4 — Fix: Mikrofon-Icons (🎤), Touch-Targets, visuelles Feedback */
         function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
+            // CSS-Animation fuer Mikrofon-Puls injizieren
+            React.useEffect(function() {
+                if (!document.getElementById('mic-pulse-style')) {
+                    var style = document.createElement('style');
+                    style.id = 'mic-pulse-style';
+                    style.textContent = '@keyframes micPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.8; } }';
+                    document.head.appendChild(style);
+                }
+            }, []);
             var ir = importResult || {};
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
@@ -63,10 +72,11 @@
                 setTimeout(function() { setSavedMsg(''); setActiveTab('stammdaten'); }, 2000);
             };
 
-            // ── Spracheingabe ──
-            var startSpeech = function(callback) {
+            // ── Spracheingabe mit visuellem Feedback ──
+            var [activeMicId, setActiveMicId] = useState(null);
+            var startSpeech = function(callback, micId) {
                 if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                    alert('Spracheingabe wird von diesem Browser nicht unterstuetzt. Bitte Chrome verwenden.');
+                    alert('Spracheingabe wird von diesem Browser nicht unterstuetzt. Bitte Chrome oder Edge verwenden.');
                     return;
                 }
                 var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -74,14 +84,55 @@
                 recognition.lang = 'de-DE';
                 recognition.continuous = false;
                 recognition.interimResults = false;
+                setActiveMicId(micId || 'active');
                 recognition.onresult = function(event) {
                     var text = event.results[0][0].transcript;
+                    setActiveMicId(null);
                     if (callback) callback(text);
                 };
                 recognition.onerror = function(event) {
-                    console.warn('Spracheingabe Fehler:', event.error);
+                    setActiveMicId(null);
+                    if (event.error === 'not-allowed') {
+                        alert('Mikrofon-Zugriff verweigert. Bitte in den Browser-Einstellungen erlauben.');
+                    } else if (event.error === 'no-speech') {
+                        // Kein Text erkannt — stille Behandlung
+                    } else {
+                        console.warn('Spracheingabe Fehler:', event.error);
+                    }
                 };
-                recognition.start();
+                recognition.onend = function() {
+                    setActiveMicId(null);
+                };
+                try {
+                    recognition.start();
+                } catch(e) {
+                    setActiveMicId(null);
+                    console.warn('Spracheingabe konnte nicht gestartet werden:', e);
+                }
+            };
+            // Mikrofon-Button Style-Helper
+            var micBtnStyle = function(micId, isCompact) {
+                var isActive = activeMicId === micId;
+                var base = {
+                    padding: isCompact ? '4px 8px' : '8px 12px',
+                    borderRadius: isCompact ? '6px' : '8px',
+                    border: isActive ? '2px solid #e74c3c' : '1px solid var(--border-color)',
+                    background: isActive ? 'rgba(231,76,60,0.15)' : 'var(--bg-tertiary)',
+                    cursor: 'pointer',
+                    fontSize: isCompact ? '16px' : '18px',
+                    flexShrink: 0,
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: isCompact ? '32px' : '40px',
+                    minHeight: isCompact ? '32px' : '40px'
+                };
+                if (isActive) {
+                    base.animation = 'micPulse 1s ease-in-out infinite';
+                    base.boxShadow = '0 0 8px rgba(231,76,60,0.4)';
+                }
+                return base;
             };
 
             // ── Zahl-Input: type=text, beim Focus leeren wenn 0, beim Blur formatieren ──
@@ -126,8 +177,8 @@
                                     <div style={{display:'flex', gap:'4px'}}>
                                         <input value={stammFelder[f[0]] || ''} readOnly={!editMode} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={inputStyle({flex:1})} />
                                         {editMode && (
-                                            <button {...tap(function(){ startSpeech(function(text){ updateStammFeld(f[0], (stammFelder[f[0]] || '') + (stammFelder[f[0]] ? ' ' : '') + text); }); })}
-                                                style={Object.assign({padding:'6px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'14px', flexShrink:0}, touchBase)}>{'\uD83C\uDF99'}</button>
+                                            <button {...tap(function(){ startSpeech(function(text){ updateStammFeld(f[0], (stammFelder[f[0]] || '') + (stammFelder[f[0]] ? ' ' : '') + text); }, 'stamm_' + f[0]); })}
+                                                style={Object.assign(micBtnStyle('stamm_' + f[0], false), touchBase)}>{activeMicId === ('stamm_' + f[0]) ? '\uD83D\uDD34' : '\uD83C\uDFA4'}</button>
                                         )}
                                     </div>
                                 </div>
@@ -186,7 +237,7 @@
                                             {editMode ? (
                                                 <div style={{display:'flex', gap:'2px'}}>
                                                     <input value={p.bez} onChange={function(e){updatePosition(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
-                                                    <button {...tap(function(){ startSpeech(function(text){ updatePosition(idx, 'bez', (p.bez ? p.bez + ' ' : '') + text); }); })} style={Object.assign({padding:'2px 5px', borderRadius:'4px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'11px', flexShrink:0}, touchBase)}>{'\uD83C\uDF99'}</button>
+                                                    <button {...tap(function(){ startSpeech(function(text){ updatePosition(idx, 'bez', (p.bez ? p.bez + ' ' : '') + text); }, 'pos_' + idx); })} style={Object.assign(micBtnStyle('pos_' + idx, true), touchBase)}>{activeMicId === ('pos_' + idx) ? '\uD83D\uDD34' : '\uD83C\uDFA4'}</button>
                                                 </div>
                                             ) : <div style={{fontSize:'11px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.bez}>{p.bez}</div>}
                                             {editMode ? zahlInput(p.einzelpreis, function(v){updatePosition(idx,'einzelpreis',v);}) : <div style={{textAlign:'right', fontSize:'11px', fontFamily:'monospace'}}>{fmtEuro(p.einzelpreis)}</div>}
@@ -219,7 +270,7 @@
                                         {editMode ? (
                                             <div style={{display:'flex', gap:'2px'}}>
                                                 <input value={r.bez} onChange={function(e){updateRaum(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
-                                                <button {...tap(function(){ startSpeech(function(text){ updateRaum(idx, 'bez', (r.bez ? r.bez + ' ' : '') + text); }); })} style={Object.assign({padding:'2px 5px', borderRadius:'4px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', fontSize:'11px', flexShrink:0}, touchBase)}>{'\uD83C\uDF99'}</button>
+                                                <button {...tap(function(){ startSpeech(function(text){ updateRaum(idx, 'bez', (r.bez ? r.bez + ' ' : '') + text); }, 'raum_' + idx); })} style={Object.assign(micBtnStyle('raum_' + idx, true), touchBase)}>{activeMicId === ('raum_' + idx) ? '\uD83D\uDD34' : '\uD83C\uDFA4'}</button>
                                             </div>
                                         ) : <div style={{fontSize:'11px'}}>{r.bez}</div>}
                                         {editMode ? cellEdit(r.geschoss, function(e){updateRaum(idx,'geschoss',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{r.geschoss}</div>}
