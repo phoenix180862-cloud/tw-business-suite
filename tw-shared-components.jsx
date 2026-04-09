@@ -697,114 +697,196 @@
             var [breadcrumb, setBreadcrumb] = useState([]);
             var [openFileUrl, setOpenFileUrl] = useState(null);
             var [openFileName, setOpenFileName] = useState('');
-            var [syncStatus, setSyncStatus] = useState(null);
             var [error, setError] = useState(null);
             var [appOrdner, setAppOrdner] = useState({});
+            var [syncProgress, setSyncProgress] = useState(null);
+            var [liveMode, setLiveMode] = useState(false);
+            var [liveFolders, setLiveFolders] = useState([]);
+            var [liveFiles, setLiveFiles] = useState([]);
+            var [storageInfo, setStorageInfo] = useState(null);
 
             var kundeId = kunde ? (kunde._driveFolderId || kunde.id || kunde.name) : null;
+            var driveFolderId = kunde ? (kunde._driveFolderId || kunde.id) : null;
             var kundeName = kunde ? (kunde.name || kunde.auftraggeber || 'Kunde') : 'Kunde';
 
-            // Ordnerstruktur + App-Dateien laden — falls leer: automatisch von Drive syncen
-            var [syncProgress, setSyncProgress] = useState(null);
-
+            // Daten laden: Erst IndexedDB, dann Live-Drive-Fallback
             useEffect(function() {
-                if (!kundeId) {
-                    setLoading(false);
-                    setError('Kein Kunde ausgew\u00e4hlt.');
-                    return;
-                }
+                if (!kundeId) { setLoading(false); setError('Kein Kunde.'); return; }
                 var cancelled = false;
 
-                function doLoad() {
-                    if (!window.TWStorage || !window.TWStorage.isReady()) return;
-                    clearInterval(retryTimer);
-                    setLoading(true);
-                    setError(null);
+                async function load() {
+                    setLoading(true); setError(null);
 
-                    Promise.all([
-                        TWStorage.OfflineBrowser.getFullTree(kundeId),
-                        TWStorage.DriveSync.getSyncStatus(kundeId),
-                        TWStorage.getAppDateienByOrdner(kundeId)
-                    ]).then(function(results) {
-                        if (cancelled) return;
-                        var driveTree = results[0] || [];
-                        var status = results[1];
-                        var appFiles = results[2] || {};
+                    // 1. Versuche IndexedDB
+                    var offlineTree = [];
+                    var appFiles = {};
+                    if (window.TWStorage && window.TWStorage.isReady()) {
+                        try {
+                            offlineTree = await TWStorage.OfflineBrowser.getFullTree(kundeId) || [];
+                            appFiles = await TWStorage.getAppDateienByOrdner(kundeId) || {};
+                            var sInfo = await TWStorage.getKundeStorageSize(kundeId);
+                            if (!cancelled) setStorageInfo(sInfo);
+                        } catch(e) { console.warn('[OrdnerBrowser] DB-Fehler:', e); }
+                    }
+                    if (cancelled) return;
+                    setAppOrdner(appFiles);
 
-                        setTree(driveTree);
-                        setSyncStatus(status);
-                        setAppOrdner(appFiles);
-
-                        var hasDrive = driveTree.length > 0;
-                        var hasApp = Object.keys(appFiles).length > 0;
-
-                        if (!hasDrive && !hasApp) {
-                            // Keine Offline-Daten — automatisch von Drive laden
-                            var driveFolderId = kunde ? (kunde._driveFolderId || kunde.id) : null;
-                            var driveService = window.GoogleDriveService;
-
-                            if (driveFolderId && driveService && driveService.accessToken) {
-                                setError(null);
-                                setSyncProgress('Ordnerstruktur wird von Google Drive geladen...');
-
-                                TWStorage.DriveSync.syncKundenOrdner(kundeId, driveFolderId, function(info) {
-                                    if (cancelled) return;
-                                    setSyncProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
-                                }).then(function() {
-                                    if (cancelled) return;
-                                    setSyncProgress(null);
-                                    return Promise.all([
-                                        TWStorage.OfflineBrowser.getFullTree(kundeId),
-                                        TWStorage.DriveSync.getSyncStatus(kundeId),
-                                        TWStorage.getAppDateienByOrdner(kundeId)
-                                    ]);
-                                }).then(function(r2) {
-                                    if (cancelled || !r2) return;
-                                    setTree(r2[0] || []);
-                                    setSyncStatus(r2[1]);
-                                    setAppOrdner(r2[2] || {});
-                                    setLoading(false);
-                                    if ((!r2[0] || r2[0].length === 0) && (!r2[2] || Object.keys(r2[2]).length === 0)) {
-                                        setError('Keine Ordner gefunden. Der Kundenordner ist m\u00f6glicherweise leer.');
-                                    }
-                                }).catch(function(e) {
-                                    if (cancelled) return;
-                                    setSyncProgress(null);
-                                    setError('Sync-Fehler: ' + e.message);
-                                    setLoading(false);
-                                });
-                            } else {
-                                setLoading(false);
-                                setError('Keine Offline-Daten. Bitte Google Drive verbinden und "Komplette Daten laden" verwenden.');
-                            }
-                        } else {
-                            setLoading(false);
-                        }
-                    }).catch(function(e) {
-                        if (cancelled) return;
-                        setError('Fehler: ' + e.message);
+                    if (offlineTree.length > 0) {
+                        setTree(offlineTree);
+                        setLiveMode(false);
                         setLoading(false);
-                    });
+                        console.log('[OrdnerBrowser] Offline:', offlineTree.length, 'Ordner');
+                        return;
+                    }
+
+                    // 2. Fallback: LIVE von Drive laden (sofort sichtbar)
+                    var service = window.GoogleDriveService;
+                    if (driveFolderId && service && service.accessToken) {
+                        try {
+                            console.log('[OrdnerBrowser] Kein Cache, lade LIVE von Drive...');
+                            var contents = await service.listFolderContents(driveFolderId);
+                            if (cancelled) return;
+                            setLiveMode(true);
+                            setLiveFolders(contents.folders || []);
+                            setLiveFiles(contents.files || []);
+                            setLoading(false);
+
+                            // Hintergrund-Sync starten
+                            if (window.TWStorage && window.TWStorage.DriveSync) {
+                                setSyncProgress('Speichere fuer Offline-Zugriff...');
+                                TWStorage.DriveSync.syncKundenOrdner(kundeId, driveFolderId, function(info) {
+                                    if (!cancelled) setSyncProgress(info.message);
+                                }).then(function(res) {
+                                    if (cancelled) return;
+                                    setSyncProgress(null);
+                                    // Baum aus DB nachladen
+                                    return TWStorage.OfflineBrowser.getFullTree(kundeId);
+                                }).then(function(ft) {
+                                    if (cancelled || !ft || ft.length === 0) return;
+                                    setTree(ft);
+                                    setLiveMode(false);
+                                }).catch(function(e) {
+                                    if (!cancelled) setSyncProgress(null);
+                                    console.warn('[OrdnerBrowser] Hintergrund-Sync:', e.message);
+                                });
+                            }
+                        } catch(e) {
+                            if (!cancelled) { setError('Drive-Fehler: ' + e.message); setLoading(false); }
+                        }
+                    } else {
+                        setLoading(false);
+                        setError('Keine Offline-Daten und kein Drive-Zugang.');
+                    }
                 }
 
-                var retryTimer = setInterval(doLoad, 500);
-                doLoad();
-                var timeout = setTimeout(function() { clearInterval(retryTimer); }, 10000);
-                return function() { cancelled = true; clearInterval(retryTimer); clearTimeout(timeout); };
+                load();
+                return function() { cancelled = true; };
             }, [kundeId]);
 
-            // Datei oeffnen (Drive-Datei oder App-Datei)
-            var handleOpenFile = function(dateiId, fileName, isAppFile) {
-                var openFn = isAppFile ? TWStorage.openAppDatei : TWStorage.OfflineBrowser.openFile;
-                openFn(dateiId).then(function(result) {
-                    if (result && result.url) {
-                        setOpenFileUrl(result.url);
-                        setOpenFileName(fileName);
-                    } else {
-                        alert('Datei konnte nicht ge\u00f6ffnet werden.');
+            // Datei oeffnen
+            var handleOpenFile = function(dateiId, fileName, isAppFile, liveDriveFileId) {
+                if (liveDriveFileId) {
+                    // Live von Drive herunterladen
+                    var svc = window.GoogleDriveService;
+                    if (svc && svc.accessToken) {
+                        svc.downloadFile(liveDriveFileId).then(function(blob) {
+                            if (blob) { setOpenFileUrl(URL.createObjectURL(blob)); setOpenFileName(fileName); }
+                        }).catch(function(e) { alert('Fehler: ' + e.message); });
                     }
+                    return;
+                }
+                var openFn = isAppFile
+                    ? (window.TWStorage ? TWStorage.openAppDatei : null)
+                    : (window.TWStorage ? TWStorage.OfflineBrowser.openFile : null);
+                if (!openFn) { alert('Speicher nicht bereit.'); return; }
+                openFn(dateiId).then(function(result) {
+                    if (result && result.url) { setOpenFileUrl(result.url); setOpenFileName(fileName); }
+                    else { alert('Datei nicht verf\u00fcgbar.'); }
                 });
             };
+
+            // Ordner-Navigation
+            var navigateToFolder = function(folder) {
+                setBreadcrumb(function(prev) { return prev.concat([{ id: folder.id, name: folder.name }]); });
+                setCurrentFolder(folder);
+                if (liveMode && folder.id && !folder._isAppOrdner) {
+                    var svc = window.GoogleDriveService;
+                    if (svc && svc.accessToken) {
+                        setLoading(true);
+                        svc.listFolderContents(folder.id).then(function(c) {
+                            setLiveFolders(c.folders || []); setLiveFiles(c.files || []); setLoading(false);
+                        }).catch(function(e) { setError(e.message); setLoading(false); });
+                    }
+                }
+            };
+            var navigateUp = function() {
+                setBreadcrumb(function(prev) {
+                    if (prev.length <= 1) {
+                        setCurrentFolder(null);
+                        if (liveMode && driveFolderId) {
+                            var svc = window.GoogleDriveService;
+                            if (svc && svc.accessToken) {
+                                setLoading(true);
+                                svc.listFolderContents(driveFolderId).then(function(c) {
+                                    setLiveFolders(c.folders || []); setLiveFiles(c.files || []); setLoading(false);
+                                }).catch(function() { setLoading(false); });
+                            }
+                        }
+                        return [];
+                    }
+                    var nc = prev.slice(0, -1);
+                    if (!liveMode) { var t = findFolderInTree(tree, nc[nc.length-1].id); setCurrentFolder(t); }
+                    return nc;
+                });
+            };
+            var navigateRoot = function() { setCurrentFolder(null); setBreadcrumb([]); };
+
+            function findFolderInTree(nodes, fid) {
+                if (!nodes) return null;
+                for (var i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id === fid) return nodes[i];
+                    var f = findFolderInTree(nodes[i].subfolders, fid);
+                    if (f) return f;
+                }
+                return null;
+            }
+
+            var fileIcon = function(t) {
+                return t === 'pdf' ? '\uD83D\uDCC4' : t === 'xlsx' || t === 'xls' ? '\uD83D\uDCCA'
+                    : t === 'doc' || t === 'docx' ? '\uD83D\uDDD2' : t === 'gdoc' ? '\uD83D\uDCC3'
+                    : t === 'gsheet' ? '\uD83D\uDCCA' : t === 'img' ? '\uD83D\uDDBC' : '\uD83D\uDCC1';
+            };
+            var formatBytes = function(b) {
+                if (!b || b === 0) return '-';
+                return b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(1)+' MB';
+            };
+
+            // Angezeigte Daten bestimmen
+            var displayFolders, displayFiles;
+            if (liveMode) {
+                displayFolders = currentFolder ? (liveFolders || []) : (liveFolders || []);
+                displayFiles = currentFolder ? (liveFiles || []) : (liveFiles || []);
+            } else {
+                displayFolders = currentFolder ? (currentFolder.subfolders || []) : (tree || []);
+                displayFiles = currentFolder ? (currentFolder.files || []) : [];
+            }
+
+            var appOrdnerNames = Object.keys(appOrdner);
+            var isInAppOrdner = currentFolder && currentFolder._isAppOrdner;
+            var currentAppFiles = isInAppOrdner ? (appOrdner[currentFolder.name] || []) : [];
+            var appVirtualFolders = [];
+            if (!currentFolder) {
+                appOrdnerNames.forEach(function(n) {
+                    if (!displayFolders.some(function(f) { return f.name === n; })) {
+                        appVirtualFolders.push({ id: 'app_'+n, name: n, _isAppOrdner: true, files: appOrdner[n]||[], subfolders: [] });
+                    }
+                });
+            }
+            if (currentFolder && !isInAppOrdner && appOrdner[currentFolder.name]) {
+                displayFiles = displayFiles.concat(appOrdner[currentFolder.name]);
+            }
+
+            var touchBtn = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
 
             // In Ordner navigieren
             var navigateToFolder = function(folder) {
@@ -906,15 +988,15 @@
                             ←
                         </button>
                         <div style={{flex:1}}>
-                            <div style={{fontSize:'18px', fontWeight:'700', color:'var(--text-primary)'}}>
-                                📁 Ordner: {kundeName.split(' – ')[0]}
+                            <div style={{fontSize:'18px', fontWeight:'700', color:'var(--text-primary)', display:'flex', alignItems:'center', gap:'8px'}}>
+                                \uD83D\uDCC1 Ordner: {kundeName.split(' \u2013 ')[0]}
+                                <span style={{fontSize:'10px', padding:'2px 8px', borderRadius:'6px', background: liveMode ? 'rgba(230,126,34,0.15)' : 'rgba(39,174,96,0.15)', color: liveMode ? '#e67e22' : '#27ae60', fontWeight:'700'}}>
+                                    {liveMode ? '\u26A1 LIVE' : '\u2705 OFFLINE'}
+                                </span>
                             </div>
-                            {syncStatus && syncStatus.storage && (
-                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
-                                    {syncStatus.storage.fileCount} Dateien · {syncStatus.storage.totalMB} MB gespeichert
-                                    {syncStatus.lastSync && (' · Sync: ' + new Date(syncStatus.lastSync).toLocaleString('de-DE'))}
-                                </div>
-                            )}
+                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                {storageInfo ? (storageInfo.fileCount + ' Dateien \u00B7 ' + storageInfo.totalMB + ' MB gespeichert') : (liveMode ? 'Daten werden direkt von Google Drive geladen' : '')}
+                            </div>
                         </div>
                     </div>
 
@@ -961,18 +1043,21 @@
                         </button>
                     )}
 
-                    {/* Loading / Sync-Fortschritt */}
-                    {(loading || syncProgress) && (
+                    {/* Loading / Sync-Fortschritt (nur wenn noch keine Daten sichtbar) */}
+                    {loading && displayFolders.length === 0 && displayFiles.length === 0 && appVirtualFolders.length === 0 && (
                         <div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)'}}>
-                            <div style={{fontSize:'36px', marginBottom:'12px', animation:'spin 1.5s linear infinite'}}>&#x1F504;</div>
+                            <div style={{fontSize:'36px', marginBottom:'12px'}}>&#x1F504;</div>
                             <div style={{fontSize:'14px', fontWeight:'600', marginBottom:'8px'}}>
-                                {syncProgress ? 'Daten werden von Google Drive geladen...' : 'Ordnerstruktur wird geladen...'}
+                                Ordner werden geladen...
                             </div>
-                            {syncProgress && (
-                                <div style={{fontSize:'12px', color:'var(--accent-blue)', padding:'8px 16px', borderRadius:'8px', background:'rgba(30,136,229,0.1)', display:'inline-block', maxWidth:'90%', wordBreak:'break-word'}}>
-                                    {syncProgress}
-                                </div>
-                            )}
+                        </div>
+                    )}
+
+                    {/* Sync-Fortschritt als dezente Info-Leiste (wenn Daten schon sichtbar) */}
+                    {syncProgress && !loading && (
+                        <div style={{fontSize:'11px', color:'var(--accent-blue)', padding:'8px 12px', borderRadius:'8px', background:'rgba(30,136,229,0.08)', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
+                            <span style={{animation:'spin 1s linear infinite', display:'inline-block'}}>&#x1F504;</span>
+                            {syncProgress}
                         </div>
                     )}
 
@@ -1048,8 +1133,9 @@
                             <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
                                 {displayFiles.map(function(datei) {
                                     var isApp = datei.isAppCreated;
+                                    var liveId = liveMode ? (datei.id || datei.driveId) : null;
                                     return (
-                                        <button key={datei.id} onClick={function() { handleOpenFile(datei.id, datei.name, isApp); }}
+                                        <button key={datei.id || datei.name} onClick={function() { handleOpenFile(datei.id, datei.name, isApp, liveId); }}
                                             style={{...touchBtn, display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px', borderRadius:'10px', border: isApp ? '1px solid rgba(39,174,96,0.25)' : '1px solid var(--border-color)', background: isApp ? 'rgba(39,174,96,0.06)' : 'var(--bg-tertiary)', cursor:'pointer', textAlign:'left'}}>
                                             <span style={{fontSize:'22px'}}>{fileIcon(datei.fileType)}</span>
                                             <div style={{flex:1, minWidth:0}}>

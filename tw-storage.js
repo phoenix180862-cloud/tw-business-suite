@@ -379,6 +379,8 @@
     // DRIVE-SYNC ENGINE
     // ================================================================
     var _syncInProgress = {};
+    var PARALLEL_DOWNLOADS = 4;  // Gleichzeitige Downloads (Google API vertraegt 4-6)
+    var PARALLEL_FOLDER_SCANS = 3;  // Gleichzeitige Ordner-Scans
 
     var DriveSync = {
         syncKundenOrdner: async function(kundeId, driveFolderId, onProgress) {
@@ -410,26 +412,32 @@
             };
 
             try {
-                notify('Ordnerstruktur wird geladen...', 'scan');
+                notify('Ordnerstruktur wird gescannt...', 'scan');
 
-                // 1. Komplette Ordnerstruktur scannen (rekursiv)
-                var structure = await this._scanFolderRecursive(service, driveFolderId, kundeId, '/', null);
+                // 1. TURBO-SCAN: Paralleler rekursiver Ordner-Scan
+                var structure = await this._scanFolderParallel(service, driveFolderId, kundeId, '/', null);
                 stats.ordnerGesamt = structure.allFolders.length;
                 stats.dateienGesamt = structure.allFiles.length;
-                notify('Gefunden: ' + stats.ordnerGesamt + ' Ordner, ' + stats.dateienGesamt + ' Dateien', 'scan');
+                notify(stats.ordnerGesamt + ' Ordner, ' + stats.dateienGesamt + ' Dateien gefunden', 'scan');
 
-                // 2. Ordnerstruktur speichern
-                for (var oi = 0; oi < structure.allFolders.length; oi++) {
-                    await saveOrdnerStruktur(kundeId, structure.allFolders[oi]);
-                    stats.ordnerSynced++;
+                // 2. Ordnerstruktur speichern (parallel in Batches)
+                var folderBatches = this._createBatches(structure.allFolders, 10);
+                for (var bi = 0; bi < folderBatches.length; bi++) {
+                    await Promise.all(folderBatches[bi].map(function(f) {
+                        return saveOrdnerStruktur(kundeId, f);
+                    }));
+                    stats.ordnerSynced += folderBatches[bi].length;
                 }
-                notify('Ordnerstruktur gespeichert. Lade Dateien...', 'download');
+                notify('Ordner gespeichert. Filtere Dateien...', 'filter');
 
-                // 3. Speicher-Budget pruefen
+                // 3. Dateien filtern + Speicher-Budget pruefen
                 var currentSize = await getKundeStorageSize(kundeId);
                 var remainingBytes = CONFIG.MAX_BYTES_PER_KUNDE - currentSize.totalBytes;
 
-                // 4. Dateien herunterladen
+                var downloadQueue = [];
+                var skipChecks = [];
+
+                // Vorab-Filter: Sync-wuerdige Dateien bestimmen
                 for (var fi = 0; fi < structure.allFiles.length; fi++) {
                     var fileInfo = structure.allFiles[fi];
                     var sizeBytes = fileInfo.sizeBytes || 0;
@@ -440,57 +448,81 @@
                     }
                     if (sizeBytes > 0 && sizeBytes > remainingBytes) {
                         stats.dateienSkipped++;
-                        stats.fehler.push({ file: fileInfo.name, error: 'Speicherlimit erreicht' });
+                        stats.fehler.push({ file: fileInfo.name, error: 'Speicherlimit' });
                         continue;
                     }
+                    skipChecks.push(fileInfo);
+                }
 
-                    // Pruefen ob bereits aktuell gecached
-                    var existingFile = await getItem('driveDateien', fileInfo.id);
-                    if (existingFile && existingFile.syncedAt && fileInfo.modifiedTime) {
-                        if (new Date(existingFile.syncedAt) >= new Date(fileInfo.modifiedTime)) {
-                            stats.dateienSkipped++;
-                            continue;
-                        }
-                    }
+                // Cache-Check parallel (existierende Dateien pruefen)
+                notify('Pruefe ' + skipChecks.length + ' Dateien auf Aktualitaet...', 'filter');
+                var cacheCheckBatches = this._createBatches(skipChecks, 20);
+                for (var ci = 0; ci < cacheCheckBatches.length; ci++) {
+                    var checkResults = await Promise.all(cacheCheckBatches[ci].map(function(fInfo) {
+                        return getItem('driveDateien', fInfo.id).then(function(existing) {
+                            if (existing && existing.syncedAt && fInfo.modifiedTime) {
+                                if (new Date(existing.syncedAt) >= new Date(fInfo.modifiedTime)) {
+                                    return { skip: true, file: fInfo };
+                                }
+                            }
+                            return { skip: false, file: fInfo };
+                        });
+                    }));
+                    checkResults.forEach(function(r) {
+                        if (r.skip) { stats.dateienSkipped++; }
+                        else { downloadQueue.push(r.file); }
+                    });
+                }
 
-                    notify((stats.dateienSynced + 1) + '/' + stats.dateienGesamt + ': ' + fileInfo.name, 'download');
+                notify(downloadQueue.length + ' Dateien werden heruntergeladen (' + PARALLEL_DOWNLOADS + 'x parallel)...', 'download');
 
-                    try {
-                        var blob = null;
-                        if (fileInfo.mimeType && CONFIG.GOOGLE_EXPORT_TYPES[fileInfo.mimeType]) {
-                            var exportInfo = CONFIG.GOOGLE_EXPORT_TYPES[fileInfo.mimeType];
-                            blob = await this._exportGoogleFile(service, fileInfo.driveId, exportInfo.exportAs);
-                            fileInfo.name = fileInfo.name + exportInfo.ext;
-                            fileInfo.mimeType = exportInfo.exportAs;
-                        } else {
-                            blob = await service.downloadFile(fileInfo.driveId);
-                        }
-                        if (blob) {
-                            await saveDatei(kundeId, fileInfo.ordnerId, fileInfo, blob);
-                            var blobSize = blob.size || 0;
-                            stats.bytesGesamt += blobSize;
-                            remainingBytes -= blobSize;
+                // 4. TURBO-DOWNLOAD: Parallele Downloads in Batches
+                var self = this;
+                var dlBatches = this._createBatches(downloadQueue, PARALLEL_DOWNLOADS);
+
+                for (var dbi = 0; dbi < dlBatches.length; dbi++) {
+                    var batch = dlBatches[dbi];
+                    var batchNum = dbi + 1;
+                    var totalBatches = dlBatches.length;
+
+                    notify('Batch ' + batchNum + '/' + totalBatches + ' (' + batch.map(function(f){return f.name;}).join(', ').substring(0,60) + '...)', 'download');
+
+                    var batchResults = await Promise.allSettled(batch.map(function(fInfo) {
+                        return self._downloadAndSave(service, kundeId, fInfo);
+                    }));
+
+                    // Ergebnisse auswerten
+                    batchResults.forEach(function(result, idx) {
+                        if (result.status === 'fulfilled' && result.value) {
                             stats.dateienSynced++;
+                            stats.bytesGesamt += result.value.size || 0;
+                            remainingBytes -= result.value.size || 0;
+                        } else {
+                            stats.dateienSkipped++;
+                            var errMsg = result.reason ? result.reason.message : 'Unbekannter Fehler';
+                            stats.fehler.push({ file: batch[idx].name, error: errMsg });
                         }
-                    } catch(dlErr) {
-                        stats.fehler.push({ file: fileInfo.name, error: dlErr.message });
-                        stats.dateienSkipped++;
-                        console.warn('[DriveSync] Download-Fehler:', fileInfo.name, dlErr);
-                    }
+                    });
+
+                    // Fortschritt nach jedem Batch
+                    notify(stats.dateienSynced + ' von ' + downloadQueue.length + ' geladen (' +
+                        Math.round(stats.bytesGesamt / 1024 / 1024 * 10) / 10 + ' MB)', 'download');
                 }
 
                 // 5. Sync-Meta speichern
+                var durationMs = Date.now() - stats.startTime;
                 await putItem('meta', {
                     key: 'sync_' + kundeId,
-                    value: { kundeId: kundeId, driveFolderId: driveFolderId, syncedAt: new Date().toISOString(), stats: stats, durationMs: Date.now() - stats.startTime },
+                    value: { kundeId: kundeId, driveFolderId: driveFolderId, syncedAt: new Date().toISOString(), stats: stats, durationMs: durationMs },
                     updatedAt: new Date().toISOString()
                 });
 
-                notify('Sync abgeschlossen! ' + stats.dateienSynced + ' Dateien (' +
-                    Math.round(stats.bytesGesamt / 1024 / 1024 * 10) / 10 + ' MB)', 'done');
+                var durationSec = Math.round(durationMs / 1000);
+                notify('Fertig! ' + stats.dateienSynced + ' Dateien (' +
+                    Math.round(stats.bytesGesamt / 1024 / 1024 * 10) / 10 + ' MB) in ' + durationSec + 's', 'done');
 
                 _syncInProgress[kundeId] = false;
-                return { status: 'ok', stats: stats };
+                return { status: 'ok', stats: stats, durationMs: durationMs };
             } catch(err) {
                 _syncInProgress[kundeId] = false;
                 console.error('[DriveSync] Fehler:', err);
@@ -498,7 +530,26 @@
             }
         },
 
-        _scanFolderRecursive: async function(service, folderId, kundeId, path, parentId) {
+        // Einzelne Datei herunterladen und speichern (fuer parallele Ausfuehrung)
+        _downloadAndSave: async function(service, kundeId, fileInfo) {
+            var blob = null;
+            if (fileInfo.mimeType && CONFIG.GOOGLE_EXPORT_TYPES[fileInfo.mimeType]) {
+                var exportInfo = CONFIG.GOOGLE_EXPORT_TYPES[fileInfo.mimeType];
+                blob = await this._exportGoogleFile(service, fileInfo.driveId, exportInfo.exportAs);
+                fileInfo.name = fileInfo.name + exportInfo.ext;
+                fileInfo.mimeType = exportInfo.exportAs;
+            } else {
+                blob = await service.downloadFile(fileInfo.driveId);
+            }
+            if (blob) {
+                await saveDatei(kundeId, fileInfo.ordnerId, fileInfo, blob);
+                return { size: blob.size || 0 };
+            }
+            return { size: 0 };
+        },
+
+        // Paralleler Ordner-Scanner (scannt Unterordner gleichzeitig)
+        _scanFolderParallel: async function(service, folderId, kundeId, path, parentId) {
             var allFolders = [];
             var allFiles = [];
             var query = "'" + folderId + "' in parents and trashed=false";
@@ -507,6 +558,7 @@
             var data = await service._fetchJSON(url);
             var items = data.files || [];
 
+            var subFolders = [];
             for (var i = 0; i < items.length; i++) {
                 var item = items[i];
                 if (item.mimeType === 'application/vnd.google-apps.folder') {
@@ -515,10 +567,7 @@
                         parentId: parentId || kundeId, path: path + item.name + '/', fileCount: 0
                     };
                     allFolders.push(folderRecord);
-                    var subResult = await this._scanFolderRecursive(service, item.id, kundeId, path + item.name + '/', item.id);
-                    allFolders = allFolders.concat(subResult.allFolders);
-                    allFiles = allFiles.concat(subResult.allFiles);
-                    folderRecord.fileCount = subResult.allFiles.length;
+                    subFolders.push({ record: folderRecord, driveId: item.id, path: path + item.name + '/' });
                 } else {
                     allFiles.push({
                         id: kundeId + '_' + (parentId || folderId) + '_' + item.name,
@@ -531,7 +580,33 @@
                     });
                 }
             }
+
+            // Unterordner PARALLEL scannen (in Batches von PARALLEL_FOLDER_SCANS)
+            if (subFolders.length > 0) {
+                var self = this;
+                var folderBatches = this._createBatches(subFolders, PARALLEL_FOLDER_SCANS);
+                for (var bi = 0; bi < folderBatches.length; bi++) {
+                    var batchResults = await Promise.all(folderBatches[bi].map(function(sf) {
+                        return self._scanFolderParallel(service, sf.driveId, kundeId, sf.path, sf.record.id);
+                    }));
+                    batchResults.forEach(function(subResult, idx) {
+                        allFolders = allFolders.concat(subResult.allFolders);
+                        allFiles = allFiles.concat(subResult.allFiles);
+                        folderBatches[bi][idx].record.fileCount = subResult.allFiles.length;
+                    });
+                }
+            }
+
             return { allFolders: allFolders, allFiles: allFiles };
+        },
+
+        // Helper: Array in Batches aufteilen
+        _createBatches: function(arr, batchSize) {
+            var batches = [];
+            for (var i = 0; i < arr.length; i += batchSize) {
+                batches.push(arr.slice(i, i + batchSize));
+            }
+            return batches;
         },
 
         _exportGoogleFile: async function(service, fileId, exportMimeType) {
