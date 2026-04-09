@@ -1,11 +1,12 @@
-        function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta }) {
+        function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta, onDatenBearbeiten, onOrdnerBrowser }) {
             const module = [
-                { id: 'aufmass', icon: '📐', name: 'Aufmaß', desc: 'VOB-konforme Aufmaß-Erfassung', color: '#1E88E5', ready: true },
-                { id: 'rechnung', icon: '💶', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', color: '#27ae60', ready: true },
-                { id: 'ausgangsbuch', icon: '📒', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', color: '#e67e22', ready: true },
-                { id: 'schriftverkehr', icon: '✉️', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', color: '#8e44ad', ready: true },
-                { id: 'baustelle', icon: '📱', name: 'Baustellen-App', desc: 'Admin-Panel für Mitarbeiter', color: '#e74c3c', ready: true },
+                { id: 'aufmass', icon: '\uD83D\uDCCF', name: 'Aufma\u00DF', desc: 'VOB-konforme Aufma\u00DF-Erfassung', color: '#1E88E5', ready: true },
+                { id: 'rechnung', icon: '\uD83D\uDCB6', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', color: '#27ae60', ready: true },
+                { id: 'ausgangsbuch', icon: '\uD83D\uDCD2', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', color: '#e67e22', ready: true },
+                { id: 'schriftverkehr', icon: '\u2709\uFE0F', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', color: '#8e44ad', ready: true },
+                { id: 'baustelle', icon: '\uD83D\uDCF1', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', color: '#e74c3c', ready: true },
             ];
+            var touchBtn = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
             return (
                 <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
                     <div style={{textAlign:'center', marginBottom:'20px'}}>
@@ -14,8 +15,22 @@
                             {kunde ? kunde.name : 'Kunde'}
                         </div>
                         <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'1.5px', textTransform:'uppercase'}}>
-                            Modul wählen
+                            Modul w\u00e4hlen
                         </div>
+                    </div>
+
+                    {/* Schnellzugriff: Kundendaten / Ordner */}
+                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                        {onDatenBearbeiten && (
+                            <button onClick={onDatenBearbeiten} style={{...touchBtn, flex:1, padding:'10px 8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-secondary)', fontSize:'12px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px'}}>
+                                <span>\uD83D\uDCCB</span> Kundendaten
+                            </button>
+                        )}
+                        {onOrdnerBrowser && (
+                            <button onClick={onOrdnerBrowser} style={{...touchBtn, flex:1, padding:'10px 8px', borderRadius:'10px', border:'1px solid rgba(41,128,185,0.3)', background:'rgba(41,128,185,0.1)', color:'#2980b9', fontSize:'12px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px'}}>
+                                <span>\uD83D\uDCC1</span> Ordner / Dokumente
+                            </button>
+                        )}
                     </div>
 
                     {/* Modul-Kacheln */}

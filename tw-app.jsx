@@ -1,5 +1,5 @@
         function App() {
-            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail'
+            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser'
             const [page, setPage] = useState('start');
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
@@ -228,20 +228,54 @@
             const navigateTo = useCallback((newPage) => {
                 setPage(newPage);
                 setHistory(prev => {
+                    // Duplikate am Ende vermeiden
+                    if (prev.length > 0 && prev[prev.length - 1] === newPage) return prev;
+                    // Neuen Eintrag anhaengen, alten Vorwaerts-Pfad abschneiden
                     const newHistory = [...prev.slice(0, historyIdx + 1), newPage];
                     setHistoryIdx(newHistory.length - 1);
                     return newHistory;
                 });
             }, [historyIdx]);
 
+            // ── Saubere Zurueck-Navigation mit definierten Parent-Seiten ──
+            const PAGE_PARENTS = {
+                'start': null,
+                'kundenModus': 'start',
+                'auswahl': 'kundenModus',
+                'manuellEingabe': 'kundenModus',
+                'akte': 'auswahl',
+                'analyseConfig': 'auswahl',
+                'datenUebersicht': 'modulwahl',
+                'geladen': 'auswahl',
+                'modulwahl': 'kundenModus',
+                'ordnerBrowser': 'modulwahl',
+                'ordnerAnalyse': 'modulwahl',
+                'ordnerAnalyseDetail': 'ordnerAnalyse',
+                'raumerkennung': 'modulwahl',
+                'raumblatt': 'raumerkennung',
+                'rechnung': 'modulwahl',
+                'ausgangsbuch': 'modulwahl',
+                'schriftverkehr': 'modulwahl',
+                'baustelle': 'modulwahl',
+            };
+
             // Globale Navigation für Module (z.B. Gesamtliste → Modulwahl)
             window._navigateToModulwahl = () => navigateTo('modulwahl');
 
             const goBack = () => {
+                // 1. Versuche zuerst History
                 if (historyIdx > 0) {
                     const newIdx = historyIdx - 1;
                     setHistoryIdx(newIdx);
                     setPage(history[newIdx]);
+                    return;
+                }
+                // 2. Fallback: Parent-Map
+                var parent = PAGE_PARENTS[page];
+                if (parent) {
+                    setPage(parent);
+                    setHistory([parent]);
+                    setHistoryIdx(0);
                 }
             };
 
@@ -267,7 +301,7 @@
                 navigateTo('kundenModus');
             };
 
-            // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell ──
+            // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell / Komplett ──
             const handleSelectModus = async (modus) => {
                 setKundeMode(modus);
                 // Manuell: DIREKT zu den 3 Listen, KEINE Kundenauswahl
@@ -954,6 +988,47 @@
                     return;
                 }
 
+                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien fuer Offline) ═══
+                if (kundeMode === 'gespeichertKomplett') {
+                    setLoading(true);
+                    setLoadProgress('Lade komplette Ordnerstruktur...');
+                    navigateTo('akte');
+                    try {
+                        var kundeIdK = kunde._driveFolderId || kunde.id || kunde.name;
+                        
+                        // Kunde in State und Storage speichern
+                        var enrichedK = {
+                            ...kunde,
+                            auftraggeber: kunde.name,
+                            _driveFolderId: kunde.id,
+                        };
+                        setSelectedKunde(enrichedK);
+                        if (window.TWStorage && window.TWStorage.isReady()) {
+                            await TWStorage.saveKunde(enrichedK);
+                            TWStorage.saveAppState('lastKundeId', kundeIdK);
+                        }
+
+                        // DriveSync starten: Alle Ordner + Dateien herunterladen
+                        if (window.TWStorage && window.TWStorage.DriveSync && kunde.id) {
+                            var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeIdK, kunde.id, function(info) {
+                                setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
+                            });
+                            
+                            console.log('[DriveSync] Komplett-Sync fertig:', syncResult.stats);
+                            setLoadProgress('Sync abgeschlossen! ' + syncResult.stats.dateienSynced + ' Dateien geladen.');
+                        } else {
+                            setLoadProgress('TWStorage oder DriveSync nicht verfuegbar.');
+                        }
+                    } catch(err) {
+                        console.error('Komplett-Sync Fehler:', err);
+                        setLoadProgress('Fehler: ' + err.message);
+                    }
+                    setLoading(false);
+                    await new Promise(function(r){ setTimeout(r, 800); });
+                    navigateTo('ordnerBrowser');
+                    return;
+                }
+
                 // ═══ MODUS: MANUELL ANLEGEN ═══
                 if (kundeMode === 'manuell') {
                     // Kunde ausgewählt, jetzt manuelles Eingabeformular
@@ -1514,7 +1589,7 @@
                             onBack={function(){ navigateTo('auswahl'); }}
                         />;
                     case 'modulwahl':
-                        return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} />;
+                        return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} onOrdnerBrowser={function(){ navigateTo('ordnerBrowser'); }} />;
                     case 'datenUebersicht':
                         return <DatenUebersicht
                             kunde={selectedKunde}
@@ -1554,6 +1629,8 @@
                         return <SchriftverkehrModul kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
                     case 'baustelle':
                         return <BaustellenAppAdmin kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
+                    case 'ordnerBrowser':
+                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} />;
                     default:
                         return <Startseite onKundenauswahl={handleKundenauswahl} onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} onDriveStatusChange={function(status){ setDriveStatus(status); if(status === 'online') setIsDriveMode(true); }} />;
                 }

@@ -463,6 +463,18 @@
                     disabledHint: 'Ben\u00f6tigt Google Drive',
                 },
                 {
+                    id: 'gespeichertKomplett',
+                    icon: '\uD83D\uDCE5',
+                    title: 'Komplette Daten vom Kunden laden',
+                    desc: 'Alle Ordner und Dokumente (PDFs, Excel, Word, Zeichnungen) werden heruntergeladen. Ideal f\u00fcr Offline-Arbeit auf der Baustelle.',
+                    color: '#2980b9',
+                    gradient: 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
+                    shadow: 'rgba(41,128,185,0.35)',
+                    badge: 'OFFLINE',
+                    disabled: !(connections && connections.driveConnected),
+                    disabledHint: 'Ben\u00f6tigt Google Drive',
+                },
+                {
                     id: 'manuell',
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',

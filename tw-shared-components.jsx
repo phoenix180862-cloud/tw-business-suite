@@ -686,5 +686,282 @@
         window.MicInput = MicInput;
 
         /* ═══════════════════════════════════════════
+           ORDNER-BROWSER -- Offline-Dateien sichten
+           Zeigt die von Google Drive heruntergeladene
+           Ordnerstruktur mit allen Dokumenten
+           ═══════════════════════════════════════════ */
+        function OrdnerBrowser({ kunde, onBack, onGoToDaten }) {
+            var [tree, setTree] = useState(null);
+            var [loading, setLoading] = useState(true);
+            var [currentFolder, setCurrentFolder] = useState(null);
+            var [breadcrumb, setBreadcrumb] = useState([]);
+            var [openFileUrl, setOpenFileUrl] = useState(null);
+            var [openFileName, setOpenFileName] = useState('');
+            var [syncStatus, setSyncStatus] = useState(null);
+            var [error, setError] = useState(null);
+
+            var kundeId = kunde ? (kunde._driveFolderId || kunde.id || kunde.name) : null;
+            var kundeName = kunde ? (kunde.name || kunde.auftraggeber || 'Kunde') : 'Kunde';
+
+            // Ordnerstruktur laden
+            useEffect(function() {
+                if (!kundeId || !window.TWStorage || !window.TWStorage.isReady()) {
+                    setLoading(false);
+                    setError('Kein Kunde oder Speicher nicht bereit');
+                    return;
+                }
+                setLoading(true);
+                Promise.all([
+                    TWStorage.OfflineBrowser.getFullTree(kundeId),
+                    TWStorage.DriveSync.getSyncStatus(kundeId)
+                ]).then(function(results) {
+                    setTree(results[0]);
+                    setSyncStatus(results[1]);
+                    setLoading(false);
+                    if (!results[0] || results[0].length === 0) {
+                        setError('Keine Ordner gespeichert. Bitte zuerst "Komplette Daten laden" verwenden.');
+                    }
+                }).catch(function(e) {
+                    setError('Fehler: ' + e.message);
+                    setLoading(false);
+                });
+            }, [kundeId]);
+
+            // Datei oeffnen
+            var handleOpenFile = function(dateiId, fileName) {
+                TWStorage.OfflineBrowser.openFile(dateiId).then(function(result) {
+                    if (result && result.url) {
+                        setOpenFileUrl(result.url);
+                        setOpenFileName(fileName);
+                    } else {
+                        alert('Datei konnte nicht geoeffnet werden.');
+                    }
+                });
+            };
+
+            // In Ordner navigieren
+            var navigateToFolder = function(folder) {
+                setBreadcrumb(function(prev) { return prev.concat([{ id: folder.id, name: folder.name }]); });
+                setCurrentFolder(folder);
+            };
+
+            // Zurueck im Ordner-Baum
+            var navigateUp = function() {
+                setBreadcrumb(function(prev) {
+                    if (prev.length <= 1) {
+                        setCurrentFolder(null);
+                        return [];
+                    }
+                    var newCrumb = prev.slice(0, -1);
+                    // Ordner in Tree finden
+                    var target = findFolderInTree(tree, newCrumb[newCrumb.length - 1].id);
+                    setCurrentFolder(target);
+                    return newCrumb;
+                });
+            };
+
+            // Zur Wurzel
+            var navigateRoot = function() {
+                setCurrentFolder(null);
+                setBreadcrumb([]);
+            };
+
+            // Ordner im Baum finden (rekursiv)
+            function findFolderInTree(nodes, folderId) {
+                if (!nodes) return null;
+                for (var i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id === folderId) return nodes[i];
+                    var found = findFolderInTree(nodes[i].subfolders, folderId);
+                    if (found) return found;
+                }
+                return null;
+            }
+
+            // FileType Icon
+            var fileIcon = function(type) {
+                switch(type) {
+                    case 'pdf': return '\uD83D\uDCC4';
+                    case 'xlsx': case 'xls': return '\uD83D\uDCCA';
+                    case 'doc': case 'docx': return '\uD83D\uDDD2';
+                    case 'gdoc': return '\uD83D\uDCC3';
+                    case 'gsheet': return '\uD83D\uDCCA';
+                    default: return '\uD83D\uDCC1';
+                }
+            };
+
+            var formatBytes = function(bytes) {
+                if (!bytes || bytes === 0) return '-';
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+            };
+
+            // Aktuelle Ordner und Dateien
+            var displayFolders = currentFolder ? (currentFolder.subfolders || []) : (tree || []);
+            var displayFiles = currentFolder ? (currentFolder.files || []) : [];
+
+            var touchBtn = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
+
+            return (
+                <div style={{padding:'16px', minHeight:'100vh', background:'var(--bg-primary)'}}>
+                    {/* Header */}
+                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
+                        <button onClick={onBack} style={{...touchBtn, padding:'8px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600'}}>
+                            \u2190
+                        </button>
+                        <div style={{flex:1}}>
+                            <div style={{fontSize:'18px', fontWeight:'700', color:'var(--text-primary)'}}>
+                                \uD83D\uDCC1 Ordner: {kundeName.split(' \u2013 ')[0]}
+                            </div>
+                            {syncStatus && syncStatus.storage && (
+                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                    {syncStatus.storage.fileCount} Dateien \u00B7 {syncStatus.storage.totalMB} MB gespeichert
+                                    {syncStatus.lastSync && (' \u00B7 Sync: ' + new Date(syncStatus.lastSync).toLocaleString('de-DE'))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Wechsel-Buttons: Ordner / Kundendaten */}
+                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                        <button style={{...touchBtn, flex:1, padding:'10px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)', color:'#fff', fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 3px 10px rgba(41,128,185,0.3)'}}>
+                            \uD83D\uDCC1 Ordner-Ansicht
+                        </button>
+                        <button onClick={onGoToDaten} style={{...touchBtn, flex:1, padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-secondary)', fontSize:'13px', fontWeight:'700', cursor:'pointer'}}>
+                            \uD83D\uDCCB Kundendaten
+                        </button>
+                    </div>
+
+                    {/* Breadcrumb */}
+                    {breadcrumb.length > 0 && (
+                        <div style={{display:'flex', alignItems:'center', gap:'4px', marginBottom:'12px', flexWrap:'wrap'}}>
+                            <span onClick={navigateRoot} style={{...touchBtn, cursor:'pointer', fontSize:'12px', color:'var(--accent-blue)', fontWeight:'600'}}>\uD83C\uDFE0 Root</span>
+                            {breadcrumb.map(function(crumb, idx) {
+                                var isLast = idx === breadcrumb.length - 1;
+                                return (
+                                    <React.Fragment key={crumb.id}>
+                                        <span style={{color:'var(--text-muted)', fontSize:'11px'}}>\u203A</span>
+                                        <span
+                                            onClick={isLast ? undefined : function() {
+                                                var target = findFolderInTree(tree, crumb.id);
+                                                setCurrentFolder(target);
+                                                setBreadcrumb(function(prev) { return prev.slice(0, idx + 1); });
+                                            }}
+                                            style={{...touchBtn, cursor: isLast ? 'default' : 'pointer', fontSize:'12px', color: isLast ? 'var(--text-primary)' : 'var(--accent-blue)', fontWeight: isLast ? '700' : '600', maxWidth:'120px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}
+                                        >
+                                            {crumb.name}
+                                        </span>
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Zurueck-Button im Ordner */}
+                    {currentFolder && (
+                        <button onClick={navigateUp} style={{...touchBtn, display:'flex', alignItems:'center', gap:'8px', width:'100%', padding:'12px', marginBottom:'8px', borderRadius:'10px', border:'1px dashed var(--border-color)', background:'transparent', cursor:'pointer', color:'var(--text-muted)', fontSize:'13px', fontWeight:'600'}}>
+                            <span style={{fontSize:'18px'}}>\u2B06\uFE0F</span>
+                            \u00DCbergeordneter Ordner
+                        </button>
+                    )}
+
+                    {/* Loading */}
+                    {loading && (
+                        <div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)'}}>
+                            <div style={{fontSize:'36px', marginBottom:'12px', animation:'spin 1.5s linear infinite'}}>&#x1F504;</div>
+                            Ordnerstruktur wird geladen...
+                        </div>
+                    )}
+
+                    {/* Error */}
+                    {error && !loading && (
+                        <div style={{padding:'20px', borderRadius:'12px', background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', fontSize:'13px', textAlign:'center', marginBottom:'16px'}}>
+                            {error}
+                        </div>
+                    )}
+
+                    {/* Ordner-Liste */}
+                    {!loading && displayFolders.length > 0 && (
+                        <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'12px'}}>
+                            {displayFolders.map(function(folder) {
+                                var fileCount = (folder.files ? folder.files.length : 0) + (folder.subfolders ? folder.subfolders.length : 0);
+                                return (
+                                    <button key={folder.id} onClick={function() { navigateToFolder(folder); }}
+                                        style={{...touchBtn, display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', textAlign:'left'}}>
+                                        <span style={{fontSize:'28px'}}>\uD83D\uDCC1</span>
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{folder.name}</div>
+                                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                                {folder.files ? folder.files.length : 0} Dateien
+                                                {folder.subfolders && folder.subfolders.length > 0 && (' \u00B7 ' + folder.subfolders.length + ' Unterordner')}
+                                            </div>
+                                        </div>
+                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>\u203A</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Dateien-Liste */}
+                    {!loading && displayFiles.length > 0 && (
+                        <div style={{marginTop:'8px'}}>
+                            <div style={{fontSize:'11px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'8px', paddingLeft:'4px'}}>
+                                Dateien ({displayFiles.length})
+                            </div>
+                            <div style={{display:'flex', flexDirection:'column', gap:'4px'}}>
+                                {displayFiles.map(function(datei) {
+                                    return (
+                                        <button key={datei.id} onClick={function() { handleOpenFile(datei.id, datei.name); }}
+                                            style={{...touchBtn, display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'left'}}>
+                                            <span style={{fontSize:'22px'}}>{fileIcon(datei.fileType)}</span>
+                                            <div style={{flex:1, minWidth:0}}>
+                                                <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{datei.name}</div>
+                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                                    {formatBytes(datei.sizeBytes)}
+                                                    {datei.syncedAt && (' \u00B7 ' + new Date(datei.syncedAt).toLocaleDateString('de-DE'))}
+                                                </div>
+                                            </div>
+                                            <span style={{fontSize:'11px', padding:'3px 8px', borderRadius:'6px', background:'rgba(30,136,229,0.15)', color:'var(--accent-blue)', fontWeight:'700'}}>
+                                                \u00D6ffnen
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Keine Dateien */}
+                    {!loading && !error && currentFolder && displayFiles.length === 0 && displayFolders.length === 0 && (
+                        <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px'}}>
+                            Dieser Ordner ist leer.
+                        </div>
+                    )}
+
+                    {/* Datei-Viewer Overlay */}
+                    {openFileUrl && (
+                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9000, background:'rgba(0,0,0,0.9)', display:'flex', flexDirection:'column'}}>
+                            <div style={{display:'flex', alignItems:'center', gap:'10px', padding:'12px 16px', background:'#1a2332', borderBottom:'1px solid rgba(255,255,255,0.1)'}}>
+                                <button onClick={function() { URL.revokeObjectURL(openFileUrl); setOpenFileUrl(null); setOpenFileName(''); }}
+                                    style={{...touchBtn, padding:'8px 16px', borderRadius:'8px', border:'none', background:'#e74c3c', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'700'}}>
+                                    \u2715 Schlie\u00DFen
+                                </button>
+                                <div style={{flex:1, fontSize:'13px', color:'rgba(255,255,255,0.8)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                    {openFileName}
+                                </div>
+                                <a href={openFileUrl} download={openFileName}
+                                    style={{...touchBtn, padding:'8px 16px', borderRadius:'8px', border:'none', background:'#27ae60', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'700', textDecoration:'none'}}>
+                                    \u2B07 Download
+                                </a>
+                            </div>
+                            <iframe src={openFileUrl} style={{flex:1, border:'none', width:'100%'}} title={openFileName} />
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
