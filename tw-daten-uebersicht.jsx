@@ -4,8 +4,8 @@
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
 
-            // DEBUG-INFO (wird nach Analyse entfernt)
-            alert('DatenUebersicht MOUNT\nimportResult: ' + (importResult ? 'JA' : 'NEIN') + '\nPositionen: ' + (ir.positionen || []).length + '\nRaeume: ' + (ir.raeume || []).length + '\nkd.auftraggeber: ' + (kd.auftraggeber || '(leer)') + '\nkunde._lvPositionen: ' + ((kunde && kunde._lvPositionen) || []).length + '\nstamm.bauherr: ' + JSON.stringify((stamm.bauherr || {})).substring(0, 80));
+            // DEBUG
+            alert('DatenUebersicht\nimportResult: ' + (importResult ? 'JA (' + (ir.positionen || []).length + ' Pos, ' + (ir.raeume || []).length + ' Raeume)' : 'NEIN') + '\nkunde._lvPositionen: ' + ((kunde && kunde._lvPositionen) || []).length + '\nkunde._stammdaten: ' + (kunde && kunde._stammdaten ? 'JA' : 'NEIN'));
 
             var [activeTab, setActiveTab] = useState('stammdaten');
             var [editMode, setEditMode] = useState(false);

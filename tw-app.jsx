@@ -837,13 +837,17 @@
                 // ═══ MODUS: GESPEICHERTE DATEN LADEN (Excel-Listen aus Kunden-Daten Ordner) ═══
                 if (kundeMode === 'gespeichert') {
                     setLoading(true);
-                    setLoadProgress('📂 Lade Kundendaten...');
+                    setLoadProgress('Lade Kundendaten...');
                     navigateTo('akte');
                     try {
                         var service = window.GoogleDriveService;
                         if (service && service.accessToken && kunde.id) {
                             // 1. Ordnerinhalt laden
                             const contents = await service.listFolderContents(kunde.id);
+
+                            // DEBUG: Welche Ordner hat der Kunde?
+                            var ordnerNamen = (contents.folders || []).map(function(f) { return f.name + ' (' + (f.files || []).length + ' Dateien)'; }).join('\n');
+                            alert('ORDNER im Kundenordner:\n' + (ordnerNamen || '(KEINE ORDNER!)') + '\n\nDateien im Root: ' + (contents.files || []).length);
 
                             // 2. "Kunden-Daten" Unterordner finden (mit/ohne Bindestrich)
                             var parser = window.KundenDatenParser;
@@ -858,6 +862,13 @@
                                 kundendatenFolder = (contents.folders || []).find(function(f) {
                                     return f.name.toLowerCase().indexOf('kundendaten') >= 0 || f.name.toLowerCase().indexOf('kunden-daten') >= 0;
                                 });
+                            }
+
+                            // DEBUG: Kunden-Daten Ordner gefunden?
+                            if (kundendatenFolder) {
+                                alert('Kunden-Daten Ordner GEFUNDEN!\nName: ' + kundendatenFolder.name + '\nDateien: ' + (kundendatenFolder.files || []).length + '\nDatei-Namen: ' + (kundendatenFolder.files || []).map(function(f){ return f.name; }).join(', '));
+                            } else {
+                                alert('KEIN Kunden-Daten Ordner gefunden!\nParser vorhanden: ' + (parser ? 'JA' : 'NEIN') + '\n\nGesucht in:\n' + ordnerNamen);
                             }
 
                             var enriched = {
@@ -907,13 +918,13 @@
                                     // 5. Import-Result erstellen (App-kompatibles Format)
                                     var impResult = parser.ergebnisZuImportResult(parseResult);
 
+                                    // DEBUG: Parser-Ergebnis
+                                    alert('PARSER FERTIG!\nPositionen: ' + impResult.positionen.length + '\nRaeume: ' + impResult.raeume.length + '\nAuftraggeber: ' + ((impResult.kundendaten || {}).auftraggeber || '(leer)'));
+
                                     // 6. Daten in App-State injizieren
                                     var kundeId = kunde.id || 'gespeichert_' + Date.now();
                                     LV_POSITIONEN[kundeId] = impResult.positionen;
                                     setImportResult(impResult);
-
-                                    // DEBUG-INFO (wird nach Analyse entfernt)
-                                    alert('PARSER OK!\nPositionen: ' + impResult.positionen.length + '\nRaeume: ' + impResult.raeume.length + '\nAuftraggeber: ' + ((impResult.kundendaten || {}).auftraggeber || '(leer)') + '\nStammdaten: ' + (impResult.stammdaten ? 'JA' : 'NEIN'));
 
                                     // 7. Kunde-Objekt mit allen Daten anreichern
                                     var kd = impResult.kundendaten || {};
