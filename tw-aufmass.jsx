@@ -229,6 +229,88 @@
                                 Bitte zuerst Gemini KI und/oder Google Drive verbinden
                             </div>
                         )}
+
+                        {/* Speicher leeren Button */}
+                        <div style={{textAlign:'center', marginTop:'12px'}}>
+                            <button
+                                onTouchEnd={function(e){
+                                    e.preventDefault();
+                                    if (confirm('Lokalen Speicher komplett leeren?\n\nAlle gespeicherten Kundendaten, Cache-Eintraege und Sitzungsdaten werden geloescht.\n\nDie Daten auf Google Drive bleiben erhalten und koennen jederzeit neu geladen werden.\n\nFortfahren?')) {
+                                        try {
+                                            // 1. localStorage komplett leeren
+                                            var keysToRemove = [];
+                                            for (var i = 0; i < localStorage.length; i++) {
+                                                var k = localStorage.key(i);
+                                                if (k && k.indexOf('aufmass_kunde_') === 0) keysToRemove.push(k);
+                                            }
+                                            keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+                                            // Auch App-State Keys entfernen
+                                            localStorage.removeItem('lastKundeId');
+                                            localStorage.removeItem('tw_app_state');
+
+                                            // 2. IndexedDB leeren (TWStorage)
+                                            if (window.TWStorage && window.TWStorage.isReady()) {
+                                                TWStorage.clearAll().then(function() {
+                                                    console.log('[Reset] IndexedDB geleert');
+                                                }).catch(function(e) {
+                                                    console.warn('[Reset] IndexedDB Fehler:', e);
+                                                    // Fallback: Datenbank loeschen
+                                                    indexedDB.deleteDatabase('TWBusinessSuite');
+                                                });
+                                            } else {
+                                                // Direkt Datenbank loeschen
+                                                indexedDB.deleteDatabase('TWBusinessSuite');
+                                            }
+
+                                            // 3. OrdnerAnalyseDB leeren
+                                            if (window.OrdnerAnalyseDB && window.OrdnerAnalyseDB.clear) {
+                                                window.OrdnerAnalyseDB.clear().catch(function(){});
+                                            }
+                                            indexedDB.deleteDatabase('TWOrdnerAnalyse');
+
+                                            var count = keysToRemove.length;
+                                            alert('Speicher geleert!\n\n' + count + ' Kunden-Eintraege aus localStorage entfernt.\nIndexedDB zurueckgesetzt.\n\nDie Seite wird jetzt neu geladen.');
+                                            window.location.reload();
+                                        } catch(resetErr) {
+                                            alert('Fehler beim Zuruecksetzen:\n' + resetErr.message);
+                                        }
+                                    }
+                                }}
+                                onClick={function(){
+                                    if (confirm('Lokalen Speicher komplett leeren?\n\nAlle gespeicherten Kundendaten, Cache-Eintraege und Sitzungsdaten werden geloescht.\n\nDie Daten auf Google Drive bleiben erhalten und koennen jederzeit neu geladen werden.\n\nFortfahren?')) {
+                                        try {
+                                            var keysToRemove = [];
+                                            for (var i = 0; i < localStorage.length; i++) {
+                                                var k = localStorage.key(i);
+                                                if (k && k.indexOf('aufmass_kunde_') === 0) keysToRemove.push(k);
+                                            }
+                                            keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+                                            localStorage.removeItem('lastKundeId');
+                                            localStorage.removeItem('tw_app_state');
+                                            if (window.TWStorage && window.TWStorage.isReady()) {
+                                                TWStorage.clearAll().then(function() { console.log('[Reset] IndexedDB geleert'); }).catch(function() { indexedDB.deleteDatabase('TWBusinessSuite'); });
+                                            } else {
+                                                indexedDB.deleteDatabase('TWBusinessSuite');
+                                            }
+                                            if (window.OrdnerAnalyseDB && window.OrdnerAnalyseDB.clear) { window.OrdnerAnalyseDB.clear().catch(function(){}); }
+                                            indexedDB.deleteDatabase('TWOrdnerAnalyse');
+                                            var count = keysToRemove.length;
+                                            alert('Speicher geleert!\n\n' + count + ' Kunden-Eintraege aus localStorage entfernt.\nIndexedDB zurueckgesetzt.\n\nDie Seite wird jetzt neu geladen.');
+                                            window.location.reload();
+                                        } catch(resetErr) {
+                                            alert('Fehler beim Zuruecksetzen:\n' + resetErr.message);
+                                        }
+                                    }
+                                }}
+                                style={{
+                                    padding:'6px 16px', borderRadius:'8px',
+                                    border:'1px solid rgba(231,76,60,0.25)', background:'transparent',
+                                    color:'var(--text-muted)', cursor:'pointer', fontSize:'11px', fontWeight:'600',
+                                    WebkitTapHighlightColor:'rgba(231,76,60,0.2)', touchAction:'manipulation',
+                                }}>
+                                {'\uD83D\uDDD1\uFE0F'} Lokalen Speicher leeren
+                            </button>
+                        </div>
                     </div>
 
                     {/* ═══ GEMINI SETTINGS (ausklappbar) ═══ */}
