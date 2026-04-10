@@ -2382,7 +2382,8 @@
             // Modus-Info
             var modusInfo = {
                 ki: { icon: '\uD83E\uDD16', label: 'KI-Analyse', color: '#1E88E5' },
-                gespeichert: { icon: '\uD83D\uDCC2', label: 'Gespeicherte Daten', color: '#27ae60' },
+                gespeichert: { icon: '\uD83D\uDCE5', label: 'Kundendaten laden', color: '#2980b9' },
+                gespeichertKomplett: { icon: '\uD83D\uDCE5', label: 'Kundendaten laden', color: '#2980b9' },
                 manuell: { icon: '\uD83D\uDCDD', label: 'Manuell anlegen', color: '#e67e22' },
             };
             var activeModus = modusInfo[kundeMode] || modusInfo.ki;
