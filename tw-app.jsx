@@ -984,11 +984,14 @@
                     // Kurz warten damit User die Erfolgsmeldung sieht
                     await new Promise(function(r){ setTimeout(r, 1200); });
                     setKundeMode('analysiert'); // Ab jetzt wie angelegter Kunde behandeln
+                    // WICHTIG: setTimeout damit React den importResult-State ERST committed,
+                    // bevor DatenUebersicht mounted und useState daraus initialisiert
+                    await new Promise(function(r){ setTimeout(r, 50); });
                     navigateTo('datenUebersicht'); // Erst Daten pruefen, dann Module!
                     return;
                 }
 
-                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien fuer Offline) ═══
+                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien fuer Offline + 3 Listen parsen) ═══
                 if (kundeMode === 'gespeichertKomplett') {
                     setLoading(true);
                     setLoadProgress('Lade komplette Ordnerstruktur...');
@@ -997,6 +1000,7 @@
                         // WICHTIG: kunde.id von der Drive-Kundenliste = Drive Folder ID
                         var driveFolderIdK = kunde.id;
                         var kundeIdK = driveFolderIdK || kunde.name;
+                        var serviceK = window.GoogleDriveService;
                         
                         // Kunde-Objekt mit _driveFolderId anreichern
                         var enrichedK = Object.assign({}, kunde, {
@@ -1004,17 +1008,104 @@
                             auftraggeber: kunde.name,
                             _driveFolderId: driveFolderIdK,
                         });
+
+                        // ── PHASE 1: Ordnerinhalt laden + Kunden-Daten parsen (wie gruener Button) ──
+                        if (serviceK && serviceK.accessToken && driveFolderIdK) {
+                            setLoadProgress('Lade Ordnerstruktur...');
+                            var contentsK = await serviceK.listFolderContents(driveFolderIdK);
+                            enrichedK.folders = contentsK.folders;
+                            enrichedK.files = contentsK.files;
+                            enrichedK.dateien = contentsK.files.length + contentsK.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0);
+
+                            // Kunden-Daten Unterordner finden
+                            var parserK = window.KundenDatenParser;
+                            var kundendatenFolderK = null;
+                            if (parserK) {
+                                kundendatenFolderK = (contentsK.folders || []).find(function(f) {
+                                    return parserK.isKundenDatenFolder(f.name);
+                                });
+                            }
+                            if (!kundendatenFolderK) {
+                                kundendatenFolderK = (contentsK.folders || []).find(function(f) {
+                                    return f.name.toLowerCase().indexOf('kundendaten') >= 0 || f.name.toLowerCase().indexOf('kunden-daten') >= 0;
+                                });
+                            }
+
+                            // Excel-Dateien aus Kunden-Daten parsen (3 Listen fuellen)
+                            if (kundendatenFolderK && kundendatenFolderK.files && kundendatenFolderK.files.length > 0 && parserK) {
+                                setLoadProgress('Lade ' + kundendatenFolderK.files.length + ' Dateien aus Kunden-Daten...');
+                                var geladeneK = [];
+                                for (var dki = 0; dki < kundendatenFolderK.files.length; dki++) {
+                                    var fileK = kundendatenFolderK.files[dki];
+                                    setLoadProgress((dki+1) + '/' + kundendatenFolderK.files.length + ': ' + fileK.name);
+                                    try {
+                                        var blobK = await serviceK.downloadFile(fileK.id);
+                                        geladeneK.push({ name: fileK.name, blob: blobK, folder: 'Kunden-Daten' });
+                                    } catch(dlErrK) {
+                                        console.error('Download-Fehler:', fileK.name, dlErrK);
+                                        geladeneK.push({ name: fileK.name, error: dlErrK.message });
+                                    }
+                                }
+
+                                var erfolgreichK = geladeneK.filter(function(d){ return !d.error; });
+                                if (erfolgreichK.length > 0) {
+                                    setLoadProgress('Parser startet fuer ' + erfolgreichK.length + ' Dateien...');
+                                    var parseResultK = await parserK.parseAlleListenAsync(erfolgreichK, function(msg) {
+                                        setLoadProgress(msg);
+                                    });
+
+                                    console.log('═══ KundenDatenParser (Komplett-Modus) ═══');
+                                    console.log('  Positionen:', parseResultK.positionen.length);
+                                    console.log('  Raeume:', parseResultK.raeume.length);
+
+                                    var impResultK = parserK.ergebnisZuImportResult(parseResultK);
+                                    LV_POSITIONEN[kundeIdK] = impResultK.positionen;
+                                    setImportResult(impResultK);
+
+                                    var kdK = impResultK.kundendaten || {};
+                                    enrichedK.auftraggeber = kdK.auftraggeber || kunde.name;
+                                    enrichedK.adresse = kdK.adresse || '';
+                                    enrichedK.baumassnahme = kdK.baumassnahme || '';
+                                    enrichedK._fullyLoaded = true;
+                                    enrichedK._lvPositionen = impResultK.positionen;
+                                    enrichedK._raeume = impResultK.raeume;
+                                    enrichedK._lvPositionenKey = kundeIdK;
+                                    enrichedK._nachtraege = impResultK.nachtraege;
+                                    enrichedK._stammdaten = parseResultK.stammdaten;
+                                    enrichedK._importResult = impResultK;
+                                    enrichedK._gespeichertAm = new Date().toLocaleString('de-DE');
+                                    enrichedK._parseQuelle = 'kunden-daten-parser-komplett';
+                                    enrichedK.raeume = impResultK.raeume;
+
+                                    setLoadProgress('Listen geladen! ' + impResultK.positionen.length + ' Positionen + ' + impResultK.raeume.length + ' Raeume');
+                                } else {
+                                    setLoadProgress('Keine Dateien im Kunden-Daten Ordner lesbar.');
+                                }
+                            } else {
+                                console.log('[Komplett] Kein Kunden-Daten Ordner gefunden — nur DriveSync.');
+                            }
+                        }
                         
-                        // State SOFORT setzen (vor async Operationen)
+                        // State setzen (vor DriveSync)
                         setSelectedKunde(enrichedK);
                         
                         if (window.TWStorage && window.TWStorage.isReady()) {
-                            await TWStorage.saveKunde(enrichedK);
+                            var toSaveK = Object.assign({}, enrichedK);
+                            delete toSaveK.folders;
+                            delete toSaveK.files;
+                            await TWStorage.saveKunde(toSaveK);
                             await TWStorage.saveAppState('lastKundeId', kundeIdK);
+                            if (enrichedK._importResult) {
+                                TWStorage.put('driveCache', { id: 'importResult_' + kundeIdK, type: 'importResult', data: enrichedK._importResult, updatedAt: new Date().toISOString() }).catch(function(){});
+                            }
+                            if (enrichedK._lvPositionen) {
+                                TWStorage.saveGesamtliste(kundeIdK, enrichedK._lvPositionen).catch(function(){});
+                            }
                         }
 
-                        // DriveSync starten: Alle Ordner + Dateien herunterladen
+                        // ── PHASE 2: DriveSync starten (alle Ordner + Dateien herunterladen) ──
                         if (window.TWStorage && window.TWStorage.DriveSync && driveFolderIdK) {
+                            setLoadProgress('Starte Komplett-Sync aller Dateien...');
                             var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeIdK, driveFolderIdK, function(info) {
                                 setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
                             });
@@ -1030,7 +1121,9 @@
                     }
                     setLoading(false);
                     await new Promise(function(r){ setTimeout(r, 800); });
-                    navigateTo('ordnerBrowser');
+                    setKundeMode('analysiert');
+                    await new Promise(function(r){ setTimeout(r, 50); });
+                    navigateTo('datenUebersicht');
                     return;
                 }
 
