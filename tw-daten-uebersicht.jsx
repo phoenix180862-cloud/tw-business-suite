@@ -1,4 +1,4 @@
-        /* DatenUebersicht v4 — kunde._importResult als Fallback fuer React-State-Timing */
+        /* DatenUebersicht v4 — kunde._importResult als Fallback */
         function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
             var ir = importResult || (kunde && kunde._importResult) || {};
             var kd = ir.kundendaten || {};

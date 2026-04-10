@@ -19,7 +19,8 @@
             const [isDriveMode, setIsDriveMode] = useState(false);
             const [loadProgress, setLoadProgress] = useState('');
             const [importResult, setImportResult] = useState(null);
-            const [kundeMode, setKundeMode] = useState('neu'); // 'neu' | 'analysiert' | 'manuell'
+            const [kundeMode, setKundeMode] = useState('neu');
+            const kundeModeRef = React.useRef('neu'); // Sofort synchron, kein React-Batch-Delay
             const [analyseConfig, setAnalyseConfig] = useState(null);
             // ── NEU: Verbindungsstatus von Startseite ──
             const [startConnections, setStartConnections] = useState({ geminiConnected: false, driveConnected: false });
@@ -303,7 +304,8 @@
 
             // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell / Komplett ──
             const handleSelectModus = async (modus) => {
-                setKundeMode(modus);
+                kundeModeRef.current = modus; // SOFORT synchron verfuegbar
+                kundeModeRef.current = modus; setKundeMode(modus);
                 // Manuell: DIREKT zu den 3 Listen, KEINE Kundenauswahl
                 if (modus === 'manuell') {
                     setIsDriveMode(false);
@@ -334,12 +336,12 @@
             };
 
             const handleKundeNeu = () => {
-                setKundeMode('neu');
+                kundeModeRef.current = 'neu'; setKundeMode('neu');
                 setShowAuth(true);
             };
 
             const handleKundeAnalysiert = () => {
-                setKundeMode('analysiert');
+                kundeModeRef.current = 'analysiert'; setKundeMode('analysiert');
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('auswahl');
@@ -347,7 +349,7 @@
 
             // ── NEU: Manueller Kunden-Handler ──
             const handleKundeManuell = () => {
-                setKundeMode('manuell');
+                kundeModeRef.current = 'manuell'; setKundeMode('manuell');
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('manuellEingabe');
@@ -528,7 +530,7 @@
                 }
 
                 setSelectedKunde(kundeObj);
-                setKundeMode('analysiert'); // Ab jetzt wie ein angelegter Kunde behandeln
+                kundeModeRef.current = 'analysiert'; setKundeMode('analysiert'); // Ab jetzt wie ein angelegter Kunde behandeln
                 navigateTo('modulwahl'); // Direkt zur Modulauswahl!
             };
 
@@ -834,8 +836,12 @@
 
                 var localKey = 'aufmass_kunde_' + (kunde.id || kunde.name || 'unknown');
 
-                // ═══ MODUS: KUNDENDATEN LADEN (Alle Ordner + 3 Listen parsen + Offline-Sync) ═══
-                if (kundeMode === 'gespeichert' || kundeMode === 'gespeichertKomplett') {
+                // WICHTIG: kundeModeRef.current statt kundeMode verwenden
+                // weil setKundeMode ein async React-State-Update ist
+                var activeMode = kundeModeRef.current || kundeMode;
+
+                // ═══ MODUS: KUNDENDATEN LADEN (Ordner + Listen + Offline-Sync) ═══
+                if (activeMode === 'gespeichert' || activeMode === 'gespeichertKomplett') {
                     setLoading(true);
                     setLoadProgress('Lade Kundendaten...');
                     navigateTo('akte');
@@ -873,9 +879,6 @@
                                 });
                             }
 
-                            // DEBUG: Was wurde gefunden?
-                            alert('ORDNER-CHECK:\nparser: ' + (parser ? 'JA' : 'NEIN') + '\nkundendatenFolder: ' + (kundendatenFolder ? kundendatenFolder.name : 'NULL') + '\nfiles drin: ' + (kundendatenFolder ? JSON.stringify(kundendatenFolder.files || 'UNDEFINED').substring(0, 200) : '-') + '\nfiles.length: ' + (kundendatenFolder && kundendatenFolder.files ? kundendatenFolder.files.length : 'N/A') + '\n\nAlle Ordner: ' + (contents.folders || []).map(function(f){ return f.name; }).join(', '));
-
                             if (kundendatenFolder && kundendatenFolder.files && kundendatenFolder.files.length > 0 && parser) {
                                 setLoadProgress('Lade ' + kundendatenFolder.files.length + ' Dateien aus Kunden-Daten...');
                                 var geladene = [];
@@ -892,20 +895,11 @@
                                 }
 
                                 var erfolgreich = geladene.filter(function(d){ return !d.error; });
-
-                                // DEBUG 1: Download-Ergebnis
-                                alert('DOWNLOAD fertig!\nGesamt: ' + geladene.length + '\nErfolgreich: ' + erfolgreich.length + '\nFehler: ' + geladene.filter(function(d){return d.error;}).map(function(d){return d.name + ': ' + d.error;}).join(', '));
-
                                 if (parser && erfolgreich.length > 0) {
                                     setLoadProgress('Parser startet...');
                                     var parseResult = await parser.parseAlleListenAsync(erfolgreich, function(msg) {
                                         setLoadProgress(msg);
                                     });
-
-                                    // DEBUG 2: Parser-Ergebnis
-                                    alert('PARSER fertig!\nPositionen: ' + parseResult.positionen.length + '\nRaeume: ' + parseResult.raeume.length + '\nStammdaten: ' + (parseResult.stammdaten ? 'JA' : 'NEIN'));
-
-                                    console.log('[Kundendaten] Parser: Pos=' + parseResult.positionen.length + ' Raeume=' + parseResult.raeume.length);
 
                                     var impResult = parser.ergebnisZuImportResult(parseResult);
                                     LV_POSITIONEN[kundeId] = impResult.positionen;
@@ -936,13 +930,9 @@
                                 enriched._fullyLoaded = false;
                             }
 
-                            // PHASE 3: State setzen
                             setSelectedKunde(enriched);
 
-                            // DEBUG 3: Was steckt im enriched-Objekt?
-                            alert('STATE GESETZT!\n_importResult: ' + (enriched._importResult ? 'JA (' + enriched._importResult.positionen.length + ' Pos)' : 'NEIN') + '\n_lvPositionen: ' + (enriched._lvPositionen || []).length + '\n_stammdaten: ' + (enriched._stammdaten ? 'JA' : 'NEIN') + '\nauftraggeber: ' + (enriched.auftraggeber || '(leer)'));
-
-                            // PHASE 4: Lokal speichern
+                            // Lokal speichern
                             try {
                                 var toSave = Object.assign({}, enriched);
                                 delete toSave.folders;
@@ -955,42 +945,38 @@
                                 delete toSaveDB.folders;
                                 delete toSaveDB.files;
                                 TWStorage.saveKunde(toSaveDB).catch(function(e) { console.warn('TWStorage:', e); });
-                                if (enriched._importResult) {
-                                    TWStorage.put('driveCache', { id: 'importResult_' + kundeId, type: 'importResult', data: enriched._importResult, updatedAt: new Date().toISOString() }).catch(function(){});
-                                }
-                                if (enriched._lvPositionen) {
-                                    TWStorage.saveGesamtliste(kundeId, enriched._lvPositionen).catch(function(){});
+                                if (enriched._importResult && enriched._importResult.positionen) {
+                                    TWStorage.saveGesamtliste(kundeId, enriched._importResult.positionen).catch(function(){});
                                 }
                                 TWStorage.saveAppState('lastKundeId', kundeId);
                             }
 
-                            // PHASE 5: DriveSync — alle Dateien fuer Offline herunterladen
+                            // DriveSync: Alle Dateien offline verfuegbar machen
                             if (window.TWStorage && window.TWStorage.DriveSync && driveFolderId) {
                                 setLoadProgress('Starte Offline-Sync...');
                                 try {
                                     var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeId, driveFolderId, function(info) {
                                         setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
                                     });
-                                    console.log('[DriveSync] Fertig:', syncResult.stats.dateienSynced, 'Dateien');
-                                    setLoadProgress('Sync: ' + syncResult.stats.dateienSynced + ' Dateien geladen.');
+                                    setLoadProgress('Sync: ' + syncResult.stats.dateienSynced + ' Dateien.');
                                 } catch(syncErr) {
-                                    console.warn('[DriveSync] Fehler:', syncErr.message);
+                                    console.warn('[DriveSync]:', syncErr.message);
                                 }
                             }
                         }
                     } catch(err) {
-                        console.error('Kundendaten laden Fehler:', err);
+                        console.error('Kundendaten laden:', err);
                         setLoadProgress('Fehler: ' + err.message);
                     }
                     setLoading(false);
-                    setKundeMode('analysiert');
+                    kundeModeRef.current = 'analysiert'; setKundeMode('analysiert');
                     await new Promise(function(r){ setTimeout(r, 800); });
                     navigateTo('ordnerBrowser');
                     return;
                 }
 
                 // ═══ MODUS: MANUELL ANLEGEN ═══
-                if (kundeMode === 'manuell') {
+                if (activeMode === 'manuell') {
                     // Kunde ausgewählt, jetzt manuelles Eingabeformular
                     setSelectedKunde({
                         ...kunde,
@@ -1002,7 +988,7 @@
                 }
 
                 // ═══ MODUS: KI-ANALYSE ═══
-                if (kundeMode === 'ki' || kundeMode === 'neu') {
+                if (activeMode === 'ki' || activeMode === 'neu') {
                     // Ordnerstruktur laden → analyseConfig zeigen
                     if (isDriveMode && kunde.id && !kunde.files) {
                         setLoading(true);
@@ -1034,7 +1020,7 @@
                 }
 
                 // ═══ FALLBACK: Alte "analysiert" Logik für Kompatibilität ═══
-                if (kundeMode === 'analysiert') {
+                if (activeMode === 'analysiert') {
                     try {
                         var cached = localStorage.getItem(localKey);
                         if (cached) {
