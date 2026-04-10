@@ -873,6 +873,9 @@
                                 });
                             }
 
+                            // DEBUG: Was wurde gefunden?
+                            alert('ORDNER-CHECK:\nparser: ' + (parser ? 'JA' : 'NEIN') + '\nkundendatenFolder: ' + (kundendatenFolder ? kundendatenFolder.name : 'NULL') + '\nfiles drin: ' + (kundendatenFolder ? JSON.stringify(kundendatenFolder.files || 'UNDEFINED').substring(0, 200) : '-') + '\nfiles.length: ' + (kundendatenFolder && kundendatenFolder.files ? kundendatenFolder.files.length : 'N/A') + '\n\nAlle Ordner: ' + (contents.folders || []).map(function(f){ return f.name; }).join(', '));
+
                             if (kundendatenFolder && kundendatenFolder.files && kundendatenFolder.files.length > 0 && parser) {
                                 setLoadProgress('Lade ' + kundendatenFolder.files.length + ' Dateien aus Kunden-Daten...');
                                 var geladene = [];
