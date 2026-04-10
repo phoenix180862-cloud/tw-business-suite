@@ -907,6 +907,13 @@
                                     // 5. Import-Result erstellen (App-kompatibles Format)
                                     var impResult = parser.ergebnisZuImportResult(parseResult);
 
+                                    // DEBUG: Was hat der Parser geliefert?
+                                    console.log('═══ GRUENER BUTTON: Parser-Ergebnis ═══');
+                                    console.log('  impResult.positionen:', impResult.positionen.length);
+                                    console.log('  impResult.raeume:', impResult.raeume.length);
+                                    console.log('  impResult.kundendaten:', JSON.stringify(impResult.kundendaten || {}).substring(0, 200));
+                                    console.log('  impResult.stammdaten:', JSON.stringify(impResult.stammdaten || {}).substring(0, 200));
+
                                     // 6. Daten in App-State injizieren
                                     var kundeId = kunde.id || 'gespeichert_' + Date.now();
                                     LV_POSITIONEN[kundeId] = impResult.positionen;
