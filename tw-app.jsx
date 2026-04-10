@@ -984,32 +984,27 @@
                     // Kurz warten damit User die Erfolgsmeldung sieht
                     await new Promise(function(r){ setTimeout(r, 1200); });
                     setKundeMode('analysiert'); // Ab jetzt wie angelegter Kunde behandeln
-                    // WICHTIG: setTimeout damit React den importResult-State ERST committed,
-                    // bevor DatenUebersicht mounted und useState daraus initialisiert
-                    await new Promise(function(r){ setTimeout(r, 50); });
                     navigateTo('datenUebersicht'); // Erst Daten pruefen, dann Module!
                     return;
                 }
 
-                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien fuer Offline + 3 Listen parsen) ═══
+                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien + 3 Listen parsen) ═══
                 if (kundeMode === 'gespeichertKomplett') {
                     setLoading(true);
                     setLoadProgress('Lade komplette Ordnerstruktur...');
                     navigateTo('akte');
                     try {
-                        // WICHTIG: kunde.id von der Drive-Kundenliste = Drive Folder ID
                         var driveFolderIdK = kunde.id;
                         var kundeIdK = driveFolderIdK || kunde.name;
                         var serviceK = window.GoogleDriveService;
-                        
-                        // Kunde-Objekt mit _driveFolderId anreichern
+
                         var enrichedK = Object.assign({}, kunde, {
                             id: kundeIdK,
                             auftraggeber: kunde.name,
                             _driveFolderId: driveFolderIdK,
                         });
 
-                        // ── PHASE 1: Ordnerinhalt laden + Kunden-Daten parsen (wie gruener Button) ──
+                        // ── PHASE 1: Ordnerinhalt laden + Kunden-Daten parsen ──
                         if (serviceK && serviceK.accessToken && driveFolderIdK) {
                             setLoadProgress('Lade Ordnerstruktur...');
                             var contentsK = await serviceK.listFolderContents(driveFolderIdK);
@@ -1043,25 +1038,18 @@
                                         geladeneK.push({ name: fileK.name, blob: blobK, folder: 'Kunden-Daten' });
                                     } catch(dlErrK) {
                                         console.error('Download-Fehler:', fileK.name, dlErrK);
-                                        geladeneK.push({ name: fileK.name, error: dlErrK.message });
                                     }
                                 }
-
                                 var erfolgreichK = geladeneK.filter(function(d){ return !d.error; });
                                 if (erfolgreichK.length > 0) {
-                                    setLoadProgress('Parser startet fuer ' + erfolgreichK.length + ' Dateien...');
+                                    setLoadProgress('Parser startet...');
                                     var parseResultK = await parserK.parseAlleListenAsync(erfolgreichK, function(msg) {
                                         setLoadProgress(msg);
                                     });
-
-                                    console.log('═══ KundenDatenParser (Komplett-Modus) ═══');
-                                    console.log('  Positionen:', parseResultK.positionen.length);
-                                    console.log('  Raeume:', parseResultK.raeume.length);
-
+                                    console.log('[Komplett] Parser: ' + parseResultK.positionen.length + ' Pos, ' + parseResultK.raeume.length + ' Raeume');
                                     var impResultK = parserK.ergebnisZuImportResult(parseResultK);
                                     LV_POSITIONEN[kundeIdK] = impResultK.positionen;
                                     setImportResult(impResultK);
-
                                     var kdK = impResultK.kundendaten || {};
                                     enrichedK.auftraggeber = kdK.auftraggeber || kunde.name;
                                     enrichedK.adresse = kdK.adresse || '';
@@ -1076,40 +1064,33 @@
                                     enrichedK._gespeichertAm = new Date().toLocaleString('de-DE');
                                     enrichedK._parseQuelle = 'kunden-daten-parser-komplett';
                                     enrichedK.raeume = impResultK.raeume;
-
-                                    setLoadProgress('Listen geladen! ' + impResultK.positionen.length + ' Positionen + ' + impResultK.raeume.length + ' Raeume');
-                                } else {
-                                    setLoadProgress('Keine Dateien im Kunden-Daten Ordner lesbar.');
+                                    setLoadProgress('Listen: ' + impResultK.positionen.length + ' Positionen + ' + impResultK.raeume.length + ' Raeume');
                                 }
                             } else {
-                                console.log('[Komplett] Kein Kunden-Daten Ordner gefunden — nur DriveSync.');
+                                console.log('[Komplett] Kein Kunden-Daten Ordner — nur DriveSync.');
                             }
                         }
-                        
-                        // State setzen (vor DriveSync)
+
                         setSelectedKunde(enrichedK);
-                        
+
+                        // Lokal speichern
                         if (window.TWStorage && window.TWStorage.isReady()) {
                             var toSaveK = Object.assign({}, enrichedK);
                             delete toSaveK.folders;
                             delete toSaveK.files;
                             await TWStorage.saveKunde(toSaveK);
                             await TWStorage.saveAppState('lastKundeId', kundeIdK);
-                            if (enrichedK._importResult) {
-                                TWStorage.put('driveCache', { id: 'importResult_' + kundeIdK, type: 'importResult', data: enrichedK._importResult, updatedAt: new Date().toISOString() }).catch(function(){});
-                            }
-                            if (enrichedK._lvPositionen) {
-                                TWStorage.saveGesamtliste(kundeIdK, enrichedK._lvPositionen).catch(function(){});
+                            if (enrichedK._importResult && enrichedK._importResult.positionen) {
+                                TWStorage.saveGesamtliste(kundeIdK, enrichedK._importResult.positionen).catch(function(){});
                             }
                         }
 
-                        // ── PHASE 2: DriveSync starten (alle Ordner + Dateien herunterladen) ──
+                        // ── PHASE 2: DriveSync — alle Ordner + Dateien herunterladen ──
                         if (window.TWStorage && window.TWStorage.DriveSync && driveFolderIdK) {
-                            setLoadProgress('Starte Komplett-Sync aller Dateien...');
+                            setLoadProgress('Starte Komplett-Sync...');
                             var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeIdK, driveFolderIdK, function(info) {
                                 setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
                             });
-                            
                             console.log('[DriveSync] Komplett-Sync fertig:', syncResult.stats);
                             setLoadProgress('Sync abgeschlossen! ' + syncResult.stats.dateienSynced + ' Dateien geladen.');
                         } else {
@@ -1120,10 +1101,9 @@
                         setLoadProgress('Fehler: ' + err.message);
                     }
                     setLoading(false);
-                    await new Promise(function(r){ setTimeout(r, 800); });
                     setKundeMode('analysiert');
-                    await new Promise(function(r){ setTimeout(r, 50); });
-                    navigateTo('datenUebersicht');
+                    await new Promise(function(r){ setTimeout(r, 800); });
+                    navigateTo('ordnerBrowser');
                     return;
                 }
 
@@ -1690,6 +1670,7 @@
                         return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} onOrdnerBrowser={function(){ navigateTo('ordnerBrowser'); }} />;
                     case 'datenUebersicht':
                         return <DatenUebersicht
+                            key={'du_' + (selectedKunde ? (selectedKunde._gespeichertAm || selectedKunde.id || selectedKunde.name || '') : '') + '_' + (importResult ? (importResult.positionen || []).length : '0')}
                             kunde={selectedKunde}
                             importResult={importResult}
                             onSave={handleDatenUebersichtSave}

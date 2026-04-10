@@ -667,7 +667,7 @@
                 var ext = file.name.split('.').pop().toLowerCase();
                 setUploadStatus('Wird verarbeitet...');
 
-                // ── Stammdaten-Import (JSON) ──
+                // Stammdaten-Import (JSON)
                 if (targetType === 'stammdaten') {
                     var readerS = new FileReader();
                     readerS.onload = function(ev) {
@@ -675,7 +675,7 @@
                             var data = JSON.parse(ev.target.result);
                             if (data && typeof data === 'object') {
                                 setStammFelder(function(prev) { return Object.assign({}, prev, data); });
-                                setUploadStatus('Kundendaten erfolgreich importiert!');
+                                setUploadStatus('Kundendaten importiert!');
                                 setActiveTab('stammdaten');
                             } else { setUploadStatus('Ungueltige JSON-Datei'); }
                         } catch(err) { setUploadStatus('JSON-Fehler: ' + err.message); }
@@ -1232,7 +1232,7 @@
                                     padding:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)',
                                     background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'12px', color:'var(--text-muted)', boxSizing:'border-box'
                                 })}>
-                                    {'\u2B06'} Kundendaten importieren (JSON)
+                                    Importieren (JSON)
                                     <input type="file" accept=".json" onChange={function(e){ handleFileUpload(e, 'stammdaten'); }} style={{display:'none'}} />
                                 </label>
                                 <button {...tap(function(){
@@ -1242,8 +1242,8 @@
                                         var url = URL.createObjectURL(blob);
                                         var a = document.createElement('a');
                                         a.href = url;
-                                        var kundenName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df _-]/g, '').trim();
-                                        a.download = 'Kundendaten_' + kundenName + '_' + new Date().toISOString().slice(0,10) + '.json';
+                                        var kName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
+                                        a.download = 'Kundendaten_' + kName + '_' + new Date().toISOString().slice(0,10) + '.json';
                                         document.body.appendChild(a);
                                         a.click();
                                         document.body.removeChild(a);
@@ -1258,7 +1258,7 @@
                                     background:'rgba(39,174,96,0.06)', cursor:'pointer', textAlign:'center', fontSize:'12px',
                                     color:'#27ae60', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px'
                                 })}>
-                                    {'\u2B07'} Kundendaten herunterladen
+                                    Herunterladen (JSON)
                                 </button>
                             </div>
                             {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [
