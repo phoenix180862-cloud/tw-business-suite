@@ -250,7 +250,7 @@
 
                                             // 2. IndexedDB leeren (TWStorage)
                                             if (window.TWStorage && window.TWStorage.isReady()) {
-                                                TWStorage.clearAll().then(function() {
+                                                TWStorage.clearAllData().then(function() {
                                                     console.log('[Reset] IndexedDB geleert');
                                                 }).catch(function(e) {
                                                     console.warn('[Reset] IndexedDB Fehler:', e);
@@ -288,7 +288,7 @@
                                             localStorage.removeItem('lastKundeId');
                                             localStorage.removeItem('tw_app_state');
                                             if (window.TWStorage && window.TWStorage.isReady()) {
-                                                TWStorage.clearAll().then(function() { console.log('[Reset] IndexedDB geleert'); }).catch(function() { indexedDB.deleteDatabase('TWBusinessSuite'); });
+                                                TWStorage.clearAllData().then(function() { console.log('[Reset] IndexedDB geleert'); }).catch(function() { indexedDB.deleteDatabase('TWBusinessSuite'); });
                                             } else {
                                                 indexedDB.deleteDatabase('TWBusinessSuite');
                                             }
