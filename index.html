@@ -4156,6 +4156,139 @@
                 var ext = file.name.split('.').pop().toLowerCase();
                 setUploadStatus('Wird verarbeitet...');
 
+                // ── Stammdaten Import: Key-Value-Paare aus Excel/CSV ──
+                if (targetType === 'stammdaten') {
+                    var processStammRows = function(rows, headers) {
+                        // Mapping: Header-Texte (case-insensitive) → stammFelder-Keys
+                        var fieldMap = {
+                            'firma': 'bauherr_firma', 'name': 'bauherr_firma', 'bauherr': 'bauherr_firma', 'auftraggeber': 'bauherr_firma', 'kunde': 'bauherr_firma',
+                            'ansprechpartner': 'bauherr_ansprechpartner', 'ansprech': 'bauherr_ansprechpartner',
+                            'strasse': 'bauherr_strasse', 'str': 'bauherr_strasse', 'adresse': 'bauherr_strasse',
+                            'plz': 'bauherr_plzOrt', 'ort': 'bauherr_plzOrt', 'plz/ort': 'bauherr_plzOrt', 'plz ort': 'bauherr_plzOrt',
+                            'telefon': 'bauherr_telefon', 'tel': 'bauherr_telefon', 'fon': 'bauherr_telefon',
+                            'fax': 'bauherr_fax',
+                            'mobil': 'bauherr_mobil', 'handy': 'bauherr_mobil',
+                            'email': 'bauherr_email', 'e-mail': 'bauherr_email', 'mail': 'bauherr_email',
+                            'website': 'bauherr_website', 'web': 'bauherr_website', 'homepage': 'bauherr_website',
+                            'bauleiter': 'bauleiter_name', 'bauleiter name': 'bauleiter_name', 'bl name': 'bauleiter_name',
+                            'bauleiter firma': 'bauleiter_firma', 'bl firma': 'bauleiter_firma', 'dienststelle': 'bauleiter_firma',
+                            'bauleiter strasse': 'bauleiter_strasse', 'bl strasse': 'bauleiter_strasse',
+                            'bauleiter plz': 'bauleiter_plzOrt', 'bl plz': 'bauleiter_plzOrt', 'bauleiter ort': 'bauleiter_plzOrt',
+                            'bauleiter telefon': 'bauleiter_telefon', 'bl telefon': 'bauleiter_telefon', 'bl tel': 'bauleiter_telefon',
+                            'bauleiter mobil': 'bauleiter_mobil', 'bl mobil': 'bauleiter_mobil',
+                            'bauleiter email': 'bauleiter_email', 'bl email': 'bauleiter_email', 'bl e-mail': 'bauleiter_email',
+                            'architekt': 'architekt_name', 'architekt name': 'architekt_name', 'planer': 'architekt_name',
+                            'architekt buero': 'architekt_buero', 'architekturbuero': 'architekt_buero', 'arch buero': 'architekt_buero',
+                            'architekt strasse': 'architekt_strasse', 'arch strasse': 'architekt_strasse',
+                            'architekt plz': 'architekt_plzOrt', 'arch plz': 'architekt_plzOrt', 'architekt ort': 'architekt_plzOrt',
+                            'architekt telefon': 'architekt_telefon', 'arch telefon': 'architekt_telefon', 'arch tel': 'architekt_telefon',
+                            'architekt mobil': 'architekt_mobil', 'arch mobil': 'architekt_mobil',
+                            'architekt email': 'architekt_email', 'arch email': 'architekt_email', 'arch e-mail': 'architekt_email',
+                            'bauvorhaben': 'objekt_bauvorhaben', 'projekt': 'objekt_bauvorhaben', 'objekt': 'objekt_bauvorhaben', 'baumassnahme': 'objekt_bauvorhaben',
+                            'baustelle': 'objekt_strasse', 'baustelle strasse': 'objekt_strasse', 'objekt strasse': 'objekt_strasse',
+                            'baustelle plz': 'objekt_plzOrt', 'objekt plz': 'objekt_plzOrt', 'baustelle ort': 'objekt_plzOrt',
+                            'projektnummer': 'objekt_projektnr', 'projekt nr': 'objekt_projektnr', 'projektnr': 'objekt_projektnr',
+                            'vergabenummer': 'objekt_vergabenr', 'vergabe nr': 'objekt_vergabenr', 'vergabenr': 'objekt_vergabenr',
+                            'auftragsnummer': 'objekt_auftragsnr', 'auftrags nr': 'objekt_auftragsnr', 'auftragsnr': 'objekt_auftragsnr',
+                            'vergabeart': 'objekt_vergabeart',
+                            'auftragsdatum': 'objekt_auftragsdatum', 'datum': 'objekt_auftragsdatum',
+                            'ausfuehrung von': 'objekt_ausfuehrung_von', 'beginn': 'objekt_ausfuehrung_von',
+                            'ausfuehrung bis': 'objekt_ausfuehrung_bis', 'ende': 'objekt_ausfuehrung_bis',
+                            'abnahmedatum': 'objekt_abnahmedatum', 'abnahme': 'objekt_abnahmedatum'
+                        };
+                        var count = 0;
+                        var newStamm = Object.assign({}, stammFelder);
+
+                        if (headers && headers.length >= 2) {
+                            // Format A: Tabellarisch mit Headern — Spalte 1 = Feld, Spalte 2 = Wert
+                            // ODER: Header-Zeile mit Spaltennamen
+                            var h0 = String(headers[0] || '').toLowerCase().trim();
+                            var h1 = String(headers[1] || '').toLowerCase().trim();
+                            var isKeyValue = (h0.indexOf('feld') >= 0 || h0.indexOf('bezeichnung') >= 0 || h0.indexOf('key') >= 0) && (h1.indexOf('wert') >= 0 || h1.indexOf('value') >= 0 || h1.indexOf('inhalt') >= 0);
+
+                            if (isKeyValue) {
+                                // Format B: Spalte A = Feldname, Spalte B = Wert
+                                for (var i = 0; i < rows.length; i++) {
+                                    var r = rows[i];
+                                    if (!r || r.length < 2) continue;
+                                    var key = String(r[0] || '').toLowerCase().trim().replace(/[_\-:]/g, ' ').replace(/\s+/g, ' ');
+                                    var val = String(r[1] || '').trim();
+                                    if (!key || !val) continue;
+                                    // Exakter Match
+                                    if (fieldMap[key]) { newStamm[fieldMap[key]] = val; count++; continue; }
+                                    // Teilmatch
+                                    var matched = false;
+                                    Object.keys(fieldMap).forEach(function(fk) {
+                                        if (!matched && key.indexOf(fk) >= 0) { newStamm[fieldMap[fk]] = val; count++; matched = true; }
+                                    });
+                                }
+                            } else {
+                                // Format C: Header-Zeile enthält Feldnamen, erste Datenzeile die Werte
+                                var firstRow = rows[0] || [];
+                                for (var ci = 0; ci < headers.length; ci++) {
+                                    var hdr = String(headers[ci] || '').toLowerCase().trim().replace(/[_\-:]/g, ' ').replace(/\s+/g, ' ');
+                                    var cellVal = String(firstRow[ci] || '').trim();
+                                    if (!hdr || !cellVal) continue;
+                                    if (fieldMap[hdr]) { newStamm[fieldMap[hdr]] = cellVal; count++; continue; }
+                                    Object.keys(fieldMap).forEach(function(fk) {
+                                        if (hdr.indexOf(fk) >= 0) { newStamm[fieldMap[fk]] = cellVal; count++; }
+                                    });
+                                }
+                            }
+                        } else {
+                            // Format D: Nur 2 Spalten, kein Header erkannt — Key/Value direkt
+                            for (var j = 0; j < rows.length; j++) {
+                                var rr = rows[j];
+                                if (!rr || rr.length < 2) continue;
+                                var k = String(rr[0] || '').toLowerCase().trim().replace(/[_\-:]/g, ' ').replace(/\s+/g, ' ');
+                                var v = String(rr[1] || '').trim();
+                                if (!k || !v) continue;
+                                if (fieldMap[k]) { newStamm[fieldMap[k]] = v; count++; continue; }
+                                Object.keys(fieldMap).forEach(function(fk) {
+                                    if (k.indexOf(fk) >= 0) { newStamm[fieldMap[fk]] = v; count++; }
+                                });
+                            }
+                        }
+
+                        if (count > 0) {
+                            setStammFelder(newStamm);
+                            setUploadStatus(count + ' Stammdaten-Felder importiert');
+                            setActiveTab('stammdaten');
+                        } else {
+                            setUploadStatus('Keine Stammdaten erkannt. Erwarte: Spalte A = Feldname, Spalte B = Wert');
+                        }
+                    };
+
+                    if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+                        var readerS = new FileReader();
+                        readerS.onload = function(ev) {
+                            try {
+                                var text = ev.target.result;
+                                var lines = text.split(/\r?\n/).filter(function(l) { return l.trim().length > 0; });
+                                var sep = text.indexOf('\t') >= 0 ? '\t' : (text.indexOf(';') >= 0 ? ';' : ',');
+                                var allRows = lines.map(function(l) { return l.split(sep).map(function(c) { return c.replace(/^"|"$/g, '').trim(); }); });
+                                processStammRows(allRows.slice(1), allRows[0] || []);
+                            } catch(err) { setUploadStatus('Fehler: ' + err.message); }
+                        };
+                        readerS.readAsText(file);
+                    } else if (ext === 'xlsx' || ext === 'xls') {
+                        var readerS2 = new FileReader();
+                        readerS2.onload = function(ev) {
+                            try {
+                                if (typeof XLSX === 'undefined') { setUploadStatus('SheetJS nicht verfuegbar'); return; }
+                                var workbook = XLSX.read(ev.target.result, { type: 'array' });
+                                var sheet = workbook.Sheets[workbook.SheetNames[0]];
+                                var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                                if (rows.length < 2) { setUploadStatus('Leere Datei'); return; }
+                                processStammRows(rows.slice(1), rows[0] || []);
+                            } catch(err) { setUploadStatus('Excel-Fehler: ' + err.message); }
+                        };
+                        readerS2.readAsArrayBuffer(file);
+                    } else { setUploadStatus('Format nicht unterstuetzt (CSV, XLSX, XLS)'); }
+                    e.target.value = '';
+                    return;
+                }
+
                 var processRows = function(rows, isRaumFile) {
                     if (targetType === 'positionen' || (!targetType && !isRaumFile)) {
                         var imported = [];
@@ -4696,6 +4829,19 @@
                     {/* ═══════════════════════════════════════════ */}
                     {activeTab === 'stammdaten' && (
                         <div>
+                            {/* Upload Stammdaten */}
+                            <div style={{marginBottom:'12px'}}>
+                                <label style={Object.assign({}, touchBase, {
+                                    display:'block', width:'100%', padding:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)',
+                                    background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'12px', color:'var(--text-muted)', boxSizing:'border-box'
+                                })}>
+                                    {'\uD83D\uDCCB'} Kundenstammdaten importieren (CSV/XLSX)
+                                    <input type="file" accept=".csv,.tsv,.xlsx,.xls" onChange={function(e){ handleFileUpload(e, 'stammdaten'); }} style={{display:'none'}} />
+                                </label>
+                                <div style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', marginTop:'4px', lineHeight:'1.4'}}>
+                                    Format: Spalte A = Feldname (z.B. Firma, Strasse, Telefon), Spalte B = Wert
+                                </div>
+                            </div>
                             {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [
                                 ['bauherr_firma', 'Firma / Name *', 'z.B. Kurhotel Haus Klement'],
                                 ['bauherr_ansprechpartner', 'Ansprechpartner', 'Herr/Frau Nachname'],
