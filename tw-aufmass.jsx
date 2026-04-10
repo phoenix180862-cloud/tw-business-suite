@@ -451,32 +451,20 @@
         function KundenModusWahl({ onSelectModus, onBack, connections }) {
             var modi = [
                 {
-                    id: 'gespeichert',
-                    icon: '📂',
-                    title: 'Gespeicherte Daten laden',
-                    desc: 'Bereits aufbereitete Kundendaten aus dem Ordner "Kunden-Daten" werden geladen und der Akte zugewiesen.',
-                    color: '#27ae60',
-                    gradient: 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)',
-                    shadow: 'rgba(39,174,96,0.35)',
-                    badge: 'EMPFOHLEN',
-                    disabled: !(connections && connections.driveConnected),
-                    disabledHint: 'Benötigt Google Drive',
-                },
-                {
                     id: 'gespeichertKomplett',
-                    icon: '📥',
-                    title: 'Komplette Daten vom Kunden laden',
-                    desc: 'Alle Ordner und Dokumente (PDFs, Excel, Word, Zeichnungen) werden heruntergeladen. Ideal für Offline-Arbeit auf der Baustelle.',
+                    icon: '\uD83D\uDCE5',
+                    title: 'Kundendaten laden',
+                    desc: 'Alle Ordner und Dokumente vom Kunden werden geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
                     color: '#2980b9',
                     gradient: 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
                     shadow: 'rgba(41,128,185,0.35)',
-                    badge: 'OFFLINE',
+                    badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
-                    disabledHint: 'Benötigt Google Drive',
+                    disabledHint: 'Google Drive verbinden',
                 },
                 {
                     id: 'manuell',
-                    icon: '📝',
+                    icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
                     color: '#e67e22',
@@ -675,7 +663,6 @@
                             if (data && typeof data === 'object') {
                                 setStammFelder(function(prev) { return Object.assign({}, prev, data); });
                                 setUploadStatus('Kundendaten importiert!');
-                                setActiveTab('stammdaten');
                             } else { setUploadStatus('Ungueltige JSON-Datei'); }
                         } catch(err) { setUploadStatus('JSON-Fehler: ' + err.message); }
                     };

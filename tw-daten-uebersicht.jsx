@@ -1,7 +1,5 @@
-        /* DatenUebersicht v4 — Fix: kunde._importResult als Fallback wenn importResult-State noch leer */
+        /* DatenUebersicht v4 — kunde._importResult als Fallback fuer React-State-Timing */
         function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
-            // WICHTIG: importResult aus React-State kann leer sein (Timing-Problem).
-            // Fallback: kunde._importResult wird synchron im enriched-Objekt gesetzt.
             var ir = importResult || (kunde && kunde._importResult) || {};
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
