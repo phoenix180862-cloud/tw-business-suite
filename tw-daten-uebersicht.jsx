@@ -1,12 +1,10 @@
-        /* DatenUebersicht v3 — Fixes: kein Auto-Spring, Zahlenformat, keine Pfeile, Spracheingabe */
+        /* DatenUebersicht v4 — Fix: kunde._importResult als Fallback wenn importResult-State noch leer */
         function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
-            var ir = importResult || {};
+            // WICHTIG: importResult aus React-State kann leer sein (Timing-Problem).
+            // Fallback: kunde._importResult wird synchron im enriched-Objekt gesetzt.
+            var ir = importResult || (kunde && kunde._importResult) || {};
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
-
-            // DEBUG
-            alert('DatenUebersicht\nimportResult: ' + (importResult ? 'JA (' + (ir.positionen || []).length + ' Pos, ' + (ir.raeume || []).length + ' Raeume)' : 'NEIN') + '\nkunde._lvPositionen: ' + ((kunde && kunde._lvPositionen) || []).length + '\nkunde._stammdaten: ' + (kunde && kunde._stammdaten ? 'JA' : 'NEIN'));
-
             var [activeTab, setActiveTab] = useState('stammdaten');
             var [editMode, setEditMode] = useState(false);
             var [savedMsg, setSavedMsg] = useState('');
