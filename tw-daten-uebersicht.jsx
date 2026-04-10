@@ -1,5 +1,5 @@
         /* DatenUebersicht v4 — kunde._importResult als Fallback */
-        function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
+        function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen, onGoToOrdner }) {
             var ir = importResult || (kunde && kunde._importResult) || {};
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
@@ -226,9 +226,14 @@
                     )}
 
                     <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'8px', maxWidth:'500px', margin:'0 auto'}}>
-                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-muted)', fontSize:'13px', fontWeight:'600', cursor:'pointer'},touchBase)}>Zurueck</button>
-                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #e67e22 0%, #d35400 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 4px 12px rgba(230,126,34,0.3)'},touchBase)}>Weiter zur Modulauswahl</button>
+                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto', marginBottom:'6px'}}>
+                            {onGoToOrdner && kunde && (kunde._driveFolderId || kunde.id) && (
+                                <button {...tap(function(){ onGoToOrdner(); })} style={Object.assign({flex:1, padding:'8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'10px', fontWeight:'700', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'},touchBase)}>{'\uD83D\uDCC1'} Ordner</button>
+                            )}
+                        </div>
+                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
+                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 2px 8px rgba(192,57,43,0.3)'},touchBase)}>{'\u2190'} Zurueck</button>
+                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 4px 12px rgba(192,57,43,0.3)'},touchBase)}>{'\uD83D\uDCDA'} Weiter zur Modulauswahl</button>
                         </div>
                     </div>
                 </div>

@@ -1395,7 +1395,7 @@
                     case 'manuellEingabe':
                         return <ManuelleEingabe onFertig={handleManuellFertig} onBack={function(){ navigateTo('kundenModus'); }} kunde={selectedKunde} />;
                     case 'auswahl':
-                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} />;
+                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} onGoToModulwahl={selectedKunde ? function(){ navigateTo('modulwahl'); } : null} onGoToDaten={selectedKunde ? function(){ navigateTo('datenUebersicht'); } : null} onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo('ordnerBrowser'); } : null} />;
                     case 'akte':
                         return <KundenAkte
                             kunde={selectedKunde}
@@ -1525,9 +1525,10 @@
                             onSave={handleDatenUebersichtSave}
                             onBack={function(){ navigateTo('modulwahl'); }}
                             onWeiterZuModulen={function(){ navigateTo('modulwahl'); }}
+                            onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo('ordnerBrowser'); } : null}
                         />;
                     case 'ordnerBrowser':
-                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} />;
+                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} onGoToModulwahl={function(){ navigateTo('modulwahl'); }} />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}

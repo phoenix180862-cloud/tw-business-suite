@@ -18,16 +18,16 @@
                         </div>
                     </div>
 
-                    {/* Schnellzugriff: Daten bearbeiten + Ordner durchsuchen */}
-                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                    {/* Schnellzugriff-Navigation */}
+                    <div style={{display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap'}}>
                         {onDatenBearbeiten && (
-                            <button onClick={onDatenBearbeiten} style={{flex:1, padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'600', color:'var(--text-secondary)', touchAction:'manipulation'}}>
+                            <button onClick={onDatenBearbeiten} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 8px rgba(192,57,43,0.3)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
                                 {'\uD83D\uDCCB'} Kundendaten
                             </button>
                         )}
                         {onOrdnerBrowser && kunde && (kunde._driveFolderId || kunde.id) && (
-                            <button onClick={onOrdnerBrowser} style={{flex:1, padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'600', color:'var(--text-secondary)', touchAction:'manipulation'}}>
-                                {'\uD83D\uDCC1'} Ordner durchsuchen
+                            <button onClick={onOrdnerBrowser} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 8px rgba(192,57,43,0.3)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
+                                {'\uD83D\uDCC1'} Ordner
                             </button>
                         )}
                     </div>

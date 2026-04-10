@@ -612,17 +612,18 @@
                         })}
                     </div>
 
-                    {/* Zurück-Button */}
+                    {/* Zurueck-Button */}
                     <div style={{textAlign:'center', marginTop:'28px'}}>
                         <button
                             onTouchEnd={function(e){ e.preventDefault(); onBack(); }}
                             onClick={onBack}
                             style={{
-                                padding:'12px 32px', borderRadius:'12px', border:'1px solid var(--border-color)',
-                                background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600',
-                                WebkitTapHighlightColor:'rgba(0,0,0,0.1)', touchAction:'manipulation',
+                                padding:'12px 32px', borderRadius:'12px', border:'none',
+                                background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', cursor:'pointer', fontSize:'14px', fontWeight:'700',
+                                boxShadow:'0 3px 10px rgba(192,57,43,0.3)',
+                                WebkitTapHighlightColor:'rgba(192,57,43,0.3)', touchAction:'manipulation',
                         }}>
-                            ← Zurück
+                            {'\u2190'} Zurueck
                         </button>
                     </div>
                 </div>
@@ -2602,7 +2603,7 @@
         /* ═══════════════════════════════════════════
            KUNDENAUSWAHL PAGE
            ═══════════════════════════════════════════ */
-        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde, kundeMode, onBack }) {
+        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde, kundeMode, onBack, onGoToModulwahl, onGoToDaten, onGoToOrdner }) {
             const [searchTerm, setSearchTerm] = useState('');
             const [updatingId, setUpdatingId] = useState(null);
             const inputRef = React.useRef(null);
@@ -2654,16 +2655,35 @@
             return (
                 <div className="page-container">
                     {/* Modus-Banner + Zurueck */}
-                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
                         {onBack && (
-                            <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', whiteSpace:'nowrap'}}>
-                                \u2190
+                            <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'none', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', cursor:'pointer', fontSize:'13px', fontWeight:'700', whiteSpace:'nowrap', boxShadow:'0 2px 6px rgba(192,57,43,0.3)', touchAction:'manipulation'}}>
+                                {'\u2190'} Zurueck
                             </button>
                         )}
                         <div style={{flex:1, display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px', borderRadius:'10px', background: activeModus.color + '15', border:'1px solid ' + activeModus.color + '30'}}>
                             <span style={{fontSize:'16px'}}>{activeModus.icon}</span>
                             <span style={{fontSize:'12px', fontWeight:'700', color: activeModus.color}}>Modus: {activeModus.label}</span>
                         </div>
+                    </div>
+
+                    {/* Schnell-Navigation */}
+                    <div style={{display:'flex', gap:'6px', marginBottom:'12px', flexWrap:'wrap'}}>
+                        {onGoToModulwahl && (
+                            <button onClick={onGoToModulwahl} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCDA'} Module
+                            </button>
+                        )}
+                        {onGoToDaten && (
+                            <button onClick={onGoToDaten} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCCB'} Kundendaten
+                            </button>
+                        )}
+                        {onGoToOrdner && (
+                            <button onClick={onGoToOrdner} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCC1'} Ordner
+                            </button>
+                        )}
                     </div>
 
                     <div className="breadcrumb">

@@ -3233,7 +3233,7 @@
            ORDNER-BROWSER -- Kundenordner durchblaettern
            Dateien oeffnen sich in neuem Tab via Google Drive.
            ═══════════════════════════════════════════ */
-        function OrdnerBrowser({ kunde, onBack, onGoToDaten }) {
+        function OrdnerBrowser({ kunde, onBack, onGoToDaten, onGoToModulwahl }) {
             var [folders, setFolders] = useState([]);
             var [files, setFiles] = useState([]);
             var [path, setPath] = useState([]);
@@ -3308,20 +3308,28 @@
             return (
                 <div style={{padding:'16px', minHeight:'100vh', background:'var(--bg-primary)'}}>
                     {/* Header */}
-                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
-                        <button onClick={onBack} style={{padding:'8px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', touchAction:'manipulation'}}>
-                            {'\u2190'}
+                    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px', flexWrap:'wrap'}}>
+                        <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'none', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', cursor:'pointer', fontSize:'12px', fontWeight:'700', touchAction:'manipulation', boxShadow:'0 2px 6px rgba(192,57,43,0.3)', display:'flex', alignItems:'center', gap:'4px'}}>
+                            {'\u2190'} Zurueck
                         </button>
-                        <div style={{flex:1}}>
-                            <div style={{fontSize:'17px', fontWeight:'700', color:'var(--text-primary)'}}>
+                        <div style={{flex:1, minWidth:'120px'}}>
+                            <div style={{fontSize:'15px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                 {'\uD83D\uDCC1'} {kundeName.split(' \u2013 ')[0]}
                             </div>
-                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
                                 {folders.length} Ordner, {files.length} Dateien
                             </div>
                         </div>
+                    </div>
+                    {/* Schnell-Navigation */}
+                    <div style={{display:'flex', gap:'6px', marginBottom:'12px'}}>
+                        {onGoToModulwahl && (
+                            <button onClick={onGoToModulwahl} style={{flex:1, padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCDA'} Module
+                            </button>
+                        )}
                         {onGoToDaten && (
-                            <button onClick={onGoToDaten} style={{padding:'8px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'700', touchAction:'manipulation'}}>
+                            <button onClick={onGoToDaten} style={{flex:1, padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
                                 {'\uD83D\uDCCB'} Kundendaten
                             </button>
                         )}
@@ -4031,17 +4039,18 @@
                         })}
                     </div>
 
-                    {/* Zurück-Button */}
+                    {/* Zurueck-Button */}
                     <div style={{textAlign:'center', marginTop:'28px'}}>
                         <button
                             onTouchEnd={function(e){ e.preventDefault(); onBack(); }}
                             onClick={onBack}
                             style={{
-                                padding:'12px 32px', borderRadius:'12px', border:'1px solid var(--border-color)',
-                                background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600',
-                                WebkitTapHighlightColor:'rgba(0,0,0,0.1)', touchAction:'manipulation',
+                                padding:'12px 32px', borderRadius:'12px', border:'none',
+                                background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', cursor:'pointer', fontSize:'14px', fontWeight:'700',
+                                boxShadow:'0 3px 10px rgba(192,57,43,0.3)',
+                                WebkitTapHighlightColor:'rgba(192,57,43,0.3)', touchAction:'manipulation',
                         }}>
-                            ← Zurück
+                            {'\u2190'} Zurueck
                         </button>
                     </div>
                 </div>
@@ -6021,7 +6030,7 @@
         /* ═══════════════════════════════════════════
            KUNDENAUSWAHL PAGE
            ═══════════════════════════════════════════ */
-        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde, kundeMode, onBack }) {
+        function Kundenauswahl({ onSelect, loading, kunden, onUpdateKunde, kundeMode, onBack, onGoToModulwahl, onGoToDaten, onGoToOrdner }) {
             const [searchTerm, setSearchTerm] = useState('');
             const [updatingId, setUpdatingId] = useState(null);
             const inputRef = React.useRef(null);
@@ -6073,16 +6082,35 @@
             return (
                 <div className="page-container">
                     {/* Modus-Banner + Zurueck */}
-                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'12px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
                         {onBack && (
-                            <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', whiteSpace:'nowrap'}}>
-                                \u2190
+                            <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'none', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', cursor:'pointer', fontSize:'13px', fontWeight:'700', whiteSpace:'nowrap', boxShadow:'0 2px 6px rgba(192,57,43,0.3)', touchAction:'manipulation'}}>
+                                {'\u2190'} Zurueck
                             </button>
                         )}
                         <div style={{flex:1, display:'flex', alignItems:'center', gap:'8px', padding:'8px 14px', borderRadius:'10px', background: activeModus.color + '15', border:'1px solid ' + activeModus.color + '30'}}>
                             <span style={{fontSize:'16px'}}>{activeModus.icon}</span>
                             <span style={{fontSize:'12px', fontWeight:'700', color: activeModus.color}}>Modus: {activeModus.label}</span>
                         </div>
+                    </div>
+
+                    {/* Schnell-Navigation */}
+                    <div style={{display:'flex', gap:'6px', marginBottom:'12px', flexWrap:'wrap'}}>
+                        {onGoToModulwahl && (
+                            <button onClick={onGoToModulwahl} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCDA'} Module
+                            </button>
+                        )}
+                        {onGoToDaten && (
+                            <button onClick={onGoToDaten} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCCB'} Kundendaten
+                            </button>
+                        )}
+                        {onGoToOrdner && (
+                            <button onClick={onGoToOrdner} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCC1'} Ordner
+                            </button>
+                        )}
                     </div>
 
                     <div className="breadcrumb">
@@ -12664,16 +12692,16 @@
                         </div>
                     </div>
 
-                    {/* Schnellzugriff: Daten bearbeiten + Ordner durchsuchen */}
-                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                    {/* Schnellzugriff-Navigation */}
+                    <div style={{display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap'}}>
                         {onDatenBearbeiten && (
-                            <button onClick={onDatenBearbeiten} style={{flex:1, padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'600', color:'var(--text-secondary)', touchAction:'manipulation'}}>
+                            <button onClick={onDatenBearbeiten} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 8px rgba(192,57,43,0.3)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
                                 {'\uD83D\uDCCB'} Kundendaten
                             </button>
                         )}
                         {onOrdnerBrowser && kunde && (kunde._driveFolderId || kunde.id) && (
-                            <button onClick={onOrdnerBrowser} style={{flex:1, padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'600', color:'var(--text-secondary)', touchAction:'manipulation'}}>
-                                {'\uD83D\uDCC1'} Ordner durchsuchen
+                            <button onClick={onOrdnerBrowser} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 8px rgba(192,57,43,0.3)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
+                                {'\uD83D\uDCC1'} Ordner
                             </button>
                         )}
                     </div>
@@ -15722,7 +15750,7 @@
 
 
         /* DatenUebersicht v4 — kunde._importResult als Fallback */
-        function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
+        function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen, onGoToOrdner }) {
             var ir = importResult || (kunde && kunde._importResult) || {};
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
@@ -15949,9 +15977,14 @@
                     )}
 
                     <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'8px', maxWidth:'500px', margin:'0 auto'}}>
-                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-muted)', fontSize:'13px', fontWeight:'600', cursor:'pointer'},touchBase)}>Zurueck</button>
-                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #e67e22 0%, #d35400 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 4px 12px rgba(230,126,34,0.3)'},touchBase)}>Weiter zur Modulauswahl</button>
+                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto', marginBottom:'6px'}}>
+                            {onGoToOrdner && kunde && (kunde._driveFolderId || kunde.id) && (
+                                <button {...tap(function(){ onGoToOrdner(); })} style={Object.assign({flex:1, padding:'8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'10px', fontWeight:'700', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'},touchBase)}>{'\uD83D\uDCC1'} Ordner</button>
+                            )}
+                        </div>
+                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
+                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 2px 8px rgba(192,57,43,0.3)'},touchBase)}>{'\u2190'} Zurueck</button>
+                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 4px 12px rgba(192,57,43,0.3)'},touchBase)}>{'\uD83D\uDCDA'} Weiter zur Modulauswahl</button>
                         </div>
                     </div>
                 </div>
@@ -17355,7 +17388,7 @@
                     case 'manuellEingabe':
                         return <ManuelleEingabe onFertig={handleManuellFertig} onBack={function(){ navigateTo('kundenModus'); }} kunde={selectedKunde} />;
                     case 'auswahl':
-                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} />;
+                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} onGoToModulwahl={selectedKunde ? function(){ navigateTo('modulwahl'); } : null} onGoToDaten={selectedKunde ? function(){ navigateTo('datenUebersicht'); } : null} onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo('ordnerBrowser'); } : null} />;
                     case 'akte':
                         return <KundenAkte
                             kunde={selectedKunde}
@@ -17485,9 +17518,10 @@
                             onSave={handleDatenUebersichtSave}
                             onBack={function(){ navigateTo('modulwahl'); }}
                             onWeiterZuModulen={function(){ navigateTo('modulwahl'); }}
+                            onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo('ordnerBrowser'); } : null}
                         />;
                     case 'ordnerBrowser':
-                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} />;
+                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} onGoToModulwahl={function(){ navigateTo('modulwahl'); }} />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}

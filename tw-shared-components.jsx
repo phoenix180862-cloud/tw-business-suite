@@ -689,7 +689,7 @@
            ORDNER-BROWSER -- Kundenordner durchblaettern
            Dateien oeffnen sich in neuem Tab via Google Drive.
            ═══════════════════════════════════════════ */
-        function OrdnerBrowser({ kunde, onBack, onGoToDaten }) {
+        function OrdnerBrowser({ kunde, onBack, onGoToDaten, onGoToModulwahl }) {
             var [folders, setFolders] = useState([]);
             var [files, setFiles] = useState([]);
             var [path, setPath] = useState([]);
@@ -764,20 +764,28 @@
             return (
                 <div style={{padding:'16px', minHeight:'100vh', background:'var(--bg-primary)'}}>
                     {/* Header */}
-                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
-                        <button onClick={onBack} style={{padding:'8px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'14px', fontWeight:'600', touchAction:'manipulation'}}>
-                            {'\u2190'}
+                    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px', flexWrap:'wrap'}}>
+                        <button onClick={onBack} style={{padding:'8px 12px', borderRadius:'8px', border:'none', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', cursor:'pointer', fontSize:'12px', fontWeight:'700', touchAction:'manipulation', boxShadow:'0 2px 6px rgba(192,57,43,0.3)', display:'flex', alignItems:'center', gap:'4px'}}>
+                            {'\u2190'} Zurueck
                         </button>
-                        <div style={{flex:1}}>
-                            <div style={{fontSize:'17px', fontWeight:'700', color:'var(--text-primary)'}}>
+                        <div style={{flex:1, minWidth:'120px'}}>
+                            <div style={{fontSize:'15px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                 {'\uD83D\uDCC1'} {kundeName.split(' \u2013 ')[0]}
                             </div>
-                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
                                 {folders.length} Ordner, {files.length} Dateien
                             </div>
                         </div>
+                    </div>
+                    {/* Schnell-Navigation */}
+                    <div style={{display:'flex', gap:'6px', marginBottom:'12px'}}>
+                        {onGoToModulwahl && (
+                            <button onClick={onGoToModulwahl} style={{flex:1, padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
+                                {'\uD83D\uDCDA'} Module
+                            </button>
+                        )}
                         {onGoToDaten && (
-                            <button onClick={onGoToDaten} style={{padding:'8px 14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'700', touchAction:'manipulation'}}>
+                            <button onClick={onGoToDaten} style={{flex:1, padding:'8px 6px', borderRadius:'8px', border:'none', cursor:'pointer', fontSize:'10px', fontWeight:'700', color:'white', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', touchAction:'manipulation', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}>
                                 {'\uD83D\uDCCB'} Kundendaten
                             </button>
                         )}
