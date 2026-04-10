@@ -37,10 +37,9 @@
 
         // Datei-Groessen-Limits
         MAX_FILE_SIZE_MB: 50,          // Dateien groesser als 50 MB werden uebersprungen
-        SKIP_IMAGE_EXTENSIONS: [],  // Bilder werden jetzt MITGESYNCT
+        SKIP_IMAGE_EXTENSIONS: [],
         
-        // Erlaubte Dateitypen fuer Sync (inkl. Bilder)
-        SYNC_FILE_TYPES: ['.pdf', '.xlsx', '.xls', '.docx', '.doc', '.txt', '.csv', '.xml', '.json', '.rtf', '.odt', '.ods', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.heic', '.heif', '.svg', '.ico', '.raw', '.cr2', '.nef'],
+        SYNC_FILE_TYPES: ['.pdf', '.xlsx', '.xls', '.docx', '.doc', '.txt', '.csv', '.xml', '.json', '.rtf', '.odt', '.ods', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.heic', '.heif', '.svg'],
         
         // Google Docs MIME-Types die exportiert werden
         GOOGLE_EXPORT_TYPES: {
@@ -267,7 +266,7 @@
     function shouldSyncFile(fileName, mimeType, sizeBytes) {
         if (!fileName) return false;
         var nameLower = fileName.toLowerCase();
-        // Bilder werden jetzt MITGESYNCT (Sperre aufgehoben)
+        // Bilder werden jetzt mitgesynct
         // Zu grosse Dateien ausschliessen
         if (sizeBytes && sizeBytes > CONFIG.MAX_FILE_SIZE_MB * 1024 * 1024) return false;
         // Google-native Docs werden exportiert (immer erlaubt)

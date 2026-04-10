@@ -5,6 +5,7 @@
             const [showAuth, setShowAuth] = useState(false);
             const [loading, setLoading] = useState(false);
             const [selectedKunde, setSelectedKunde] = useState(null);
+            const selectedKundeRef = React.useRef(null);
             const [selectedRaum, setSelectedRaum] = useState(null);
             const [selectedPositions, setSelectedPositions] = useState([]);
             const [fertigeRaeume, setFertigeRaeume] = useState([]);
@@ -19,6 +20,7 @@
             const [isDriveMode, setIsDriveMode] = useState(false);
             const [loadProgress, setLoadProgress] = useState('');
             const [importResult, setImportResult] = useState(null);
+            const importResultRef = React.useRef(null); // Sofort verfuegbar, kein React-Batch-Delay
             const [kundeMode, setKundeMode] = useState('neu'); // 'neu' | 'analysiert' | 'manuell'
             const [analyseConfig, setAnalyseConfig] = useState(null);
             // ── NEU: Verbindungsstatus von Startseite ──
@@ -418,7 +420,7 @@
                     raeume: result.raeume || (importResult && importResult.raeume) || [],
                     kundendaten: updatedKd
                 });
-                setImportResult(newIR);
+                importResultRef.current = newIR; setImportResult(newIR);
                 kunde._importResult = newIR;
 
                 // Lokal speichern
@@ -514,7 +516,7 @@
                         objektdaten: { bauvorhaben: stammF.objekt_bauvorhaben || data.bauvorhaben || '', baustelleStrasse: stammF.objekt_strasse || '', baustellePlzOrt: stammF.objekt_plzOrt || '', gewerk: 'Fliesenarbeiten', auftragsdatum: stammF.objekt_auftragsdatum || '' }
                     }
                 };
-                setImportResult(impResult);
+                importResultRef.current = impResult; setImportResult(impResult);
 
                 // Lokal speichern (wie analysierter Kunde)
                 var localKey = 'aufmass_kunde_' + kundeId;
@@ -623,7 +625,7 @@
                         _fullyLoaded: true,
                     });
                     setSelectedKunde(fullyLoaded);
-                    setImportResult(result);
+                    importResultRef.current = result; setImportResult(result);
                     setIsDriveMode(true);
 
                     // 5. Lokal speichern (überschreibt alte Daten)
@@ -715,7 +717,7 @@
                         var kundeKey = selectedKunde._driveFolderId || selectedKunde.id;
                         if (typeof LV_POSITIONEN !== 'undefined') LV_POSITIONEN[kundeKey] = result.positionen;
                     }
-                    setImportResult(result);
+                    importResultRef.current = result; setImportResult(result);
 
                     // Kundendaten anreichern
                     var kd = result.kundendaten || {};
@@ -837,17 +839,13 @@
                 // ═══ MODUS: GESPEICHERTE DATEN LADEN (Excel-Listen aus Kunden-Daten Ordner) ═══
                 if (kundeMode === 'gespeichert') {
                     setLoading(true);
-                    setLoadProgress('Lade Kundendaten...');
+                    setLoadProgress('📂 Lade Kundendaten...');
                     navigateTo('akte');
                     try {
                         var service = window.GoogleDriveService;
                         if (service && service.accessToken && kunde.id) {
                             // 1. Ordnerinhalt laden
                             const contents = await service.listFolderContents(kunde.id);
-
-                            // DEBUG: Welche Ordner hat der Kunde?
-                            var ordnerNamen = (contents.folders || []).map(function(f) { return f.name + ' (' + (f.files || []).length + ' Dateien)'; }).join('\n');
-                            alert('ORDNER im Kundenordner:\n' + (ordnerNamen || '(KEINE ORDNER!)') + '\n\nDateien im Root: ' + (contents.files || []).length);
 
                             // 2. "Kunden-Daten" Unterordner finden (mit/ohne Bindestrich)
                             var parser = window.KundenDatenParser;
@@ -862,13 +860,6 @@
                                 kundendatenFolder = (contents.folders || []).find(function(f) {
                                     return f.name.toLowerCase().indexOf('kundendaten') >= 0 || f.name.toLowerCase().indexOf('kunden-daten') >= 0;
                                 });
-                            }
-
-                            // DEBUG: Kunden-Daten Ordner gefunden?
-                            if (kundendatenFolder) {
-                                alert('Kunden-Daten Ordner GEFUNDEN!\nName: ' + kundendatenFolder.name + '\nDateien: ' + (kundendatenFolder.files || []).length + '\nDatei-Namen: ' + (kundendatenFolder.files || []).map(function(f){ return f.name; }).join(', '));
-                            } else {
-                                alert('KEIN Kunden-Daten Ordner gefunden!\nParser vorhanden: ' + (parser ? 'JA' : 'NEIN') + '\n\nGesucht in:\n' + ordnerNamen);
                             }
 
                             var enriched = {
@@ -918,13 +909,10 @@
                                     // 5. Import-Result erstellen (App-kompatibles Format)
                                     var impResult = parser.ergebnisZuImportResult(parseResult);
 
-                                    // DEBUG: Parser-Ergebnis
-                                    alert('PARSER FERTIG!\nPositionen: ' + impResult.positionen.length + '\nRaeume: ' + impResult.raeume.length + '\nAuftraggeber: ' + ((impResult.kundendaten || {}).auftraggeber || '(leer)'));
-
                                     // 6. Daten in App-State injizieren
                                     var kundeId = kunde.id || 'gespeichert_' + Date.now();
                                     LV_POSITIONEN[kundeId] = impResult.positionen;
-                                    setImportResult(impResult);
+                                    importResultRef.current = impResult; setImportResult(impResult);
 
                                     // 7. Kunde-Objekt mit allen Daten anreichern
                                     var kd = impResult.kundendaten || {};
@@ -988,6 +976,7 @@
                                 enriched._fullyLoaded = false;
                             }
 
+                            selectedKundeRef.current = enriched;
                             setSelectedKunde(enriched);
                         }
                     } catch(err) {
@@ -995,54 +984,110 @@
                         setLoadProgress('❌ Fehler: ' + err.message);
                     }
                     setLoading(false);
-                    // Kurz warten damit User die Erfolgsmeldung sieht
                     await new Promise(function(r){ setTimeout(r, 1200); });
-                    setKundeMode('analysiert'); // Ab jetzt wie angelegter Kunde behandeln
-                    navigateTo('datenUebersicht'); // Erst Daten pruefen, dann Module!
+                    setKundeMode('analysiert');
+                    navigateTo('datenUebersicht');
                     return;
                 }
 
-                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien fuer Offline) ═══
+                // ═══ MODUS: KOMPLETTE DATEN LADEN (Alle Ordner + Dateien + 3 Listen) ═══
                 if (kundeMode === 'gespeichertKomplett') {
                     setLoading(true);
                     setLoadProgress('Lade komplette Ordnerstruktur...');
                     navigateTo('akte');
                     try {
-                        // WICHTIG: kunde.id von der Drive-Kundenliste = Drive Folder ID
                         var driveFolderIdK = kunde.id;
                         var kundeIdK = driveFolderIdK || kunde.name;
-                        
-                        // Kunde-Objekt mit _driveFolderId anreichern
+                        var serviceK = window.GoogleDriveService;
+
                         var enrichedK = Object.assign({}, kunde, {
                             id: kundeIdK,
                             auftraggeber: kunde.name,
                             _driveFolderId: driveFolderIdK,
                         });
-                        
-                        // State SOFORT setzen (vor async Operationen)
+
+                        // PHASE 1: Ordnerinhalt + Kunden-Daten parsen
+                        if (serviceK && serviceK.accessToken && driveFolderIdK) {
+                            setLoadProgress('Lade Ordnerstruktur...');
+                            var contentsK = await serviceK.listFolderContents(driveFolderIdK);
+                            enrichedK.folders = contentsK.folders;
+                            enrichedK.files = contentsK.files;
+                            enrichedK.dateien = contentsK.files.length + contentsK.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0);
+
+                            var parserK = window.KundenDatenParser;
+                            var kundendatenFolderK = null;
+                            if (parserK) {
+                                kundendatenFolderK = (contentsK.folders || []).find(function(f) {
+                                    return parserK.isKundenDatenFolder(f.name);
+                                });
+                            }
+                            if (!kundendatenFolderK) {
+                                kundendatenFolderK = (contentsK.folders || []).find(function(f) {
+                                    return f.name.toLowerCase().indexOf('kundendaten') >= 0 || f.name.toLowerCase().indexOf('kunden-daten') >= 0;
+                                });
+                            }
+
+                            if (kundendatenFolderK && kundendatenFolderK.files && kundendatenFolderK.files.length > 0 && parserK) {
+                                setLoadProgress('Lade ' + kundendatenFolderK.files.length + ' Dateien aus Kunden-Daten...');
+                                var geladeneK = [];
+                                for (var dki = 0; dki < kundendatenFolderK.files.length; dki++) {
+                                    var fileK = kundendatenFolderK.files[dki];
+                                    setLoadProgress((dki+1) + '/' + kundendatenFolderK.files.length + ': ' + fileK.name);
+                                    try {
+                                        var blobK = await serviceK.downloadFile(fileK.id);
+                                        geladeneK.push({ name: fileK.name, blob: blobK, folder: 'Kunden-Daten' });
+                                    } catch(dlErrK) {
+                                        console.error('Download-Fehler:', fileK.name, dlErrK);
+                                    }
+                                }
+                                var erfolgreichK = geladeneK.filter(function(d){ return !d.error; });
+                                if (erfolgreichK.length > 0) {
+                                    setLoadProgress('Parser startet...');
+                                    var parseResultK = await parserK.parseAlleListenAsync(erfolgreichK, function(msg) { setLoadProgress(msg); });
+                                    var impResultK = parserK.ergebnisZuImportResult(parseResultK);
+                                    LV_POSITIONEN[kundeIdK] = impResultK.positionen;
+                                    importResultRef.current = impResultK; setImportResult(impResultK);
+                                    var kdK = impResultK.kundendaten || {};
+                                    enrichedK.auftraggeber = kdK.auftraggeber || kunde.name;
+                                    enrichedK.adresse = kdK.adresse || '';
+                                    enrichedK._fullyLoaded = true;
+                                    enrichedK._lvPositionen = impResultK.positionen;
+                                    enrichedK._raeume = impResultK.raeume;
+                                    enrichedK._lvPositionenKey = kundeIdK;
+                                    enrichedK._nachtraege = impResultK.nachtraege;
+                                    enrichedK._stammdaten = parseResultK.stammdaten;
+                                    enrichedK._importResult = impResultK;
+                                    enrichedK._gespeichertAm = new Date().toLocaleString('de-DE');
+                                    enrichedK.raeume = impResultK.raeume;
+                                    setLoadProgress('Listen: ' + impResultK.positionen.length + ' Pos + ' + impResultK.raeume.length + ' Raeume');
+                                }
+                            }
+                        }
+
+                        selectedKundeRef.current = enrichedK;
                         setSelectedKunde(enrichedK);
-                        
+
                         if (window.TWStorage && window.TWStorage.isReady()) {
-                            await TWStorage.saveKunde(enrichedK);
+                            var toSaveK = Object.assign({}, enrichedK);
+                            delete toSaveK.folders; delete toSaveK.files;
+                            await TWStorage.saveKunde(toSaveK);
                             await TWStorage.saveAppState('lastKundeId', kundeIdK);
                         }
 
-                        // DriveSync starten: Alle Ordner + Dateien herunterladen
+                        // PHASE 2: DriveSync
                         if (window.TWStorage && window.TWStorage.DriveSync && driveFolderIdK) {
+                            setLoadProgress('Starte Komplett-Sync...');
                             var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeIdK, driveFolderIdK, function(info) {
                                 setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
                             });
-                            
-                            console.log('[DriveSync] Komplett-Sync fertig:', syncResult.stats);
-                            setLoadProgress('Sync abgeschlossen! ' + syncResult.stats.dateienSynced + ' Dateien geladen.');
-                        } else {
-                            setLoadProgress('TWStorage oder DriveSync nicht verfuegbar.');
+                            setLoadProgress('Sync: ' + syncResult.stats.dateienSynced + ' Dateien.');
                         }
                     } catch(err) {
                         console.error('Komplett-Sync Fehler:', err);
                         setLoadProgress('Fehler: ' + err.message);
                     }
                     setLoading(false);
+                    setKundeMode('analysiert');
                     await new Promise(function(r){ setTimeout(r, 800); });
                     navigateTo('ordnerBrowser');
                     return;
@@ -1103,7 +1148,7 @@
                                 LV_POSITIONEN[kundeKeyC] = cachedData._lvPositionen;
                                 cachedData._lvPositionenKey = kundeKeyC;
                             }
-                            if (cachedData._importResult) setImportResult(cachedData._importResult);
+                            if (cachedData._importResult) importResultRef.current = cachedData._importResult; setImportResult(cachedData._importResult);
                             cachedData._fullyLoaded = true;
                             setSelectedKunde(cachedData);
                             setLoadProgress('');
@@ -1266,7 +1311,7 @@
                         _analyseConfig: config,
                     });
                     setSelectedKunde(fullyLoaded);
-                    setImportResult(result);
+                    importResultRef.current = result; setImportResult(result);
 
                     // ═══ LOKAL SPEICHERN ═══
                     try {
@@ -1349,10 +1394,10 @@
                             _fullyLoaded: true,
                         });
                         setSelectedKunde(updatedKunde);
-                        setImportResult(result);
+                        importResultRef.current = result; setImportResult(result);
                     } catch (err) {
                         console.error('Nachladen fehlgeschlagen:', err);
-                        setImportResult({ fehler: [{ datei: 'Import', fehler: err.message }], positionen: [], quellenInfo: [] });
+                        importResultRef.current = { fehler: [{ datei: 'Import', fehler: err.message }], positionen: [], quellenInfo: [] }; setImportResult({ fehler: [{ datei: 'Import', fehler: err.message }], positionen: [], quellenInfo: [] });
                     }
                 }
                 setLoading(false);
@@ -1505,7 +1550,7 @@
                                 try {
                                     window._kiDisabled = false; // KI AKTIV!
                                     window._analyseAbbrechen = false;
-                                    setImportResult(null); // Reset Ergebnis
+                                    importResultRef.current = null; setImportResult(null); // Reset Ergebnis
                                     setAnalyseConfig(config);
                                     handleLoadAkteWithConfig(config);
                                 } catch(startErr) {
@@ -1515,7 +1560,7 @@
                             }}
                             onDatenLaden={async function(config) {
                                 console.log('📥 NUR Daten laden (keine Analyse!), Config:', config);
-                                setImportResult(null);
+                                importResultRef.current = null; setImportResult(null);
                                 setLoading(true);
                                 setLoadProgress('📂 Verbinde mit Google Drive...');
 
@@ -1611,8 +1656,9 @@
                         return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} onOrdnerBrowser={function(){ navigateTo('ordnerBrowser'); }} />;
                     case 'datenUebersicht':
                         return <DatenUebersicht
-                            kunde={selectedKunde}
-                            importResult={importResult}
+                            key={'du_' + Date.now()}
+                            kunde={selectedKundeRef.current || selectedKunde}
+                            importResult={importResultRef.current || importResult}
                             onSave={handleDatenUebersichtSave}
                             onBack={function(){ navigateTo('modulwahl'); }}
                             onWeiterZuModulen={function(){ navigateTo('modulwahl'); }}

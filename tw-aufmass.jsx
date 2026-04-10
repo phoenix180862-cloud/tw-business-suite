@@ -667,7 +667,6 @@
                 var ext = file.name.split('.').pop().toLowerCase();
                 setUploadStatus('Wird verarbeitet...');
 
-                // Stammdaten-Import (JSON)
                 if (targetType === 'stammdaten') {
                     var readerS = new FileReader();
                     readerS.onload = function(ev) {
@@ -1228,11 +1227,11 @@
                             {/* Import / Export */}
                             <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
                                 <label style={Object.assign({}, touchBase, {
-                                    flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:'6px',
+                                    flex:1, display:'flex', alignItems:'center', justifyContent:'center',
                                     padding:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)',
                                     background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'12px', color:'var(--text-muted)', boxSizing:'border-box'
                                 })}>
-                                    Importieren (JSON)
+                                    Kundendaten importieren (JSON)
                                     <input type="file" accept=".json" onChange={function(e){ handleFileUpload(e, 'stammdaten'); }} style={{display:'none'}} />
                                 </label>
                                 <button {...tap(function(){
@@ -1242,23 +1241,20 @@
                                         var url = URL.createObjectURL(blob);
                                         var a = document.createElement('a');
                                         a.href = url;
-                                        var kName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9 _-]/g, '').trim();
-                                        a.download = 'Kundendaten_' + kName + '_' + new Date().toISOString().slice(0,10) + '.json';
+                                        a.download = 'Kundendaten_' + (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9 _-]/g, '') + '.json';
                                         document.body.appendChild(a);
                                         a.click();
                                         document.body.removeChild(a);
                                         URL.revokeObjectURL(url);
-                                        setUploadStatus('Kundendaten heruntergeladen!');
+                                        setUploadStatus('Heruntergeladen!');
                                         setTimeout(function(){ setUploadStatus(''); }, 3000);
-                                    } catch(dlErr) {
-                                        setUploadStatus('Download-Fehler: ' + dlErr.message);
-                                    }
+                                    } catch(dlErr) { setUploadStatus('Fehler: ' + dlErr.message); }
                                 })} style={Object.assign({}, touchBase, {
                                     flex:1, padding:'10px', borderRadius:'10px', border:'1px solid rgba(39,174,96,0.3)',
                                     background:'rgba(39,174,96,0.06)', cursor:'pointer', textAlign:'center', fontSize:'12px',
-                                    color:'#27ae60', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px'
+                                    color:'#27ae60', fontWeight:'600'
                                 })}>
-                                    Herunterladen (JSON)
+                                    Kundendaten herunterladen (JSON)
                                 </button>
                             </div>
                             {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [
