@@ -18,7 +18,7 @@ echo     ^<div id="root"^>^</div^> >> index.html
 echo. >> index.html
 echo     ^<script type="text/babel"^> >> index.html
 
-REM Fuege alle Module zusammen
+REM Fuege alle Module zusammen (REIHENFOLGE WICHTIG!)
 echo. >> index.html
 type tw-shared-components.jsx >> index.html
 echo. >> index.html
@@ -33,6 +33,8 @@ echo. >> index.html
 type tw-ausgangsbuch.jsx >> index.html
 echo. >> index.html
 type tw-baustelle.jsx >> index.html
+echo. >> index.html
+type tw-daten-uebersicht.jsx >> index.html
 echo. >> index.html
 type tw-app.jsx >> index.html
 
