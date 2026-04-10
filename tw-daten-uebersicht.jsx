@@ -1,21 +1,11 @@
-        /* DatenUebersicht v4 — Fix: useEffect fuer Daten-Sync wenn Props sich aendern */
+        /* DatenUebersicht v3 — Fixes: kein Auto-Spring, Zahlenformat, keine Pfeile, Spracheingabe */
         function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen }) {
             var ir = importResult || {};
             var kd = ir.kundendaten || {};
             var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
 
-            // DEBUG: Was kommt tatsaechlich an?
-            console.log('═══ DatenUebersicht MOUNT ═══');
-            console.log('  importResult vorhanden:', !!importResult);
-            console.log('  importResult.positionen:', (ir.positionen || []).length);
-            console.log('  importResult.raeume:', (ir.raeume || []).length);
-            console.log('  importResult.stammdaten:', !!ir.stammdaten);
-            console.log('  importResult.kundendaten:', !!ir.kundendaten);
-            console.log('  kunde._lvPositionen:', (kunde && kunde._lvPositionen || []).length);
-            console.log('  kunde._raeume:', (kunde && kunde._raeume || []).length);
-            console.log('  kunde._stammdaten:', !!(kunde && kunde._stammdaten));
-            console.log('  kd.auftraggeber:', kd.auftraggeber || '(leer)');
-            console.log('  stamm.bauherr:', JSON.stringify(stamm.bauherr || '(leer)').substring(0, 100));
+            // DEBUG-INFO (wird nach Analyse entfernt)
+            alert('DatenUebersicht MOUNT\nimportResult: ' + (importResult ? 'JA' : 'NEIN') + '\nPositionen: ' + (ir.positionen || []).length + '\nRaeume: ' + (ir.raeume || []).length + '\nkd.auftraggeber: ' + (kd.auftraggeber || '(leer)') + '\nkunde._lvPositionen: ' + ((kunde && kunde._lvPositionen) || []).length + '\nstamm.bauherr: ' + JSON.stringify((stamm.bauherr || {})).substring(0, 80));
 
             var [activeTab, setActiveTab] = useState('stammdaten');
             var [editMode, setEditMode] = useState(false);
