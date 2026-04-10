@@ -98,7 +98,7 @@
 
             // ── Datum/Uhrzeit formatieren ──
             var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-            var monate = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
             var tag = tage[currentTime.getDay()];
             var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
             var stunden = String(currentTime.getHours()).padStart(2,'0');
@@ -196,7 +196,7 @@
                                     boxShadow:'0 3px 10px rgba(0,0,0,0.2)', transition:'transform 0.15s ease',
                                     WebkitTapHighlightColor:'rgba(0,0,0,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none',
                             }}>
-                                <span style={{fontSize:'16px'}}>{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '📂'}</span>
+                                <span style={{fontSize:'16px'}}>{driveConnected ? '\u2705' : driveConnecting ? '\u23F3' : '\uD83D\uDCC2'}</span>
                                 <span style={{fontSize:'11px', fontWeight:'700'}}>
                                     {driveConnected ? 'Google Drive' : driveConnecting ? 'Verbinde...' : 'Google Drive'}
                                 </span>
@@ -454,7 +454,7 @@
                     id: 'gespeichertKomplett',
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
-                    desc: 'Alle Ordner und Dokumente vom Kunden werden geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
+                    desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
                     color: '#2980b9',
                     gradient: 'linear-gradient(135deg, #2980b9 0%, #1a5276 100%)',
                     shadow: 'rgba(41,128,185,0.35)',
@@ -654,22 +654,6 @@
                 if (!file) return;
                 var ext = file.name.split('.').pop().toLowerCase();
                 setUploadStatus('Wird verarbeitet...');
-
-                if (targetType === 'stammdaten') {
-                    var readerS = new FileReader();
-                    readerS.onload = function(ev) {
-                        try {
-                            var data = JSON.parse(ev.target.result);
-                            if (data && typeof data === 'object') {
-                                setStammFelder(function(prev) { return Object.assign({}, prev, data); });
-                                setUploadStatus('Kundendaten importiert!');
-                            } else { setUploadStatus('Ungueltige JSON-Datei'); }
-                        } catch(err) { setUploadStatus('JSON-Fehler: ' + err.message); }
-                    };
-                    readerS.readAsText(file);
-                    e.target.value = '';
-                    return;
-                }
 
                 var processRows = function(rows, isRaumFile) {
                     if (targetType === 'positionen' || (!targetType && !isRaumFile)) {
@@ -1029,7 +1013,7 @@
                     addFooter(page);
 
                     // PDF speichern
-                    var kundeName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9äöü\u00c4\u00d6\u00dc\u00df _-]/g, '');
+                    var kundeName = (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9\u00e4\u00f6\u00fc\u00c4\u00d6\u00dc\u00df _-]/g, '');
                     doc.save('Kundenlisten_' + kundeName + '_' + new Date().toISOString().slice(0,10) + '.pdf');
                     setPdfStatus('PDF erfolgreich erstellt und heruntergeladen!');
                     setTimeout(function() { setPdfStatus(''); }, 4000);
@@ -1211,39 +1195,6 @@
                     {/* ═══════════════════════════════════════════ */}
                     {activeTab === 'stammdaten' && (
                         <div>
-                            {/* Import / Export */}
-                            <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
-                                <label style={Object.assign({}, touchBase, {
-                                    flex:1, display:'flex', alignItems:'center', justifyContent:'center',
-                                    padding:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)',
-                                    background:'var(--bg-tertiary)', cursor:'pointer', textAlign:'center', fontSize:'12px', color:'var(--text-muted)', boxSizing:'border-box'
-                                })}>
-                                    Kundendaten importieren (JSON)
-                                    <input type="file" accept=".json" onChange={function(e){ handleFileUpload(e, 'stammdaten'); }} style={{display:'none'}} />
-                                </label>
-                                <button {...tap(function(){
-                                    try {
-                                        var json = JSON.stringify(stammFelder, null, 2);
-                                        var blob = new Blob([json], { type: 'application/json' });
-                                        var url = URL.createObjectURL(blob);
-                                        var a = document.createElement('a');
-                                        a.href = url;
-                                        a.download = 'Kundendaten_' + (stammFelder.bauherr_firma || 'Kunde').replace(/[^a-zA-Z0-9 _-]/g, '') + '.json';
-                                        document.body.appendChild(a);
-                                        a.click();
-                                        document.body.removeChild(a);
-                                        URL.revokeObjectURL(url);
-                                        setUploadStatus('Heruntergeladen!');
-                                        setTimeout(function(){ setUploadStatus(''); }, 3000);
-                                    } catch(dlErr) { setUploadStatus('Fehler: ' + dlErr.message); }
-                                })} style={Object.assign({}, touchBase, {
-                                    flex:1, padding:'10px', borderRadius:'10px', border:'1px solid rgba(39,174,96,0.3)',
-                                    background:'rgba(39,174,96,0.06)', cursor:'pointer', textAlign:'center', fontSize:'12px',
-                                    color:'#27ae60', fontWeight:'600'
-                                })}>
-                                    Kundendaten herunterladen (JSON)
-                                </button>
-                            </div>
                             {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [
                                 ['bauherr_firma', 'Firma / Name *', 'z.B. Kurhotel Haus Klement'],
                                 ['bauherr_ansprechpartner', 'Ansprechpartner', 'Herr/Frau Nachname'],
@@ -2431,8 +2382,8 @@
             // Modus-Info
             var modusInfo = {
                 ki: { icon: '\uD83E\uDD16', label: 'KI-Analyse', color: '#1E88E5' },
-                gespeichert: { icon: '📂', label: 'Gespeicherte Daten', color: '#27ae60' },
-                manuell: { icon: '📝', label: 'Manuell anlegen', color: '#e67e22' },
+                gespeichert: { icon: '\uD83D\uDCC2', label: 'Gespeicherte Daten', color: '#27ae60' },
+                manuell: { icon: '\uD83D\uDCDD', label: 'Manuell anlegen', color: '#e67e22' },
             };
             var activeModus = modusInfo[kundeMode] || modusInfo.ki;
 
@@ -7622,7 +7573,7 @@
                                                     editTotal = Math.max(0, editTotal);
                                                 }
 
-                                                return (<>
+                                                return (<React.Fragment>
                                                 {/* ── Stift-Toolbar ── */}
                                                 <div className={`rw-edit-toolbar ${isEditMode ? 'active' : ''}`}>
                                                     <button className={`rw-edit-toggle ${isEditMode ? 'active' : ''}`}
@@ -7732,7 +7683,7 @@
                                                         ))}
                                                     </div>
                                                 )}
-                                                </>);
+                                                </React.Fragment>);
                                             })() : (
                                                 /* Manueller Rechenweg wurde fertiggestellt → anzeigen */
                                                 <div className="rechenweg-container manual">
@@ -8819,7 +8770,7 @@
 
                     {gesamtliste.length === 0 ? (
                         <div className="gl-empty">Noch keine Räume fertiggestellt.</div>
-                    ) : (<>
+                    ) : (<React.Fragment>
                         {/* ═══ RÄUME MIT POSITIONEN UND RECHENWEGEN ═══ */}
                         {gesamtliste.map((room, ri) => {
                             const isExpanded = expandedRooms.includes(ri);
@@ -8836,7 +8787,7 @@
                                     <span className="gl-room-count">{isExpanded ? '▲' : '▼'}</span>
                                 </div>
 
-                                {isExpanded && (<>
+                                {isExpanded && (<React.Fragment>
                                     <div className="gl-room-body">
                                         {/* Positionen als Karten */}
                                         {posWithErg.map((pos, pi) => {
@@ -8955,7 +8906,7 @@
                                             </button>
                                         )}
                                     </div>
-                                </>)}
+                                </React.Fragment>)}
                             </div>
                             );
                         })}
@@ -9040,7 +8991,7 @@
                                 </div>
                             </button>
                         )}
-                    </>)}
+                    </React.Fragment>)}
                 </div>
             );
         }

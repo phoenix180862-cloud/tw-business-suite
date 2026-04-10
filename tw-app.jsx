@@ -19,8 +19,7 @@
             const [isDriveMode, setIsDriveMode] = useState(false);
             const [loadProgress, setLoadProgress] = useState('');
             const [importResult, setImportResult] = useState(null);
-            const [kundeMode, setKundeMode] = useState('neu');
-            const kundeModeRef = React.useRef('neu'); // Sofort synchron, kein React-Batch-Delay
+            const [kundeMode, setKundeMode] = useState('neu'); // 'neu' | 'analysiert' | 'manuell'
             const [analyseConfig, setAnalyseConfig] = useState(null);
             // ── NEU: Verbindungsstatus von Startseite ──
             const [startConnections, setStartConnections] = useState({ geminiConnected: false, driveConnected: false });
@@ -229,54 +228,20 @@
             const navigateTo = useCallback((newPage) => {
                 setPage(newPage);
                 setHistory(prev => {
-                    // Duplikate am Ende vermeiden
-                    if (prev.length > 0 && prev[prev.length - 1] === newPage) return prev;
-                    // Neuen Eintrag anhaengen, alten Vorwaerts-Pfad abschneiden
                     const newHistory = [...prev.slice(0, historyIdx + 1), newPage];
                     setHistoryIdx(newHistory.length - 1);
                     return newHistory;
                 });
             }, [historyIdx]);
 
-            // ── Saubere Zurueck-Navigation mit definierten Parent-Seiten ──
-            const PAGE_PARENTS = {
-                'start': null,
-                'kundenModus': 'start',
-                'auswahl': 'kundenModus',
-                'manuellEingabe': 'kundenModus',
-                'akte': 'auswahl',
-                'analyseConfig': 'auswahl',
-                'datenUebersicht': 'modulwahl',
-                'geladen': 'auswahl',
-                'modulwahl': 'kundenModus',
-                'ordnerBrowser': 'modulwahl',
-                'ordnerAnalyse': 'modulwahl',
-                'ordnerAnalyseDetail': 'ordnerAnalyse',
-                'raumerkennung': 'modulwahl',
-                'raumblatt': 'raumerkennung',
-                'rechnung': 'modulwahl',
-                'ausgangsbuch': 'modulwahl',
-                'schriftverkehr': 'modulwahl',
-                'baustelle': 'modulwahl',
-            };
-
             // Globale Navigation für Module (z.B. Gesamtliste → Modulwahl)
             window._navigateToModulwahl = () => navigateTo('modulwahl');
 
             const goBack = () => {
-                // 1. Versuche zuerst History
                 if (historyIdx > 0) {
                     const newIdx = historyIdx - 1;
                     setHistoryIdx(newIdx);
                     setPage(history[newIdx]);
-                    return;
-                }
-                // 2. Fallback: Parent-Map
-                var parent = PAGE_PARENTS[page];
-                if (parent) {
-                    setPage(parent);
-                    setHistory([parent]);
-                    setHistoryIdx(0);
                 }
             };
 
@@ -302,10 +267,9 @@
                 navigateTo('kundenModus');
             };
 
-            // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell / Komplett ──
+            // ── Modus-Auswahl: KI-Analyse / Gespeicherte Daten / Manuell ──
             const handleSelectModus = async (modus) => {
-                kundeModeRef.current = modus; // SOFORT synchron verfuegbar
-                kundeModeRef.current = modus; setKundeMode(modus);
+                setKundeMode(modus);
                 // Manuell: DIREKT zu den 3 Listen, KEINE Kundenauswahl
                 if (modus === 'manuell') {
                     setIsDriveMode(false);
@@ -336,12 +300,12 @@
             };
 
             const handleKundeNeu = () => {
-                kundeModeRef.current = 'neu'; setKundeMode('neu');
+                setKundeMode('neu');
                 setShowAuth(true);
             };
 
             const handleKundeAnalysiert = () => {
-                kundeModeRef.current = 'analysiert'; setKundeMode('analysiert');
+                setKundeMode('analysiert');
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('auswahl');
@@ -349,7 +313,7 @@
 
             // ── NEU: Manueller Kunden-Handler ──
             const handleKundeManuell = () => {
-                kundeModeRef.current = 'manuell'; setKundeMode('manuell');
+                setKundeMode('manuell');
                 setIsDriveMode(false);
                 setDriveStatus('offline');
                 navigateTo('manuellEingabe');
@@ -530,7 +494,7 @@
                 }
 
                 setSelectedKunde(kundeObj);
-                kundeModeRef.current = 'analysiert'; setKundeMode('analysiert'); // Ab jetzt wie ein angelegter Kunde behandeln
+                setKundeMode('analysiert'); // Ab jetzt wie ein angelegter Kunde behandeln
                 navigateTo('modulwahl'); // Direkt zur Modulauswahl!
             };
 
@@ -836,36 +800,18 @@
 
                 var localKey = 'aufmass_kunde_' + (kunde.id || kunde.name || 'unknown');
 
-                // WICHTIG: kundeModeRef.current statt kundeMode verwenden
-                // weil setKundeMode ein async React-State-Update ist
-                var activeMode = kundeModeRef.current || kundeMode;
-
-                // ═══ MODUS: KUNDENDATEN LADEN (Ordner + Listen + Offline-Sync) ═══
-                if (activeMode === 'gespeichert' || activeMode === 'gespeichertKomplett') {
+                // ═══ MODUS: KUNDENDATEN KOMPLETT LADEN (Ordner + 3 Listen parsen) ═══
+                if (kundeMode === 'gespeichert' || kundeMode === 'gespeichertKomplett') {
                     setLoading(true);
-                    setLoadProgress('Lade Kundendaten...');
+                    setLoadProgress('📂 Lade Kundendaten...');
                     navigateTo('akte');
                     try {
                         var service = window.GoogleDriveService;
-                        var driveFolderId = kunde.id;
-                        var kundeId = driveFolderId || kunde.name;
+                        if (service && service.accessToken && kunde.id) {
+                            // 1. Ordnerinhalt laden
+                            const contents = await service.listFolderContents(kunde.id);
 
-                        if (service && service.accessToken && driveFolderId) {
-                            // PHASE 1: Ordnerstruktur laden
-                            setLoadProgress('Lade Ordnerstruktur...');
-                            var contents = await service.listFolderContents(driveFolderId);
-
-                            var enriched = Object.assign({}, kunde, {
-                                id: kundeId,
-                                auftraggeber: kunde.name,
-                                adresse: '',
-                                folders: contents.folders,
-                                files: contents.files,
-                                dateien: contents.files.length + contents.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0),
-                                _driveFolderId: driveFolderId,
-                            });
-
-                            // PHASE 2: Kunden-Daten Ordner finden und 3 Listen parsen
+                            // 2. "Kunden-Daten" Unterordner finden (mit/ohne Bindestrich)
                             var parser = window.KundenDatenParser;
                             var kundendatenFolder = null;
                             if (parser) {
@@ -874,17 +820,31 @@
                                 });
                             }
                             if (!kundendatenFolder) {
+                                // Fallback: alte Schreibweise
                                 kundendatenFolder = (contents.folders || []).find(function(f) {
                                     return f.name.toLowerCase().indexOf('kundendaten') >= 0 || f.name.toLowerCase().indexOf('kunden-daten') >= 0;
                                 });
                             }
 
-                            if (kundendatenFolder && kundendatenFolder.files && kundendatenFolder.files.length > 0 && parser) {
-                                setLoadProgress('Lade ' + kundendatenFolder.files.length + ' Dateien aus Kunden-Daten...');
+                            var enriched = {
+                                ...kunde,
+                                auftraggeber: kunde.name,
+                                adresse: '',
+                                folders: contents.folders,
+                                files: contents.files,
+                                dateien: contents.files.length + contents.folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0),
+                                _driveFolderId: kunde.id,
+                                _loadFromKundendaten: true,
+                            };
+
+                            if (kundendatenFolder && kundendatenFolder.files && kundendatenFolder.files.length > 0) {
+                                setLoadProgress('📥 Lade ' + kundendatenFolder.files.length + ' Dateien aus Kunden-Daten...');
+
+                                // 3. Excel-Dateien herunterladen
                                 var geladene = [];
                                 for (var di = 0; di < kundendatenFolder.files.length; di++) {
                                     var file = kundendatenFolder.files[di];
-                                    setLoadProgress((di+1) + '/' + kundendatenFolder.files.length + ': ' + file.name);
+                                    setLoadProgress('📥 ' + (di+1) + '/' + kundendatenFolder.files.length + ': ' + file.name);
                                     try {
                                         var blob = await service.downloadFile(file.id);
                                         geladene.push({ name: file.name, blob: blob, folder: 'Kunden-Daten' });
@@ -895,16 +855,30 @@
                                 }
 
                                 var erfolgreich = geladene.filter(function(d){ return !d.error; });
+                                setLoadProgress('📊 ' + erfolgreich.length + ' Dateien geladen — Parser startet...');
+
+                                // 4. ═══ EXCEL-PARSER: 3 Listen deterministisch parsen ═══
                                 if (parser && erfolgreich.length > 0) {
-                                    setLoadProgress('Parser startet...');
                                     var parseResult = await parser.parseAlleListenAsync(erfolgreich, function(msg) {
                                         setLoadProgress(msg);
                                     });
 
+                                    console.log('═══ KundenDatenParser Ergebnis ═══');
+                                    console.log('  Stammdaten:', parseResult.stammdaten ? 'JA' : 'NEIN');
+                                    console.log('  Positionen:', parseResult.positionen.length);
+                                    console.log('  Nachtraege:', parseResult.nachtraege.length);
+                                    console.log('  Raeume:', parseResult.raeume.length);
+                                    console.log('  Fehler:', parseResult.meta.fehler);
+
+                                    // 5. Import-Result erstellen (App-kompatibles Format)
                                     var impResult = parser.ergebnisZuImportResult(parseResult);
+
+                                    // 6. Daten in App-State injizieren
+                                    var kundeId = kunde.id || 'gespeichert_' + Date.now();
                                     LV_POSITIONEN[kundeId] = impResult.positionen;
                                     setImportResult(impResult);
 
+                                    // 7. Kunde-Objekt mit allen Daten anreichern
                                     var kd = impResult.kundendaten || {};
                                     enriched.auftraggeber = kd.auftraggeber || kunde.name;
                                     enriched.adresse = kd.adresse || '';
@@ -917,66 +891,71 @@
                                     enriched._stammdaten = parseResult.stammdaten;
                                     enriched._importResult = impResult;
                                     enriched._gespeichertAm = new Date().toLocaleString('de-DE');
-                                    enriched._parseQuelle = 'kunden-daten-komplett';
+                                    enriched._parseQuelle = 'kunden-daten-parser';
                                     enriched.raeume = impResult.raeume;
 
-                                    setLoadProgress(impResult.positionen.length + ' Positionen + ' + impResult.raeume.length + ' Raeume geladen!');
+                                    // 8. Lokal speichern fuer spaetere Verwendung
+                                    var localKey2 = 'aufmass_kunde_' + kundeId;
+                                    try {
+                                        var toSave = Object.assign({}, enriched);
+                                        delete toSave.folders;
+                                        delete toSave.files;
+                                        localStorage.setItem(localKey2, JSON.stringify(toSave));
+                                        console.log('Kunde lokal gespeichert:', localKey2);
+                                    } catch(saveErr) {
+                                        console.warn('LocalStorage Speicherfehler:', saveErr);
+                                    }
+
+                                    // 8b. IndexedDB-Speicher (groesser, persistenter, offline-faehig)
+                                    if (window.TWStorage && window.TWStorage.isReady()) {
+                                        TWStorage.saveKunde(enriched).catch(function(e) { console.warn('TWStorage Kunde:', e); });
+                                        if (impResult) {
+                                            TWStorage.put('driveCache', { id: 'importResult_' + kundeId, type: 'importResult', data: impResult, updatedAt: new Date().toISOString() }).catch(function(){});
+                                        }
+                                        if (impResult.positionen) {
+                                            TWStorage.saveGesamtliste(kundeId, impResult.positionen).catch(function(){});
+                                        }
+                                        TWStorage.saveAppState('lastKundeId', kundeId);
+                                        console.log('[TW-Storage] Kundendaten in IndexedDB gespeichert');
+
+                                        // Drive-Sync: Komplette Ordnerstruktur + Dateien herunterladen
+                                        if (kunde.id) {
+                                            TWStorage.DriveSync.syncKundenOrdner(kundeId, kunde.id, function(info) {
+                                                console.log('[DriveSync] ' + info.message);
+                                            }).then(function(result) {
+                                                console.log('[DriveSync] Sync abgeschlossen:', result.stats.dateienSynced, 'Dateien');
+                                            }).catch(function(e) {
+                                                console.warn('[DriveSync] Sync-Fehler:', e.message);
+                                            });
+                                        }
+                                    }
+
+                                    setLoadProgress('✅ ' + impResult.positionen.length + ' Positionen + ' + impResult.raeume.length + ' Räume geladen!');
                                 } else {
-                                    setLoadProgress('Keine auswertbaren Dateien im Kunden-Daten Ordner.');
+                                    setLoadProgress('⚠ Parser nicht verfügbar oder keine Dateien.');
                                     enriched._fullyLoaded = true;
                                 }
                             } else {
-                                setLoadProgress('Kein Kunden-Daten Ordner gefunden.');
+                                setLoadProgress('⚠ Kein "Kunden-Daten" Ordner gefunden in: ' + kunde.name);
                                 enriched._fullyLoaded = false;
                             }
 
                             setSelectedKunde(enriched);
-
-                            // Lokal speichern
-                            try {
-                                var toSave = Object.assign({}, enriched);
-                                delete toSave.folders;
-                                delete toSave.files;
-                                localStorage.setItem('aufmass_kunde_' + kundeId, JSON.stringify(toSave));
-                            } catch(saveErr) { console.warn('Speicherfehler:', saveErr); }
-
-                            if (window.TWStorage && window.TWStorage.isReady()) {
-                                var toSaveDB = Object.assign({}, enriched);
-                                delete toSaveDB.folders;
-                                delete toSaveDB.files;
-                                TWStorage.saveKunde(toSaveDB).catch(function(e) { console.warn('TWStorage:', e); });
-                                if (enriched._importResult && enriched._importResult.positionen) {
-                                    TWStorage.saveGesamtliste(kundeId, enriched._importResult.positionen).catch(function(){});
-                                }
-                                TWStorage.saveAppState('lastKundeId', kundeId);
-                            }
-
-                            // DriveSync: Alle Dateien offline verfuegbar machen
-                            if (window.TWStorage && window.TWStorage.DriveSync && driveFolderId) {
-                                setLoadProgress('Starte Offline-Sync...');
-                                try {
-                                    var syncResult = await TWStorage.DriveSync.syncKundenOrdner(kundeId, driveFolderId, function(info) {
-                                        setLoadProgress(info.message + (info.percent > 0 ? ' (' + info.percent + '%)' : ''));
-                                    });
-                                    setLoadProgress('Sync: ' + syncResult.stats.dateienSynced + ' Dateien.');
-                                } catch(syncErr) {
-                                    console.warn('[DriveSync]:', syncErr.message);
-                                }
-                            }
                         }
                     } catch(err) {
                         console.error('Kundendaten laden:', err);
-                        setLoadProgress('Fehler: ' + err.message);
+                        setLoadProgress('❌ Fehler: ' + err.message);
                     }
                     setLoading(false);
-                    kundeModeRef.current = 'analysiert'; setKundeMode('analysiert');
-                    await new Promise(function(r){ setTimeout(r, 800); });
-                    navigateTo('ordnerBrowser');
+                    // Kurz warten damit User die Erfolgsmeldung sieht
+                    await new Promise(function(r){ setTimeout(r, 1200); });
+                    setKundeMode('analysiert'); // Ab jetzt wie angelegter Kunde behandeln
+                    navigateTo('datenUebersicht'); // Erst Daten pruefen, dann Module!
                     return;
                 }
 
                 // ═══ MODUS: MANUELL ANLEGEN ═══
-                if (activeMode === 'manuell') {
+                if (kundeMode === 'manuell') {
                     // Kunde ausgewählt, jetzt manuelles Eingabeformular
                     setSelectedKunde({
                         ...kunde,
@@ -988,7 +967,7 @@
                 }
 
                 // ═══ MODUS: KI-ANALYSE ═══
-                if (activeMode === 'ki' || activeMode === 'neu') {
+                if (kundeMode === 'ki' || kundeMode === 'neu') {
                     // Ordnerstruktur laden → analyseConfig zeigen
                     if (isDriveMode && kunde.id && !kunde.files) {
                         setLoading(true);
@@ -1020,7 +999,7 @@
                 }
 
                 // ═══ FALLBACK: Alte "analysiert" Logik für Kompatibilität ═══
-                if (activeMode === 'analysiert') {
+                if (kundeMode === 'analysiert') {
                     try {
                         var cached = localStorage.getItem(localKey);
                         if (cached) {
@@ -1544,6 +1523,8 @@
                             onBack={function(){ navigateTo('modulwahl'); }}
                             onWeiterZuModulen={function(){ navigateTo('modulwahl'); }}
                         />;
+                    case 'ordnerBrowser':
+                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}
@@ -1575,8 +1556,6 @@
                         return <SchriftverkehrModul kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
                     case 'baustelle':
                         return <BaustellenAppAdmin kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
-                    case 'ordnerBrowser':
-                        return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} />;
                     default:
                         return <Startseite onKundenauswahl={handleKundenauswahl} onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} onDriveStatusChange={function(status){ setDriveStatus(status); if(status === 'online') setIsDriveMode(true); }} />;
                 }

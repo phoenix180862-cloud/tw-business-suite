@@ -685,10 +685,8 @@
         window.MicLabel = MicLabel;
         window.MicInput = MicInput;
 
-
         /* ═══════════════════════════════════════════
-           ORDNER-BROWSER v2 -- Komplett neu
-           Einfach, sauber, funktional.
+           ORDNER-BROWSER -- Kundenordner durchblaettern
            Dateien oeffnen sich in neuem Tab via Google Drive.
            ═══════════════════════════════════════════ */
         function OrdnerBrowser({ kunde, onBack, onGoToDaten }) {
@@ -870,7 +868,6 @@
                 </div>
             );
         }
-
 
         /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl

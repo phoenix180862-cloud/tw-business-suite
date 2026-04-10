@@ -1,66 +1,74 @@
 ════════════════════════════════════════════════════════════
-  TW BUSINESS SUITE — UPDATE: KundenDaten-Parser
-  Erstellt am: 08.04.2026
+  TW BUSINESS SUITE — UPDATE: Blauer Button + 3-Listen-Fix
+  Erstellt am: 10.04.2026
 ════════════════════════════════════════════════════════════
 
 INHALT DIESER LIEFERUNG:
 ─────────────────────────
-1. tw-kundendaten-parser.js  — NEUER deterministischer Excel-Parser
-2. tw-app.jsx                — AKTUALISIERT (gespeichert-Modus mit Parser)
-3. INSTALL.txt               — Diese Datei
+1. tw-app.jsx                — AKTUALISIERT (gespeichertKomplett Modus + Parser-Fix)
+2. tw-aufmass.jsx            — AKTUALISIERT (nur blauer Button, kein gruener mehr)
+3. tw-modulwahl.jsx          — AKTUALISIERT (Schnellzugriff Kundendaten + Ordner-Browser)
+4. tw-shared-components.jsx  — AKTUALISIERT (OrdnerBrowser-Komponente hinzugefuegt)
+5. INSTALL.txt               — Diese Datei
+
+WAS WURDE GEAENDERT:
+────────────────────
+
+HAUPTAENDERUNG: Ein Button, eine Funktion
+  → Der gruene Button "Gespeicherte Daten laden" wurde ENTFERNT
+  → Der blaue Button "Kundendaten laden" ist jetzt der EINZIGE Lade-Button
+  → Er macht ALLES in einem Schritt:
+    1. Ordnerstruktur vom Kunden komplett laden
+    2. "Kunden-Daten" Unterordner finden
+    3. Excel-Listen herunterladen
+    4. Parser startet automatisch (3 Listen: Stammdaten, Positionen, Raeume)
+    5. Daten werden fuer alle Module bereitgestellt
+    6. Navigation zur Daten-Uebersicht (zum Pruefen)
+    7. Von dort weiter zur Modulwahl
+
+FIX: 3 Listen werden wieder korrekt geladen
+  → Die bewaehrte Parser-Logik aus der funktionierenden Version
+  → Korrekte Navigation: Akte → Parser → Daten-Uebersicht → Modulwahl
+  → IndexedDB + localStorage Speicherung wie vorher
+
+NEU: Ordner-Browser als Bonus-Feature
+  → Auf der Modulwahl-Seite gibt es jetzt zwei Schnellzugriff-Buttons:
+    - "Kundendaten" → Daten-Uebersicht (Listen bearbeiten)
+    - "Ordner durchsuchen" → Ordner-Browser (Dateien ansehen/oeffnen)
+  → Der Ordner-Browser zeigt alle Dateien im Kundenordner
+  → Dateien oeffnen sich per Klick direkt in Google Drive
 
 INSTALLATION:
 ─────────────
 
 SCHRITT 1: Dateien kopieren
-  → tw-kundendaten-parser.js ins Hauptverzeichnis kopieren (neben tw-app.jsx)
-  → tw-app.jsx ersetzen (alte Version ueberschreiben)
+  → Alle 4 .jsx Dateien ins Hauptverzeichnis kopieren
+  → (neben die bestehenden Dateien, alte Versionen ueberschreiben)
+     - tw-app.jsx
+     - tw-aufmass.jsx
+     - tw-modulwahl.jsx
+     - tw-shared-components.jsx
 
-SCHRITT 2: Parser in index-template.html einbinden
-  → Oeffne index-template.html
-  → Suche nach der Zeile: <link rel="stylesheet" href="tw-design.css">
-  → Fuege DIREKT DARUNTER folgende Zeile ein:
-
-    <script src="tw-kundendaten-parser.js"></script>
-
-  Das sieht dann so aus:
-
-    <link rel="stylesheet" href="tw-design.css">
-    <script src="tw-kundendaten-parser.js"></script>
-
-SCHRITT 3: Build ausfuehren
+SCHRITT 2: Build ausfuehren
   → build.bat ausfuehren (Doppelklick)
   → Dadurch wird die neue index.html erstellt
 
-SCHRITT 4: Testen
+SCHRITT 3: Testen
   → start-server.bat ausfuehren
   → Browser oeffnen: http://localhost:8080
-  → Startseite: Gemini KI + Google Drive verbinden
+  → Startseite: Google Drive verbinden
   → KUNDENAUSWAHL klicken
-  → "Gespeicherte Daten laden" (gruener Button) waehlen
+  → Den BLAUEN Button "Kundendaten laden" waehlen
   → Einen Kunden auswaehlen (z.B. BBS Montabaur)
-  → Parser laedt automatisch die 3 Excel-Listen aus dem
-    Unterordner "Kunden-Daten" und zeigt die Ergebnisse
+  → Die 3 Listen sollten automatisch geladen werden
+  → Danach: Daten-Uebersicht zeigt die Ergebnisse
+  → Weiter zur Modulwahl
 
-WAS IST NEU:
-────────────
-- Der gruene "Gespeicherte Daten laden" Button funktioniert jetzt
-- Er greift auf den Ordner "Kunden-Daten" im Kundenordner zu
-- Die 3 Excel-Listen werden deterministisch geparst (KEINE KI)
-- Erkannte Daten: 
-  * Liste 1: Kundenstammdaten (Bauherr, Bauleiter, Architekt etc.)
-  * Liste 2: LV-Positionen + Nachtraege (mit EP/GP)
-  * Liste 3: Raumliste (mit Flaechen, Umfang, Positonsreferenzen)
-- Daten werden automatisch den Modulen zugeordnet:
-  * Aufmass: Positionsliste + Raumliste
-  * Rechnung: Positionen + Preise + Kundendaten
-  * Schriftverkehr: Adressen (Bauherr, Bauleiter, Architekt)
-- Nach erfolgreichem Laden: Direkte Navigation zur Modulwahl
-- Daten werden lokal gespeichert fuer spaetere Verwendung
+HINWEIS:
+────────
+Der KundenDatenParser (tw-kundendaten-parser.js) muss wie bisher
+in der index-template.html eingebunden sein:
 
-HINWEIS ZUR KI:
-───────────────
-Die KI-Infrastruktur (Gemini) bleibt vollstaendig erhalten und
-funktionsfaehig. Der KI-Analyse Button auf der KundenModusWahl-Seite
-ist weiterhin vorhanden fuer zukuenftige Nutzung.
-Fuer die vorbereiteten Excel-Listen wird KEINE KI benoetigt.
+    <script src="tw-kundendaten-parser.js"></script>
+
+Falls noch nicht vorhanden, siehe INSTALL.txt vom 08.04.2026.
