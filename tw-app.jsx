@@ -889,11 +889,18 @@
                                 }
 
                                 var erfolgreich = geladene.filter(function(d){ return !d.error; });
+
+                                // DEBUG 1: Download-Ergebnis
+                                alert('DOWNLOAD fertig!\nGesamt: ' + geladene.length + '\nErfolgreich: ' + erfolgreich.length + '\nFehler: ' + geladene.filter(function(d){return d.error;}).map(function(d){return d.name + ': ' + d.error;}).join(', '));
+
                                 if (parser && erfolgreich.length > 0) {
                                     setLoadProgress('Parser startet...');
                                     var parseResult = await parser.parseAlleListenAsync(erfolgreich, function(msg) {
                                         setLoadProgress(msg);
                                     });
+
+                                    // DEBUG 2: Parser-Ergebnis
+                                    alert('PARSER fertig!\nPositionen: ' + parseResult.positionen.length + '\nRaeume: ' + parseResult.raeume.length + '\nStammdaten: ' + (parseResult.stammdaten ? 'JA' : 'NEIN'));
 
                                     console.log('[Kundendaten] Parser: Pos=' + parseResult.positionen.length + ' Raeume=' + parseResult.raeume.length);
 
@@ -928,6 +935,9 @@
 
                             // PHASE 3: State setzen
                             setSelectedKunde(enriched);
+
+                            // DEBUG 3: Was steckt im enriched-Objekt?
+                            alert('STATE GESETZT!\n_importResult: ' + (enriched._importResult ? 'JA (' + enriched._importResult.positionen.length + ' Pos)' : 'NEIN') + '\n_lvPositionen: ' + (enriched._lvPositionen || []).length + '\n_stammdaten: ' + (enriched._stammdaten ? 'JA' : 'NEIN') + '\nauftraggeber: ' + (enriched.auftraggeber || '(leer)'));
 
                             // PHASE 4: Lokal speichern
                             try {
