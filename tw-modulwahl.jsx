@@ -18,20 +18,6 @@
                         </div>
                     </div>
 
-                    {/* Schnellzugriff-Navigation */}
-                    <div style={{display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap'}}>
-                        {onDatenBearbeiten && (
-                            <button onClick={onDatenBearbeiten} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCCB'} Kundendaten
-                            </button>
-                        )}
-                        {onOrdnerBrowser && kunde && (kunde._driveFolderId || kunde.id) && (
-                            <button onClick={onOrdnerBrowser} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCC1'} Ordner
-                            </button>
-                        )}
-                    </div>
-
                     {/* Modul-Kacheln */}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
                         {module.map(function(m) {

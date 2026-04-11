@@ -3320,19 +3320,6 @@
                             </div>
                         </div>
                     </div>
-                    {/* Schnell-Navigation */}
-                    <div style={{display:'flex', gap:'6px', marginBottom:'12px'}}>
-                        {onGoToModulwahl && (
-                            <button onClick={onGoToModulwahl} style={{flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCDA'} Module
-                            </button>
-                        )}
-                        {onGoToDaten && (
-                            <button onClick={onGoToDaten} style={{flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCCB'} Kundendaten
-                            </button>
-                        )}
-                    </div>
 
                     {/* Breadcrumb */}
                     {path.length > 0 && (
@@ -6099,25 +6086,6 @@
                             <span style={{fontSize:'16px'}}>{activeModus.icon}</span>
                             <span style={{fontSize:'11px', fontWeight:'600', color: activeModus.color, fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.8px'}}>Modus: {activeModus.label}</span>
                         </div>
-                    </div>
-
-                    {/* Schnell-Navigation */}
-                    <div style={{display:'flex', gap:'6px', marginBottom:'12px', flexWrap:'wrap'}}>
-                        {onGoToModulwahl && (
-                            <button onClick={onGoToModulwahl} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCDA'} Module
-                            </button>
-                        )}
-                        {onGoToDaten && (
-                            <button onClick={onGoToDaten} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCCB'} Kundendaten
-                            </button>
-                        )}
-                        {onGoToOrdner && (
-                            <button onClick={onGoToOrdner} style={{flex:1, minWidth:'80px', padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCC1'} Ordner
-                            </button>
-                        )}
                     </div>
 
                     <div className="breadcrumb">
@@ -13573,20 +13541,6 @@
                         </div>
                     </div>
 
-                    {/* Schnellzugriff-Navigation */}
-                    <div style={{display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap'}}>
-                        {onDatenBearbeiten && (
-                            <button onClick={onDatenBearbeiten} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCCB'} Kundendaten
-                            </button>
-                        )}
-                        {onOrdnerBrowser && kunde && (kunde._driveFolderId || kunde.id) && (
-                            <button onClick={onOrdnerBrowser} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCC1'} Ordner
-                            </button>
-                        )}
-                    </div>
-
                     {/* Modul-Kacheln */}
                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
                         {module.map(function(m) {
@@ -16858,14 +16812,8 @@
                     )}
 
                     <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto', marginBottom:'6px'}}>
-                            {onGoToOrdner && kunde && (kunde._driveFolderId || kunde.id) && (
-                                <button {...tap(function(){ onGoToOrdner(); })} style={Object.assign({flex:1, padding:'8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'11px', fontWeight:'600', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'},touchBase)}>{'\uD83D\uDCC1'} Ordner</button>
-                            )}
-                        </div>
                         <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
                             <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\u2190'} Zurueck</button>
-                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\uD83D\uDCDA'} Weiter zur Modulauswahl</button>
                         </div>
                     </div>
                 </div>

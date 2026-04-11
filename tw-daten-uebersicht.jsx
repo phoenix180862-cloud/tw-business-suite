@@ -226,14 +226,8 @@
                     )}
 
                     <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto', marginBottom:'6px'}}>
-                            {onGoToOrdner && kunde && (kunde._driveFolderId || kunde.id) && (
-                                <button {...tap(function(){ onGoToOrdner(); })} style={Object.assign({flex:1, padding:'8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'11px', fontWeight:'600', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'},touchBase)}>{'\uD83D\uDCC1'} Ordner</button>
-                            )}
-                        </div>
                         <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
                             <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\u2190'} Zurueck</button>
-                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\uD83D\uDCDA'} Weiter zur Modulauswahl</button>
                         </div>
                     </div>
                 </div>

@@ -777,19 +777,6 @@
                             </div>
                         </div>
                     </div>
-                    {/* Schnell-Navigation */}
-                    <div style={{display:'flex', gap:'6px', marginBottom:'12px'}}>
-                        {onGoToModulwahl && (
-                            <button onClick={onGoToModulwahl} style={{flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCDA'} Module
-                            </button>
-                        )}
-                        {onGoToDaten && (
-                            <button onClick={onGoToDaten} style={{flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
-                                {'\uD83D\uDCCB'} Kundendaten
-                            </button>
-                        )}
-                    </div>
 
                     {/* Breadcrumb */}
                     {path.length > 0 && (
