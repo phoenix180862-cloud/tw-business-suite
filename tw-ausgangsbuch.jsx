@@ -164,36 +164,36 @@
 
                 var monatsnamen = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
-                return React.createElement('div', { className: 'ab-analyse-panel' },
-                    // Jahresuebersicht
-                    React.createElement('div', { className: 'ab-jahres-card' },
-                        React.createElement('div', { className: 'ab-jahres-label' }, 'Jahresumsatz ' + new Date().getFullYear() + ' (netto)'),
-                        React.createElement('div', { className: 'ab-jahres-value' }, fmt(jahresGesamt) + ' \u20AC')
+                return React.createElement('div', { style: { padding: '16px' } },
+                    // Jahresübersicht
+                    React.createElement('div', { style: { padding: '14px', background: 'linear-gradient(135deg, rgba(30,136,229,0.1), rgba(46,204,113,0.1))', borderRadius: '12px', marginBottom: '16px', textAlign: 'center' } },
+                        React.createElement('div', { style: { fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' } }, 'Jahresumsatz ' + new Date().getFullYear() + ' (netto)'),
+                        React.createElement('div', { style: { fontSize: '28px', fontWeight: '700', color: 'var(--success)', marginTop: '4px' } }, fmt(jahresGesamt) + ' €')
                     ),
                     // Monats-Balkendiagramm
-                    React.createElement('div', { className: 'ab-analyse-section-title' }, '\uD83D\uDCCA Monatsumsaetze (brutto)'),
+                    React.createElement('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '8px' } }, '📊 Monatsumsätze (brutto)'),
                     monate.slice(0, 12).map(function(m) {
                         var d = monatsUmsaetze[m];
                         var pct = maxBrutto > 0 ? (d.brutto / maxBrutto * 100) : 0;
                         var parts = m.split('-');
                         var label = monatsnamen[parseInt(parts[1])] + ' ' + parts[0];
-                        return React.createElement('div', { key: m, className: 'ab-bar-row' },
-                            React.createElement('div', { className: 'ab-bar-header' },
+                        return React.createElement('div', { key: m, style: { marginBottom: '6px' } },
+                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' } },
                                 React.createElement('span', null, label + ' (' + d.count + ' RE)'),
-                                React.createElement('span', null, fmt(d.brutto) + ' \u20AC')
+                                React.createElement('span', { style: { fontWeight: '700' } }, fmt(d.brutto) + ' €')
                             ),
-                            React.createElement('div', { className: 'ab-bar-track' },
-                                React.createElement('div', { className: 'ab-bar-fill', style: { width: pct + '%' } })
+                            React.createElement('div', { style: { height: '14px', background: 'var(--bg-tertiary)', borderRadius: '7px', overflow: 'hidden' } },
+                                React.createElement('div', { style: { height: '100%', width: pct + '%', borderRadius: '7px', background: 'linear-gradient(90deg, #1E88E5, #27ae60)', transition: 'width 0.3s' } })
                             )
                         );
                     }),
                     // Quartale
                     Object.keys(quartale).length > 0 && React.createElement('div', { style: { marginTop: '16px' } },
-                        React.createElement('div', { className: 'ab-analyse-section-title' }, '\uD83D\uDCC8 Quartalsumsaetze'),
+                        React.createElement('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '8px' } }, '📈 Quartalsumsätze'),
                         Object.keys(quartale).sort().reverse().map(function(q) {
-                            return React.createElement('div', { key: q, className: 'ab-quartal-row' },
-                                React.createElement('span', null, q + ' (' + quartale[q].count + ' RE)'),
-                                React.createElement('span', null, 'Netto: ' + fmt(quartale[q].netto) + ' \u20AC \u00B7 Brutto: ' + fmt(quartale[q].brutto) + ' \u20AC')
+                            return React.createElement('div', { key: q, style: { display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '1px solid var(--border-subtle)', fontSize: '12px' } },
+                                React.createElement('span', { style: { fontWeight: '600' } }, q + ' (' + quartale[q].count + ' RE)'),
+                                React.createElement('span', null, 'Netto: ' + fmt(quartale[q].netto) + ' € · Brutto: ' + fmt(quartale[q].brutto) + ' €')
                             );
                         })
                     )
@@ -204,9 +204,9 @@
             var renderSettings = function() {
                 var s = Object.assign({}, settings);
                 var update = function(key, val) { var n = Object.assign({}, s); n[key] = val; saveSettings(n); };
-                var iStyle = { width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' };
-                return React.createElement('div', { className: 'ab-settings-panel' },
-                    React.createElement('div', { className: 'ab-settings-title' }, '\u2699\uFE0F Einstellungen'),
+                var iStyle = { width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' };
+                return React.createElement('div', { style: { padding: '16px' } },
+                    React.createElement('div', { style: { fontWeight: '700', fontSize: '14px', marginBottom: '12px' } }, '⚙️ Einstellungen'),
                     [
                         { key: 'standardZahlungsziel', label: 'Standard-Zahlungsziel (Tage)', type: 'number' },
                         { key: 'standardMwst', label: 'Standard MwSt-Satz (%)', type: 'number' },
@@ -214,12 +214,12 @@
                         { key: 'standardSkontoTage', label: 'Standard Skonto-Frist (Tage)', type: 'number' },
                         { key: 'alarmTageVorher', label: 'Alarm X Tage vor Zahlungsziel', type: 'number' },
                     ].map(function(field) {
-                        return React.createElement('div', { key: field.key, className: 'ab-settings-field' },
-                            React.createElement('label', { className: 'ab-settings-label' }, field.label),
+                        return React.createElement('div', { key: field.key, style: { marginBottom: '10px' } },
+                            React.createElement('label', { style: { fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' } }, field.label),
                             React.createElement('input', {
                                 type: field.type, value: settings[field.key] || '',
                                 onChange: function(e) { update(field.key, field.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value); },
-                                className: 'ab-edit-input'
+                                style: iStyle
                             })
                         );
                     })
@@ -227,17 +227,17 @@
             };
 
             // ═══ STATUS-FARBEN ═══
-            var statusColors = { offen: '#f39c12', bezahlt: '#27ae60', gemahnt: '#e63535', storniert: '#7f8c8d' };
+            var statusColors = { offen: '#f39c12', bezahlt: '#27ae60', gemahnt: '#e74c3c', storniert: '#7f8c8d' };
             var statusLabels = { offen: 'Offen', bezahlt: 'Bezahlt', gemahnt: 'Gemahnt', storniert: 'Storniert' };
 
             // ═══ EDIT-FORMULAR ═══
             var renderEditForm = function() {
                 var d = editData;
                 var set = function(key, val) { setEditData(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
-                var iStyle = { width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' };
+                var iStyle = { width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' };
                 return React.createElement('div', { className: 'modal-overlay', style: { zIndex: 4000 } },
-                    React.createElement('div', { className: 'ab-edit-modal' },
-                        React.createElement('div', { className: 'ab-edit-title' }, '\u270F\uFE0F Eintrag bearbeiten'),
+                    React.createElement('div', { style: { width: '95%', maxWidth: '500px', maxHeight: '90vh', overflow: 'auto', background: 'var(--bg-primary)', borderRadius: '16px', padding: '20px' } },
+                        React.createElement('div', { style: { fontWeight: '700', fontSize: '15px', marginBottom: '16px' } }, '✏️ Eintrag bearbeiten'),
                         [
                             { key: 'rechnungsNr', label: 'Rechnungsnummer', type: 'text' },
                             { key: 'typ', label: 'Rechnungstyp', type: 'text' },
@@ -255,25 +255,25 @@
                             { key: 'notiz', label: 'Notiz', type: 'text' },
                         ].map(function(f) {
                             if (f.type === 'select') {
-                                return React.createElement('div', { key: f.key, className: 'ab-edit-field' },
-                                    React.createElement('label', { className: 'ab-edit-label' }, f.label),
-                                    React.createElement('select', { value: d[f.key] || '', onChange: function(e) { set(f.key, e.target.value); }, className: 'ab-edit-input' },
+                                return React.createElement('div', { key: f.key, style: { marginBottom: '8px' } },
+                                    React.createElement('label', { style: { fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' } }, f.label),
+                                    React.createElement('select', { value: d[f.key] || '', onChange: function(e) { set(f.key, e.target.value); }, style: iStyle },
                                         f.options.map(function(o) { return React.createElement('option', { key: o, value: o }, statusLabels[o] || o); })
                                     )
                                 );
                             }
-                            return React.createElement('div', { key: f.key, className: 'ab-edit-field' },
-                                React.createElement('label', { className: 'ab-edit-label' }, f.label),
+                            return React.createElement('div', { key: f.key, style: { marginBottom: '8px' } },
+                                React.createElement('label', { style: { fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' } }, f.label),
                                 React.createElement('input', {
                                     type: f.type, value: d[f.key] != null ? d[f.key] : '',
                                     onChange: function(e) { set(f.key, f.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value); },
-                                    className: 'ab-edit-input'
+                                    style: iStyle
                                 })
                             );
                         }),
-                        React.createElement('div', { className: 'ab-edit-actions' },
-                            React.createElement('button', { onClick: saveEdit, className: 'ab-save-btn' }, '\uD83D\uDCBE Speichern'),
-                            React.createElement('button', { onClick: cancelEdit, className: 'ab-cancel-btn' }, 'Abbrechen')
+                        React.createElement('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } },
+                            React.createElement('button', { onClick: saveEdit, style: { flex: 1, padding: '10px', background: 'var(--success)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' } }, '💾 Speichern'),
+                            React.createElement('button', { onClick: cancelEdit, style: { flex: 1, padding: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '10px', fontSize: '13px', cursor: 'pointer' } }, 'Abbrechen')
                         )
                     )
                 );
@@ -281,43 +281,43 @@
 
             // ═══ HAUPTANSICHT ═══
             return (
-                <div className="page-container ab-page">
+                <div className="page-container" style={{padding:'16px', minHeight:'100vh'}}>
                     {/* Header */}
-                    <div className="ab-header">
-                        <button onClick={onBack} className="ab-back-btn">{'\u2190'}</button>
-                        <div className="ab-header-info">
-                            <div className="ab-header-title">{'\uD83D\uDCD2'} Rechnungsausgangsbuch</div>
-                            <div className="ab-header-subtitle">{eintraege.length} Eintr\u00E4ge {'\u00B7'} {fmt(gesamtOffen)} {'\u20AC'} offen</div>
+                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px'}}>
+                        <button onClick={onBack} style={{background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'var(--text-primary)'}}>←</button>
+                        <div style={{flex:1}}>
+                            <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>📒 Rechnungsausgangsbuch</div>
+                            <div style={{fontSize:'11px', color:'var(--text-muted)'}}>{eintraege.length} Einträge · {fmt(gesamtOffen)} € offen</div>
                         </div>
-                        <button onClick={function() { setShowAnalyse(!showAnalyse); setShowSettings(false); }} className={'ab-toggle-btn ' + (showAnalyse ? 'active' : 'inactive')}>{'\uD83D\uDCCA'}</button>
-                        <button onClick={function() { setShowSettings(!showSettings); setShowAnalyse(false); }} className={'ab-toggle-btn ' + (showSettings ? 'active' : 'inactive')}>{'\u2699\uFE0F'}</button>
+                        <button onClick={function() { setShowAnalyse(!showAnalyse); setShowSettings(false); }} style={{padding:'6px 10px', background: showAnalyse ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: showAnalyse ? 'white' : 'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer'}}>📊</button>
+                        <button onClick={function() { setShowSettings(!showSettings); setShowAnalyse(false); }} style={{padding:'6px 10px', background: showSettings ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: showSettings ? 'white' : 'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer'}}>⚙️</button>
                     </div>
 
                     {/* Alarm-Banner */}
                     {ueberfaelligeCount > 0 && (
-                        <div className="ab-alarm-banner"
+                        <div style={{padding:'10px 14px', marginBottom:'12px', background:'rgba(231,76,60,0.12)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer'}}
                             onClick={function() { setFilterStatus('ueberfaellig'); }}>
-                            <span className="ab-alarm-icon">{'\uD83D\uDEA8'}</span>
+                            <span style={{fontSize:'20px'}}>🚨</span>
                             <div>
-                                <div className="ab-alarm-title">{ueberfaelligeCount} {'\u00FC'}berf{'\u00E4'}llige Rechnung{ueberfaelligeCount > 1 ? 'en' : ''}!</div>
-                                <div className="ab-alarm-subtitle">Zahlungsziel {'\u00FC'}berschritten -- Klicken zum Filtern</div>
+                                <div style={{fontWeight:'700', fontSize:'13px', color:'var(--accent-red-light)'}}>{ueberfaelligeCount} überfällige Rechnung{ueberfaelligeCount > 1 ? 'en' : ''}!</div>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)'}}>Zahlungsziel überschritten -- Klicken zum Filtern</div>
                             </div>
                         </div>
                     )}
 
                     {/* Statistik-Karten */}
-                    <div className="ab-stats-grid">
-                        <div className="ab-stat-card">
-                            <div className="ab-stat-value warn">{offeneCount}</div>
-                            <div className="ab-stat-label">Offen</div>
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'6px', marginBottom:'12px'}}>
+                        <div style={{padding:'8px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
+                            <div style={{fontSize:'18px', fontWeight:'700', color:'var(--accent-orange-light)'}}>{offeneCount}</div>
+                            <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Offen</div>
                         </div>
-                        <div className="ab-stat-card">
-                            <div className="ab-stat-value danger">{fmt(gesamtOffen)}{'\u20AC'}</div>
-                            <div className="ab-stat-label">Ausstehend</div>
+                        <div style={{padding:'8px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
+                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--accent-red-light)'}}>{fmt(gesamtOffen)}€</div>
+                            <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Ausstehend</div>
                         </div>
-                        <div className="ab-stat-card">
-                            <div className="ab-stat-value success">{fmt(gesamtBezahlt)}{'\u20AC'}</div>
-                            <div className="ab-stat-label">Bezahlt</div>
+                        <div style={{padding:'8px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
+                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--success)'}}>{fmt(gesamtBezahlt)}€</div>
+                            <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Bezahlt</div>
                         </div>
                     </div>
 
@@ -326,73 +326,82 @@
                     {showAnalyse && renderAnalyse()}
 
                     {/* Filter-Tabs + Neuer Eintrag */}
-                    <div className="ab-filter-row">
+                    <div style={{display:'flex', gap:'4px', marginBottom:'10px', flexWrap:'wrap', alignItems:'center'}}>
                         {['alle', 'offen', 'ueberfaellig', 'bezahlt', 'gemahnt', 'storniert'].map(function(f) {
-                            var label = f === 'ueberfaellig' ? '\u26A0 \u00DCberf\u00E4llig' : f === 'alle' ? 'Alle' : (statusLabels[f] || f);
+                            var label = f === 'ueberfaellig' ? '⚠ Überfällig' : f === 'alle' ? 'Alle' : (statusLabels[f] || f);
                             return React.createElement('button', {
                                 key: f, onClick: function() { setFilterStatus(f); },
-                                className: 'ab-filter-btn ' + (filterStatus === f ? 'active' : 'inactive')
+                                style: {
+                                    padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                                    background: filterStatus === f ? 'var(--accent-blue)' : 'var(--bg-tertiary)',
+                                    color: filterStatus === f ? 'white' : 'var(--text-muted)'
+                                }
                             }, label);
                         })}
-                        <button onClick={addManualEntry} className="ab-add-btn">+ Neu</button>
+                        <button onClick={addManualEntry} style={{marginLeft:'auto', padding:'4px 10px', background:'var(--success)', color:'white', border:'none', borderRadius:'6px', fontSize:'11px', fontWeight:'700', cursor:'pointer'}}>+ Neu</button>
                     </div>
 
                     {/* Rechnungsliste */}
-                    <div className="ab-entry-list">
+                    <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
                         {filtered.length === 0 && (
-                            <div className="ab-empty">
-                                {eintraege.length === 0 ? 'Noch keine Rechnungen im Ausgangsbuch.\nErstelle eine Rechnung im Rechnungsmodul -- sie wird automatisch hier gespeichert!' : 'Keine Eintr\u00E4ge f\u00FCr diesen Filter.'}
+                            <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px'}}>
+                                {eintraege.length === 0 ? 'Noch keine Rechnungen im Ausgangsbuch.\nErstelle eine Rechnung im Rechnungsmodul -- sie wird automatisch hier gespeichert!' : 'Keine Einträge für diesen Filter.'}
                             </div>
                         )}
                         {filtered.map(function(entry) {
                             var daysInfo = getDaysInfo(entry);
                             var isOverdue = daysInfo && daysInfo.overdue;
                             var isWarning = daysInfo && daysInfo.warning;
-                            var cardClass = 'ab-entry-card' + (isOverdue ? ' overdue' : isWarning ? ' warning' : '');
+                            var borderColor = isOverdue ? '#e74c3c' : isWarning ? '#f39c12' : 'var(--border-subtle)';
 
                             return React.createElement('div', {
                                 key: entry.id,
-                                className: cardClass
+                                style: {
+                                    padding: '10px 12px', borderRadius: '10px', border: '1px solid ' + borderColor,
+                                    background: isOverdue ? 'rgba(231,76,60,0.06)' : isWarning ? 'rgba(243,156,18,0.06)' : 'var(--bg-secondary)',
+                                    position: 'relative'
+                                }
                             },
                                 // Zeile 1: Nr + Typ + Status
-                                React.createElement('div', { className: 'ab-entry-row', style: { marginBottom: '4px' } },
-                                    React.createElement('div', { className: 'ab-entry-nr' }, entry.rechnungsNr || '\u2013'),
-                                    React.createElement('div', { className: 'ab-entry-status-area' },
-                                        isOverdue && React.createElement('span', { className: 'ab-overdue-tag' }, Math.abs(daysInfo.days) + 'T \u00FCberf\u00E4llig!'),
-                                        isWarning && React.createElement('span', { className: 'ab-warning-tag' }, 'F\u00E4llig in ' + daysInfo.days + 'T'),
-                                        React.createElement('span', { className: 'ab-status-badge', style: {
+                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } },
+                                    React.createElement('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)' } }, entry.rechnungsNr || '–'),
+                                    React.createElement('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } },
+                                        isOverdue && React.createElement('span', { style: { fontSize: '10px', color: '#e74c3c', fontWeight: '700' } }, Math.abs(daysInfo.days) + 'T überfällig!'),
+                                        isWarning && React.createElement('span', { style: { fontSize: '10px', color: '#f39c12', fontWeight: '700' } }, 'Fällig in ' + daysInfo.days + 'T'),
+                                        React.createElement('span', { style: {
+                                            padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
                                             background: (statusColors[entry.status] || '#999') + '22', color: statusColors[entry.status] || '#999'
                                         } }, statusLabels[entry.status] || entry.status)
                                     )
                                 ),
                                 // Zeile 2: Kunde + Betrag
-                                React.createElement('div', { className: 'ab-entry-detail' },
-                                    React.createElement('span', { className: 'ab-entry-kunde' }, (entry.typ || '') + ' \u00B7 ' + (entry.kunde || '').substring(0, 30)),
-                                    React.createElement('span', { className: 'ab-entry-betrag' }, fmt(entry.bruttoBetrag) + ' \u20AC')
+                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' } },
+                                    React.createElement('span', { style: { color: 'var(--text-secondary)' } }, (entry.typ || '') + ' · ' + (entry.kunde || '').substring(0, 30)),
+                                    React.createElement('span', { style: { fontWeight: '700', color: 'var(--text-primary)' } }, fmt(entry.bruttoBetrag) + ' €')
                                 ),
                                 // Zeile 3: Datum + Zahlungsziel
-                                React.createElement('div', { className: 'ab-entry-meta' },
-                                    React.createElement('span', null, 'Datum: ' + (entry.datum || '\u2013') + (entry.bauvorhaben ? ' \u00B7 ' + entry.bauvorhaben.substring(0, 25) : '')),
-                                    React.createElement('span', null, 'Ziel: ' + (entry.zahlungszielDatum || '\u2013'))
+                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' } },
+                                    React.createElement('span', null, 'Datum: ' + (entry.datum || '–') + (entry.bauvorhaben ? ' · ' + entry.bauvorhaben.substring(0, 25) : '')),
+                                    React.createElement('span', null, 'Ziel: ' + (entry.zahlungszielDatum || '–'))
                                 ),
                                 // Zeile 4: Aktionen
-                                React.createElement('div', { className: 'ab-entry-actions' },
+                                React.createElement('div', { style: { display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' } },
                                     entry.status === 'offen' && React.createElement('button', {
                                         onClick: function() { changeStatus(entry.id, 'bezahlt'); },
-                                        className: 'ab-action-btn pay'
-                                    }, '\u2713 Bezahlt'),
+                                        style: { padding: '3px 8px', background: 'rgba(46,204,113,0.15)', color: '#27ae60', border: 'none', borderRadius: '5px', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }
+                                    }, '✓ Bezahlt'),
                                     entry.status === 'offen' && isOverdue && React.createElement('button', {
                                         onClick: function() { changeStatus(entry.id, 'gemahnt'); },
-                                        className: 'ab-action-btn remind'
-                                    }, '\u26A0 Gemahnt'),
+                                        style: { padding: '3px 8px', background: 'rgba(231,76,60,0.15)', color: '#e74c3c', border: 'none', borderRadius: '5px', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }
+                                    }, '⚠ Gemahnt'),
                                     React.createElement('button', {
                                         onClick: function() { startEdit(entry); },
-                                        className: 'ab-action-btn edit'
-                                    }, '\u270F\uFE0F'),
+                                        style: { padding: '3px 8px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }
+                                    }, '✏️'),
                                     React.createElement('button', {
                                         onClick: function() { deleteEntry(entry.id); },
-                                        className: 'ab-action-btn delete'
-                                    }, '\uD83D\uDDD1\uFE0F')
+                                        style: { padding: '3px 8px', background: 'var(--bg-tertiary)', color: '#e74c3c', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }
+                                    }, '🗑️')
                                 )
                             );
                         })}

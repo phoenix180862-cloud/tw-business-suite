@@ -702,29 +702,29 @@
                     { id: 'einzel', icon: '🧾', name: 'Einzelrechnung', desc: 'Einfache Rechnung ohne Abschläge', color: '#00897b' },
                 ];
                 return (
-                    <div className="page-container re-page">
+                    <div className="page-container" style={{padding:'16px', minHeight:'100vh'}}>
                         <div dangerouslySetInnerHTML={{__html: noSpinnerCSS}} />
-                        <div className="re-header">
+                        <div style={{textAlign:'center', marginBottom:'20px'}}>
                             <FirmenLogo size="small" />
-                            <div className="re-header-title" style={{marginTop:'12px'}}>{kunde ? kunde.name : ''}</div>
-                            <div className="re-header-subtitle">Rechnungstyp w{'\u00E4'}hlen</div>
+                            <div style={{marginTop:'12px', fontSize:'15px', fontWeight:'700'}}>{kunde ? kunde.name : ''}</div>
+                            <div style={{fontSize:'11px', color:'var(--text-muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginTop:'4px'}}>Rechnungstyp wählen</div>
                         </div>
-                        <div className="re-typ-list">
+                        <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
                             {typen.map(function(t) {
                                 return (
                                     <button key={t.id} onClick={function(){ setRechnungsTyp(t.id); setPhase('posauswahl'); }}
-                                        className="re-typ-btn" style={{border:'2px solid ' + t.color + '22'}}>
-                                        <span className="re-typ-icon">{t.icon}</span>
-                                        <div className="re-typ-info">
-                                            <div className="re-typ-name" style={{color: t.color}}>{t.name}</div>
-                                            <div className="re-typ-desc">{t.desc}</div>
+                                        style={{padding:'14px 16px', borderRadius:'12px', border:'2px solid ' + t.color + '22', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px', textAlign:'left', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
+                                        <span style={{fontSize:'24px'}}>{t.icon}</span>
+                                        <div style={{flex:1}}>
+                                            <div style={{fontSize:'14px', fontWeight:'700', color: t.color}}>{t.name}</div>
+                                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'1px'}}>{t.desc}</div>
                                         </div>
-                                        <span className="re-typ-arrow">{'\u203A'}</span>
+                                        <span style={{color:'var(--text-muted)', fontSize:'16px'}}>›</span>
                                     </button>
                                 );
                             })}
                         </div>
-                        <button onClick={onBack} className="re-back-btn">{'\u2190'} Zur{'\u00FC'}ck zur Modulwahl</button>
+                        <button onClick={onBack} style={{width:'100%', marginTop:'16px', padding:'12px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'13px', cursor:'pointer'}}>← Zurück zur Modulwahl</button>
                     </div>
                 );
             }
@@ -740,40 +740,40 @@
                 var ausgewaehlteAnzahl = allePosn.filter(function(p) { return posAuswahl[p.idx] !== false; }).length;
 
                 return (
-                    <div className="page-container re-page posauswahl">
+                    <div className="page-container" style={{padding:'16px', minHeight:'100vh', paddingBottom:'90px'}}>
                         <div dangerouslySetInnerHTML={{__html: noSpinnerCSS}} />
-                        <div className="re-header sm">
-                            <div className="re-header-subtitle">Positionen auswählen</div>
-                            <div className="re-header-title">{kunde ? kunde.name : ''}</div>
+                        <div style={{textAlign:'center', marginBottom:'16px'}}>
+                            <div style={{fontSize:'11px', color:'var(--text-muted)', letterSpacing:'1.5px', textTransform:'uppercase'}}>Positionen auswählen</div>
+                            <div style={{fontSize:'15px', fontWeight:'700', marginTop:'4px'}}>{kunde ? kunde.name : ''}</div>
                         </div>
 
                         {allePosn.length > 0 ? (
-                            <div className="re-pos-card">
+                            <div style={{background:'var(--bg-secondary)', borderRadius:'14px', overflow:'hidden', boxShadow:'0 2px 8px rgba(0,0,0,0.1)', marginBottom:'12px'}}>
                                 {/* Alle auswählen */}
-                                <div className="re-pos-header">
+                                <div style={{padding:'10px 14px', borderBottom:'2px solid var(--border-color)', display:'flex', alignItems:'center', gap:'8px'}}>
                                     <input type="checkbox" checked={alleAusgewaehlt} onChange={function() {
                                         var neu = {};
                                         allePosn.forEach(function(p) { neu[p.idx] = !alleAusgewaehlt; });
                                         setPosAuswahl(neu);
                                     }} />
-                                    <span className="re-pos-title">Alle Positionen ({allePosn.length})</span>
-                                    <span className="re-pos-count">{ausgewaehlteAnzahl} ausgewählt</span>
+                                    <span style={{fontSize:'12px', fontWeight:'700', color:'var(--accent-blue)'}}>Alle Positionen ({allePosn.length})</span>
+                                    <span style={{marginLeft:'auto', fontSize:'11px', color:'var(--text-muted)'}}>{ausgewaehlteAnzahl} ausgewählt</span>
                                 </div>
-                                <div className="re-pos-scroll">
+                                <div style={{maxHeight:'400px', overflow:'auto'}}>
                                     {allePosn.map(function(p) {
                                         var checked = posAuswahl[p.idx] !== false;
                                         return (
-                                            <div key={p.idx} className={'re-pos-item' + (checked ? '' : ' unchecked')}>
+                                            <div key={p.idx} style={{padding:'10px 14px', borderBottom:'1px solid var(--border-color)', display:'flex', alignItems:'flex-start', gap:'8px', opacity: checked ? 1 : 0.4}}>
                                                 <input type="checkbox" checked={checked} onChange={function() { setPosAuswahl(function(prev) { var n = Object.assign({}, prev); n[p.idx] = !checked; return n; }); }} style={{marginTop:'2px'}} />
-                                                <div className="re-pos-item-info">
-                                                    <div className="re-pos-item-row">
-                                                        <span className="re-pos-nr">{p.pos}</span>
-                                                        <span className="re-pos-bez">{p.bez}</span>
+                                                <div style={{flex:1}}>
+                                                    <div style={{display:'flex', gap:'6px', alignItems:'center'}}>
+                                                        <span style={{fontWeight:'700', fontSize:'11px', color:'var(--accent-blue)', minWidth:'40px'}}>{p.pos}</span>
+                                                        <span style={{fontSize:'12px'}}>{p.bez}</span>
                                                     </div>
-                                                    <div className="re-pos-meta">
+                                                    <div style={{display:'flex', gap:'12px', marginTop:'3px', fontSize:'11px', color:'var(--text-muted)'}}>
                                                         <span>LV: {fmt(p.menge)} {p.einheit}</span>
-                                                        {p.einzelpreis > 0 && <span>EP: {fmt(p.einzelpreis)} {'\u20AC'}</span>}
-                                                        {p.aufmassMenge > 0 && <span className="re-aufmass-tag">Aufma{'\u00DF'}: {fmt(p.aufmassMenge)} {p.einheit}</span>}
+                                                        {p.einzelpreis > 0 && <span>EP: {fmt(p.einzelpreis)} €</span>}
+                                                        {p.aufmassMenge > 0 && <span style={{color:'var(--success)', fontWeight:'600'}}>Aufmaß: {fmt(p.aufmassMenge)} {p.einheit}</span>}
                                                     </div>
                                                 </div>
                                             </div>
@@ -782,7 +782,7 @@
                                 </div>
                             </div>
                         ) : (
-                            <div className="re-empty-state">
+                            <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px', background:'var(--bg-secondary)', borderRadius:'14px', marginBottom:'12px'}}>
                                 Keine LV-Positionen erkannt.<br/>Verwende "Manuell eingeben" um Positionen anzulegen.
                             </div>
                         )}
@@ -798,27 +798,28 @@
                             </button>
                         )}
                         {!hatAufmass && (
-                            <div className="re-hint-bar">
-                                {'\uD83D\uDCD0'} Aufma{'\u00DF'}-{'\u00DC'}bernahme nicht verf{'\u00FC'}gbar -- erstelle zuerst ein Aufma{'\u00DF'}
+                            <div style={{padding:'8px 12px', marginBottom:'8px', borderRadius:'8px', background:'rgba(230,126,34,0.08)', fontSize:'11px', color:'var(--accent-orange)', textAlign:'center'}}>
+                                📐 Aufmaß-Übernahme nicht verfügbar -- erstelle zuerst ein Aufmaß
                             </div>
                         )}
 
                         {/* Action Buttons */}
-                        <div className="re-bottom-bar" style={{display:'flex', gap:'8px'}}>
-                            <button onClick={function(){ setPhase('typwahl'); }} className="re-bar-secondary">{'\u2190'} Zur{'\u00FC'}ck</button>
+                        <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'10px 16px', background:'var(--bg-primary)', borderTop:'1px solid var(--border-color)', zIndex:100, display:'flex', gap:'8px'}}>
+                            <button onClick={function(){ setPhase('typwahl'); }} style={{flex:1, padding:'12px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'12px', cursor:'pointer'}}>← Zurück</button>
                             <button onClick={function(){
-                                // Ausgewaehlte uebernehmen
+                                // Ausgewählte übernehmen
                                 var selected = allePosn.filter(function(p) { return posAuswahl[p.idx] !== false; });
                                 initPositionen(selected);
                                 setPhase('formular');
                             }} disabled={ausgewaehlteAnzahl === 0 && allePosn.length > 0}
-                                className="re-bar-main" style={{flex:2, background: ausgewaehlteAnzahl > 0 || allePosn.length === 0 ? 'var(--accent-blue)' : 'var(--bg-tertiary)'}}>
-                                {ausgewaehlteAnzahl > 0 ? ausgewaehlteAnzahl + ' Positionen \u00FCbernehmen \u2192' : 'Weiter \u2192'}
+                                style={{flex:2, padding:'12px', background: ausgewaehlteAnzahl > 0 || allePosn.length === 0 ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color:'white', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer'}}>
+                                {ausgewaehlteAnzahl > 0 ? ausgewaehlteAnzahl + ' Positionen übernehmen →' : 'Weiter →'}
                             </button>
                         </div>
                         <div style={{marginTop:'4px'}}>
-                            <button onClick={function(){ setPositionen([]); setPhase('formular'); }} className="re-bar-skip">
-                                {'\u270F\uFE0F'} Alle Positionen manuell eingeben
+                            <button onClick={function(){ setPositionen([]); setPhase('formular'); }}
+                                style={{width:'100%', padding:'10px', background:'none', color:'var(--text-muted)', border:'1px dashed var(--border-color)', borderRadius:'10px', fontSize:'12px', cursor:'pointer'}}>
+                                ✏️ Alle Positionen manuell eingeben
                             </button>
                         </div>
                     </div>
@@ -836,7 +837,7 @@
                 : 'Einzelrechnung';
 
             return (
-                <div className="page-container re-page formular">
+                <div className="page-container" style={{padding:'16px', minHeight:'100vh', paddingBottom:'80px'}}>
                     <div dangerouslySetInnerHTML={{__html: noSpinnerCSS}} />
 
                     {/* Header mit Logo */}
@@ -1027,65 +1028,65 @@
                     )}
 
                     {/* Fixed Bottom Bar */}
-                    <div className="re-bottom-bar">
-                        <div className="re-bottom-row" style={{marginBottom: showFormatWahl ? '8px' : '0'}}>
+                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'10px 16px', background:'var(--bg-primary)', borderTop:'1px solid var(--border-color)', zIndex:100}}>
+                        <div style={{display:'flex', gap:'8px', marginBottom: showFormatWahl ? '8px' : '0'}}>
                             <button onClick={function(){ setPhase('posauswahl'); }}
                                 onTouchEnd={function(e){ e.preventDefault(); setPhase('posauswahl'); }}
-                                className="re-bar-back">{'\u2190'}</button>
+                                style={{padding:'12px 10px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'12px', cursor:'pointer', touchAction:'manipulation', minWidth:'44px', minHeight:'44px'}}>←</button>
                             <button
                                 onTouchEnd={function(e){ e.preventDefault(); setShowFormatWahl(!showFormatWahl); }}
                                 onClick={function(){ setShowFormatWahl(!showFormatWahl); }}
-                                className="re-bar-main" style={{background:'linear-gradient(135deg, ' + typColor + ', ' + typColor + 'cc)'}}>
-                                {'\uD83D\uDCC4'} Rechnung erstellen {showFormatWahl ? '\u25BC' : '\u25B2'}
+                                style={{flex:1, padding:'12px', background:'linear-gradient(135deg, ' + typColor + ', ' + typColor + 'cc)', color:'white', border:'none', borderRadius:'10px', fontSize:'14px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', touchAction:'manipulation', minHeight:'48px'}}>
+                                📄 Rechnung erstellen {showFormatWahl ? '▼' : '▲'}
                             </button>
                             <button
                                 onTouchEnd={function(e){ e.preventDefault(); openMailDialog(); }}
                                 onClick={openMailDialog}
-                                className="re-bar-email">
-                                {'\u2709\uFE0F'}
+                                style={{padding:'12px 16px', background:'linear-gradient(135deg, #e67e22, #d35400)', color:'white', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', touchAction:'manipulation', minHeight:'48px'}}>
+                                ✉️
                             </button>
                         </div>
 
                         {/* Format-Auswahl Panel */}
                         {showFormatWahl && (
-                            <div className="re-format-list">
+                            <div style={{display:'flex', flexDirection:'column', gap:'6px', padding:'8px 0 4px', animation:'fadeIn 0.15s ease'}}>
                                 {/* PDF Standard */}
                                 <button
                                     onTouchEnd={function(e){ e.preventDefault(); generatePDF(); setShowFormatWahl(false); }}
                                     onClick={function(){ generatePDF(); setShowFormatWahl(false); }}
-                                    className="re-format-btn">
-                                    <span className="re-format-icon">{'\uD83D\uDCC4'}</span>
-                                    <div className="re-format-info">
-                                        <div className="re-format-name">PDF-Rechnung</div>
-                                        <div className="re-format-desc">Standard-PDF {'\u00B7'} F{'\u00FC'}r Privatkunden (B2C) & Druck</div>
+                                    style={{width:'100%', padding:'14px 16px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px', textAlign:'left', touchAction:'manipulation', minHeight:'56px', WebkitTapHighlightColor:'rgba(30,136,229,0.2)'}}>
+                                    <span style={{fontSize:'24px'}}>📄</span>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)'}}>PDF-Rechnung</div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'1px'}}>Standard-PDF · Für Privatkunden (B2C) & Druck</div>
                                     </div>
-                                    <span className="re-format-tag b2c">B2C</span>
+                                    <span style={{fontSize:'11px', color:'var(--text-muted)', background:'var(--bg-tertiary)', padding:'3px 8px', borderRadius:'6px', fontWeight:'600'}}>B2C</span>
                                 </button>
 
                                 {/* ZUGFeRD */}
                                 <button
                                     onTouchEnd={function(e){ e.preventDefault(); downloadZUGFeRD(); setShowFormatWahl(false); }}
                                     onClick={function(){ downloadZUGFeRD(); setShowFormatWahl(false); }}
-                                    className="re-format-btn zugferd">
-                                    <span className="re-format-icon">{'\uD83D\uDCCB'}</span>
-                                    <div className="re-format-info">
-                                        <div className="re-format-name" style={{color:'var(--success)'}}>ZUGFeRD E-Rechnung</div>
-                                        <div className="re-format-desc">PDF + XML (EN16931) {'\u00B7'} Hybrid f{'\u00FC'}r Gesch{'\u00E4'}ftskunden</div>
+                                    style={{width:'100%', padding:'14px 16px', borderRadius:'12px', border:'1px solid rgba(39,174,96,0.3)', background:'rgba(39,174,96,0.05)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px', textAlign:'left', touchAction:'manipulation', minHeight:'56px', WebkitTapHighlightColor:'rgba(39,174,96,0.2)'}}>
+                                    <span style={{fontSize:'24px'}}>📋</span>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--success)'}}>ZUGFeRD E-Rechnung</div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'1px'}}>PDF + XML (EN16931) · Hybrid für Geschäftskunden</div>
                                     </div>
-                                    <span className="re-format-tag b2b">B2B</span>
+                                    <span style={{fontSize:'11px', color:'var(--success)', background:'rgba(39,174,96,0.1)', padding:'3px 8px', borderRadius:'6px', fontWeight:'600'}}>B2B</span>
                                 </button>
 
                                 {/* XRechnung */}
                                 <button
                                     onTouchEnd={function(e){ e.preventDefault(); downloadXRechnung(); setShowFormatWahl(false); }}
                                     onClick={function(){ downloadXRechnung(); setShowFormatWahl(false); }}
-                                    className="re-format-btn xrechnung">
-                                    <span className="re-format-icon">{'\uD83C\uDFDB\uFE0F'}</span>
-                                    <div className="re-format-info">
-                                        <div className="re-format-name" style={{color:'var(--accent-blue)'}}>XRechnung</div>
-                                        <div className="re-format-desc">Reines XML (CII) {'\u00B7'} F{'\u00FC'}r Beh{'\u00F6'}rden & {'\u00F6'}ffentl. Auftraggeber</div>
+                                    style={{width:'100%', padding:'14px 16px', borderRadius:'12px', border:'1px solid rgba(30,136,229,0.3)', background:'rgba(30,136,229,0.05)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px', textAlign:'left', touchAction:'manipulation', minHeight:'56px', WebkitTapHighlightColor:'rgba(30,136,229,0.2)'}}>
+                                    <span style={{fontSize:'24px'}}>🏛️</span>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--accent-blue)'}}>XRechnung</div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'1px'}}>Reines XML (CII) · Für Behörden & öffentl. Auftraggeber</div>
                                     </div>
-                                    <span className="re-format-tag b2g">B2G</span>
+                                    <span style={{fontSize:'11px', color:'var(--accent-blue)', background:'rgba(30,136,229,0.1)', padding:'3px 8px', borderRadius:'6px', fontWeight:'600'}}>B2G</span>
                                 </button>
                             </div>
                         )}

@@ -408,13 +408,13 @@
                             }
                         </div>
                         {!isDemoMode && step === 0 && (
-                            <div className="auth-info-box">
+                            <div style={{padding:'8px 12px', background:'rgba(230,126,34,0.08)', borderRadius:'6px', fontSize:'11px', color:'var(--accent-orange)', marginBottom:'10px', lineHeight:'1.5'}}>
                                 <strong>Aktuelle URL:</strong> {window.location.origin}<br/>
                                 Diese URL muss in der Google Cloud Console als "Autorisierte JavaScript-Quelle" eingetragen sein.
                             </div>
                         )}
                         {error && (
-                            <div className="auth-error-box">
+                            <div style={{padding:'12px 14px', background:'rgba(196,30,30,0.1)', border:'1px solid rgba(196,30,30,0.3)', borderRadius:'8px', color:'var(--accent-red-light)', fontSize:'13px', marginBottom:'12px', whiteSpace:'pre-wrap', lineHeight:'1.5', maxHeight:'200px', overflowY:'auto'}}>
                                 ⚠️ {error}
                             </div>
                         )}
@@ -479,15 +479,21 @@
             }
             render() {
                 if (this.state.hasError) {
-                    return React.createElement('div', { className: 'eb-container' },
-                        React.createElement('h2', { className: 'eb-title' }, '\u26A0\uFE0F App-Fehler aufgetreten'),
-                        React.createElement('p', { className: 'eb-message' }, 'Die App ist abgestuerzt. Bitte Screenshot an den Entwickler senden:'),
-                        React.createElement('pre', { className: 'eb-stack' }, String(this.state.error)),
-                        this.state.errorInfo && React.createElement('pre', { className: 'eb-stack-detail' }, this.state.errorInfo.componentStack),
+                    return React.createElement('div', {
+                        style: { padding: '30px', background: '#1a2332', color: '#ff6b6b', minHeight: '100vh', fontFamily: 'monospace', fontSize: '14px' }
+                    },
+                        React.createElement('h2', { style: { color: '#ff6b6b', marginBottom: '16px' } }, '⚠️ App-Fehler aufgetreten'),
+                        React.createElement('p', { style: { color: '#f0f2f5', marginBottom: '12px' } }, 'Die App ist abgestürzt. Bitte Screenshot an den Entwickler senden:'),
+                        React.createElement('pre', {
+                            style: { background: '#243044', padding: '16px', borderRadius: '8px', overflow: 'auto', maxHeight: '200px', whiteSpace: 'pre-wrap', marginBottom: '12px', border: '1px solid #3a4d66' }
+                        }, String(this.state.error)),
+                        this.state.errorInfo && React.createElement('pre', {
+                            style: { background: '#243044', padding: '16px', borderRadius: '8px', overflow: 'auto', maxHeight: '300px', whiteSpace: 'pre-wrap', fontSize: '11px', border: '1px solid #3a4d66' }
+                        }, this.state.errorInfo.componentStack),
                         React.createElement('button', {
                             onClick: function() { window.location.reload(); },
-                            className: 'eb-reload-btn'
-                        }, '\uD83D\uDD04 App neu laden')
+                            style: { marginTop: '16px', padding: '12px 24px', background: '#c41e1e', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', cursor: 'pointer' }
+                        }, '🔄 App neu laden')
                     );
                 }
                 return this.props.children;
@@ -505,14 +511,14 @@
             var s = document.createElement('style');
             s.id = 'tw-mic-pulse-css';
             s.textContent = [
-                '@keyframes twMicPulse { 0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(230,53,53,0.4); } 50% { transform:scale(1.08); box-shadow:0 0 0 6px rgba(230,53,53,0); } }',
+                '@keyframes twMicPulse { 0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(231,76,60,0.4); } 50% { transform:scale(1.08); box-shadow:0 0 0 6px rgba(231,76,60,0); } }',
                 '@keyframes twMicIdle { 0%,100% { opacity:0.85; } 50% { opacity:1; } }',
-                '.tw-mic-btn { display:inline-flex !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; transition:all 0.15s ease !important; -webkit-tap-highlight-color:rgba(77,166,255,0.2) !important; touch-action:manipulation !important; user-select:none !important; -webkit-user-select:none !important; }',
+                '.tw-mic-btn { display:inline-flex !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; transition:all 0.15s ease !important; -webkit-tap-highlight-color:rgba(30,136,229,0.2) !important; touch-action:manipulation !important; user-select:none !important; -webkit-user-select:none !important; }',
                 '.tw-mic-btn:active { transform:scale(0.92) !important; }',
                 '.tw-mic-btn-normal { min-width:40px; min-height:40px; width:40px; height:40px; padding:0; border-radius:10px; font-size:18px; }',
                 '.tw-mic-btn-small { min-width:30px; min-height:30px; width:30px; height:30px; padding:0; border-radius:6px; font-size:14px; }',
-                '.tw-mic-btn-idle { background:rgba(77,166,255,0.08); border:1.5px solid rgba(77,166,255,0.25); color:var(--accent-blue); }',
-                '.tw-mic-btn-active { background:rgba(230,53,53,0.15); border:2px solid var(--accent-red-light); color:var(--accent-red-light); animation:twMicPulse 1.2s ease-in-out infinite; }'
+                '.tw-mic-btn-idle { background:rgba(30,136,229,0.08); border:1.5px solid rgba(30,136,229,0.25); color:#1E88E5; }',
+                '.tw-mic-btn-active { background:rgba(231,76,60,0.15); border:2px solid #e74c3c; color:#e74c3c; animation:twMicPulse 1.2s ease-in-out infinite; }'
             ].join('\n');
             document.head.appendChild(s);
         })();
@@ -649,7 +655,7 @@
                 style: Object.assign({
                     fontSize: '11px', fontWeight: '700', display: 'block', marginBottom: '3px',
                     textTransform: 'uppercase', letterSpacing: '0.5px',
-                    color: isActive ? 'var(--accent-red-light)' : 'var(--text-muted)',
+                    color: isActive ? '#e74c3c' : 'var(--text-muted)',
                     transition: 'color 0.2s'
                 }, style)
             }, isActive ? '\uD83D\uDD34 Aufnahme...' : label);
@@ -662,8 +668,8 @@
             var isActive = activeMic === fieldKey;
             var baseInputStyle = props.style || {};
             var mergedStyle = Object.assign({}, baseInputStyle, {
-                borderColor: isActive ? 'var(--accent-red-light)' : (baseInputStyle.borderColor || 'var(--border-color)'),
-                boxShadow: isActive ? '0 0 0 2px rgba(230,53,53,0.2)' : (baseInputStyle.boxShadow || 'none'),
+                borderColor: isActive ? '#e74c3c' : (baseInputStyle.borderColor || 'var(--border-color)'),
+                boxShadow: isActive ? '0 0 0 2px rgba(231,76,60,0.2)' : (baseInputStyle.boxShadow || 'none'),
                 transition: 'border-color 0.2s, box-shadow 0.2s'
             });
             var inputProps = Object.assign({}, props, { style: mergedStyle });
@@ -756,30 +762,30 @@
             }
 
             return (
-                <div className="ob-container">
+                <div style={{padding:'16px', minHeight:'100vh', background:'var(--bg-primary)'}}>
                     {/* Header */}
-                    <div className="ob-header">
-                        <button onClick={onBack} className="ob-quick-btn" style={{flex:'none', padding:'8px 12px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px', flexWrap:'wrap'}}>
+                        <button onClick={onBack} style={{padding:'10px 16px', borderRadius:'var(--radius-md)', border:'none', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', cursor:'pointer', fontSize:'12px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', display:'flex', alignItems:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.8px', transition:'all 0.25s ease'}}>
                             {'\u2190'} Zurueck
                         </button>
-                        <div className="ob-kunde-info">
-                            <div className="ob-kunde-name">
+                        <div style={{flex:1, minWidth:'120px'}}>
+                            <div style={{fontSize:'15px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                                 {'\uD83D\uDCC1'} {kundeName.split(' \u2013 ')[0]}
                             </div>
-                            <div className="ob-kunde-meta">
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
                                 {folders.length} Ordner, {files.length} Dateien
                             </div>
                         </div>
                     </div>
                     {/* Schnell-Navigation */}
-                    <div className="ob-quick-nav">
+                    <div style={{display:'flex', gap:'6px', marginBottom:'12px'}}>
                         {onGoToModulwahl && (
-                            <button onClick={onGoToModulwahl} className="ob-quick-btn">
+                            <button onClick={onGoToModulwahl} style={{flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
                                 {'\uD83D\uDCDA'} Module
                             </button>
                         )}
                         {onGoToDaten && (
-                            <button onClick={onGoToDaten} className="ob-quick-btn">
+                            <button onClick={onGoToDaten} style={{flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
                                 {'\uD83D\uDCCB'} Kundendaten
                             </button>
                         )}
@@ -787,17 +793,17 @@
 
                     {/* Breadcrumb */}
                     {path.length > 0 && (
-                        <div className="ob-breadcrumb">
-                            <span className="ob-breadcrumb-link" onClick={function() { setPath([]); loadFolder(driveFolderId); }}>
+                        <div style={{display:'flex', alignItems:'center', gap:'4px', marginBottom:'12px', flexWrap:'wrap', fontSize:'12px'}}>
+                            <span onClick={function() { setPath([]); loadFolder(driveFolderId); }} style={{cursor:'pointer', color:'var(--accent-blue)', fontWeight:'600', touchAction:'manipulation'}}>
                                 {'\uD83C\uDFE0'} Root
                             </span>
                             {path.map(function(p, idx) {
                                 var isLast = idx === path.length - 1;
                                 return (
                                     <React.Fragment key={p.id}>
-                                        <span className="ob-breadcrumb-sep">{'\u203A'}</span>
+                                        <span style={{color:'var(--text-muted)'}}>{'\u203A'}</span>
                                         <span onClick={isLast ? undefined : function() { var np = path.slice(0, idx + 1); setPath(np); loadFolder(p.id); }}
-                                            className={isLast ? 'ob-breadcrumb-current' : 'ob-breadcrumb-link'}>
+                                            style={{cursor: isLast ? 'default' : 'pointer', color: isLast ? 'var(--text-primary)' : 'var(--accent-blue)', fontWeight: isLast ? '700' : '600', maxWidth:'140px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', touchAction:'manipulation'}}>
                                             {p.name}
                                         </span>
                                     </React.Fragment>
@@ -808,26 +814,29 @@
 
                     {/* Zurueck */}
                     {path.length > 0 && (
-                        <button onClick={goUp} className="ob-go-up">
+                        <button onClick={goUp} style={{display:'flex', alignItems:'center', gap:'8px', width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)', background:'transparent', cursor:'pointer', color:'var(--text-muted)', fontSize:'13px', fontWeight:'600', touchAction:'manipulation'}}>
                             {'\u2B06\uFE0F'} {'\u00DCbergeordneter Ordner'}
                         </button>
                     )}
 
                     {/* Loading */}
-                    {loading && (<div className="ob-loading">Ordner wird geladen...</div>)}
+                    {loading && (<div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)'}}><div style={{fontSize:'14px'}}>Ordner wird geladen...</div></div>)}
 
                     {/* Error */}
-                    {error && !loading && (<div className="ob-error">{error}</div>)}
+                    {error && !loading && (<div style={{padding:'16px', borderRadius:'12px', background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', fontSize:'13px', textAlign:'center', marginBottom:'16px'}}>{error}</div>)}
 
                     {/* ORDNER */}
                     {!loading && folders.length > 0 && (
-                        <div className="ob-folder-list">
+                        <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'16px'}}>
                             {folders.map(function(folder) {
                                 return (
-                                    <button key={folder.id} onClick={function() { goIntoFolder(folder); }} className="ob-folder-btn">
-                                        <span className="ob-folder-icon">{'\uD83D\uDCC1'}</span>
-                                        <div className="ob-folder-name">{folder.name}</div>
-                                        <span className="ob-folder-arrow">{'\u203A'}</span>
+                                    <button key={folder.id} onClick={function() { goIntoFolder(folder); }}
+                                        style={{display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', textAlign:'left', touchAction:'manipulation'}}>
+                                        <span style={{fontSize:'26px'}}>{'\uD83D\uDCC1'}</span>
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{folder.name}</div>
+                                        </div>
+                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>{'\u203A'}</span>
                                     </button>
                                 );
                             })}
@@ -837,19 +846,20 @@
                     {/* DATEIEN */}
                     {!loading && files.length > 0 && (
                         <div>
-                            <div className="ob-file-header">
+                            <div style={{fontSize:'11px', fontWeight:'700', color:'var(--accent-blue)', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'8px', paddingLeft:'4px'}}>
                                 {files.length} {files.length === 1 ? 'Datei' : 'Dateien'}
                             </div>
-                            <div className="ob-file-list">
+                            <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
                                 {files.map(function(datei) {
                                     return (
-                                        <button key={datei.id} onClick={function() { openFile(datei.id); }} className="ob-file-btn">
-                                            <span className="ob-file-icon">{getIcon(datei.name, datei.mimeType)}</span>
-                                            <div className="ob-file-info">
-                                                <div className="ob-file-name">{datei.name}</div>
-                                                <div className="ob-file-size">{datei.size}</div>
+                                        <button key={datei.id} onClick={function() { openFile(datei.id); }}
+                                            style={{display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px 14px', borderRadius:'10px', border:'1px solid rgba(30,136,229,0.25)', background:'rgba(30,136,229,0.05)', cursor:'pointer', textAlign:'left', touchAction:'manipulation'}}>
+                                            <span style={{fontSize:'22px'}}>{getIcon(datei.name, datei.mimeType)}</span>
+                                            <div style={{flex:1, minWidth:0}}>
+                                                <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{datei.name}</div>
+                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>{datei.size}</div>
                                             </div>
-                                            <span className="ob-file-open-tag">
+                                            <span style={{fontSize:'12px', padding:'5px 12px', borderRadius:'var(--radius-sm)', background:'var(--accent-blue)', color:'#fff', fontWeight:'600', whiteSpace:'nowrap', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
                                                 {'\u00D6ffnen'}
                                             </span>
                                         </button>
@@ -861,7 +871,7 @@
 
                     {/* Leer */}
                     {!loading && !error && folders.length === 0 && files.length === 0 && (
-                        <div className="ob-empty">Dieser Ordner ist leer.</div>
+                        <div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)', fontSize:'13px'}}>Dieser Ordner ist leer.</div>
                     )}
                 </div>
             );

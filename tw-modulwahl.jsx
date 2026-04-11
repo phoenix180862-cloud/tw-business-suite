@@ -1,48 +1,58 @@
         function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta, onDatenBearbeiten, onOrdnerBrowser }) {
             const module = [
-                { id: 'aufmass', icon: '\uD83D\uDCD0', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', color: '#1E88E5', ready: true },
-                { id: 'rechnung', icon: '\uD83D\uDCB6', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', color: '#27ae60', ready: true },
-                { id: 'ausgangsbuch', icon: '\uD83D\uDCD2', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', color: '#e67e22', ready: true },
+                { id: 'aufmass', icon: '\uD83D\uDCD0', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', color: 'var(--accent-blue)', ready: true },
+                { id: 'rechnung', icon: '\uD83D\uDCB6', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', color: 'var(--success)', ready: true },
+                { id: 'ausgangsbuch', icon: '\uD83D\uDCD2', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', color: 'var(--accent-orange)', ready: true },
                 { id: 'schriftverkehr', icon: '\u2709\uFE0F', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', color: '#8e44ad', ready: true },
-                { id: 'baustelle', icon: '\uD83D\uDCF1', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', color: '#e74c3c', ready: true },
+                { id: 'baustelle', icon: '\uD83D\uDCF1', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', color: 'var(--accent-red-light)', ready: true },
             ];
             return (
-                <div className="page-container mw-page">
-                    <div className="mw-header">
+                <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
+                    <div style={{textAlign:'center', marginBottom:'20px'}}>
                         <FirmenLogo size="small" />
-                        <div className="mw-header-title">
+                        <div style={{marginTop:'12px', fontSize:'15px', fontWeight:'600', color:'var(--text-primary)', fontFamily:'Oswald, sans-serif'}}>
                             {kunde ? kunde.name : 'Kunde'}
                         </div>
-                        <div className="mw-header-subtitle">
-                            Modul w{'\u00e4'}hlen
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'1.5px', textTransform:'uppercase', fontFamily:'Oswald, sans-serif', fontWeight:'500'}}>
+                            Modul w\u00e4hlen
                         </div>
                     </div>
 
                     {/* Schnellzugriff-Navigation */}
-                    <div className="mw-quick-row">
+                    <div style={{display:'flex', gap:'6px', marginBottom:'16px', flexWrap:'wrap'}}>
                         {onDatenBearbeiten && (
-                            <button onClick={onDatenBearbeiten} className="mw-quick-btn">
+                            <button onClick={onDatenBearbeiten} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
                                 {'\uD83D\uDCCB'} Kundendaten
                             </button>
                         )}
                         {onOrdnerBrowser && kunde && (kunde._driveFolderId || kunde.id) && (
-                            <button onClick={onOrdnerBrowser} className="mw-quick-btn">
+                            <button onClick={onOrdnerBrowser} style={{flex:1, minWidth:'100px', padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', fontSize:'11px', fontWeight:'600', color:'#fff', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', boxShadow:'0 2px 8px rgba(196,30,30,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
                                 {'\uD83D\uDCC1'} Ordner
                             </button>
                         )}
                     </div>
 
                     {/* Modul-Kacheln */}
-                    <div className="mw-grid">
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
                         {module.map(function(m) {
                             return (
                                 <button key={m.id} onClick={function() { if (m.ready) onSelectModul(m.id); }}
-                                    className={'mw-modul-btn' + (m.ready ? '' : ' disabled')}>
-                                    <span className="mw-modul-icon">{m.icon}</span>
-                                    <span className="mw-modul-name" style={{color: m.ready ? m.color : 'var(--text-muted)'}}>{m.name}</span>
-                                    <span className="mw-modul-desc">{m.desc}</span>
+                                    style={{
+                                        padding:'20px 14px', borderRadius:'var(--radius-lg)', border:'1px solid var(--border-color)', cursor: m.ready ? 'pointer' : 'default',
+                                        background: m.ready ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                                        opacity: m.ready ? 1 : 0.4,
+                                        display:'flex', flexDirection:'column', alignItems:'center', gap:'8px',
+                                        boxShadow: m.ready ? 'var(--shadow-md)' : 'none',
+                                        transition:'all 0.25s ease',
+                                        position:'relative'
+                                    }}>
+                                    <span style={{fontSize:'32px'}}>{m.icon}</span>
+                                    <span style={{fontSize:'14px', fontWeight:'600', color: m.ready ? m.color : 'var(--text-muted)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>{m.name}</span>
+                                    <span style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.3', fontFamily:'Source Sans 3, sans-serif'}}>{m.desc}</span>
                                     {!m.ready && (
-                                        <span className="mw-bald-tag">BALD</span>
+                                        <span style={{position:'absolute', top:'8px', right:'8px', fontSize:'9px', background:'rgba(196,30,30,0.12)', color:'var(--accent-red-light)', padding:'2px 6px', borderRadius:'var(--radius-sm)', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                            BALD
+                                        </span>
                                     )}
                                 </button>
                             );
@@ -59,22 +69,22 @@
             var pct = totalDocs > 0 ? Math.round((currentDoc / totalDocs) * 100) : 0;
             return (
                 <div className="modal-overlay" style={{zIndex:5000, background:'rgba(10,15,25,0.95)', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                    <div className="ki-overlay-content">
-                        <div className="ki-overlay-icon">{'\uD83E\uDD16'}</div>
-                        <div className="ki-overlay-title">KI-Analyse l{'\u00E4'}uft...</div>
+                    <div style={{width:'90%', maxWidth:'400px', textAlign:'center', color:'white'}}>
+                        <div style={{fontSize:'48px', marginBottom:'16px'}}>🤖</div>
+                        <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px'}}>KI-Analyse l\u00e4uft...</div>
 
                         {/* Fortschrittsbalken */}
-                        <div className="ki-progress-track">
-                            <div className="ki-progress-fill" style={{width: pct + '%'}}></div>
+                        <div style={{width:'100%', height:'8px', background:'rgba(255,255,255,0.1)', borderRadius:'4px', overflow:'hidden', marginBottom:'12px'}}>
+                            <div style={{width: pct + '%', height:'100%', background:'linear-gradient(90deg, var(--accent-blue), var(--accent-orange))', borderRadius:'4px', transition:'width 0.5s ease'}}></div>
                         </div>
-                        <div className="ki-progress-text">
+                        <div style={{fontSize:'14px', color:'rgba(255,255,255,0.7)', marginBottom:'16px'}}>
                             {progress || ('Dokument ' + currentDoc + ' von ' + totalDocs + ' wird analysiert')}
                         </div>
-                        <div className="ki-progress-pct">{pct}%</div>
+                        <div style={{fontSize:'13px', fontWeight:'600', marginBottom:'12px'}}>{pct}%</div>
 
                         {/* Detail-Liste */}
                         {details && details.length > 0 && (
-                            <div className="ki-detail-list">
+                            <div style={{textAlign:'left', fontSize:'12px', lineHeight:'1.8'}}>
                                 {details.map(function(d, i) {
                                     return (
                                         <div key={i} style={{color: d.done ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)'}}>
@@ -98,13 +108,13 @@
                 return (
                     <div className="modal-overlay" style={{zIndex:4000}}>
                         <div style={{width:'95%', maxWidth:'700px', background:'var(--bg-primary)', borderRadius:'16px', padding:'24px', textAlign:'center'}}>
-                            <div style={{fontSize:'48px', marginBottom:'12px'}}>{'\uD83E\uDD16'}</div>
+                            <div style={{fontSize:'48px', marginBottom:'12px'}}>🤖</div>
                             <div style={{fontSize:'16px', fontWeight:'700', marginBottom:'8px'}}>Keine KI-Akte vorhanden</div>
                             <div style={{fontSize:'13px', color:'var(--text-muted)', marginBottom:'20px'}}>
-                                {'\u00D6'}ffne den Kunden {'\u00FC'}ber "Kunde NEU" um eine KI-Analyse durchzuf{'\u00FC'}hren.
+                                Öffne den Kunden über "Kunde NEU" um eine KI-Analyse durchzuführen.
                             </div>
-                            <button onClick={onClose} className="ki-akte-btn close" style={{flex:'none', padding:'10px 24px'}}>
-                                Schlie{'\u00DF'}en
+                            <button onClick={onClose} style={{padding:'10px 24px', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', border:'none', borderRadius:'var(--radius-md)', fontSize:'14px', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontWeight:'600', textTransform:'uppercase', letterSpacing:'1px', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', transition:'all 0.25s ease'}}>
+                                Schlie\u00dfen
                             </button>
                         </div>
                     </div>
@@ -128,45 +138,50 @@
 
             return (
                 <div className="modal-overlay" style={{zIndex:4000}}>
-                    <div className="ki-akte-modal">
+                    <div style={{width:'95%', maxWidth:'750px', maxHeight:'92vh', background:'var(--bg-primary)', borderRadius:'16px', overflow:'hidden', display:'flex', flexDirection:'column'}}>
                         {/* Header */}
-                        <div className="ki-akte-header">
-                            <span className="ki-akte-header-icon">{'\uD83E\uDD16'}</span>
-                            <div className="ki-akte-header-info">
-                                <div className="ki-akte-header-title">KI-Akte: {kunde ? kunde.name : ''}</div>
-                                <div className="ki-akte-header-meta">
-                                    Analysiert: {kiAkte.meta.analyseZeitpunkt ? new Date(kiAkte.meta.analyseZeitpunkt).toLocaleString('de-DE') : '\u2013'} {'\u00B7'} {kiAkte.meta.anzahlDokumente || 0} Dokumente
+                        <div style={{padding:'16px 20px', borderBottom:'1px solid var(--border-color)', display:'flex', alignItems:'center', gap:'12px'}}>
+                            <span style={{fontSize:'24px'}}>🤖</span>
+                            <div style={{flex:1}}>
+                                <div style={{fontSize:'16px', fontWeight:'700'}}>KI-Akte: {kunde ? kunde.name : ''}</div>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)'}}>
+                                    Analysiert: {kiAkte.meta.analyseZeitpunkt ? new Date(kiAkte.meta.analyseZeitpunkt).toLocaleString('de-DE') : '–'} · {kiAkte.meta.anzahlDokumente || 0} Dokumente
                                 </div>
                             </div>
-                            <button onClick={onClose} className="ki-akte-close">{'\u2715'}</button>
+                            <button onClick={onClose} style={{background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'var(--text-muted)'}}>✕</button>
                         </div>
 
                         {/* Schnellübersicht-Karten */}
-                        <div className="ki-akte-stats">
-                            <div className="ki-stat-card success">
-                                <div className="ki-stat-label success">AUFTRAGSSUMME</div>
-                                <div className="ki-stat-value">{vertrag.auftragssumme ? Number(vertrag.auftragssumme).toLocaleString('de-DE', {style:'currency', currency:'EUR'}) : '\u2013'}</div>
+                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', padding:'12px 16px'}}>
+                            <div style={{padding:'10px', borderRadius:'10px', background:'rgba(39,174,96,0.1)', border:'1px solid rgba(39,174,96,0.2)'}}>
+                                <div style={{fontSize:'11px', color:'#27ae60', fontWeight:'600'}}>AUFTRAGSSUMME</div>
+                                <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>{vertrag.auftragssumme ? Number(vertrag.auftragssumme).toLocaleString('de-DE', {style:'currency', currency:'EUR'}) : '–'}</div>
                             </div>
-                            <div className="ki-stat-card info">
-                                <div className="ki-stat-label info">POSITIONEN</div>
-                                <div className="ki-stat-value">{pos.length}</div>
+                            <div style={{padding:'10px', borderRadius:'10px', background:'rgba(30,136,229,0.1)', border:'1px solid rgba(30,136,229,0.2)'}}>
+                                <div style={{fontSize:'11px', color:'#1E88E5', fontWeight:'600'}}>POSITIONEN</div>
+                                <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>{pos.length}</div>
                             </div>
-                            <div className="ki-stat-card warn">
-                                <div className="ki-stat-label warn">OFFENE NACHTR{'\u00C4'}GE</div>
-                                <div className="ki-stat-value">{nachtr.filter(function(n){return n.status !== 'beauftragt';}).length}</div>
+                            <div style={{padding:'10px', borderRadius:'10px', background:'rgba(230,126,34,0.1)', border:'1px solid rgba(230,126,34,0.2)'}}>
+                                <div style={{fontSize:'11px', color:'#e67e22', fontWeight:'600'}}>OFFENE NACHTRÄGE</div>
+                                <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>{nachtr.filter(function(n){return n.status !== 'beauftragt';}).length}</div>
                             </div>
-                            <div className={'ki-stat-card ' + (warnungen.length > 0 ? 'danger' : 'neutral')}>
-                                <div className={'ki-stat-label ' + (warnungen.length > 0 ? 'danger' : 'neutral')}>{'\u26A0'} WARNUNGEN</div>
-                                <div className="ki-stat-value">{warnungen.length}</div>
+                            <div style={{padding:'10px', borderRadius:'10px', background: warnungen.length > 0 ? 'rgba(231,76,60,0.1)' : 'rgba(127,140,141,0.1)', border: '1px solid ' + (warnungen.length > 0 ? 'rgba(231,76,60,0.2)' : 'rgba(127,140,141,0.2)')}}>
+                                <div style={{fontSize:'11px', color: warnungen.length > 0 ? '#e74c3c' : '#7f8c8d', fontWeight:'600'}}>⚠ WARNUNGEN</div>
+                                <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>{warnungen.length}</div>
                             </div>
                         </div>
 
                         {/* Tab-Leiste */}
-                        <div className="ki-tab-bar">
+                        <div style={{display:'flex', gap:'4px', padding:'0 16px', overflowX:'auto', borderBottom:'1px solid var(--border-color)'}}>
                             {tabs.map(function(t) {
                                 return (
                                     <button key={t.id} onClick={function(){setActiveTab(t.id);}}
-                                        className={'ki-tab' + (activeTab === t.id ? ' active' : '')}>
+                                        style={{
+                                            padding:'8px 12px', fontSize:'11px', fontWeight:'600', cursor:'pointer',
+                                            border:'none', background:'none', whiteSpace:'nowrap',
+                                            color: activeTab === t.id ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                            borderBottom: activeTab === t.id ? '2px solid var(--accent-blue)' : '2px solid transparent'
+                                        }}>
                                         {t.label}
                                     </button>
                                 );
@@ -174,7 +189,7 @@
                         </div>
 
                         {/* Tab-Inhalt */}
-                        <div className="ki-tab-content">
+                        <div style={{flex:1, overflow:'auto', padding:'12px 16px'}}>
                             {activeTab === 'positionen' && (
                                 <div>
                                     {pos.length === 0 ? (
@@ -188,7 +203,7 @@
                                                     <span style={{fontWeight:'600', minWidth:'60px', textAlign:'right'}}>{p.menge ? Number(p.menge).toLocaleString('de-DE') : '–'}</span>
                                                     <span style={{color:'var(--text-muted)', minWidth:'30px', textAlign:'right', fontSize:'11px'}}>{p.einheit || ''}</span>
                                                 </div>
-                                                {p.besonderheiten && <div style={{fontSize:'11px', color:'var(--accent-orange)', marginTop:'4px'}}>ℹ {p.besonderheiten}</div>}
+                                                {p.besonderheiten && <div style={{fontSize:'11px', color:'#e67e22', marginTop:'4px'}}>ℹ {p.besonderheiten}</div>}
                                             </div>
                                         );
                                     })}
@@ -266,12 +281,12 @@
                         </div>
 
                         {/* Footer mit Neu-Analyse */}
-                        <div className="ki-akte-footer">
-                            <button onClick={onNeuAnalyse} className="ki-akte-btn reanalyse">
+                        <div style={{padding:'12px 16px', borderTop:'1px solid var(--border-color)', display:'flex', gap:'8px'}}>
+                            <button onClick={onNeuAnalyse} style={{flex:1, padding:'10px', background:'rgba(196,30,30,0.08)', color:'var(--accent-red-light)', border:'1px solid rgba(196,30,30,0.3)', borderRadius:'var(--radius-md)', fontSize:'12px', fontWeight:'600', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', transition:'all 0.2s ease'}}>
                                 {'\uD83D\uDD04'} KI-Analyse neu starten
                             </button>
-                            <button onClick={onClose} className="ki-akte-btn close">
-                                Schlie{'\u00DF'}en
+                            <button onClick={onClose} style={{flex:1, padding:'10px', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', border:'none', borderRadius:'var(--radius-md)', fontSize:'12px', fontWeight:'600', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', transition:'all 0.25s ease'}}>
+                                Schlie\u00dfen
                             </button>
                         </div>
                     </div>
@@ -319,41 +334,44 @@
             var gesamtFehler = crossRef && crossRef.zusammenfassung ? crossRef.zusammenfassung.gesamtFehler : 0;
 
             return (
-                <div className="page-container mw-page">
+                <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
                     {/* Header */}
                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px'}}>
-                        <button onClick={onBack} className="oa-back-btn">{'\u2190'}</button>
+                        <button onClick={onBack} style={{background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'var(--text-primary)', padding:'4px'}}>←</button>
                         <div>
-                            <div className="oa-page-title">{'\uD83E\uDD16'} KI-Ordneranalyse</div>
-                            <div className="oa-page-subtitle">{kunde ? kunde.name : ''}</div>
+                            <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>🤖 KI-Ordneranalyse</div>
+                            <div style={{fontSize:'11px', color:'var(--text-muted)', letterSpacing:'1px', textTransform:'uppercase'}}>{kunde ? kunde.name : ''}</div>
                         </div>
                     </div>
 
                     {/* Status-Banner */}
                     {meta && meta.status === 'completed' ? (
-                        <div className="oa-status-banner success">
+                        <div style={{padding:'14px 16px', marginBottom:'16px', background:'linear-gradient(135deg, rgba(46,204,113,0.12) 0%, rgba(30,136,229,0.12) 100%)', border:'1px solid rgba(46,204,113,0.3)', borderRadius:'12px'}}>
                             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                                 <div>
-                                    <div style={{fontWeight:'700', fontSize:'13px', color:'var(--success)'}}>{'\u2705'} Analyse abgeschlossen</div>
+                                    <div style={{fontWeight:'700', fontSize:'13px', color:'var(--success)'}}>✅ Analyse abgeschlossen</div>
                                     <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
-                                        {meta.ordnerAnalysiert || 0}/{meta.ordnerGefunden || 0} Ordner {'\u00B7'} {meta.gesamtDokumente || 0} Dokumente {'\u00B7'} {gesamtFehler > 0 ? '\u26A0 ' + gesamtFehler + ' Unstimmigkeiten' : '\u2713 Keine Unstimmigkeiten'}
+                                        {meta.ordnerAnalysiert || 0}/{meta.ordnerGefunden || 0} Ordner · {meta.gesamtDokumente || 0} Dokumente · {gesamtFehler > 0 ? '⚠ ' + gesamtFehler + ' Unstimmigkeiten' : '✓ Keine Unstimmigkeiten'}
                                     </div>
                                 </div>
                                 <div style={{textAlign:'right'}}>
-                                    <div style={{fontSize:'20px', fontWeight:'700', color: avgQuality >= 80 ? 'var(--success)' : avgQuality >= 60 ? 'var(--accent-orange-light)' : 'var(--accent-red-light)'}}>{avgQuality}%</div>
-                                    <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Qualit{'\u00E4'}t</div>
+                                    <div style={{fontSize:'20px', fontWeight:'700', color: avgQuality >= 80 ? 'var(--success)' : avgQuality >= 60 ? '#f39c12' : '#e74c3c'}}>{avgQuality}%</div>
+                                    <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Qualität</div>
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <div className="oa-status-banner empty">
-                            <div style={{fontSize:'13px', fontWeight:'600', color:'var(--accent-red-light)', marginBottom:'8px'}}>Noch keine Ordneranalyse durchgef{'\u00FC'}hrt</div>
-                            <button onClick={function() { onStartAnalyse(kundenId); }} className="oa-start-btn">{'\uD83D\uDE80'} Ordneranalyse starten</button>
+                        <div style={{padding:'14px 16px', marginBottom:'16px', background:'rgba(231,76,60,0.08)', border:'1px solid rgba(231,76,60,0.2)', borderRadius:'12px', textAlign:'center'}}>
+                            <div style={{fontSize:'13px', fontWeight:'600', color:'#e74c3c', marginBottom:'8px'}}>Noch keine Ordneranalyse durchgeführt</div>
+                            <button onClick={function() { onStartAnalyse(kundenId); }} style={{
+                                padding:'10px 20px', background:'linear-gradient(135deg, #1E88E5 0%, #8e44ad 100%)',
+                                color:'white', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer'
+                            }}>🚀 Ordneranalyse starten</button>
                         </div>
                     )}
 
                     {/* Ordner-Karten -- ALLE analysierten Ordner anzeigen */}
-                    <div className="oa-ordner-list">
+                    <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
                         {/* Erst konfigurierte Ordner (01-08) */}
                         {['01','02','03','04','05','06','07','08'].map(function(nr) {
                             var ordnerCfg = cfg[nr];
@@ -377,14 +395,16 @@
 
                             return (
                                 <button key={nr} onClick={function() { if (analyse) onOpenDetail(nr); else if (onReanalyzeOrdner) onReanalyzeOrdner(nr); }}
-                                    className="oa-ordner-btn">
-                                    <span className="oa-ordner-icon">{ordnerCfg.icon}</span>
-                                    <div className="oa-ordner-info">
-                                        <div className="oa-ordner-name" style={{color: ordnerCfg.color}}>
+                                    style={{width:'100%', padding:'12px 14px', borderRadius:'12px', border:'1px solid var(--border-subtle)',
+                                        background:'var(--bg-secondary)', display:'flex', alignItems:'center', gap:'12px',
+                                        cursor:'pointer', opacity: 1, textAlign:'left', WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation'}}>
+                                    <span style={{fontSize:'24px'}}>{ordnerCfg.icon}</span>
+                                    <div style={{flex:1, minWidth:0}}>
+                                        <div style={{fontSize:'13px', fontWeight:'700', color: ordnerCfg.color}}>
                                             {nr} {ordnerCfg.name}
-                                            {ordnerCfg.kritisch && <span className="oa-kritisch-tag">KRITISCH</span>}
+                                            {ordnerCfg.kritisch && <span style={{fontSize:'9px', background:'rgba(231,76,60,0.15)', color:'#e74c3c', padding:'1px 5px', borderRadius:'4px', marginLeft:'6px', fontWeight:'600'}}>KRITISCH</span>}
                                         </div>
-                                        <div className="oa-ordner-meta">
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
                                             {status === 'completed' ? (docsCount + ' Dok. · ' + (summary || 'Analysiert')) : status === 'error' ? 'Fehler bei Analyse' : 'Nicht analysiert'}
                                         </div>
                                     </div>
@@ -412,7 +432,7 @@
                                         cursor:'pointer', textAlign:'left', WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation'}}>
                                     <span style={{fontSize:'24px'}}>📂</span>
                                     <div style={{flex:1, minWidth:0}}>
-                                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--text-muted)'}}>{analyse.ordnerName || ('Ordner ' + analyse.ordnerNr)}</div>
+                                        <div style={{fontSize:'13px', fontWeight:'700', color:'#7f8c8d'}}>{analyse.ordnerName || ('Ordner ' + analyse.ordnerNr)}</div>
                                         <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
                                             {status === 'completed' ? (docsCount + ' Dok. · ' + (summary || 'Analysiert')) : 'Fehler'}
                                         </div>
@@ -438,11 +458,11 @@
                             </div>
                             {showCrossRefDetail && (
                                 <div style={{marginTop:'10px', borderTop:'1px solid var(--border-subtle)', paddingTop:'10px'}}>
-                                    {crossRef.zusammenfassung.nurPosNrAnders > 0 && <div style={{fontSize:'11px', color:'var(--accent-orange-light)', marginBottom:'4px'}}>⚠️ {crossRef.zusammenfassung.nurPosNrAnders} Positionen -- nur Positionsnummer anders</div>}
-                                    {crossRef.zusammenfassung.abweichungen > 0 && <div style={{fontSize:'11px', color:'var(--accent-red-light)', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.abweichungen} Positionen mit Daten-Abweichungen</div>}
-                                    {crossRef.zusammenfassung.nurInOrdner01 > 0 && <div style={{fontSize:'11px', color:'var(--accent-red-light)', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.nurInOrdner01} Positionen nur in Baustellenauswertung</div>}
-                                    {crossRef.zusammenfassung.nurInOrdner02 > 0 && <div style={{fontSize:'11px', color:'var(--accent-red-light)', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.nurInOrdner02} Positionen nur im LV</div>}
-                                    {crossRef.zusammenfassung.mengenAbweichungenKritisch > 0 && <div style={{fontSize:'11px', color:'var(--accent-red-light)', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.mengenAbweichungenKritisch} kritische Mengenabweichungen (Aufmaß ↔ LV)</div>}
+                                    {crossRef.zusammenfassung.nurPosNrAnders > 0 && <div style={{fontSize:'11px', color:'#f39c12', marginBottom:'4px'}}>⚠️ {crossRef.zusammenfassung.nurPosNrAnders} Positionen -- nur Positionsnummer anders</div>}
+                                    {crossRef.zusammenfassung.abweichungen > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.abweichungen} Positionen mit Daten-Abweichungen</div>}
+                                    {crossRef.zusammenfassung.nurInOrdner01 > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.nurInOrdner01} Positionen nur in Baustellenauswertung</div>}
+                                    {crossRef.zusammenfassung.nurInOrdner02 > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.nurInOrdner02} Positionen nur im LV</div>}
+                                    {crossRef.zusammenfassung.mengenAbweichungenKritisch > 0 && <div style={{fontSize:'11px', color:'#e74c3c', marginBottom:'4px'}}>🔴 {crossRef.zusammenfassung.mengenAbweichungenKritisch} kritische Mengenabweichungen (Aufmaß ↔ LV)</div>}
                                     {/* Positionsvergleich-Tabelle */}
                                     {crossRef.positionsVergleich && crossRef.positionsVergleich.filter(function(v) { return v.status !== 'match'; }).length > 0 && (
                                         <div style={{marginTop:'8px', maxHeight:'200px', overflow:'auto', borderRadius:'8px', border:'1px solid var(--border-subtle)'}}>
@@ -496,21 +516,28 @@
             if (progress.phase === 'start') pct = 5;
             return (
                 <div className="modal-overlay" style={{zIndex:5000}}>
-                    <div className="oa-progress-modal">
-                        <div style={{fontSize:'48px', marginBottom:'12px', animation: progress.phase === 'done' ? 'none' : 'spin 2s linear infinite'}}>{progress.phase === 'done' ? '\u2705' : '\uD83E\uDD16'}</div>
+                    <div style={{width:'90%', maxWidth:'500px', background:'var(--bg-primary)', borderRadius:'16px', padding:'28px', textAlign:'center'}}>
+                        <div style={{fontSize:'48px', marginBottom:'12px', animation: progress.phase === 'done' ? 'none' : 'spin 2s linear infinite'}}>{progress.phase === 'done' ? '✅' : '🤖'}</div>
                         <div style={{fontSize:'16px', fontWeight:'700', marginBottom:'4px', color:'var(--text-primary)'}}>
-                            {progress.phase === 'done' ? 'Analyse abgeschlossen!' : 'KI-Ordneranalyse l\u00E4uft...'}
+                            {progress.phase === 'done' ? 'Analyse abgeschlossen!' : 'KI-Ordneranalyse läuft...'}
                         </div>
 
-                        <div className="oa-progress-pct">{pct}%</div>
+                        {/* Große Prozentanzeige */}
+                        <div style={{fontSize:'36px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'8px', fontFamily:'monospace'}}>
+                            {pct}%
+                        </div>
 
                         <div style={{fontSize:'13px', color:'var(--accent-blue)', marginBottom:'16px', minHeight:'20px'}}>
                             {progress.message || 'Vorbereitung...'}
                         </div>
                         {progress.total > 0 && (
                             <div style={{marginBottom:'16px'}}>
-                                <div className="oa-progress-bar">
-                                    <div className="oa-progress-fill" style={{width: pct + '%'}} />
+                                <div style={{height:'8px', background:'var(--bg-tertiary)', borderRadius:'4px', overflow:'hidden', border:'1px solid var(--border-color)'}}>
+                                    <div style={{
+                                        height:'100%', borderRadius:'4px', transition:'width 0.5s ease-out',
+                                        background:'linear-gradient(90deg, var(--accent-blue), var(--accent-orange), var(--success))',
+                                        width: pct + '%'
+                                    }} />
                                 </div>
                                 <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px'}}>
                                     Ordner {progress.current || 0} von {progress.total || 0}
@@ -518,8 +545,8 @@
                             </div>
                         )}
                         {progress.phase === 'done' && (
-                            <button onClick={onClose} className="oa-result-btn">
-                                {'\uD83D\uDE80'} Ergebnis anzeigen
+                            <button onClick={onClose} style={{padding:'12px 28px', background:'var(--success)', color:'#fff', border:'none', borderRadius:'var(--radius-md)', fontSize:'14px', fontWeight:'600', cursor:'pointer', marginTop:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'}}>
+                                🚀 Ergebnis anzeigen
                             </button>
                         )}
                         {progress.phase !== 'done' && (
@@ -625,24 +652,24 @@
             };
 
             return (
-                <div className="page-container mw-page">
+                <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
-                        <button onClick={onBack} className="oa-back-btn">{'\u2190'}</button>
+                        <button onClick={onBack} style={{background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'var(--text-primary)'}}>←</button>
                         <div style={{flex:1}}>
                             <div style={{fontSize:'16px', fontWeight:'700', color: cfg.color}}>{cfg.icon} {ordnerNr} {cfg.name}</div>
                             <div style={{fontSize:'11px', color:'var(--text-muted)'}}>
-                                {analyse.dokumenteAnalysiert || 0} Dokumente {'\u00B7'} {analyse.analyseDauer ? Math.round(analyse.analyseDauer) + 's' : '\u2013'}
+                                {analyse.dokumenteAnalysiert || 0} Dokumente · {analyse.analyseDauer ? Math.round(analyse.analyseDauer) + 's' : '–'}
                             </div>
                         </div>
                         {onReanalyze && (
-                            <button onClick={function() { onReanalyze(ordnerNr); }} className="oa-reanalyse-btn">{'\uD83D\uDD04'} Neu</button>
+                            <button onClick={function() { onReanalyze(ordnerNr); }} style={{padding:'6px 12px', background:'var(--bg-tertiary)', color:'var(--text-secondary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer'}}>🔄 Neu</button>
                         )}
                     </div>
 
                     {/* Warnhinweise */}
                     {ergebnis.warnhinweise && ergebnis.warnhinweise.length > 0 && (
                         <div style={{padding:'10px 14px', marginBottom:'12px', background:'rgba(243,156,18,0.1)', border:'1px solid rgba(243,156,18,0.25)', borderRadius:'10px'}}>
-                            <div style={{fontWeight:'700', fontSize:'12px', color:'var(--accent-orange-light)', marginBottom:'4px'}}>⚠ Warnhinweise</div>
+                            <div style={{fontWeight:'700', fontSize:'12px', color:'#f39c12', marginBottom:'4px'}}>⚠ Warnhinweise</div>
                             {ergebnis.warnhinweise.map(function(w, i) {
                                 return React.createElement('div', {key:i, style:{fontSize:'11px', color:'var(--text-secondary)', paddingLeft:'8px', marginTop:'3px'}}, '• ' + w);
                             })}
