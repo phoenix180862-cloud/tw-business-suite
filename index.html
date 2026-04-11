@@ -2538,8 +2538,6 @@
     <div id="root"></div>
 
 
-    <div id="root"></div>
-
     <script type="text/babel">
         const { useState, useEffect, useCallback, useRef } = React;
 
@@ -18397,19 +18395,19 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
-                    {/* -- GLOBALE SCHNELLNAVIGATION: 6 Buttons in einer Reihe -- */}
+                    {/* -- GLOBALE SCHNELLNAVIGATION: 6 rote Buttons in einer Reihe -- */}
                     {page !== 'start' && (
                         <div style={{display:'flex', gap:'4px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
                             <button onClick={function(){ navigateTo('start'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', cursor:'pointer', background: page === 'start' ? 'var(--accent-blue)' : 'var(--bg-card)', color: page === 'start' ? '#fff' : 'var(--text-light)', fontSize:'9px', fontWeight:'600', border: page === 'start' ? 'none' : '1px solid var(--border-color)', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
+                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
                                 {'\uD83C\uDFE0'} Start
                             </button>
                             <button onClick={function(){ navigateTo('kundenModus'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-blue)' : 'var(--bg-card)', color: page === 'kundenModus' ? '#fff' : 'var(--text-light)', fontSize:'9px', fontWeight:'600', border: page === 'kundenModus' ? 'none' : '1px solid var(--border-color)', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
+                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
                                 {'\uD83D\uDC77'} Kunden
                             </button>
                             <button onClick={function(){ navigateTo('auswahl'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-blue)' : 'var(--bg-card)', color: page === 'auswahl' ? '#fff' : 'var(--text-light)', fontSize:'9px', fontWeight:'600', border: page === 'auswahl' ? 'none' : '1px solid var(--border-color)', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
+                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
                                 {'\uD83D\uDCC2'} Baustellen
                             </button>
                             <button onClick={function(){ navigateTo('datenUebersicht'); }} disabled={!selectedKunde}
