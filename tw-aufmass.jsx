@@ -4511,6 +4511,13 @@
                 return false;
             });
             const [bodenPlusTuerlaibung, setBodenPlusTuerlaibung] = useState(reEdit ? reEdit.bodenPlusTuerlaibung || false : ((raum && raum.bodenPlusTuerlaibung) || false));
+            // ── Raumblatt Tab-Navigation (4-Seiten-Architektur) ──
+            const [activeTab, setActiveTab] = useState(0); // 0=Grundriss, 1=Fotos, 2=Oeffnungen, 3=Positionen
+            const handleTabChange = (tabIdx) => {
+                setActiveTab(tabIdx);
+                const page = document.querySelector('.page-container');
+                if (page) page.scrollTo({ top: 0, behavior: 'smooth' });
+            };
             // ── Edit-Modus für Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
             const [wandMasse, setWandMasse] = useState(() => {
@@ -6345,6 +6352,29 @@
                         </div>
                     )}
 
+                    {/* ═══ RAUMBLATT TAB-NAVIGATION ═══ */}
+                    <div className="raumblatt-tabs">
+                        <button className={activeTab===0?'tab active':'tab'} onClick={()=>handleTabChange(0)}>
+                            <span className="tab-emoji">📐</span> Grundriss
+                        </button>
+                        <button className={activeTab===1?'tab active':'tab'} onClick={()=>handleTabChange(1)}>
+                            <span className="tab-emoji">📸</span> Fotos
+                        </button>
+                        <button className={activeTab===2?'tab active':'tab'} onClick={()=>handleTabChange(2)}>
+                            <span className="tab-emoji">🚪</span> Oeffnungen
+                        </button>
+                        <button className={activeTab===3?'tab active':'tab'} onClick={()=>handleTabChange(3)}>
+                            <span className="tab-emoji">📋</span> Positionen
+                            {posCards.length > 0 && (
+                                <span className="tab-badge">{posCards.filter(p => calcPositionResult(p) > 0).length}/{posCards.length}</span>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* ═══ TAB 1: Grundriss & Raummasze ═══ */}
+                    {activeTab === 0 && (
+                    <div className="raumblatt-tab-content">
+
                     {/* Grundriss */}
                     <div className="grundriss-card">
                         <div className="grundriss-card-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -6370,6 +6400,13 @@
                             </svg>
                         )}
                     </div>
+
+                    </div>
+                    )}
+
+                    {/* ═══ TAB 2: Fotos & KI-Erkennung ═══ */}
+                    {activeTab === 1 && (
+                    <div className="raumblatt-tab-content">
 
                     {/* ═══ FOTOANALYSE-RAUMBLATT -- KI-gestützte Maßermittlung ═══ */}
                     <input type="file" accept="image/*" capture="environment" ref={fotoAnalyseInputRef}
@@ -6910,6 +6947,13 @@
                         ]);
                     })()}
 
+                    </div>
+                    )}
+
+                    {/* ═══ TAB 1 (Fortsetzung): Laser DISTO + Raummasze ═══ */}
+                    {activeTab === 0 && (
+                    <div className="raumblatt-tab-content">
+
                     {/* ═══ LASER DISTO Bluetooth-Tastatur ═══ */}
                     <div className="laser-bar">
                         <button className={`laser-btn ${laserActive ? 'active' : ''}`}
@@ -7276,6 +7320,28 @@
                                 )}
                             </React.Fragment>
                         )}
+                    </div>
+
+                    </div>
+                    )}
+
+                    {/* ═══ TAB 3: Tueren, Fenster & Sonstige Bauteile ═══ */}
+                    {activeTab === 2 && (
+                    <div className="raumblatt-tab-content">
+
+                    {/* Laser DISTO auch auf Oeffnungen-Tab */}
+                    <div className="laser-bar">
+                        <button className={`laser-btn ${laserActive ? 'active' : ''}`}
+                            onClick={toggleLaser}>
+                            <span className="laser-pulse"></span>
+                            <span>{laserActive ? '🔴 Laser aktiv' : '📡 Laser DISTO'}</span>
+                        </button>
+                        <div className={`laser-status ${laserActive ? 'connected' : 'disconnected'}`}
+                            style={{fontSize:'11px', lineHeight:'1.3', whiteSpace:'normal'}}>
+                            {laserActive
+                                ? '✓ Messen → Wert landet im Feld → springt weiter'
+                                : 'DISTO per Bluetooth koppeln, Modus: Text'}
+                        </div>
                     </div>
 
                     {/* ═══ TÜREN (eigene Sektion, aufklappbar) ═══ */}
@@ -7762,6 +7828,13 @@
                         )}
                     </div>
 
+                    </div>
+                    )}
+
+                    {/* ═══ TAB 4: Positionen & Raumzusammenfassung ═══ */}
+                    {activeTab === 3 && (
+                    <div className="raumblatt-tab-content">
+
                     {/* ═══════════════════════════════════════
                        POSITIONS-KARTEN (aus Raumerkennung übernommen)
                        ═══════════════════════════════════════ */}
@@ -8212,6 +8285,11 @@
                             <span className="btn-text">Zurück zur Raumerkennung</span>
                         </button>
                     </div>
+
+                    </div>
+                    )}
+
+                    {/* ═══ MODALS (ausserhalb der Tabs, immer verfuegbar) ═══ */}
 
                     {/* ═══ MANUELLER RECHENWEG MODAL (Vollbild) ═══ */}
                     {rwModalPos && (() => {

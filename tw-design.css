@@ -3464,3 +3464,76 @@
         .copy-masse-btn:active {
             transform: scale(0.98);
         }
+
+        /* ═══════════════════════════════════════════
+           RAUMBLATT TAB-NAVIGATION (4-Seiten)
+           ═══════════════════════════════════════════ */
+        .raumblatt-tabs {
+            display: flex;
+            gap: 2px;
+            margin: 0 -4px 16px;
+            padding: 4px;
+            background: var(--bg-secondary);
+            border-radius: 14px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .raumblatt-tabs .tab {
+            flex: 1;
+            min-width: 0;
+            padding: 10px 6px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'Oswald', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            white-space: nowrap;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            position: relative;
+        }
+        .raumblatt-tabs .tab .tab-emoji {
+            font-size: 16px;
+            line-height: 1;
+        }
+        .raumblatt-tabs .tab.active {
+            background: var(--accent-blue);
+            color: white;
+            box-shadow: 0 2px 8px rgba(30,136,229,0.3);
+        }
+        .raumblatt-tabs .tab:not(.active):hover {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-secondary);
+        }
+        .raumblatt-tabs .tab:active {
+            transform: scale(0.97);
+        }
+        .tab-badge {
+            position: absolute;
+            top: 2px;
+            right: 4px;
+            font-size: 9px;
+            font-family: 'Source Sans 3', sans-serif;
+            background: var(--accent-orange);
+            color: white;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        .raumblatt-tab-content {
+            animation: tabFadeIn 0.2s ease;
+        }
+        @keyframes tabFadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
