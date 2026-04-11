@@ -4452,8 +4452,37 @@
             const fotoTargetWand = React.useRef(null);
             const [laserActive, setLaserActive] = useState(false);
             // ── Fotoanalyse-Raumblatt State ──
-            const [fotoAnalyse, setFotoAnalyse] = useState(null); // { wandIdx, mode: null|'fertig'|'rohbau', step, tileParams, photo, result, ... }
+            const [fotoAnalyse, setFotoAnalyse] = useState(null);
             const fotoAnalyseInputRef = React.useRef(null);
+
+            // ── 3-Phasen Fotodokumentation (Seite 2) ──
+            const FOTO_PHASEN = [
+                { key: 'rohzustand', label: 'Rohzustand', subtitle: 'Vor Arbeitsbeginn', nr: 1, color: 'var(--accent-orange)' },
+                { key: 'vorarbeiten', label: 'Nach Vorarbeiten', subtitle: 'Abdichtung / Grundierung', nr: 2, color: 'var(--accent-blue)' },
+                { key: 'fertigstellung', label: 'Fertigstellung', subtitle: 'Nach Fliesenarbeiten', nr: 3, color: 'var(--success)' }
+            ];
+            const [phasenFotos, setPhasenFotos] = useState(() => {
+                if (reEdit && reEdit.phasenFotos) return reEdit.phasenFotos;
+                const initial = {};
+                FOTO_PHASEN.forEach(phase => { initial[phase.key] = {}; });
+                return initial;
+            });
+            const [fotoContext, setFotoContext] = useState(null);
+            const fotoInputRef2 = React.useRef(null);
+            const [analyseRunning, setAnalyseRunning] = useState(false);
+            const [analyseProgress, setAnalyseProgress] = useState({ current: 0, total: 0, wandId: '' });
+            const [kiErgebnisse, setKiErgebnisse] = useState(
+                reEdit && reEdit.kiErgebnisse ? reEdit.kiErgebnisse : {
+                    loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0,
+                    sanitaerObjekte: [], installationen: [],
+                    abdichtungsflaeche_m2: 0, dichtungsbaender_lfm: 0, gefliesteFlaeche_m2: 0,
+                    details: []
+                }
+            );
+            const [expandedPhases, setExpandedPhases] = useState({ rohzustand: true, vorarbeiten: false, fertigstellung: false });
+            const [cropState, setCropState] = useState(null); // { phase, wandId, image, cropRect, dragging, dragCorner }
+            const cropCanvasRef = React.useRef(null);
+            const cropImageRef = React.useRef(null);
 
             const [masse, setMasse] = useState(() => {
                 // ═══ RE-EDIT aus Gesamtliste: Gespeicherte Maße direkt übernehmen ═══
@@ -4511,16 +4540,20 @@
                 return false;
             });
             const [bodenPlusTuerlaibung, setBodenPlusTuerlaibung] = useState(reEdit ? reEdit.bodenPlusTuerlaibung || false : ((raum && raum.bodenPlusTuerlaibung) || false));
-            // ── Raumblatt Tab-Navigation (4-Seiten-Architektur) ──
-            const [activeTab, setActiveTab] = useState(0); // 0=Grundriss, 1=Fotos, 2=Oeffnungen, 3=Positionen
+            // ── Raumblatt 4-Seiten Tab-Navigation ──
+            const [rbTab, setRbTab] = useState(0); // 0=Grundriss, 1=Fotos, 2=Oeffnungen, 3=Positionen
+            const [posFilter, setPosFilter] = useState('alle'); // 'alle', 'berechnet', 'leer', 'manuell'
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+            const [kiFotoErgebnisse, setKiFotoErgebnisse] = useState(null);
+
             const handleTabChange = (tabIdx) => {
-                setActiveTab(tabIdx);
+                setRbTab(tabIdx);
                 const page = document.querySelector('.page-container');
                 if (page) page.scrollTo({ top: 0, behavior: 'smooth' });
             };
-            // Tastatur-Navigation: Strg+1/2/3/4 fuer Tab-Wechsel (Desktop)
-            React.useEffect(() => {
+
+            // ── Tastatur-Navigation: Strg+1/2/3/4 fuer Tab-Wechsel ──
+            useEffect(() => {
                 const handleKeyNav = (e) => {
                     if (e.ctrlKey && e.key >= '1' && e.key <= '4') {
                         e.preventDefault();
@@ -4530,7 +4563,13 @@
                 document.addEventListener('keydown', handleKeyNav);
                 return () => document.removeEventListener('keydown', handleKeyNav);
             }, []);
-            // ── Edit-Modus für Rechenweg-Schritte (Stift-Button) ──
+
+            // ── Ungespeicherte-Aenderungen Tracking ──
+            useEffect(() => {
+                setHasUnsavedChanges(true);
+            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos]);
+
+            // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
             const [wandMasse, setWandMasse] = useState(() => {
                 if (reEdit && reEdit.wandMasse) return reEdit.wandMasse.map(w => ({...w}));
@@ -4683,6 +4722,18 @@
             const [isDrawMode, setIsDrawMode] = useState(false);
             const canvasRef = React.useRef(null);
 
+            // ── Grundriss-Modus und Handskizze ──
+            const [grundrissModus, setGrundrissModus] = useState('manual'); // 'ki', 'manual', 'skizze'
+            const [skizze, setSkizze] = useState({
+                mode: 'draw', paths: [], currentPath: null,
+                labels: [], currentLabel: null,
+                processedSvg: null, erkannteWaende: [], erkannteLabels: [],
+                gridSize: 20, penColor: '#b8c4d4', penWidth: 3,
+                labelColor: '#e74c3c', labelWidth: 4, undoStack: []
+            });
+            const skizzeCanvasRef = React.useRef(null);
+            const skizzeLabelTimeout = React.useRef(null);
+
             // Positions-Karten State
             const [posCards, setPosCards] = useState(() => {
                 // ═══ RE-EDIT: Gespeicherte posCards direkt übernehmen ═══
@@ -4710,11 +4761,6 @@
             // ── Manueller Rechenweg Modal ──
             const [rwModalPos, setRwModalPos] = useState(null); // pos.pos oder null
             const [rwModalZeilen, setRwModalZeilen] = useState([]);
-
-            // ── Aenderungs-Tracking fuer ungespeicherte Daten ──
-            React.useEffect(() => {
-                setHasUnsavedChanges(true);
-            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits]);
 
             // ═══ LASER DISTO – Tastatur-Modus ═══
             // Enter/Tab vom DISTO → Wert formatieren + nächstes Feld
@@ -5880,6 +5926,402 @@
                 }
             };
 
+            // ── KI-Foto-Ergebnis Vorschlaege fuer Positions-Karten ──
+            const getKiSuggestion = (pos) => {
+                if (!kiFotoErgebnisse || !kiFotoErgebnisse.transferred) return null;
+                const kat = pos.kategorie;
+                const tags = pos.tags || [];
+                if ((kat === 'abdichtung' && !tags.includes('boden')) || kat === 'wandabdichtung') {
+                    if (kiFotoErgebnisse.abdichtungsflaeche_m2 > 0) {
+                        return { label: 'KI-Fotoanalyse: Abdichtungsflaeche', wert: kiFotoErgebnisse.abdichtungsflaeche_m2, einheit: 'm2' };
+                    }
+                }
+                if (kat === 'dichtungsband' || kat === 'abdichtung_ecke') {
+                    if (kiFotoErgebnisse.dichtungsbaender_lfm > 0) {
+                        return { label: 'KI-Fotoanalyse: Dichtungsbaender', wert: kiFotoErgebnisse.dichtungsbaender_lfm, einheit: 'lfm' };
+                    }
+                }
+                if (kat === 'wand' || kat === 'wandfliesen') {
+                    if (kiFotoErgebnisse.gefliesteFlaeche_m2 > 0) {
+                        return { label: 'KI-Fotoanalyse: Geflieste Flaeche', wert: kiFotoErgebnisse.gefliesteFlaeche_m2, einheit: 'm2' };
+                    }
+                }
+                if (kat === 'kernbohrung' || kat === 'durchbruch') {
+                    if (kiFotoErgebnisse.loecher > 0) {
+                        return { label: 'KI-Fotoanalyse: Durchbrueche', wert: kiFotoErgebnisse.loecher, einheit: 'Stk' };
+                    }
+                }
+                if (kat === 'silikon' || kat === 'anschluss' || kat === 'profil') {
+                    if (kiFotoErgebnisse.wandanschluesse > 0) {
+                        return { label: 'KI-Fotoanalyse: Wandanschluesse', wert: kiFotoErgebnisse.wandanschluesse, einheit: 'Stk' };
+                    }
+                }
+                return null;
+            };
+
+            const applyKiSuggestion = (pos, kiSugg) => {
+                setPosCards(prev => prev.map(p => {
+                    if (p.pos !== pos.pos) return p;
+                    return { ...p, manualMenge: String(kiSugg.wert).replace('.', ',') };
+                }));
+            };
+
+            // ── Positions-Filter fuer Seite 4 ──
+            const filteredPosCards = posCards.filter(pos => {
+                if (posFilter === 'alle') return true;
+                const result = calcPositionResult(pos);
+                if (posFilter === 'berechnet') return result > 0;
+                if (posFilter === 'leer') return result === 0;
+                if (posFilter === 'manuell') return pos.hasManualRW || pos.manualMenge;
+                return true;
+            });
+
+            // ── Tab-Status Indikatoren ──
+            const getTabStatus = (tabIdx) => {
+                switch(tabIdx) {
+                    case 0: return (parseMass(masse.laenge) > 0 || parseMass(masse.hoehe) > 0) ? 'complete' : 'empty';
+                    case 1: {
+                        const totalPhotos = FOTO_PHASEN.reduce((sum, p) => sum + countPhasePhotos(p.key), 0);
+                        if (kiErgebnisse.details && kiErgebnisse.details.length > 0) return 'complete';
+                        if (totalPhotos > 0) return 'partial';
+                        return 'empty';
+                    }
+                    case 2: return (tueren.length > 0 || fenster.length > 0) ? 'complete' : 'empty';
+                    case 3: {
+                        const berechnet = posCards.filter(p => calcPositionResult(p) > 0).length;
+                        if (berechnet === posCards.length && posCards.length > 0) return 'complete';
+                        if (berechnet > 0) return 'partial';
+                        return 'empty';
+                    }
+                    default: return 'empty';
+                }
+            };
+
+            // ── Validierte Fertigstellung ──
+            const handleFinishRaumValidated = (callback) => {
+                const leerePositionen = posCards.filter(p => calcPositionResult(p) === 0);
+                if (leerePositionen.length > 0) {
+                    const names = leerePositionen.map(p => 'Pos. ' + p.pos).join(', ');
+                    if (!confirm('Folgende Positionen haben Ergebnis 0:\n' + names +
+                        '\n\nDiese werden NICHT in die Gesamtliste/Rechnung uebernommen.\n\nTrotzdem fortfahren?')) {
+                        return;
+                    }
+                }
+                setHasUnsavedChanges(false);
+                callback();
+            };
+
+            // ── Schnellzugriff Handler ──
+            const handleOpenKundendaten = () => {
+                if (window.TW && window.TW.EventBus) {
+                    window.TW.EventBus.emit('navigation:datenUebersicht', {
+                        kundeId: kunde.id || kunde._driveFolderId
+                    });
+                }
+            };
+
+            const handleOpenOrdner = () => {
+                if (kunde._driveFolderId && window.open) {
+                    window.open('https://drive.google.com/drive/folders/' + kunde._driveFolderId, '_blank');
+                }
+            };
+
+            // ── 3-Phasen Foto-Handler ──
+            const getWallIds = () => {
+                if (wandMasse && wandMasse.length > 0) {
+                    return wandMasse.map(w => w.id);
+                }
+                if (raum && raum.waende && raum.waende.length > 0) {
+                    return raum.waende.map(w => w.id);
+                }
+                return ['A', 'B', 'C', 'D'];
+            };
+
+            const countPhasePhotos = (phaseKey) => {
+                const phaseData = phasenFotos[phaseKey] || {};
+                return Object.keys(phaseData).length;
+            };
+
+            const handlePhotoCapture = (phase, wandId) => {
+                setFotoContext({ phase, wandId });
+                if (fotoInputRef2.current) { fotoInputRef2.current.value = ''; fotoInputRef2.current.click(); }
+            };
+
+            const handlePhotoFileChange = (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file || !fotoContext) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    setPhasenFotos(prev => {
+                        const updated = { ...prev };
+                        updated[fotoContext.phase] = {
+                            ...updated[fotoContext.phase],
+                            [fotoContext.wandId]: {
+                                image: ev.target.result, croppedImage: null,
+                                zeit: new Date().toLocaleTimeString('de-DE'),
+                                aiAnalysis: null, marked: false
+                            }
+                        };
+                        return updated;
+                    });
+                    setFotoContext(null);
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const handlePhotoDelete = (phaseKey, wandId) => {
+                if (!confirm('Foto loeschen?')) return;
+                setPhasenFotos(prev => {
+                    const updated = { ...prev };
+                    const phaseData = { ...updated[phaseKey] };
+                    delete phaseData[wandId];
+                    updated[phaseKey] = phaseData;
+                    return updated;
+                });
+            };
+
+            const togglePhotoMark = (phaseKey, wandId) => {
+                setPhasenFotos(prev => {
+                    const updated = { ...prev };
+                    const foto = updated[phaseKey][wandId];
+                    if (foto) {
+                        updated[phaseKey] = { ...updated[phaseKey],
+                            [wandId]: { ...foto, marked: !foto.marked }
+                        };
+                    }
+                    return updated;
+                });
+            };
+
+            const getMarkedFotos = () => {
+                const marked = [];
+                FOTO_PHASEN.forEach(phase => {
+                    const phaseData = phasenFotos[phase.key] || {};
+                    Object.entries(phaseData).forEach(([wandId, foto]) => {
+                        if (foto && foto.marked && (foto.croppedImage || foto.image)) {
+                            marked.push({ phase: phase.key, wandId, foto });
+                        }
+                    });
+                });
+                return marked;
+            };
+
+            const markAllPhotos = (markState) => {
+                setPhasenFotos(prev => {
+                    const updated = {};
+                    FOTO_PHASEN.forEach(phase => {
+                        updated[phase.key] = {};
+                        const phaseData = prev[phase.key] || {};
+                        Object.entries(phaseData).forEach(([wandId, foto]) => {
+                            updated[phase.key][wandId] = { ...foto, marked: markState };
+                        });
+                    });
+                    return updated;
+                });
+            };
+
+            // ── Foto-Crop-Tool ──
+            const openCropModal = (phase, wandId) => {
+                const foto = phasenFotos[phase] && phasenFotos[phase][wandId];
+                if (!foto || !foto.image) return;
+                setCropState({
+                    phase, wandId, image: foto.image,
+                    cropRect: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, // Relative coords 0-1
+                    dragging: false, dragCorner: null, dragStart: null
+                });
+            };
+
+            const cropGetPos = (e, canvas) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: (clientX - rect.left) / rect.width,
+                    y: (clientY - rect.top) / rect.height
+                };
+            };
+
+            const cropFindCorner = (pos, cropRect) => {
+                const corners = [
+                    { key: 'tl', x: cropRect.x, y: cropRect.y },
+                    { key: 'tr', x: cropRect.x + cropRect.w, y: cropRect.y },
+                    { key: 'bl', x: cropRect.x, y: cropRect.y + cropRect.h },
+                    { key: 'br', x: cropRect.x + cropRect.w, y: cropRect.y + cropRect.h }
+                ];
+                const threshold = 0.05;
+                for (const c of corners) {
+                    if (Math.abs(pos.x - c.x) < threshold && Math.abs(pos.y - c.y) < threshold) return c.key;
+                }
+                // Check if inside rect -> move entire rect
+                if (pos.x > cropRect.x && pos.x < cropRect.x + cropRect.w &&
+                    pos.y > cropRect.y && pos.y < cropRect.y + cropRect.h) return 'move';
+                return null;
+            };
+
+            const handleCropStart = (e) => {
+                e.preventDefault();
+                const canvas = cropCanvasRef.current;
+                if (!canvas || !cropState) return;
+                const pos = cropGetPos(e, canvas);
+                const corner = cropFindCorner(pos, cropState.cropRect);
+                if (corner) {
+                    setCropState(prev => ({...prev, dragging: true, dragCorner: corner, dragStart: pos}));
+                }
+            };
+
+            const handleCropMove = (e) => {
+                if (!cropState || !cropState.dragging) return;
+                e.preventDefault();
+                const canvas = cropCanvasRef.current;
+                if (!canvas) return;
+                const pos = cropGetPos(e, canvas);
+                const dx = pos.x - cropState.dragStart.x;
+                const dy = pos.y - cropState.dragStart.y;
+                setCropState(prev => {
+                    let r = {...prev.cropRect};
+                    const corner = prev.dragCorner;
+                    if (corner === 'move') {
+                        r.x = Math.max(0, Math.min(1 - r.w, r.x + dx));
+                        r.y = Math.max(0, Math.min(1 - r.h, r.y + dy));
+                    } else if (corner === 'tl') {
+                        const newX = Math.max(0, r.x + dx);
+                        const newY = Math.max(0, r.y + dy);
+                        r.w = r.w - (newX - r.x); r.h = r.h - (newY - r.y);
+                        r.x = newX; r.y = newY;
+                    } else if (corner === 'tr') {
+                        r.w = Math.min(1 - r.x, r.w + dx);
+                        const newY = Math.max(0, r.y + dy);
+                        r.h = r.h - (newY - r.y); r.y = newY;
+                    } else if (corner === 'bl') {
+                        const newX = Math.max(0, r.x + dx);
+                        r.w = r.w - (newX - r.x); r.x = newX;
+                        r.h = Math.min(1 - r.y, r.h + dy);
+                    } else if (corner === 'br') {
+                        r.w = Math.min(1 - r.x, r.w + dx);
+                        r.h = Math.min(1 - r.y, r.h + dy);
+                    }
+                    r.w = Math.max(0.05, r.w); r.h = Math.max(0.05, r.h);
+                    return {...prev, cropRect: r, dragStart: pos};
+                });
+            };
+
+            const handleCropEnd = () => {
+                if (!cropState) return;
+                setCropState(prev => ({...prev, dragging: false, dragCorner: null}));
+            };
+
+            const applyCrop = () => {
+                if (!cropState) return;
+                const img = cropImageRef.current;
+                if (!img) return;
+                const r = cropState.cropRect;
+                const canvas = document.createElement('canvas');
+                const sx = r.x * img.naturalWidth;
+                const sy = r.y * img.naturalHeight;
+                const sw = r.w * img.naturalWidth;
+                const sh = r.h * img.naturalHeight;
+                canvas.width = Math.max(1, Math.round(sw));
+                canvas.height = Math.max(1, Math.round(sh));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+                const croppedImage = canvas.toDataURL('image/jpeg', 0.85);
+                // Save cropped image
+                setPhasenFotos(prev => {
+                    const updated = {...prev};
+                    if (updated[cropState.phase] && updated[cropState.phase][cropState.wandId]) {
+                        updated[cropState.phase] = {...updated[cropState.phase],
+                            [cropState.wandId]: {...updated[cropState.phase][cropState.wandId], croppedImage}
+                        };
+                    }
+                    return updated;
+                });
+                setCropState(null);
+            };
+
+            const runKiAnalyse = async (stufe) => {
+                const marked = getMarkedFotos();
+                if (marked.length === 0) { alert('Keine Fotos markiert! Markiere Fotos mit dem Haekchen oben rechts.'); return; }
+                if (!window.GEMINI_CONFIG || !window.GEMINI_CONFIG.apiKey) {
+                    alert('Gemini API-Key nicht konfiguriert. Bitte zuerst auf der Startseite verbinden.'); return;
+                }
+                setAnalyseRunning(true);
+                setAnalyseProgress({ current: 0, total: marked.length, wandId: '' });
+                const results = [];
+                for (let i = 0; i < marked.length; i++) {
+                    const m = marked[i];
+                    setAnalyseProgress({ current: i + 1, total: marked.length, wandId: m.wandId });
+                    try {
+                        const imgData = (m.foto.croppedImage || m.foto.image).split(',')[1];
+                        const prompt = stufe === 'klein'
+                            ? 'Analysiere dieses Bild einer Wand/Boden in einem Badezimmer/Raum. Zaehle: loecher (Steckdosen, Rohrdurchfuehrungen, Sanitaeranschluesse), wandanschluesse (Fugen an Waenden/Decke/Boden), innenecken (einspringend), aussenecken (vorspringend). Erkenne Sanitaer-Objekte (WC, Waschbecken, Dusche, Badewanne). Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}'
+                            : 'Analysiere dieses Bild einer Wand/Boden. Zaehle: loecher, wandanschluesse, innenecken, aussenecken, Sanitaer-Objekte. ZUSAETZLICH schaetze: abdichtung (flaeche_m2, dichtungsbaender_lfm, abdichtungshoehe_m, sichtbar), geflieste_flaeche_m2. Raummasze zur Plausibilitaet: Laenge=' + (masse.laenge||'?') + 'm, Breite=' + (masse.breite||'?') + 'm, Hoehe=' + (masse.hoehe||'?') + 'm. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"abdichtung":{"flaeche_m2":0,"dichtungsbaender_lfm":0,"abdichtungshoehe_m":0,"sichtbar":false},"geflieste_flaeche_m2":0,"zusammenfassung":""}';
+                        const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + window.GEMINI_CONFIG.apiKey, {
+                            method: 'POST', headers: {'Content-Type':'application/json'},
+                            body: JSON.stringify({
+                                contents: [{ parts: [
+                                    { inlineData: { mimeType: 'image/jpeg', data: imgData } },
+                                    { text: prompt }
+                                ]}]
+                            })
+                        });
+                        const data = await resp.json();
+                        let text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
+                        text = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                        const parsed = JSON.parse(text);
+                        results.push(parsed);
+                        // Ergebnis am Foto speichern
+                        setPhasenFotos(prev => {
+                            const updated = { ...prev };
+                            if (updated[m.phase] && updated[m.phase][m.wandId]) {
+                                updated[m.phase] = { ...updated[m.phase],
+                                    [m.wandId]: { ...updated[m.phase][m.wandId], aiAnalysis: parsed }
+                                };
+                            }
+                            return updated;
+                        });
+                    } catch(err) {
+                        console.error('KI-Analyse Fehler:', err);
+                        results.push({ loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0, zusammenfassung: 'Fehler: ' + err.message });
+                    }
+                }
+                // Aggregation
+                const agg = {
+                    loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0,
+                    sanitaerObjekte: [], installationen: [],
+                    abdichtungsflaeche_m2: 0, dichtungsbaender_lfm: 0, gefliesteFlaeche_m2: 0,
+                    details: results
+                };
+                results.forEach(r => {
+                    agg.loecher += (r.loecher || 0);
+                    agg.wandanschluesse += (r.wandanschluesse || 0);
+                    agg.innenecken += (r.innenecken || 0);
+                    agg.aussenecken += (r.aussenecken || 0);
+                    if (r.objekte) {
+                        r.objekte.forEach(obj => {
+                            const existing = agg.sanitaerObjekte.find(s => s.typ === obj.typ);
+                            if (existing) existing.anzahl += obj.anzahl;
+                            else agg.sanitaerObjekte.push({ ...obj });
+                        });
+                    }
+                    if (stufe === 'gross' && r.abdichtung) {
+                        agg.abdichtungsflaeche_m2 += (r.abdichtung.flaeche_m2 || 0);
+                        agg.dichtungsbaender_lfm += (r.abdichtung.dichtungsbaender_lfm || 0);
+                    }
+                    if (stufe === 'gross' && r.geflieste_flaeche_m2) {
+                        agg.gefliesteFlaeche_m2 += r.geflieste_flaeche_m2;
+                    }
+                });
+                setKiErgebnisse(agg);
+                setAnalyseRunning(false);
+            };
+
+            const transferKiErgebnisseToPositions = () => {
+                setKiFotoErgebnisse({
+                    ...kiErgebnisse, timestamp: Date.now(), transferred: true
+                });
+                handleTabChange(3);
+            };
+
             const handleFoto = (wandId) => {
                 fotoTargetWand.current = wandId || 'extra_' + Date.now();
                 if (fotoInputRef.current) {
@@ -6255,6 +6697,236 @@
                 }
             }, [isDrawMode]);
 
+            // ── Handskizze Canvas-Handler ──
+            const skizzeGetPos = (e) => {
+                const canvas = skizzeCanvasRef.current;
+                if (!canvas) return {x:0,y:0};
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: (clientX - rect.left) * (canvas.width / rect.width),
+                    y: (clientY - rect.top) * (canvas.height / rect.height)
+                };
+            };
+            const skizzeSnap = (pos) => ({
+                x: Math.round(pos.x / skizze.gridSize) * skizze.gridSize,
+                y: Math.round(pos.y / skizze.gridSize) * skizze.gridSize
+            });
+
+            const skizzeDrawGrid = (ctx, w, h, gs) => {
+                ctx.fillStyle = '#1a2332';
+                ctx.fillRect(0, 0, w, h);
+                ctx.strokeStyle = 'rgba(100,140,180,0.12)';
+                ctx.lineWidth = 0.5;
+                for (let x = 0; x <= w; x += gs) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+                for (let y = 0; y <= h; y += gs) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+                ctx.strokeStyle = 'rgba(100,140,180,0.25)';
+                ctx.lineWidth = 1;
+                for (let x = 0; x <= w; x += gs*5) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+                for (let y = 0; y <= h; y += gs*5) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+            };
+
+            const skizzeRedraw = React.useCallback(() => {
+                const canvas = skizzeCanvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                skizzeDrawGrid(ctx, canvas.width, canvas.height, skizze.gridSize);
+                // Saved paths
+                skizze.paths.forEach(path => {
+                    ctx.strokeStyle = path.color; ctx.lineWidth = path.width;
+                    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    path.points.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+                    ctx.stroke();
+                });
+                // Current path
+                if (skizze.currentPath) {
+                    ctx.strokeStyle = skizze.currentPath.color; ctx.lineWidth = skizze.currentPath.width;
+                    ctx.lineCap = 'round'; ctx.beginPath();
+                    skizze.currentPath.points.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+                    ctx.stroke();
+                }
+                // Saved labels (red)
+                skizze.labels.forEach(label => {
+                    label.strokes.forEach(stroke => {
+                        ctx.strokeStyle = skizze.labelColor; ctx.lineWidth = skizze.labelWidth;
+                        ctx.lineCap = 'round'; ctx.beginPath();
+                        stroke.points.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+                        ctx.stroke();
+                    });
+                });
+                // Current label
+                if (skizze.currentLabel) {
+                    skizze.currentLabel.strokes.forEach(stroke => {
+                        ctx.strokeStyle = skizze.labelColor; ctx.lineWidth = skizze.labelWidth;
+                        ctx.lineCap = 'round'; ctx.beginPath();
+                        stroke.points.forEach((p,i) => { if(i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); });
+                        ctx.stroke();
+                    });
+                }
+            }, [skizze]);
+
+            useEffect(() => { if (grundrissModus === 'skizze') skizzeRedraw(); }, [skizze, grundrissModus]);
+
+            const handleSkizzeStart = (e) => {
+                e.preventDefault();
+                const pos = skizzeSnap(skizzeGetPos(e));
+                setSkizze(prev => ({...prev, currentPath: { points: [pos], color: prev.penColor, width: prev.penWidth }}));
+            };
+            const handleSkizzeMove = (e) => {
+                if (!skizze.currentPath) return;
+                e.preventDefault();
+                const pos = skizzeGetPos(e);
+                setSkizze(prev => ({...prev, currentPath: {...prev.currentPath, points: [...prev.currentPath.points, pos]}}));
+            };
+            const handleSkizzeEnd = () => {
+                if (!skizze.currentPath) return;
+                const path = {...skizze.currentPath};
+                const last = path.points[path.points.length - 1];
+                path.points[path.points.length - 1] = skizzeSnap(last);
+                setSkizze(prev => ({...prev, paths: [...prev.paths, path], currentPath: null,
+                    undoStack: [...prev.undoStack, { type:'path', index: prev.paths.length }]}));
+            };
+
+            const handleLabelStart = (e) => {
+                e.preventDefault();
+                if (skizzeLabelTimeout.current) { clearTimeout(skizzeLabelTimeout.current); skizzeLabelTimeout.current = null; }
+                const pos = skizzeGetPos(e);
+                if (skizze.currentLabel) {
+                    // Continue same label with new stroke
+                    setSkizze(prev => {
+                        const label = {...prev.currentLabel};
+                        label.strokes = [...label.strokes, { points: [pos] }];
+                        return {...prev, currentLabel: label};
+                    });
+                } else {
+                    setSkizze(prev => ({...prev, currentLabel: { x: pos.x, y: pos.y, strokes: [{ points: [pos] }] }}));
+                }
+            };
+            const handleLabelMove = (e) => {
+                if (!skizze.currentLabel) return;
+                e.preventDefault();
+                const pos = skizzeGetPos(e);
+                setSkizze(prev => {
+                    const label = {...prev.currentLabel};
+                    const lastStroke = {...label.strokes[label.strokes.length - 1]};
+                    lastStroke.points = [...lastStroke.points, pos];
+                    label.strokes = [...label.strokes.slice(0, -1), lastStroke];
+                    return {...prev, currentLabel: label};
+                });
+            };
+            const handleLabelEnd = () => {
+                if (!skizze.currentLabel) return;
+                skizzeLabelTimeout.current = setTimeout(() => {
+                    setSkizze(prev => ({...prev, labels: [...prev.labels, prev.currentLabel], currentLabel: null,
+                        undoStack: [...prev.undoStack, { type:'label', index: prev.labels.length }]}));
+                }, 800);
+            };
+
+            const handleSkizzeUndo = () => {
+                if (skizze.undoStack.length === 0) return;
+                const last = skizze.undoStack[skizze.undoStack.length - 1];
+                setSkizze(prev => {
+                    const newStack = prev.undoStack.slice(0, -1);
+                    if (last.type === 'path') return {...prev, paths: prev.paths.slice(0, -1), undoStack: newStack};
+                    if (last.type === 'label') return {...prev, labels: prev.labels.slice(0, -1), undoStack: newStack};
+                    return {...prev, undoStack: newStack};
+                });
+            };
+
+            const generateSvgFromKiResult = (result) => {
+                const sW = 500, sH = 400, pad = 50;
+                const dW = sW - 2*pad, dH = sH - 2*pad;
+                const pts = result.waende.map(w => ({
+                    x1: pad + (w.startPunkt.x_prozent/100)*dW, y1: pad + (w.startPunkt.y_prozent/100)*dH,
+                    x2: pad + (w.endPunkt.x_prozent/100)*dW, y2: pad + (w.endPunkt.y_prozent/100)*dH, id: w.id
+                }));
+                let svg = '<svg viewBox="0 0 '+sW+' '+sH+'" xmlns="http://www.w3.org/2000/svg">';
+                pts.forEach(p => {
+                    svg += '<line x1="'+p.x1+'" y1="'+p.y1+'" x2="'+p.x2+'" y2="'+p.y2+'" stroke="#b8c4d4" stroke-width="3" stroke-linecap="round"/>';
+                    const mx = (p.x1+p.x2)/2, my = (p.y1+p.y2)/2;
+                    const dx = p.x2-p.x1, dy = p.y2-p.y1, len = Math.sqrt(dx*dx+dy*dy)||1;
+                    const nx = -dy/len*15, ny = dx/len*15;
+                    svg += '<text x="'+(mx+nx)+'" y="'+(my+ny)+'" text-anchor="middle" fill="#e67e22" font-size="14" font-weight="700" font-family="Oswald">'+p.id+'</text>';
+                });
+                if (result.tueren) result.tueren.forEach(t => {
+                    const w = pts.find(p => p.id === t.wandId); if(!w) return;
+                    const pos = t.position_prozent/100;
+                    const tx = w.x1+(w.x2-w.x1)*pos, ty = w.y1+(w.y2-w.y1)*pos;
+                    svg += '<circle cx="'+tx+'" cy="'+ty+'" r="6" fill="none" stroke="#e63535" stroke-width="2"/>';
+                });
+                if (result.fenster) result.fenster.forEach(f => {
+                    const w = pts.find(p => p.id === f.wandId); if(!w) return;
+                    const pos = f.position_prozent/100;
+                    const fx = w.x1+(w.x2-w.x1)*pos, fy = w.y1+(w.y2-w.y1)*pos;
+                    svg += '<line x1="'+(fx-8)+'" y1="'+fy+'" x2="'+(fx+8)+'" y2="'+fy+'" stroke="#3498db" stroke-width="3"/>';
+                });
+                svg += '</svg>';
+                return svg;
+            };
+
+            const applySkizzeToState = (result) => {
+                const isRect = result.raumForm === 'rechteck' && result.waende.length <= 4;
+                if (!isRect) {
+                    setWandMasse(result.waende.map(w => ({ id: w.id, l: '' })));
+                }
+                if (result.tueren && result.tueren.length > 0) {
+                    setTueren(prev => [...prev, ...result.tueren.map((t,i) => ({
+                        id: Date.now()+100+i, name: 'Tuer '+(i+1)+' (Wand '+t.wandId+')',
+                        breite:'', hoehe:'', tiefe:'', expanded:false, hatLaibung:true,
+                        sturzGefliest:false, sturzAbgedichtet:false, quelle:'skizze'
+                    }))]);
+                }
+                if (result.fenster && result.fenster.length > 0) {
+                    setFenster(prev => [...prev, ...result.fenster.map((f,i) => ({
+                        id: Date.now()+200+i, name: 'Fenster '+(i+1)+' (Wand '+f.wandId+')',
+                        breite:'', hoehe:'', tiefe:'', leibungWandGefliest:true, fensterbankGefliest:true,
+                        sturzGefliest:false, expanded:false, quelle:'skizze'
+                    }))]);
+                }
+            };
+
+            const handleSkizzeVerarbeiten = async () => {
+                setSkizze(p => ({...p, mode:'processing'}));
+                const canvas = skizzeCanvasRef.current;
+                if (!canvas) { setSkizze(p => ({...p, mode:'draw'})); return; }
+                const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
+                if (!window.GEMINI_CONFIG || !window.GEMINI_CONFIG.apiKey) {
+                    alert('Gemini API-Key nicht konfiguriert.'); setSkizze(p => ({...p, mode:'draw'})); return;
+                }
+                const prompt = 'Du bist ein Experte fuer Grundriss-Erkennung aus Handskizzen. AUFGABE: Analysiere diese handgezeichnete Raumskizze auf Millimeterpapier. 1. BEGRADIGE die Linien: Erkenne die gezeichneten Waende als gerade Linien. 2. ERKENNE DIE BESCHRIFTUNG: Waende sind handschriftlich beschriftet in ROT (A,B,C,D bei 4 Waenden oder 1,2,3,4... bei mehr). Waende sind in GRAU gezeichnet. 3. ERKENNE DETAILS: Tueren, Fenster falls gezeichnet. ANTWORTE NUR als JSON: {"waende_erkannt":true,"anzahl_waende":4,"beschriftungstyp":"buchstaben","waende":[{"id":"A","startPunkt":{"x_prozent":0,"y_prozent":0},"endPunkt":{"x_prozent":100,"y_prozent":0},"laenge_relativ":1.0,"richtung":"horizontal"}],"tueren":[{"wandId":"A","position_prozent":50,"breite_relativ":0.3}],"fenster":[{"wandId":"B","position_prozent":40,"breite_relativ":0.4}],"raumForm":"rechteck","hinweise":[]}';
+                try {
+                    const apiKey = window.GEMINI_CONFIG.apiKey;
+                    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+                        method:'POST', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({ contents: [{ parts: [
+                            { inlineData: { mimeType:'image/png', data: imageBase64 } },
+                            { text: prompt }
+                        ]}]})
+                    });
+                    if (!res.ok) throw new Error('API Fehler: ' + res.status);
+                    const data = await res.json();
+                    const text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
+                    const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+                    if (result.waende_erkannt && result.waende && result.waende.length > 0) {
+                        const svg = generateSvgFromKiResult(result);
+                        setSkizze(p => ({...p, mode:'done', processedSvg: svg,
+                            erkannteWaende: result.waende,
+                            erkannteLabels: result.waende.map(w => ({ text: w.id, zuordnung: 'wand_' + result.waende.indexOf(w) }))
+                        }));
+                        applySkizzeToState(result);
+                    } else {
+                        setSkizze(p => ({...p, mode:'draw'}));
+                        alert('Grundriss konnte nicht erkannt werden. Bitte deutlicher zeichnen und Waende beschriften.');
+                    }
+                } catch(err) {
+                    console.error('Skizze KI Fehler:', err);
+                    setSkizze(p => ({...p, mode:'draw'}));
+                    alert('KI-Verarbeitung fehlgeschlagen: ' + err.message);
+                }
+            };
+
             // SVG Grundriss
             const svgW = 340; const svgH = 280;
             const drawGrundriss = () => {
@@ -6345,7 +7017,12 @@
                     <div className="breadcrumb">
                         <span>{kunde.name.split(' – ')[0]}</span>
                         <span>›</span>
-                        <span style={{cursor:'pointer', color:'var(--text-light)'}} onClick={onBack}>Raumerkennung</span>
+                        <span style={{cursor:'pointer', color:'var(--text-light)'}} onClick={() => {
+                            if (hasUnsavedChanges) {
+                                if (!confirm('Es gibt ungespeicherte Aenderungen.\nWirklich zurueck?')) return;
+                            }
+                            onBack();
+                        }}>Raumerkennung</span>
                         <span>›</span>
                         <span className="breadcrumb-active">Raumblatt {(raum && raum.nr) || ''}</span>
                     </div>
@@ -6370,66 +7047,233 @@
                     )}
 
                     {/* ═══ RAUMBLATT TAB-NAVIGATION ═══ */}
-                    <div className="raumblatt-tabs">
-                        <button className={activeTab===0?'tab active':'tab'} onClick={()=>handleTabChange(0)}>
-                            <span className="tab-emoji">📐</span> Grundriss
-                            <span className={'tab-status ' + (parseMass(masse.laenge) > 0 && parseMass(masse.breite) > 0 ? 'complete' : parseMass(masse.laenge) > 0 || parseMass(masse.breite) > 0 ? 'partial' : 'empty')}></span>
+                    <div className="raumblatt-nav-bar">
+                        <div className="raumblatt-tabs">
+                            {[
+                                {id: 0, label: 'Grundriss', icon: '📐'},
+                                {id: 1, label: 'Fotos', icon: '📸'},
+                                {id: 2, label: 'Oeffnungen', icon: '🚪'},
+                                {id: 3, label: 'Positionen', icon: '📋'}
+                            ].map(tab => {
+                                const status = getTabStatus(tab.id);
+                                const isActive = rbTab === tab.id;
+                                return (
+                                    <button key={tab.id}
+                                        className={'rb-tab' + (isActive ? ' active' : '')}
+                                        onClick={() => handleTabChange(tab.id)}>
+                                        <span className="rb-tab-label">{tab.label}</span>
+                                        {tab.id === 3 && posCards.length > 0 && (
+                                            <span className="rb-tab-badge">
+                                                {posCards.filter(p => calcPositionResult(p) > 0).length}/{posCards.length}
+                                            </span>
+                                        )}
+                                        <span className={'rb-tab-dot ' + status}></span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="raumblatt-nav-quick">
+                            <button className="nav-quick-btn" onClick={handleOpenKundendaten} title="Kundendaten">
+                                📋
+                            </button>
+                            <button className="nav-quick-btn" onClick={handleOpenOrdner} title="Ordner durchsuchen">
+                                📂
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* ═══ TAB 0: GRUNDRISS & RAUMMASZE ═══ */}
+                    {rbTab === 0 && (<React.Fragment>
+
+                    {/* Grundriss */}
+                    {/* 3er-Modus-Toggle fuer Grundriss */}
+                    <div style={{
+                        display:'flex', gap:'4px', marginBottom:'8px',
+                        background:'var(--bg-tertiary)', borderRadius:'12px', padding:'4px'
+                    }}>
+                        <button className={'ja-nein-btn ' + (grundrissModus === 'manual' ? 'active ja' : '')}
+                            onClick={() => setGrundrissModus('manual')}
+                            style={{flex:1, padding:'8px 6px', fontSize:'11px'}}>
+                            Manuell
                         </button>
-                        <button className={activeTab===1?'tab active':'tab'} onClick={()=>handleTabChange(1)}>
-                            <span className="tab-emoji">📸</span> Fotos
-                            <span className={'tab-status ' + (fotos.filter(f => f.aiAnalysis).length > 0 ? 'complete' : fotos.filter(f => f.image).length > 0 ? 'partial' : 'empty')}></span>
+                        <button className={'ja-nein-btn ' + (grundrissModus === 'skizze' ? 'active ja' : '')}
+                            onClick={() => setGrundrissModus('skizze')}
+                            style={{flex:1, padding:'8px 6px', fontSize:'11px', background: grundrissModus === 'skizze' ? '#e67e22' : undefined}}>
+                            Handskizze
                         </button>
-                        <button className={activeTab===2?'tab active':'tab'} onClick={()=>handleTabChange(2)}>
-                            <span className="tab-emoji">🚪</span> Oeffnungen
-                            <span className={'tab-status ' + (tueren.length > 0 || fenster.length > 0 ? 'complete' : 'empty')}></span>
-                        </button>
-                        <button className={activeTab===3?'tab active':'tab'} onClick={()=>handleTabChange(3)}>
-                            <span className="tab-emoji">📋</span> Positionen
-                            {posCards.length > 0 && (
-                                <span className="tab-badge">{posCards.filter(p => calcPositionResult(p) > 0).length}/{posCards.length}</span>
-                            )}
-                            <span className={'tab-status ' + (posCards.length > 0 && posCards.every(p => calcPositionResult(p) > 0) ? 'complete' : posCards.some(p => calcPositionResult(p) > 0) ? 'partial' : 'empty')}></span>
+                        <button className={'ja-nein-btn ' + (grundrissModus === 'ki' ? 'active ja' : '')}
+                            onClick={() => setGrundrissModus('ki')}
+                            style={{flex:1, padding:'8px 6px', fontSize:'11px'}}>
+                            KI-Grundriss
                         </button>
                     </div>
 
-                    {/* ═══ TAB 1: Grundriss & Raummasze ═══ */}
-                    {activeTab === 0 && (
-                    <div className="raumblatt-tab-content">
-
-                    {/* Grundriss */}
                     <div className="grundriss-card">
-                        <div className="grundriss-card-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span>📐 Grundriss</span>
-                            {(raum && raum.manuell) && (
-                                <button style={{fontSize:'12px', padding:'4px 10px', background:'rgba(230,126,34,0.1)', border:'1px solid var(--accent-orange)', borderRadius:'4px', color:'var(--accent-orange)', cursor:'pointer'}}
-                                    onClick={() => setIsDrawMode(!isDrawMode)}>
-                                    {isDrawMode ? '✓ Fertig' : '✏️ Freihand zeichnen'}
-                                </button>
-                            )}
-                        </div>
-                        {isDrawMode ? (
-                            <canvas ref={canvasRef} width="340" height="280"
-                                style={{width:'100%', maxWidth:'340px', height:'280px', margin:'0 auto', display:'block', background:'rgba(255,255,255,0.02)', border:'1px solid var(--border-color)', borderRadius:'6px', touchAction:'none', cursor:'crosshair'}} />
-                        ) : (
-                            <svg className="grundriss-svg" viewBox={`0 0 ${svgW} ${svgH}`} style={{maxWidth:'340px', minHeight:'260px'}}>
-                                {drawGrundriss()}
-                                {!hasData && L <= 0 && (
-                                    <text x={svgW/2} y={svgH/2} textAnchor="middle" fill="#7a8a9e" fontSize="13">
-                                        Maße eingeben für Darstellung
-                                    </text>
+                        {/* === MANUELL: Bestehender SVG-Grundriss === */}
+                        {grundrissModus === 'manual' && (
+                            <React.Fragment>
+                                <div className="grundriss-card-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                    <span>📐 Grundriss</span>
+                                    {(raum && raum.manuell) && (
+                                        <button style={{fontSize:'12px', padding:'4px 10px', background:'rgba(230,126,34,0.1)', border:'1px solid var(--accent-orange)', borderRadius:'4px', color:'var(--accent-orange)', cursor:'pointer'}}
+                                            onClick={() => setIsDrawMode(!isDrawMode)}>
+                                            {isDrawMode ? 'Fertig' : 'Freihand zeichnen'}
+                                        </button>
+                                    )}
+                                </div>
+                                {isDrawMode ? (
+                                    <canvas ref={canvasRef} width="340" height="280"
+                                        style={{width:'100%', maxWidth:'340px', height:'280px', margin:'0 auto', display:'block', background:'rgba(255,255,255,0.02)', border:'1px solid var(--border-color)', borderRadius:'6px', touchAction:'none', cursor:'crosshair'}} />
+                                ) : (
+                                    <svg className="grundriss-svg" viewBox={`0 0 ${svgW} ${svgH}`} style={{maxWidth:'340px', minHeight:'260px'}}>
+                                        {drawGrundriss()}
+                                        {!hasData && L <= 0 && (
+                                            <text x={svgW/2} y={svgH/2} textAnchor="middle" fill="#7a8a9e" fontSize="13">
+                                                Masze eingeben fuer Darstellung
+                                            </text>
+                                        )}
+                                    </svg>
                                 )}
-                            </svg>
+                            </React.Fragment>
+                        )}
+
+                        {/* === HANDSKIZZE: Millimeterpapier-Canvas === */}
+                        {grundrissModus === 'skizze' && (
+                            <React.Fragment>
+                                <div className="grundriss-card-title">
+                                    <span>✏️ Handskizze</span>
+                                </div>
+                                {/* Toolbar */}
+                                <div className="skizze-toolbar" style={{
+                                    display:'flex', gap:'4px', margin:'0 0 8px', padding:'4px',
+                                    background:'var(--bg-tertiary)', borderRadius:'10px'
+                                }}>
+                                    <button className={'skizze-tool-btn' + (skizze.mode === 'draw' ? ' active' : '')}
+                                        style={{flex:1, padding:'7px 4px', border:'none', borderRadius:'8px',
+                                            background: skizze.mode === 'draw' ? 'var(--accent-blue)' : 'transparent',
+                                            color: skizze.mode === 'draw' ? 'white' : 'var(--text-muted)',
+                                            fontFamily:'Oswald', fontSize:'11px', fontWeight:600, textTransform:'uppercase', cursor:'pointer'}}
+                                        onClick={() => setSkizze(p => ({...p, mode:'draw'}))}>
+                                        Zeichnen
+                                    </button>
+                                    <button className={'skizze-tool-btn' + (skizze.mode === 'label' ? ' active' : '')}
+                                        style={{flex:1, padding:'7px 4px', border:'none', borderRadius:'8px',
+                                            background: skizze.mode === 'label' ? '#e74c3c' : 'transparent',
+                                            color: skizze.mode === 'label' ? 'white' : 'var(--text-muted)',
+                                            fontFamily:'Oswald', fontSize:'11px', fontWeight:600, textTransform:'uppercase', cursor:'pointer'}}
+                                        onClick={() => setSkizze(p => ({...p, mode:'label'}))}>
+                                        Beschriften (A,B,C...)
+                                    </button>
+                                    <button style={{padding:'7px 8px', border:'none', borderRadius:'8px',
+                                        background:'transparent', color:'var(--text-muted)', fontSize:'11px',
+                                        fontFamily:'Oswald', fontWeight:600, cursor:'pointer', opacity: skizze.undoStack.length === 0 ? 0.3 : 1}}
+                                        onClick={handleSkizzeUndo} disabled={skizze.undoStack.length === 0}>
+                                        ↺
+                                    </button>
+                                    <button style={{padding:'7px 8px', border:'none', borderRadius:'8px',
+                                        background:'transparent', color:'var(--text-muted)', fontSize:'11px',
+                                        fontFamily:'Oswald', fontWeight:600, cursor:'pointer'}}
+                                        onClick={() => setSkizze(p => ({...p, paths:[], labels:[], currentPath:null, currentLabel:null, processedSvg:null, erkannteWaende:[], erkannteLabels:[], undoStack:[]}))}>
+                                        Neu
+                                    </button>
+                                </div>
+
+                                {/* Canvas */}
+                                <div style={{width:'100%', aspectRatio:'4/3', borderRadius:'12px',
+                                    border:'1px solid var(--border-subtle)', overflow:'hidden', position:'relative', background:'#1a2332'}}>
+                                    {skizze.mode !== 'done' ? (
+                                        <React.Fragment>
+                                            <canvas ref={skizzeCanvasRef} width={600} height={450}
+                                                style={{width:'100%', height:'100%', touchAction:'none',
+                                                    cursor: skizze.mode === 'label' ? 'text' : 'crosshair'}}
+                                                onMouseDown={skizze.mode === 'draw' ? handleSkizzeStart : handleLabelStart}
+                                                onMouseMove={skizze.mode === 'draw' ? handleSkizzeMove : handleLabelMove}
+                                                onMouseUp={skizze.mode === 'draw' ? handleSkizzeEnd : handleLabelEnd}
+                                                onTouchStart={skizze.mode === 'draw' ? handleSkizzeStart : handleLabelStart}
+                                                onTouchMove={skizze.mode === 'draw' ? handleSkizzeMove : handleLabelMove}
+                                                onTouchEnd={skizze.mode === 'draw' ? handleSkizzeEnd : handleLabelEnd}
+                                            />
+                                            <div style={{position:'absolute', bottom:'8px', left:'50%', transform:'translateX(-50%)',
+                                                fontSize:'11px', color:'var(--text-muted)', background:'rgba(0,0,0,0.5)',
+                                                padding:'4px 12px', borderRadius:'8px', pointerEvents:'none'}}>
+                                                {skizze.mode === 'draw'
+                                                    ? 'Waende zeichnen (grau)'
+                                                    : 'Buchstaben/Zahlen an die Waende schreiben (rot)'}
+                                            </div>
+                                        </React.Fragment>
+                                    ) : (
+                                        <div dangerouslySetInnerHTML={{__html: skizze.processedSvg}}
+                                            style={{width:'100%', height:'100%', padding:'10px'}} />
+                                    )}
+                                </div>
+
+                                {/* KI-Button */}
+                                {skizze.mode !== 'done' && skizze.mode !== 'processing' && (
+                                    <button style={{
+                                        width:'100%', padding:'12px', marginTop:'8px',
+                                        background: (skizze.paths.length > 0 && skizze.labels.length > 0) ? 'var(--accent-blue)' : 'var(--bg-tertiary)',
+                                        color: (skizze.paths.length > 0 && skizze.labels.length > 0) ? 'white' : 'var(--text-muted)',
+                                        border:'none', borderRadius:'12px', fontFamily:'Oswald', fontSize:'14px', fontWeight:700,
+                                        cursor: (skizze.paths.length > 0 && skizze.labels.length > 0) ? 'pointer' : 'default'
+                                    }} disabled={skizze.paths.length === 0 || skizze.labels.length === 0}
+                                        onClick={handleSkizzeVerarbeiten}>
+                                        🧠 KI: Begradigen und Erkennen
+                                    </button>
+                                )}
+                                {skizze.mode === 'processing' && (
+                                    <div style={{textAlign:'center', padding:'16px', color:'var(--accent-blue)'}}>
+                                        KI analysiert Ihre Skizze...
+                                    </div>
+                                )}
+                                {skizze.mode === 'done' && (
+                                    <button style={{
+                                        width:'100%', padding:'10px', marginTop:'8px',
+                                        background:'rgba(230,126,34,0.1)', border:'1px solid rgba(230,126,34,0.3)',
+                                        borderRadius:'10px', color:'var(--accent-orange)',
+                                        fontFamily:'Oswald', fontSize:'13px', fontWeight:600, cursor:'pointer'
+                                    }} onClick={() => setSkizze(p => ({...p, mode:'draw', processedSvg:null}))}>
+                                        Skizze nochmal bearbeiten
+                                    </button>
+                                )}
+                                {/* Info-Text */}
+                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'6px', textAlign:'center'}}>
+                                    {skizze.paths.length} {skizze.paths.length === 1 ? 'Wand' : 'Waende'} gezeichnet, {skizze.labels.length} {skizze.labels.length === 1 ? 'Beschriftung' : 'Beschriftungen'}
+                                </div>
+                            </React.Fragment>
+                        )}
+
+                        {/* === KI-GRUNDRISS: Platzhalter (spaetere Implementierung) === */}
+                        {grundrissModus === 'ki' && (
+                            <div style={{padding:'20px', textAlign:'center'}}>
+                                <div style={{fontSize:'36px', marginBottom:'8px'}}>🧠</div>
+                                <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-white)', marginBottom:'6px'}}>
+                                    KI-Grundrisserkennung
+                                </div>
+                                <div style={{fontSize:'12px', color:'var(--text-muted)', lineHeight:'1.5'}}>
+                                    Gemini Pro analysiert eine vorhandene Zeichnung und erkennt den Raum automatisch.
+                                    <br/>Funktion wird mit der naechsten Version freigeschaltet.
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    </div>
+                    {/* Fotos & KI → jetzt auf Tab 2 (Fotos) */}
+                    {(fotos.length > 0 || Object.values(phasenFotos).some(p => Object.keys(p).length > 0)) && (
+                        <div style={{
+                            padding:'10px 14px', marginBottom:'10px',
+                            background:'rgba(30,136,229,0.06)', border:'1px solid rgba(30,136,229,0.15)',
+                            borderRadius:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer'
+                        }} onClick={() => handleTabChange(1)}>
+                            <span style={{fontSize:'20px'}}>📸</span>
+                            <div style={{flex:1}}>
+                                <div style={{fontSize:'12px', fontWeight:600, color:'var(--text-primary)'}}>Fotos & KI-Analyse</div>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)'}}>Zum Fotos-Tab wechseln</div>
+                            </div>
+                            <span style={{color:'var(--accent-blue)', fontSize:'14px'}}>▶</span>
+                        </div>
                     )}
 
-                    {/* ═══ TAB 2: Fotos & KI-Erkennung ═══ */}
-                    {activeTab === 1 && (
-                    <div className="raumblatt-tab-content">
-
-                    {/* ═══ FOTOANALYSE-RAUMBLATT -- KI-gestützte Maßermittlung ═══ */}
+                    {/* Hidden file inputs (behalten fuer Rueckwaertskompatibilitaet) */}
                     <input type="file" accept="image/*" capture="environment" ref={fotoAnalyseInputRef}
                         style={{display:'none'}} onChange={e => {
                             var file = e.target.files && e.target.files[0];
@@ -6441,539 +7285,8 @@
                             reader.readAsDataURL(file);
                             e.target.value = '';
                         }} />
-
-                    {fotoAnalyse && (
-                        <div className="modal-overlay" style={{zIndex:4500}}>
-                            <div style={{width:'95%', maxWidth:'520px', maxHeight:'92vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', padding:'18px'}}>
-
-                                {/* Header */}
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px'}}>
-                                    <div style={{fontWeight:'700', fontSize:'15px', color:'var(--text-primary)'}}>📷 Fotoanalyse -- Wand {wandMasse[fotoAnalyse.wandIdx] ? wandMasse[fotoAnalyse.wandIdx].id : ''}</div>
-                                    <button onClick={() => setFotoAnalyse(null)} style={{background:'none', border:'none', fontSize:'18px', cursor:'pointer', color:'var(--text-muted)'}}>✕</button>
-                                </div>
-
-                                {/* SCHRITT 1: Modus-Auswahl */}
-                                {fotoAnalyse.step === 'modus' && (
-                                    <div>
-                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'12px'}}>Wie sieht die Wand aus?</div>
-                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
-                                            <button onClick={() => setFotoAnalyse(prev => ({...prev, mode: 'rohbau', step: 'foto'}))}
-                                                style={{padding:'18px 12px', borderRadius:'12px', border:'2px solid var(--border-subtle)', background:'var(--bg-secondary)', cursor:'pointer', textAlign:'center'}}>
-                                                <div style={{fontSize:'28px', marginBottom:'6px'}}>🏗️</div>
-                                                <div style={{fontWeight:'700', fontSize:'13px', color:'var(--text-primary)'}}>Rohbau</div>
-                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'4px'}}>Referenzmaß-Verfahren</div>
-                                            </button>
-                                            <button onClick={() => setFotoAnalyse(prev => ({...prev, mode: 'fertig', step: 'fliesen'}))}
-                                                style={{padding:'18px 12px', borderRadius:'12px', border:'2px solid var(--accent-blue)', background:'rgba(30,136,229,0.08)', cursor:'pointer', textAlign:'center'}}>
-                                                <div style={{fontSize:'28px', marginBottom:'6px'}}>🏠</div>
-                                                <div style={{fontWeight:'700', fontSize:'13px', color:'var(--accent-blue)'}}>Fertig gefliest</div>
-                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'4px'}}>Fliesenzählung (präzise)</div>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* SCHRITT 2 (Fertig): Fliesen-Parameter */}
-                                {fotoAnalyse.step === 'fliesen' && (
-                                    <div>
-                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'10px'}}>Fliesenformat + Fugenbreite eingeben (mm)</div>
-                                        {/* Schnellauswahl-Chips */}
-                                        <div style={{display:'flex', flexWrap:'wrap', gap:'6px', marginBottom:'12px'}}>
-                                            {[{l:'10×10',w:100,h:100},{l:'15×15',w:150,h:150},{l:'20×20',w:200,h:200},{l:'20×25',w:200,h:250},{l:'25×33',w:250,h:330},{l:'30×60',w:300,h:600},{l:'60×60',w:600,h:600},{l:'60×120',w:600,h:1200}].map(s => (
-                                                <button key={s.l} onClick={() => setFotoAnalyse(prev => ({...prev, tileParams: {...prev.tileParams, tileWidth: s.w, tileHeight: s.h}}))}
-                                                    style={{padding:'4px 10px', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer',
-                                                        border: fotoAnalyse.tileParams.tileWidth == s.w && fotoAnalyse.tileParams.tileHeight == s.h ? '2px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
-                                                        background: fotoAnalyse.tileParams.tileWidth == s.w && fotoAnalyse.tileParams.tileHeight == s.h ? 'rgba(30,136,229,0.1)' : 'var(--bg-tertiary)',
-                                                        color: 'var(--text-secondary)'
-                                                    }}>{s.l}</button>
-                                            ))}
-                                        </div>
-                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'10px'}}>
-                                            <div><label style={{fontSize:'10px', color:'var(--text-muted)'}}>Breite (mm)</label>
-                                                <input type="number" value={fotoAnalyse.tileParams.tileWidth} onChange={e => setFotoAnalyse(prev => ({...prev, tileParams: {...prev.tileParams, tileWidth: e.target.value}}))}
-                                                    style={{width:'100%', padding:'8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'14px'}} /></div>
-                                            <div><label style={{fontSize:'10px', color:'var(--text-muted)'}}>Höhe (mm)</label>
-                                                <input type="number" value={fotoAnalyse.tileParams.tileHeight} onChange={e => setFotoAnalyse(prev => ({...prev, tileParams: {...prev.tileParams, tileHeight: e.target.value}}))}
-                                                    style={{width:'100%', padding:'8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'14px'}} /></div>
-                                        </div>
-                                        <div style={{marginBottom:'10px'}}><label style={{fontSize:'10px', color:'var(--text-muted)'}}>Fugenbreite (mm)</label>
-                                            <input type="number" value={fotoAnalyse.tileParams.groutWidth} onChange={e => setFotoAnalyse(prev => ({...prev, tileParams: {...prev.tileParams, groutWidth: e.target.value}}))}
-                                                style={{width:'100%', padding:'8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'14px'}} /></div>
-                                        <div style={{marginBottom:'14px'}}><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block', marginBottom:'4px'}}>Verlegemuster</label>
-                                            <div style={{display:'flex', gap:'8px'}}>
-                                                {[{id:'kreuzfuge',l:'Kreuzfuge'},{id:'halbverband',l:'Halbverband'},{id:'drittelverband',l:'Drittelverband'}].map(p => (
-                                                    <button key={p.id} onClick={() => setFotoAnalyse(prev => ({...prev, tileParams: {...prev.tileParams, pattern: p.id}}))}
-                                                        style={{flex:1, padding:'6px', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer',
-                                                            border: fotoAnalyse.tileParams.pattern === p.id ? '2px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
-                                                            background: fotoAnalyse.tileParams.pattern === p.id ? 'rgba(30,136,229,0.1)' : 'var(--bg-tertiary)',
-                                                            color: 'var(--text-secondary)'}}>{p.l}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <button onClick={() => { if (fotoAnalyse.tileParams.tileWidth && fotoAnalyse.tileParams.tileHeight) setFotoAnalyse(prev => ({...prev, step: 'foto'})); else alert('Bitte Fliesengröße eingeben!'); }}
-                                            style={{width:'100%', padding:'12px', background:'var(--accent-blue)', color:'white', border:'none', borderRadius:'10px', fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                                            Weiter → Foto aufnehmen
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* SCHRITT: Foto aufnehmen */}
-                                {fotoAnalyse.step === 'foto' && (
-                                    <div style={{textAlign:'center'}}>
-                                        <div style={{padding:'16px', background:'rgba(30,136,229,0.06)', borderRadius:'12px', marginBottom:'14px', fontSize:'12px', color:'var(--text-secondary)', lineHeight:'1.6', textAlign:'left'}}>
-                                            📸 <strong>Tipp für optimale Ergebnisse:</strong><br/>
-                                            • Frontal auf die Wand fotografieren<br/>
-                                            • Gesamte Fläche sichtbar<br/>
-                                            • Gute Beleuchtung, wenig Schatten<br/>
-                                            {fotoAnalyse.mode === 'fertig' && '• Fugen müssen erkennbar sein'}
-                                            {fotoAnalyse.mode === 'rohbau' && '• Bekanntes Objekt im Bild (Tür, Zollstock)'}
-                                        </div>
-                                        {/* KI-Modell Auswahl */}
-                                        <div style={{marginBottom:'14px', textAlign:'left'}}>
-                                            <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block', marginBottom:'6px'}}>🧠 KI-Modell für Fotoanalyse</label>
-                                            <div style={{display:'flex', gap:'6px'}}>
-                                                {Object.keys(GEMINI_CONFIG.MODELS).map(function(key) {
-                                                    var m = GEMINI_CONFIG.MODELS[key];
-                                                    var isActive = fotoAnalyse.kiModel === key;
-                                                    return React.createElement('button', {
-                                                        key: key,
-                                                        onClick: function() { setFotoAnalyse(function(prev) { return Object.assign({}, prev, { kiModel: key }); }); },
-                                                        style: {
-                                                            flex: 1, padding: '8px 6px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
-                                                            border: isActive ? '2px solid ' + m.color : '1px solid var(--border-subtle)',
-                                                            background: isActive ? m.color + '18' : 'var(--bg-tertiary)',
-                                                            color: isActive ? m.color : 'var(--text-muted)',
-                                                        }
-                                                    },
-                                                        React.createElement('div', { style: { fontSize: '16px' } }, m.icon),
-                                                        React.createElement('div', { style: { fontSize: '10px', fontWeight: '700', marginTop: '2px' } }, m.name.replace('Gemini ', '')),
-                                                        React.createElement('div', { style: { fontSize: '9px', marginTop: '1px' } }, m.desc)
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                        <button onClick={() => fotoAnalyseInputRef.current && fotoAnalyseInputRef.current.click()}
-                                            style={{width:'100%', padding:'16px', background:'linear-gradient(135deg, #1E88E5, #8e44ad)', color:'white', border:'none', borderRadius:'12px', fontSize:'15px', fontWeight:'700', cursor:'pointer'}}>
-                                            📷 Foto aufnehmen
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* SCHRITT (Fertig): KI-Analyse läuft / Ergebnis */}
-                                {fotoAnalyse.step === 'analyse' && fotoAnalyse.mode === 'fertig' && (
-                                    <div>
-                                        {!fotoAnalyse.result ? (
-                                            <div style={{textAlign:'center'}}>
-                                                {fotoAnalyse.photo && <img src={fotoAnalyse.photo} style={{width:'100%', maxHeight:'200px', objectFit:'contain', borderRadius:'10px', marginBottom:'12px'}} />}
-                                                <div style={{fontSize:'14px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'8px'}}>📸 Foto bereit</div>
-                                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'14px'}}>Fliesen werden gezählt und Maße berechnet</div>
-                                                <button onClick={async () => {
-                                                    try {
-                                                        setFotoAnalyse(prev => ({...prev, step: 'analyse_running'}));
-                                                        var base64 = fotoAnalyse.photo.split(',')[1];
-                                                        var tp = fotoAnalyse.tileParams;
-                                                        var prompt = 'Du bist ein Experte für Fliesenanalyse und Maßermittlung.\n\nFLIESEN-PARAMETER:\n- Fliesengröße: ' + tp.tileWidth + ' × ' + tp.tileHeight + ' mm\n- Fugenbreite: ' + tp.groutWidth + ' mm\n- Verlegemuster: ' + tp.pattern + '\n\nANALYSIERE das Foto der gefliesten Wand:\n1. Zähle die VOLLSTÄNDIGEN Fliesen horizontal und vertikal\n2. Schätze Teilfliesen an den Rändern (Anteil 0.0–1.0)\n3. Berechne:\n   - Breite = (Fliesen_H × Breite) + (Fugen) in mm\n   - Höhe = (Fliesen_V × Höhe) + (Fugen) in mm\n\nAntworte NUR als JSON ohne Backticks:\n{"tilesH":{"full":0,"partialLeft":0,"partialRight":0},"tilesV":{"full":0,"partialTop":0,"partialBottom":0},"width_mm":0,"height_mm":0,"confidence":0.0,"hinweise":[]}';
-                                                        var selModelId = (GEMINI_CONFIG.MODELS[fotoAnalyse.kiModel] || GEMINI_CONFIG.MODELS['pro']).id;
-                                                        var apiResult = await window.callGeminiAPI([
-                                                            { role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: base64 } }, { text: prompt }] }
-                                                        ], 2000, { model: selModelId });
-                                                        if (!apiResult) throw new Error('Keine KI-Antwort');
-                                                        var parsed = JSON.parse(apiResult.replace(/```json|```/g, '').trim());
-                                                        setFotoAnalyse(prev => ({...prev, result: parsed, step: 'ergebnis'}));
-                                                    } catch(err) {
-                                                        console.error('Fotoanalyse Fehler:', err);
-                                                        alert('Fotoanalyse fehlgeschlagen: ' + err.message);
-                                                        setFotoAnalyse(prev => ({...prev, step: 'foto'}));
-                                                    }
-                                                }} style={{width:'100%', padding:'14px', background:'linear-gradient(135deg, #1E88E5, #8e44ad)', color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:'700', cursor:'pointer'}}>
-                                                    🔍 KI-Analyse starten
-                                                </button>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                )}
-
-                                {/* Analyse läuft */}
-                                {fotoAnalyse.step === 'analyse_running' && (
-                                    <div style={{textAlign:'center', padding:'20px'}}>
-                                        {fotoAnalyse.photo && <img src={fotoAnalyse.photo} style={{width:'100%', maxHeight:'150px', objectFit:'contain', borderRadius:'10px', marginBottom:'12px'}} />}
-                                        <div style={{fontSize:'36px', marginBottom:'8px'}}>🔍</div>
-                                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--accent-blue)'}}>KI analysiert Fliesen...</div>
-                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'6px'}}>Bitte warten</div>
-                                    </div>
-                                )}
-
-                                {/* SCHRITT (Rohbau): Referenzmaß setzen */}
-                                {fotoAnalyse.step === 'referenz' && fotoAnalyse.mode === 'rohbau' && (
-                                    <div>
-                                        {fotoAnalyse.photo && <img src={fotoAnalyse.photo} style={{width:'100%', maxHeight:'180px', objectFit:'contain', borderRadius:'10px', marginBottom:'10px'}} />}
-                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px'}}>Bekanntes Referenzmaß eingeben:</div>
-                                        <div style={{display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px'}}>
-                                            {[{l:'Türhöhe',v:'2010'},{l:'Türbreite',v:'860'},{l:'Zollstock',v:'2000'}].map(r => (
-                                                <button key={r.l} onClick={() => setFotoAnalyse(prev => ({...prev, refMass: r.v}))}
-                                                    style={{padding:'4px 10px', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer',
-                                                        border: fotoAnalyse.refMass === r.v ? '2px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
-                                                        background: fotoAnalyse.refMass === r.v ? 'rgba(30,136,229,0.1)' : 'var(--bg-tertiary)', color:'var(--text-secondary)'
-                                                    }}>{r.l} ({r.v}mm)</button>
-                                            ))}
-                                        </div>
-                                        <div style={{marginBottom:'10px'}}>
-                                            <label style={{fontSize:'10px', color:'var(--text-muted)'}}>Referenzmaß (mm)</label>
-                                            <input type="number" value={fotoAnalyse.refMass || ''} onChange={e => setFotoAnalyse(prev => ({...prev, refMass: e.target.value}))}
-                                                placeholder="z.B. 2010" style={{width:'100%', padding:'8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'14px'}} />
-                                        </div>
-                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'10px'}}>Gemessene Wandlänge oder -höhe (mm):</div>
-                                        <div style={{marginBottom:'14px'}}>
-                                            <label style={{fontSize:'10px', color:'var(--text-muted)'}}>Zu messende Strecke (mm) -- geschätzt aus Foto</label>
-                                            <input type="number" value={fotoAnalyse.measuredMm || ''} onChange={e => setFotoAnalyse(prev => ({...prev, measuredMm: e.target.value}))}
-                                                placeholder="z.B. 3500" style={{width:'100%', padding:'8px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'14px'}} />
-                                        </div>
-                                        <button onClick={async () => {
-                                            try {
-                                                var base64 = fotoAnalyse.photo.split(',')[1];
-                                                var prompt = 'Du bist ein Bauexperte für Maßermittlung.\n\nIM BILD: Eine Wand/Fläche eines Rohbau-Raumes.\nBEKANNTES REFERENZMAß: ' + (fotoAnalyse.refMass || '2010') + ' mm (z.B. Türhöhe, Zollstock)\n\nANALYSIERE das Foto und schätze:\n1. Die BREITE der sichtbaren Hauptwand in mm\n2. Die HÖHE der sichtbaren Hauptwand in mm\n3. Nutze das Referenzmaß als Skalierung\n\nAntworte NUR als JSON ohne Backticks:\n{"width_mm":0,"height_mm":0,"confidence":0.0,"referenz_genutzt":"' + (fotoAnalyse.refMass || '2010') + 'mm","hinweise":[]}';
-                                                setFotoAnalyse(prev => ({...prev, step: 'rohbau_analyse'}));
-                                                var selModelId2 = (GEMINI_CONFIG.MODELS[fotoAnalyse.kiModel] || GEMINI_CONFIG.MODELS['pro']).id;
-                                                var apiResult = await window.callGeminiAPI([
-                                                    { role: 'user', parts: [{ inlineData: { mimeType: 'image/jpeg', data: base64 } }, { text: prompt }] }
-                                                ], 2000, { model: selModelId2 });
-                                                if (!apiResult) throw new Error('Keine KI-Antwort');
-                                                var parsed = JSON.parse(apiResult.replace(/```json|```/g, '').trim());
-                                                setFotoAnalyse(prev => ({...prev, result: parsed, step: 'ergebnis'}));
-                                            } catch(err) {
-                                                alert('Rohbau-Analyse fehlgeschlagen: ' + err.message);
-                                                setFotoAnalyse(prev => ({...prev, step: 'referenz'}));
-                                            }
-                                        }} disabled={!fotoAnalyse.refMass}
-                                            style={{width:'100%', padding:'12px', background: fotoAnalyse.refMass ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: fotoAnalyse.refMass ? 'white' : 'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'14px', fontWeight:'700', cursor: fotoAnalyse.refMass ? 'pointer' : 'default'}}>
-                                            🔍 KI-Analyse starten
-                                        </button>
-                                    </div>
-                                )}
-
-                                {/* Rohbau: Analyse läuft */}
-                                {fotoAnalyse.step === 'rohbau_analyse' && (
-                                    <div style={{textAlign:'center', padding:'20px'}}>
-                                        <div style={{fontSize:'36px', marginBottom:'8px'}}>🔍</div>
-                                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--accent-blue)'}}>KI analysiert Rohbau-Foto...</div>
-                                    </div>
-                                )}
-
-                                {/* ERGEBNIS (beide Modi) */}
-                                {fotoAnalyse.step === 'ergebnis' && fotoAnalyse.result && (() => {
-                                    var r = fotoAnalyse.result;
-                                    var wM = (r.width_mm / 1000).toFixed(3);
-                                    var hM = (r.height_mm / 1000).toFixed(3);
-                                    var area = ((r.width_mm * r.height_mm) / 1000000).toFixed(2);
-                                    var conf = Math.round((r.confidence || 0) * 100);
-                                    var confColor = conf >= 90 ? 'var(--success)' : conf >= 70 ? '#f39c12' : '#e74c3c';
-                                    var confIcon = conf >= 90 ? '🟢' : conf >= 70 ? '🟡' : '🔴';
-                                    return (
-                                        <div>
-                                            {fotoAnalyse.photo && <img src={fotoAnalyse.photo} style={{width:'100%', maxHeight:'150px', objectFit:'contain', borderRadius:'10px', marginBottom:'12px'}} />}
-                                            {/* Fliesen-Details (nur Fertig-Modus) */}
-                                            {fotoAnalyse.mode === 'fertig' && r.tilesH && (
-                                                <div style={{padding:'10px 12px', background:'rgba(30,136,229,0.06)', borderRadius:'10px', marginBottom:'10px', fontSize:'12px'}}>
-                                                    <div style={{fontWeight:'700', marginBottom:'4px'}}>🔢 Fliesenzählung</div>
-                                                    <div style={{color:'var(--text-secondary)'}}>
-                                                        Horizontal: {r.tilesH.full} ganze{r.tilesH.partialLeft > 0 ? ' + ' + r.tilesH.partialLeft + ' links' : ''}{r.tilesH.partialRight > 0 ? ' + ' + r.tilesH.partialRight + ' rechts' : ''}<br/>
-                                                        Vertikal: {r.tilesV.full} ganze{r.tilesV.partialTop > 0 ? ' + ' + r.tilesV.partialTop + ' oben' : ''}{r.tilesV.partialBottom > 0 ? ' + ' + r.tilesV.partialBottom + ' unten' : ''}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {/* Maße */}
-                                            <div style={{padding:'14px', background:'var(--bg-secondary)', borderRadius:'12px', marginBottom:'10px'}}>
-                                                <div style={{fontWeight:'700', fontSize:'13px', marginBottom:'8px'}}>📏 Berechnete Maße</div>
-                                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px', textAlign:'center'}}>
-                                                    <div><div style={{fontSize:'18px', fontWeight:'700', color:'var(--accent-blue)'}}>{wM}</div><div style={{fontSize:'10px', color:'var(--text-muted)'}}>Breite (m)</div></div>
-                                                    <div><div style={{fontSize:'18px', fontWeight:'700', color:'var(--accent-blue)'}}>{hM}</div><div style={{fontSize:'10px', color:'var(--text-muted)'}}>Höhe (m)</div></div>
-                                                    <div><div style={{fontSize:'18px', fontWeight:'700', color:'var(--success)'}}>{area}</div><div style={{fontSize:'10px', color:'var(--text-muted)'}}>Fläche (m²)</div></div>
-                                                </div>
-                                            </div>
-                                            {/* Konfidenz */}
-                                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px', fontSize:'12px'}}>
-                                                <span>{confIcon}</span>
-                                                <span style={{color: confColor, fontWeight:'700'}}>Konfidenz: {conf}%</span>
-                                                {conf < 70 && <span style={{color:'#e74c3c', fontSize:'10px'}}>-- Manuelle Kontrolle empfohlen</span>}
-                                            </div>
-                                            {/* Hinweise */}
-                                            {r.hinweise && r.hinweise.length > 0 && (
-                                                <div style={{padding:'8px 10px', background:'rgba(243,156,18,0.08)', borderRadius:'8px', marginBottom:'12px', fontSize:'11px', color:'var(--text-secondary)'}}>
-                                                    {r.hinweise.map((h, i) => <div key={i}>ℹ️ {h}</div>)}
-                                                </div>
-                                            )}
-                                            {/* Übernahme ins Raumblatt */}
-                                            <div style={{display:'flex', gap:'8px'}}>
-                                                <button onClick={() => {
-                                                    // Wandlänge übernehmen
-                                                    var idx = fotoAnalyse.wandIdx;
-                                                    setWandMasse(prev => prev.map((ww, i) => i === idx ? {...ww, l: wM.replace('.', ',')} : ww));
-                                                    // Raumhöhe übernehmen (wenn noch nicht gesetzt)
-                                                    if (!masse.raumhoehe || parseMass(masse.raumhoehe) === 0) {
-                                                        setMasse(prev => ({...prev, raumhoehe: hM.replace('.', ',')}));
-                                                    }
-                                                    if (!masse.hoehe || parseMass(masse.hoehe) === 0) {
-                                                        setMasse(prev => ({...prev, hoehe: hM.replace('.', ',')}));
-                                                    }
-                                                    setFotoAnalyse(null);
-                                                }} style={{flex:1, padding:'12px', background:'var(--success)', color:'white', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer'}}>
-                                                    ✓ Ins Raumblatt übernehmen
-                                                </button>
-                                                <button onClick={() => setFotoAnalyse(prev => ({...prev, step: 'foto', photo: null, result: null}))}
-                                                    style={{padding:'12px', background:'var(--bg-tertiary)', color:'var(--text-secondary)', border:'1px solid var(--border-subtle)', borderRadius:'10px', fontSize:'13px', cursor:'pointer'}}>
-                                                    📷 Neu
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ═══ FOTO-SYSTEM – Wandfotos + KI-Erkennung ═══ */}
                     <input type="file" accept="image/*" capture="environment" ref={fotoInputRef}
                         style={{display:'none'}} onChange={handleFotoCapture} />
-
-                    <div className="foto-section">
-                        <div className="foto-section-header" onClick={() => setFotoSectionOpen(!fotoSectionOpen)}>
-                            <div className="foto-section-title">
-                                <span>📸 Wandfotos & KI-Erkennung</span>
-                                {fotos.length > 0 && <span className="foto-section-badge">{fotos.filter(f => f.image).length} Fotos</span>}
-                                {fotos.some(f => f.aiAnalysis && f.aiAnalysis.objects && f.aiAnalysis.objects.length > 0) && (
-                                    <span className="foto-section-badge" style={{background:'var(--success)'}}>KI ✓</span>
-                                )}
-                            </div>
-                            <span className={'foto-section-chevron ' + (fotoSectionOpen ? 'open' : '')}>▼</span>
-                        </div>
-                        {fotoSectionOpen && (
-                            <div className="foto-section-body">
-                                {/* Wand-Slots Grid */}
-                                <div className="foto-wall-grid">
-                                    {(function() {
-                                        var wallIds = [];
-                                        if (hasData && raum && raum.waende) {
-                                            wallIds = raum.waende.map(function(w) { return w.id; });
-                                        } else if (isMultiWall && raum && raum.waende) {
-                                            wallIds = raum.waende.map(function(w) { return w.id; });
-                                        } else {
-                                            wallIds = ['A','B','C','D'];
-                                        }
-                                        // Add extra foto slots
-                                        var extraFotos = fotos.filter(function(f) { return f.wandId.startsWith('extra_'); });
-
-                                        var slots = wallIds.map(function(wId) {
-                                            var foto = fotos.find(function(f) { return f.wandId === wId; });
-                                            var isAnalyzing = foto && foto.aiAnalysis && foto.aiAnalysis.analyzing;
-                                            var hasAi = foto && foto.aiAnalysis && foto.aiAnalysis.objects && foto.aiAnalysis.objects.length > 0;
-                                            return React.createElement('div', {
-                                                key: wId,
-                                                className: 'foto-wall-slot' + (foto && foto.image ? ' has-photo' : '') + (isAnalyzing ? ' analyzing' : ''),
-                                            }, [
-                                                React.createElement('div', { key: 'label', className: 'foto-wall-label' }, 'Wand ' + wId),
-                                                foto && foto.image
-                                                    ? React.createElement(React.Fragment, { key: 'content' }, [
-                                                        React.createElement('img', {
-                                                            key: 'thumb',
-                                                            className: 'foto-wall-thumb',
-                                                            src: foto.image,
-                                                            alt: 'Wand ' + wId,
-                                                            onClick: function() { setFotoDetailId(foto.wandId); }
-                                                        }),
-                                                        isAnalyzing
-                                                            ? React.createElement('div', { key: 'loading', className: 'foto-analyzing-text' }, '🔍 KI analysiert...')
-                                                            : hasAi
-                                                                ? React.createElement('div', { key: 'tags', className: 'foto-ai-tags' },
-                                                                    foto.aiAnalysis.objects.map(function(obj, oi) {
-                                                                        return React.createElement('span', {
-                                                                            key: oi,
-                                                                            className: 'foto-ai-tag' + (obj.count > 0 ? ' count' : ''),
-                                                                            onClick: function() { setFotoDetailId(foto.wandId); }
-                                                                        }, (obj.icon || '•') + ' ' + obj.type + (obj.count > 1 ? ' ×' + obj.count : ''));
-                                                                    })
-                                                                )
-                                                                : null,
-                                                        foto.aiAnalysis && foto.aiAnalysis.error
-                                                            ? React.createElement('div', { key: 'err', style: {fontSize:'10px', color:'var(--accent-red-light)', padding:'4px 8px'} }, foto.aiAnalysis.error)
-                                                            : null,
-                                                        React.createElement('div', { key: 'actions', className: 'foto-wall-actions' }, [
-                                                            React.createElement('button', {
-                                                                key: 'ai',
-                                                                className: 'foto-wall-ai-btn' + (hasAi ? ' done' : ''),
-                                                                onClick: function() { handleAiAnalyze(wId); }
-                                                            }, hasAi ? '✓ Erkannt' : '🤖 KI Analyse'),
-                                                            React.createElement('button', {
-                                                                key: 'retake',
-                                                                className: 'foto-wall-ai-btn',
-                                                                onClick: function() { handleFoto(wId); }
-                                                            }, '📷 Neu'),
-                                                            React.createElement('button', {
-                                                                key: 'del',
-                                                                className: 'foto-wall-del-btn',
-                                                                onClick: function() { handleFotoDelete(wId); }
-                                                            }, '✕')
-                                                        ])
-                                                    ])
-                                                    : React.createElement('div', {
-                                                        key: 'empty',
-                                                        className: 'foto-wall-empty',
-                                                        onClick: function() { handleFoto(wId); }
-                                                    }, [
-                                                        React.createElement('span', { key: 'icon', className: 'foto-wall-empty-icon' }, '📷'),
-                                                        React.createElement('span', { key: 'txt' }, 'Foto aufnehmen')
-                                                    ])
-                                            ]);
-                                        });
-
-                                        // Extra-Foto Slots
-                                        extraFotos.forEach(function(foto) {
-                                            var isAnalyzing = foto.aiAnalysis && foto.aiAnalysis.analyzing;
-                                            var hasAi = foto.aiAnalysis && foto.aiAnalysis.objects && foto.aiAnalysis.objects.length > 0;
-                                            slots.push(React.createElement('div', {
-                                                key: foto.wandId,
-                                                className: 'foto-wall-slot has-photo' + (isAnalyzing ? ' analyzing' : ''),
-                                            }, [
-                                                React.createElement('div', { key: 'label', className: 'foto-wall-label' }, foto.label),
-                                                React.createElement('img', {
-                                                    key: 'thumb',
-                                                    className: 'foto-wall-thumb',
-                                                    src: foto.image,
-                                                    alt: foto.label,
-                                                    onClick: function() { setFotoDetailId(foto.wandId); }
-                                                }),
-                                                isAnalyzing
-                                                    ? React.createElement('div', { key: 'loading', className: 'foto-analyzing-text' }, '🔍 KI analysiert...')
-                                                    : hasAi
-                                                        ? React.createElement('div', { key: 'tags', className: 'foto-ai-tags' },
-                                                            foto.aiAnalysis.objects.map(function(obj, oi) {
-                                                                return React.createElement('span', { key: oi, className: 'foto-ai-tag' + (obj.count > 0 ? ' count' : '') },
-                                                                    (obj.icon || '•') + ' ' + obj.type + (obj.count > 1 ? ' ×' + obj.count : '')
-                                                                );
-                                                            })
-                                                        )
-                                                        : null,
-                                                React.createElement('div', { key: 'actions', className: 'foto-wall-actions' }, [
-                                                    React.createElement('button', {
-                                                        key: 'ai',
-                                                        className: 'foto-wall-ai-btn' + (hasAi ? ' done' : ''),
-                                                        onClick: function() { handleAiAnalyze(foto.wandId); }
-                                                    }, hasAi ? '✓ Erkannt' : '🤖 KI Analyse'),
-                                                    React.createElement('button', {
-                                                        key: 'del',
-                                                        className: 'foto-wall-del-btn',
-                                                        onClick: function() { handleFotoDelete(foto.wandId); }
-                                                    }, '✕')
-                                                ])
-                                            ]));
-                                        });
-
-                                        return slots;
-                                    })()}
-                                </div>
-
-                                {/* Extra Foto + Alle Analysieren */}
-                                <div style={{display:'flex', gap:'8px'}}>
-                                    <button className="foto-extra-btn" style={{flex:1}} onClick={function() { handleFoto(null); }}>
-                                        + Sonstiges Foto
-                                    </button>
-                                    {fotos.filter(function(f) { return f.image; }).length > 0 && (
-                                        <button className="foto-extra-btn" style={{flex:1, borderColor:'var(--accent-orange)', color:'var(--accent-orange)'}}
-                                            onClick={handleAiAnalyzeAll}>
-                                            🤖 Alle analysieren
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* KI-Zusammenfassung */}
-                                {(function() {
-                                    var totalWA = 0; var totalEcken = 0;
-                                    fotos.forEach(function(f) {
-                                        if (f.aiAnalysis) {
-                                            totalWA += (f.aiAnalysis.wandanschluesse || 0);
-                                            totalEcken += (f.aiAnalysis.ecken || 0);
-                                        }
-                                    });
-                                    if (totalWA > 0 || totalEcken > 0) {
-                                        return React.createElement('div', {
-                                            style: { marginTop:'10px', padding:'10px', background:'rgba(39,174,96,0.06)', border:'1px solid rgba(39,174,96,0.15)', borderRadius:'8px', fontSize:'13px', color:'var(--text-light)' }
-                                        }, [
-                                            React.createElement('span', { key: 'title', style: {fontWeight:700, marginBottom:'4px', display:'block', color:'var(--success)'} }, '🤖 KI-Auswertung Gesamtraum'),
-                                            totalWA > 0 ? React.createElement('div', { key: 'wa' }, '🔗 Wandanschlüsse gesamt: ' + totalWA) : null,
-                                            totalEcken > 0 ? React.createElement('div', { key: 'ecken' }, '📐 Ecken gesamt: ' + totalEcken) : null
-                                        ]);
-                                    }
-                                    return null;
-                                })()}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Foto-Detail-Modal */}
-                    {fotoDetailId && (function() {
-                        var foto = fotos.find(function(f) { return f.wandId === fotoDetailId; });
-                        if (!foto) return null;
-                        var hasAi = foto.aiAnalysis && foto.aiAnalysis.objects && foto.aiAnalysis.objects.length > 0;
-                        return React.createElement('div', {
-                            className: 'foto-detail-overlay',
-                            onClick: function(e) { if (e.target === e.currentTarget) setFotoDetailId(null); }
-                        }, [
-                            React.createElement('button', {
-                                key: 'close',
-                                className: 'foto-detail-close',
-                                onClick: function() { setFotoDetailId(null); }
-                            }, '✕'),
-                            React.createElement('img', {
-                                key: 'img',
-                                className: 'foto-detail-image',
-                                src: foto.image,
-                                alt: foto.label
-                            }),
-                            React.createElement('div', { key: 'panel', className: 'foto-detail-analysis' }, [
-                                React.createElement('div', { key: 'title', className: 'foto-detail-title' }, [
-                                    React.createElement('span', { key: 'icon' }, '📸'),
-                                    React.createElement('span', { key: 'txt' }, foto.label + ' – ' + foto.zeit),
-                                    !hasAi && !(foto.aiAnalysis && foto.aiAnalysis.analyzing) ? React.createElement('button', {
-                                        key: 'btn',
-                                        style: { marginLeft:'auto', padding:'4px 12px', fontSize:'12px', background:'rgba(230,126,34,0.15)', border:'1px solid var(--accent-orange)', borderRadius:'6px', color:'var(--accent-orange)', cursor:'pointer', fontFamily:'Source Sans 3, sans-serif' },
-                                        onClick: function() { handleAiAnalyze(foto.wandId); }
-                                    }, '🤖 KI analysieren') : null
-                                ]),
-                                foto.aiAnalysis && foto.aiAnalysis.analyzing
-                                    ? React.createElement('div', { key: 'loading', className: 'foto-analyzing-text', style:{padding:'20px'} }, '🔍 KI analysiert das Foto...')
-                                    : null,
-                                hasAi ? React.createElement('div', { key: 'objects', className: 'foto-detail-objects' },
-                                    foto.aiAnalysis.objects.map(function(obj, idx) {
-                                        return React.createElement('div', { key: idx, className: 'foto-detail-obj' }, [
-                                            React.createElement('div', { key: 'left' }, [
-                                                React.createElement('div', { key: 'name', className: 'foto-detail-obj-name' }, [
-                                                    React.createElement('span', { key: 'icon' }, obj.icon || '•'),
-                                                    React.createElement('span', { key: 'txt' }, obj.type)
-                                                ]),
-                                                obj.details ? React.createElement('div', { key: 'det', className: 'foto-detail-obj-detail' }, obj.details) : null
-                                            ]),
-                                            React.createElement('span', { key: 'count', className: 'foto-detail-obj-count' }, '×' + obj.count)
-                                        ]);
-                                    })
-                                ) : null,
-                                hasAi && foto.aiAnalysis.summary
-                                    ? React.createElement('div', { key: 'summary', className: 'foto-detail-summary' }, foto.aiAnalysis.summary)
-                                    : null,
-                                foto.aiAnalysis && foto.aiAnalysis.error
-                                    ? React.createElement('div', { key: 'err', style: {color:'var(--accent-red-light)', padding:'10px', fontSize:'12px'} }, foto.aiAnalysis.error)
-                                    : null,
-                                !foto.aiAnalysis && !hasAi
-                                    ? React.createElement('div', { key: 'empty', style:{color:'var(--text-muted)', fontSize:'12px', padding:'10px', textAlign:'center'} }, 'Noch keine KI-Analyse. Tippe auf "KI analysieren" um Objekte erkennen zu lassen.')
-                                    : null
-                            ])
-                        ]);
-                    })()}
-
-                    </div>
-                    )}
-
-                    {/* ═══ TAB 1 (Fortsetzung): Laser DISTO + Raummasze ═══ */}
-                    {activeTab === 0 && (
-                    <div className="raumblatt-tab-content">
 
                     {/* ═══ LASER DISTO Bluetooth-Tastatur ═══ */}
                     <div className="laser-bar">
@@ -7343,29 +7656,420 @@
                         )}
                     </div>
 
-                    </div>
+                    </React.Fragment>)}
+
+                    {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
+                    {rbTab === 1 && (
+                        <div>
+                            {/* Hidden file input fuer Phasen-Fotos */}
+                            <input type="file" accept="image/*" capture="environment"
+                                ref={fotoInputRef2} style={{display:'none'}}
+                                onChange={handlePhotoFileChange} />
+
+                            <div className="foto-phasen-container">
+                                {FOTO_PHASEN.map(phase => {
+                                    const wallIds = getWallIds();
+                                    const photoCount = countPhasePhotos(phase.key);
+                                    const isExpanded = expandedPhases[phase.key];
+                                    return (
+                                        <div key={phase.key} className="foto-phase">
+                                            <div className="foto-phase-header"
+                                                onClick={() => setExpandedPhases(prev => ({...prev, [phase.key]: !prev[phase.key]}))}>
+                                                <div style={{display:'flex', alignItems:'center', gap:'8px', flex:1}}>
+                                                    <span className="phase-nummer" style={{
+                                                        background: phase.color.replace(')', ',0.15)').replace('var(', 'rgba(').replace('--accent-orange', '230,126,34').replace('--accent-blue', '30,136,229').replace('--success', '39,174,96'),
+                                                        color: phase.color === 'var(--accent-orange)' ? '#e67e22' : phase.color === 'var(--accent-blue)' ? '#1e88e5' : '#27ae60',
+                                                        width:'26px', height:'26px', borderRadius:'50%',
+                                                        display:'flex', alignItems:'center', justifyContent:'center',
+                                                        fontFamily:'Oswald', fontWeight:700, fontSize:'13px'
+                                                    }}>{phase.nr}</span>
+                                                    <div>
+                                                        <div className="foto-phase-title" style={{
+                                                            fontFamily:'Oswald', fontWeight:600, fontSize:'13px',
+                                                            textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--text-primary)'
+                                                        }}>{phase.label}</div>
+                                                        <div style={{fontSize:'11px', color:'var(--text-muted)'}}>{phase.subtitle}</div>
+                                                    </div>
+                                                </div>
+                                                <span style={{
+                                                    fontSize:'11px', padding:'2px 8px', borderRadius:'10px',
+                                                    background: photoCount > 0 ? 'rgba(39,174,96,0.12)' : 'rgba(255,255,255,0.06)',
+                                                    color: photoCount > 0 ? 'var(--success)' : 'var(--text-muted)', fontWeight:600
+                                                }}>{photoCount}/{wallIds.length}</span>
+                                                <span style={{fontSize:'14px', marginLeft:'6px', transition:'transform 0.2s',
+                                                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)'}}>
+                                                    {isExpanded ? '\u25B2' : '\u25BC'}
+                                                </span>
+                                            </div>
+                                            {isExpanded && (
+                                                <div style={{padding:'10px'}}>
+                                                    <div className="foto-phase-grid" style={{
+                                                        display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:'8px'
+                                                    }}>
+                                                        {wallIds.map(wandId => {
+                                                            const foto = phasenFotos[phase.key] && phasenFotos[phase.key][wandId];
+                                                            return (
+                                                                <div key={wandId} className={'foto-wand-slot' + (foto ? ' has-photo' : '') + (foto && foto.marked ? ' marked' : '')}
+                                                                    style={{
+                                                                        position:'relative', aspectRatio:'3/4', borderRadius:'10px',
+                                                                        border: foto && foto.marked ? '2px solid var(--accent-blue)' : foto ? '2px solid var(--border-subtle)' : '2px dashed var(--border-subtle)',
+                                                                        overflow:'hidden', display:'flex', flexDirection:'column',
+                                                                        alignItems:'center', justifyContent:'center',
+                                                                        background:'var(--bg-tertiary)', cursor:'pointer',
+                                                                        boxShadow: foto && foto.marked ? '0 0 0 2px rgba(30,136,229,0.25)' : 'none'
+                                                                    }}
+                                                                    onClick={() => { if (!foto) handlePhotoCapture(phase.key, wandId); }}>
+                                                                    {/* Wand-Label */}
+                                                                    <span style={{
+                                                                        position:'absolute', top:'4px', left:'4px', width:'22px', height:'22px',
+                                                                        borderRadius:'50%', background:'rgba(230,126,34,0.9)', color:'white',
+                                                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                                                        display:'flex', alignItems:'center', justifyContent:'center', zIndex:2
+                                                                    }}>{wandId}</span>
+
+                                                                    {foto ? (
+                                                                        <React.Fragment>
+                                                                            <img src={foto.croppedImage || foto.image}
+                                                                                style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                                                                            {/* Mark-Button */}
+                                                                            <button onClick={(e) => { e.stopPropagation(); togglePhotoMark(phase.key, wandId); }}
+                                                                                style={{
+                                                                                    position:'absolute', top:'4px', right:'4px', width:'24px', height:'24px',
+                                                                                    borderRadius:'6px', border:'none', cursor:'pointer', zIndex:2,
+                                                                                    background: foto.marked ? 'var(--accent-blue)' : 'rgba(0,0,0,0.5)',
+                                                                                    color:'white', fontSize:'14px', display:'flex', alignItems:'center', justifyContent:'center'
+                                                                                }}>
+                                                                                {foto.marked ? '\u2713' : '\u25CB'}
+                                                                            </button>
+                                                                            {/* KI-Badge */}
+                                                                            {foto.aiAnalysis && (
+                                                                                <span style={{
+                                                                                    position:'absolute', bottom:'4px', right:'4px', fontSize:'10px',
+                                                                                    padding:'2px 5px', borderRadius:'4px',
+                                                                                    background:'rgba(39,174,96,0.9)', color:'white', fontWeight:600
+                                                                                }}>KI</span>
+                                                                            )}
+                                                                            {/* Crop-Badge */}
+                                                                            {foto.croppedImage && (
+                                                                                <span style={{
+                                                                                    position:'absolute', bottom: foto.aiAnalysis ? '18px' : '4px', right:'4px', fontSize:'9px',
+                                                                                    padding:'2px 5px', borderRadius:'4px',
+                                                                                    background:'rgba(30,136,229,0.9)', color:'white', fontWeight:600
+                                                                                }}>CROP</span>
+                                                                            )}
+                                                                            {/* Actions */}
+                                                                            <div style={{
+                                                                                position:'absolute', bottom:0, left:0, right:0, display:'flex',
+                                                                                background:'rgba(0,0,0,0.6)', backdropFilter:'blur(4px)'
+                                                                            }}>
+                                                                                <button onClick={(e) => { e.stopPropagation(); openCropModal(phase.key, wandId); }}
+                                                                                    style={{flex:1, padding:'5px', border:'none', background:'transparent', color:'#3498db', fontSize:'12px', cursor:'pointer'}}>
+                                                                                    Crop
+                                                                                </button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handlePhotoCapture(phase.key, wandId); }}
+                                                                                    style={{flex:1, padding:'5px', border:'none', background:'transparent', color:'white', fontSize:'12px', cursor:'pointer'}}>
+                                                                                    Neu
+                                                                                </button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); handlePhotoDelete(phase.key, wandId); }}
+                                                                                    style={{flex:1, padding:'5px', border:'none', background:'transparent', color:'#e74c3c', fontSize:'12px', cursor:'pointer'}}>
+                                                                                    X
+                                                                                </button>
+                                                                            </div>
+                                                                            {/* Zeit */}
+                                                                            {foto.zeit && (
+                                                                                <span style={{
+                                                                                    position:'absolute', bottom:'22px', left:'4px', fontSize:'9px',
+                                                                                    padding:'1px 4px', borderRadius:'3px',
+                                                                                    background:'rgba(0,0,0,0.5)', color:'rgba(255,255,255,0.7)'
+                                                                                }}>{foto.zeit}</span>
+                                                                            )}
+                                                                        </React.Fragment>
+                                                                    ) : (
+                                                                        <div style={{textAlign:'center', color:'var(--text-muted)'}}>
+                                                                            <div style={{fontSize:'24px', marginBottom:'4px'}}>📷</div>
+                                                                            <div style={{fontSize:'10px'}}>Foto</div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* ═══ ANALYSE-BEREICH ═══ */}
+                            <div style={{marginTop:'14px'}}>
+                                {/* Markierungs-Steuerung */}
+                                <div style={{display:'flex', gap:'6px', marginBottom:'10px'}}>
+                                    <button className="ja-nein-btn" onClick={() => markAllPhotos(true)}
+                                        style={{flex:1, padding:'6px', fontSize:'11px'}}>
+                                        Alle markieren
+                                    </button>
+                                    <button className="ja-nein-btn" onClick={() => markAllPhotos(false)}
+                                        style={{flex:1, padding:'6px', fontSize:'11px'}}>
+                                        Alle abwaehlen
+                                    </button>
+                                </div>
+
+                                {/* Analyse-Buttons */}
+                                <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
+                                    <button className="raum-action-btn" disabled={analyseRunning || getMarkedFotos().length === 0}
+                                        onClick={() => runKiAnalyse('klein')}
+                                        style={{flex:1, opacity: (analyseRunning || getMarkedFotos().length === 0) ? 0.5 : 1}}>
+                                        <span className="btn-icon">🔍</span>
+                                        <span className="btn-text">
+                                            Kleine Analyse
+                                            <span className="btn-sub">Zaehlungen (Loecher, Ecken, Anschluesse)</span>
+                                        </span>
+                                    </button>
+                                    <button className="raum-action-btn" disabled={analyseRunning || getMarkedFotos().length === 0}
+                                        onClick={() => runKiAnalyse('gross')}
+                                        style={{flex:1, opacity: (analyseRunning || getMarkedFotos().length === 0) ? 0.5 : 1}}>
+                                        <span className="btn-icon">🧠</span>
+                                        <span className="btn-text">
+                                            Grosse Analyse
+                                            <span className="btn-sub">+ Flaechenberechnung</span>
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {/* Fortschrittsanzeige */}
+                                {analyseRunning && (
+                                    <div style={{
+                                        padding:'12px', background:'rgba(30,136,229,0.06)',
+                                        border:'1px solid rgba(30,136,229,0.2)', borderRadius:'10px',
+                                        marginBottom:'12px', textAlign:'center'
+                                    }}>
+                                        <div style={{fontSize:'13px', color:'var(--accent-blue)', fontWeight:600, marginBottom:'6px'}}>
+                                            KI analysiert Wand {analyseProgress.wandId}...
+                                        </div>
+                                        <div style={{fontSize:'12px', color:'var(--text-muted)'}}>
+                                            {analyseProgress.current} von {analyseProgress.total} Fotos
+                                        </div>
+                                        <div style={{
+                                            height:'4px', background:'var(--bg-tertiary)', borderRadius:'2px', marginTop:'8px', overflow:'hidden'
+                                        }}>
+                                            <div style={{
+                                                height:'100%', background:'var(--accent-blue)', borderRadius:'2px',
+                                                width: (analyseProgress.total > 0 ? (analyseProgress.current / analyseProgress.total * 100) : 0) + '%',
+                                                transition:'width 0.3s'
+                                            }} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* KI-Ergebnisse */}
+                                {kiErgebnisse.details && kiErgebnisse.details.length > 0 && !analyseRunning && (
+                                    <div style={{
+                                        background:'var(--bg-secondary)', borderRadius:'14px',
+                                        border:'1px solid var(--border-subtle)', padding:'14px', marginBottom:'12px'
+                                    }}>
+                                        <div style={{
+                                            fontFamily:'Oswald', fontWeight:600, fontSize:'14px',
+                                            textTransform:'uppercase', letterSpacing:'0.5px',
+                                            color:'var(--text-primary)', marginBottom:'10px'
+                                        }}>KI-Ergebnisse</div>
+
+                                        {/* 4er-Grid Zaehlungen */}
+                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px', marginBottom:'10px'}}>
+                                            {[
+                                                {label:'Durchbrueche', val: kiErgebnisse.loecher, icon:'🕳️'},
+                                                {label:'Wandanschluesse', val: kiErgebnisse.wandanschluesse, icon:'📏'},
+                                                {label:'Innenecken', val: kiErgebnisse.innenecken, icon:'◣'},
+                                                {label:'Aussenecken', val: kiErgebnisse.aussenecken, icon:'◢'}
+                                            ].map(item => (
+                                                <div key={item.label} style={{
+                                                    display:'flex', justifyContent:'space-between', alignItems:'center',
+                                                    padding:'8px 10px', background:'var(--bg-tertiary)',
+                                                    borderRadius:'8px', border:'1px solid var(--border-subtle)'
+                                                }}>
+                                                    <span style={{fontSize:'12px', color:'var(--text-secondary)'}}>
+                                                        {item.icon} {item.label}
+                                                    </span>
+                                                    <span style={{fontFamily:'Oswald', fontWeight:700, fontSize:'16px', color:'var(--text-primary)'}}>
+                                                        {item.val}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Flaechen (nur bei grosser Analyse) */}
+                                        {(kiErgebnisse.abdichtungsflaeche_m2 > 0 || kiErgebnisse.gefliesteFlaeche_m2 > 0) && (
+                                            <div style={{
+                                                padding:'10px', background:'rgba(30,136,229,0.06)',
+                                                border:'1px solid rgba(30,136,229,0.15)', borderRadius:'8px', marginBottom:'10px'
+                                            }}>
+                                                <div style={{fontSize:'11px', color:'var(--accent-blue)', fontWeight:600, marginBottom:'6px', textTransform:'uppercase'}}>
+                                                    Flaechenberechnung
+                                                </div>
+                                                {kiErgebnisse.gefliesteFlaeche_m2 > 0 && (
+                                                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                                                        <span style={{fontSize:'12px', color:'var(--text-secondary)'}}>Geflieste Flaeche</span>
+                                                        <span style={{fontFamily:'Oswald', fontWeight:700, color:'var(--accent-blue)'}}>
+                                                            {fmtDe(kiErgebnisse.gefliesteFlaeche_m2)} m2
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {kiErgebnisse.abdichtungsflaeche_m2 > 0 && (
+                                                    <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                                                        <span style={{fontSize:'12px', color:'var(--text-secondary)'}}>Abdichtungsflaeche</span>
+                                                        <span style={{fontFamily:'Oswald', fontWeight:700, color:'var(--accent-blue)'}}>
+                                                            {fmtDe(kiErgebnisse.abdichtungsflaeche_m2)} m2
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {kiErgebnisse.dichtungsbaender_lfm > 0 && (
+                                                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                                                        <span style={{fontSize:'12px', color:'var(--text-secondary)'}}>Dichtungsbaender</span>
+                                                        <span style={{fontFamily:'Oswald', fontWeight:700, color:'var(--accent-blue)'}}>
+                                                            {fmtDe(kiErgebnisse.dichtungsbaender_lfm)} lfm
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Erkannte Objekte */}
+                                        {kiErgebnisse.sanitaerObjekte && kiErgebnisse.sanitaerObjekte.length > 0 && (
+                                            <div style={{display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'10px'}}>
+                                                {kiErgebnisse.sanitaerObjekte.map((obj, i) => (
+                                                    <span key={i} style={{
+                                                        fontSize:'11px', padding:'3px 8px', borderRadius:'10px',
+                                                        background:'rgba(39,174,96,0.1)', color:'var(--success)',
+                                                        border:'1px solid rgba(39,174,96,0.2)', fontWeight:600
+                                                    }}>{obj.typ} ({obj.anzahl}x)</span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Transfer-Button */}
+                                        <button className="raum-action-btn finish" onClick={transferKiErgebnisseToPositions}
+                                            style={{width:'100%'}}>
+                                            <span className="btn-icon">📋</span>
+                                            <span className="btn-text">
+                                                Ergebnisse in Positionen uebertragen
+                                                <span className="btn-sub">Wechselt zu Tab Positionen</span>
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Info: Markierte Fotos */}
+                                <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center'}}>
+                                    {getMarkedFotos().length} {getMarkedFotos().length === 1 ? 'Foto' : 'Fotos'} markiert fuer KI-Analyse
+                                </div>
+                            </div>
+
+                            {/* ═══ CROP-MODAL ═══ */}
+                            {cropState && (
+                                <div className="modal-overlay" style={{zIndex:5000}} onClick={() => setCropState(null)}>
+                                    <div style={{
+                                        width:'95%', maxWidth:'520px', background:'var(--bg-primary)',
+                                        borderRadius:'16px', padding:'16px', maxHeight:'92vh', overflow:'auto'
+                                    }} onClick={e => e.stopPropagation()}>
+                                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px'}}>
+                                            <div>
+                                                <div style={{fontSize:'11px', color:'var(--accent-blue)', textTransform:'uppercase', letterSpacing:'1px', fontWeight:600}}>
+                                                    Foto zuschneiden
+                                                </div>
+                                                <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-white)', marginTop:'2px'}}>
+                                                    Wand {cropState.wandId} - Ecke zu Ecke
+                                                </div>
+                                            </div>
+                                            <button style={{background:'none', border:'none', color:'var(--text-muted)', fontSize:'24px', cursor:'pointer'}}
+                                                onClick={() => setCropState(null)}>X</button>
+                                        </div>
+
+                                        {/* Crop Canvas Area */}
+                                        <div style={{position:'relative', width:'100%', borderRadius:'10px', overflow:'hidden', border:'1px solid var(--border-subtle)', touchAction:'none'}}>
+                                            <img ref={cropImageRef} src={cropState.image}
+                                                style={{width:'100%', display:'block', userSelect:'none', pointerEvents:'none'}}
+                                                draggable="false" />
+                                            {/* Overlay Canvas fuer Crop-Rechteck */}
+                                            <div style={{position:'absolute', top:0, left:0, right:0, bottom:0}}
+                                                onMouseDown={handleCropStart}
+                                                onMouseMove={handleCropMove}
+                                                onMouseUp={handleCropEnd}
+                                                onTouchStart={handleCropStart}
+                                                onTouchMove={handleCropMove}
+                                                onTouchEnd={handleCropEnd}>
+                                                {/* Abdunkelung ausserhalb */}
+                                                <div style={{position:'absolute', top:0, left:0, right:0, bottom:0, pointerEvents:'none'}}>
+                                                    {/* Top */}
+                                                    <div style={{position:'absolute', top:0, left:0, right:0,
+                                                        height: (cropState.cropRect.y * 100) + '%',
+                                                        background:'rgba(0,0,0,0.55)'}} />
+                                                    {/* Bottom */}
+                                                    <div style={{position:'absolute', bottom:0, left:0, right:0,
+                                                        height: ((1 - cropState.cropRect.y - cropState.cropRect.h) * 100) + '%',
+                                                        background:'rgba(0,0,0,0.55)'}} />
+                                                    {/* Left */}
+                                                    <div style={{position:'absolute',
+                                                        top: (cropState.cropRect.y * 100) + '%',
+                                                        left:0,
+                                                        width: (cropState.cropRect.x * 100) + '%',
+                                                        height: (cropState.cropRect.h * 100) + '%',
+                                                        background:'rgba(0,0,0,0.55)'}} />
+                                                    {/* Right */}
+                                                    <div style={{position:'absolute',
+                                                        top: (cropState.cropRect.y * 100) + '%',
+                                                        right:0,
+                                                        width: ((1 - cropState.cropRect.x - cropState.cropRect.w) * 100) + '%',
+                                                        height: (cropState.cropRect.h * 100) + '%',
+                                                        background:'rgba(0,0,0,0.55)'}} />
+                                                    {/* Border */}
+                                                    <div style={{position:'absolute',
+                                                        top: (cropState.cropRect.y * 100) + '%',
+                                                        left: (cropState.cropRect.x * 100) + '%',
+                                                        width: (cropState.cropRect.w * 100) + '%',
+                                                        height: (cropState.cropRect.h * 100) + '%',
+                                                        border:'2px solid var(--accent-blue)',
+                                                        boxShadow:'0 0 0 1px rgba(30,136,229,0.3)'}} />
+                                                    {/* Corner handles */}
+                                                    {[
+                                                        {x: cropState.cropRect.x, y: cropState.cropRect.y},
+                                                        {x: cropState.cropRect.x + cropState.cropRect.w, y: cropState.cropRect.y},
+                                                        {x: cropState.cropRect.x, y: cropState.cropRect.y + cropState.cropRect.h},
+                                                        {x: cropState.cropRect.x + cropState.cropRect.w, y: cropState.cropRect.y + cropState.cropRect.h}
+                                                    ].map((c, i) => (
+                                                        <div key={i} style={{
+                                                            position:'absolute',
+                                                            left: (c.x * 100) + '%', top: (c.y * 100) + '%',
+                                                            width:'16px', height:'16px', marginLeft:'-8px', marginTop:'-8px',
+                                                            borderRadius:'50%', background:'var(--accent-blue)',
+                                                            border:'2px solid white', boxShadow:'0 2px 6px rgba(0,0,0,0.4)'
+                                                        }} />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px', textAlign:'center'}}>
+                                            Ziehe die Ecken oder verschiebe das Rechteck - nur der markierte Bereich wird verwendet
+                                        </div>
+
+                                        <div style={{display:'flex', gap:'8px', marginTop:'12px'}}>
+                                            <button className="modal-btn secondary" onClick={() => setCropState(null)} style={{flex:1}}>
+                                                Abbrechen
+                                            </button>
+                                            <button className="modal-btn primary" onClick={applyCrop} style={{flex:1}}>
+                                                Zuschnitt speichern
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
 
-                    {/* ═══ TAB 3: Tueren, Fenster & Sonstige Bauteile ═══ */}
-                    {activeTab === 2 && (
-                    <div className="raumblatt-tab-content">
+                    {/* ═══ TAB 2: OEFFNUNGEN ═══ */}
+                    {rbTab === 2 && (<React.Fragment>
 
-                    {/* Laser DISTO auch auf Oeffnungen-Tab */}
-                    <div className="laser-bar">
-                        <button className={`laser-btn ${laserActive ? 'active' : ''}`}
-                            onClick={toggleLaser}>
-                            <span className="laser-pulse"></span>
-                            <span>{laserActive ? '🔴 Laser aktiv' : '📡 Laser DISTO'}</span>
-                        </button>
-                        <div className={`laser-status ${laserActive ? 'connected' : 'disconnected'}`}
-                            style={{fontSize:'11px', lineHeight:'1.3', whiteSpace:'normal'}}>
-                            {laserActive
-                                ? '✓ Messen → Wert landet im Feld → springt weiter'
-                                : 'DISTO per Bluetooth koppeln, Modus: Text'}
-                        </div>
-                    </div>
-
-                    {/* ═══ TÜREN (eigene Sektion, aufklappbar) ═══ */}
+                    {/* ═══ TUEREN (eigene Sektion, aufklappbar) ═══ */}
                     <div className="masse-section">
                         <div className="masse-section-title">🚪 Türen ({tueren.length})</div>
                         {tueren.map(t => {
@@ -7849,24 +8553,45 @@
                         )}
                     </div>
 
-                    </div>
+                    </React.Fragment>)}
+
+                    {/* ═══ TAB 3: POSITIONEN ═══ */}
+                    {rbTab === 3 && (<React.Fragment>
+
+                    {/* Positions-Schnellfilter (bei > 5 Positionen) */}
+                    {posCards.length > 5 && (
+                        <div style={{
+                            display:'flex', gap:'4px', marginBottom:'10px',
+                            background:'var(--bg-tertiary)', borderRadius:'8px',
+                            padding:'3px', fontSize:'11px'
+                        }}>
+                            {[
+                                {key:'alle', label:'Alle (' + posCards.length + ')'},
+                                {key:'berechnet', label:'Berechnet'},
+                                {key:'leer', label:'Offen'},
+                                {key:'manuell', label:'Manuell'}
+                            ].map(f => (
+                                <button key={f.key}
+                                    className={'ja-nein-btn ' + (posFilter === f.key ? 'active ja' : '')}
+                                    onClick={() => setPosFilter(f.key)}
+                                    style={{flex:1, padding:'5px 4px', fontSize:'10px'}}>
+                                    {f.label}
+                                </button>
+                            ))}
+                        </div>
                     )}
 
-                    {/* ═══ TAB 4: Positionen & Raumzusammenfassung ═══ */}
-                    {activeTab === 3 && (
-                    <div className="raumblatt-tab-content">
-
                     {/* ═══════════════════════════════════════
-                       POSITIONS-KARTEN (aus Raumerkennung übernommen)
+                       POSITIONS-KARTEN (aus Raumerkennung uebernommen)
                        ═══════════════════════════════════════ */}
                     <div className="masse-section">
                         <div className="masse-section-title">📋 Positionen ({posCards.length})</div>
                         {posCards.length === 0 && (
                             <div style={{fontSize:'13px', color:'var(--text-muted)', fontStyle:'italic', padding:'12px 0'}}>
-                                Keine Positionen ausgewählt – zurück zur Raumerkennung um Positionen zuzuweisen.
+                                Keine Positionen ausgewaehlt - zurueck zur Raumerkennung um Positionen zuzuweisen.
                             </div>
                         )}
-                        {posCards.map(pos => {
+                        {filteredPosCards.map(pos => {
                             const isExpanded = expandedPos === pos.pos;
                             const result = calcPositionResult(pos);
                             const hasResult = result > 0;
@@ -8057,7 +8782,45 @@
                                                 </div>
                                             )}
 
-                                            {/* Button: Manuell bearbeiten → öffnet Modal */}
+                                            {/* KI-Foto-Vorschlag (wenn vorhanden) */}
+                                            {(() => {
+                                                const kiSugg = getKiSuggestion(pos);
+                                                if (!kiSugg) return null;
+                                                return (
+                                                    <div style={{
+                                                        margin:'8px 0', padding:'8px 12px',
+                                                        background:'rgba(30,136,229,0.06)',
+                                                        border:'1px solid rgba(30,136,229,0.2)',
+                                                        borderRadius:'8px', fontSize:'12px'
+                                                    }}>
+                                                        <div style={{
+                                                            display:'flex', justifyContent:'space-between',
+                                                            alignItems:'center'
+                                                        }}>
+                                                            <span style={{color:'var(--accent-blue)'}}>
+                                                                {kiSugg.label}
+                                                            </span>
+                                                            <span style={{
+                                                                fontFamily:'Oswald', fontWeight:700,
+                                                                color:'var(--accent-blue)'
+                                                            }}>
+                                                                {fmtDe(kiSugg.wert)} {kiSugg.einheit}
+                                                            </span>
+                                                        </div>
+                                                        <button style={{
+                                                            marginTop:'6px', width:'100%', padding:'6px',
+                                                            background:'rgba(30,136,229,0.1)',
+                                                            border:'1px solid rgba(30,136,229,0.3)',
+                                                            borderRadius:'6px', color:'var(--accent-blue)',
+                                                            fontSize:'11px', fontWeight:600, cursor:'pointer'
+                                                        }} onClick={() => applyKiSuggestion(pos, kiSugg)}>
+                                                            Uebernehmen als manuelles Ergebnis
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* Button: Manuell bearbeiten - oeffnet Modal */}
                                             <button className="rw-manual-btn" onClick={() => openRWModal(pos)}>
                                                 ✏️ {pos.hasManualRW ? 'Rechenweg bearbeiten' : 'Manuellen Rechenweg eingeben'}
                                             </button>
@@ -8141,7 +8904,7 @@
                     {/* ═══ ACTION BUTTONS ═══ */}
                     <div className="raum-action-grid">
                         {/* Raumblatt fertigstellen */}
-                        <button className="raum-action-btn finish" onClick={() => {
+                        <button className="raum-action-btn finish" onClick={() => handleFinishRaumValidated(() => {
                             // Alle Einstellungen sammeln
                             const tuerenEntries = tueren.length > 0 ? tueren.map(t => ({...t})) : null;
                             const tuerDefaults = tueren.length > 0 ? {
@@ -8193,7 +8956,10 @@
                                 posRechenwegEdits: {...posRechenwegEdits},
                                 fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
-                                raumhoehe: masse.raumhoehe
+                                raumhoehe: masse.raumhoehe,
+                                phasenFotos: phasenFotos,
+                                kiErgebnisse: kiErgebnisse,
+                                kiFotoErgebnisse: kiFotoErgebnisse
                             };
                             const raumName = (raum && raum.name) || (raum && raum.nr) || 'Raum';
                             onFinishRaum((raum && raum.nr), {
@@ -8207,11 +8973,11 @@
                                 fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung
                             });
-                        }}>
+                        })}>
                             <span className="btn-icon">✅</span>
                             <span className="btn-text">
                                 Raumblatt fertiggestellt
-                                <span className="btn-sub">Aufmaß vom Raumblatt erstellt und abgespeichert · Nächster Raum</span>
+                                <span className="btn-sub">Aufmasz vom Raumblatt erstellt und abgespeichert - Naechster Raum</span>
                             </span>
                         </button>
 
@@ -8224,8 +8990,8 @@
                             </span>
                         </button>
 
-                        {/* Aufmaß fertigstellen (gesamt) */}
-                        <button className="raum-action-btn complete" onClick={() => {
+                        {/* Aufmasz fertigstellen (gesamt) */}
+                        <button className="raum-action-btn complete" onClick={() => handleFinishRaumValidated(() => {
                             // Erst aktuellen Raum fertigstellen
                             const tuerenEntries = tueren.length > 0 ? tueren.map(t => ({...t})) : null;
                             const tuerDefaults = tueren.length > 0 ? {
@@ -8275,7 +9041,10 @@
                                 posRechenwegEdits: {...posRechenwegEdits},
                                 fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
-                                raumhoehe: masse.raumhoehe
+                                raumhoehe: masse.raumhoehe,
+                                phasenFotos: phasenFotos,
+                                kiErgebnisse: kiErgebnisse,
+                                kiFotoErgebnisse: kiFotoErgebnisse
                             };
                             const raumName = (raum && raum.name) || (raum && raum.nr) || 'Raum';
                             // Aktuellen Raum speichern UND dann Aufmaß beenden
@@ -8292,28 +9061,27 @@
                             });
                             // Aufmaß beenden wird nach dem State-Update ausgelöst
                             setTimeout(() => onAufmassBeenden && onAufmassBeenden(), 100);
-                        }}>
+                        })}>
                             <span className="btn-icon">📦</span>
                             <span className="btn-text">
-                                Aufmaß fertigstellen
-                                <span className="btn-sub">Letztes Raumblatt speichern · Gesamtliste · Export nach Google Drive</span>
+                                Aufmasz fertigstellen
+                                <span className="btn-sub">Letztes Raumblatt speichern - Gesamtliste - Export nach Google Drive</span>
                             </span>
                         </button>
 
                         {/* Zurueck */}
                         <button className="raum-action-btn" onClick={() => {
                             if (hasUnsavedChanges) {
-                                if (!confirm('Es gibt ungespeicherte Aenderungen im Raumblatt. Wirklich verlassen?')) return;
+                                if (!confirm('Es gibt ungespeicherte Aenderungen im Raumblatt.\n\nWirklich zurueck zur Raumerkennung?')) return;
                             }
                             onBack();
                         }} style={{color:'var(--text-muted)'}}>
                             <span className="btn-icon">◀</span>
-                            <span className="btn-text">Zurück zur Raumerkennung</span>
+                            <span className="btn-text">Zurueck zur Raumerkennung</span>
                         </button>
                     </div>
 
-                    </div>
-                    )}
+                    </React.Fragment>)}
 
                     {/* ═══ MODALS (ausserhalb der Tabs, immer verfuegbar) ═══ */}
 
