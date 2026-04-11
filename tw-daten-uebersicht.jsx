@@ -100,15 +100,15 @@
             // ── Stammdaten-Sektion mit Sprache ──
             var sectionCard = function(icon, title, fields) {
                 return (
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'12px', border:'1px solid var(--border-color)'}}>
-                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
-                            <span style={{fontSize:'18px'}}>{icon}</span> {title}
+                    <div className="du-section-card">
+                        <div className="du-section-title">
+                            <span className="du-section-icon">{icon}</span> {title}
                         </div>
-                        <div style={{display:'grid', gap:'8px'}}>
+                        <div className="du-section-grid">
                             {fields.map(function(f) { return (
                                 <div key={f[0]}>
                                     <MicLabel fieldKey={'du_' + f[0]} label={f[1]} />
-                                    <div style={{display:'flex', gap:'4px'}}>
+                                    <div className="du-field-row">
                                         <MicInput fieldKey={'du_' + f[0]} value={stammFelder[f[0]] || ''} readOnly={!editMode} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={inputStyle({flex:1})} />
                                         {editMode && (
                                             <MicButton fieldKey={'du_' + f[0]} size="normal" onResult={function(text){ updateStammFeld(f[0], (stammFelder[f[0]] || '') + (stammFelder[f[0]] ? ' ' : '') + text); }} />
@@ -123,25 +123,25 @@
             var cellEdit = function(val, onChange, extra) { return <input value={val} onChange={onChange} style={Object.assign({width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}, extra || {})} />; };
 
             return (
-                <div style={{padding:'12px 16px', minHeight:'100vh', background:'var(--bg-primary)', paddingBottom:'180px'}}>
-                    <div style={{textAlign:'center', marginBottom:'16px'}}>
-                        <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>{stammFelder.bauherr_firma || (kunde && kunde.name) || 'Kundendaten'}</div>
-                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{stammFelder.objekt_bauvorhaben || 'Projekt'}</div>
+                <div className="du-page">
+                    <div className="du-header">
+                        <div className="du-header-title">{stammFelder.bauherr_firma || (kunde && kunde.name) || 'Kundendaten'}</div>
+                        <div className="du-header-subtitle">{stammFelder.objekt_bauvorhaben || 'Projekt'}</div>
                     </div>
-                    {savedMsg && (<div style={{padding:'10px 16px', background:'rgba(39,174,96,0.12)', border:'1px solid rgba(39,174,96,0.3)', borderRadius:'10px', marginBottom:'12px', fontSize:'13px', color:'#27ae60', fontWeight:'600', textAlign:'center'}}>{savedMsg}</div>)}
-                    <div style={{display:'flex', gap:'4px', marginBottom:'12px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
+                    {savedMsg && (<div className="du-saved-msg">{savedMsg}</div>)}
+                    <div className="du-tab-bar">
                         {tabs.map(function(tab) { var isActive = activeTab === tab.id; return (
-                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', background: isActive ? 'var(--accent-blue)' : 'transparent', color: isActive ? 'white' : 'var(--text-muted)', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease' }, touchBase)}>
-                                <span style={{fontSize:'16px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
-                                {tab.label}{tab.count !== null && <span style={{marginLeft:'4px', fontSize:'10px', opacity:0.8}}>({tab.count})</span>}
+                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} className={'du-tab ' + (isActive ? 'active' : 'inactive')}>
+                                <span className="du-tab-icon">{tab.icon}</span>
+                                {tab.label}{tab.count !== null && <span className="du-tab-count">({tab.count})</span>}
                             </button>
                         ); })}
                     </div>
-                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                    <div className="du-edit-row">
                         {!editMode ? (
-                            <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5 0%, #1565C0 100%)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
+                            <button {...tap(function(){ setEditMode(true); })} className="du-edit-btn start">Bearbeitung beginnen</button>
                         ) : (
-                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(39,174,96,0.3)' }, touchBase)}>Bearbeitung beenden & Daten in Module laden</button>
+                            <button {...tap(handleSave)} className="du-edit-btn save">Bearbeitung beenden & Daten in Module laden</button>
                         )}
                     </div>
 
@@ -155,85 +155,85 @@
                     )}
 
                     {activeTab === 'positionen' && (
-                        <div style={{overflowX:'auto'}}>
-                            <div style={{minWidth:'580px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
-                                    <div>Pos-Nr.</div><div style={{textAlign:'right'}}>Menge</div><div style={{textAlign:'center'}}>Einh.</div><div>Leistungsbeschreibung</div><div style={{textAlign:'right'}}>EP netto</div><div style={{textAlign:'right'}}>GP netto</div>
+                        <div className="du-table-wrap">
+                            <div className="du-table-inner">
+                                <div className="du-table-header positionen">
+                                    <div>Pos-Nr.</div><div className="du-cell-right">Menge</div><div className="du-cell-center">Einh.</div><div>Leistungsbeschreibung</div><div className="du-cell-right">EP netto</div><div className="du-cell-right">GP netto</div>
                                 </div>
                                 {positionen.map(function(p, idx) {
                                     var gp = Math.round((p.menge || 0) * (p.einzelpreis || 0) * 100) / 100;
                                     return (
                                         <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '58px 60px 42px 1fr 78px 88px 28px' : '58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: p._istNachtrag ? 'rgba(230,126,34,0.06)' : (idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent'), borderBottom:'1px solid var(--border-color)', borderLeft: p._istNachtrag ? '3px solid #e67e22' : '3px solid transparent'}}>
-                                            {editMode ? cellEdit(p.pos, function(e){updatePosition(idx,'pos',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px', color: p._istNachtrag ? '#e67e22' : 'var(--text-primary)'}}>{p.pos}</div>}
-                                            {editMode ? zahlInput(p.menge, function(v){updatePosition(idx,'menge',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(p.menge)}</div>}
-                                            {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
+                                            {editMode ? cellEdit(p.pos, function(e){updatePosition(idx,'pos',e.target.value);}, {fontWeight:'700'}) : <div className="du-cell-bold" style={{color: p._istNachtrag ? 'var(--accent-orange)' : 'var(--text-primary)'}}>{p.pos}</div>}
+                                            {editMode ? zahlInput(p.menge, function(v){updatePosition(idx,'menge',v);}) : <div className="du-cell-right" style={{fontSize:'11px'}}>{fmtZahl(p.menge)}</div>}
+                                            {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div className="du-cell-center" style={{fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
                                             {editMode ? (
                                                 <div style={{display:'flex', gap:'2px'}}>
                                                     <input value={p.bez} onChange={function(e){updatePosition(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
                                                     <MicButton fieldKey={'pos_bez_' + idx} size="small" onResult={function(text){ updatePosition(idx, 'bez', (p.bez ? p.bez + ' ' : '') + text); }} />
                                                 </div>
-                                            ) : <div style={{fontSize:'11px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.bez}>{p.bez}</div>}
-                                            {editMode ? zahlInput(p.einzelpreis, function(v){updatePosition(idx,'einzelpreis',v);}) : <div style={{textAlign:'right', fontSize:'11px', fontFamily:'monospace'}}>{fmtEuro(p.einzelpreis)}</div>}
-                                            <div style={{textAlign:'right', fontSize:'11px', fontWeight:'600', fontFamily:'monospace'}}>{fmtEuro(gp)}</div>
-                                            {editMode && <button {...tap(function(){removePosition(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
+                                            ) : <div className="du-cell-text" title={p.bez}>{p.bez}</div>}
+                                            {editMode ? zahlInput(p.einzelpreis, function(v){updatePosition(idx,'einzelpreis',v);}) : <div className="du-cell-mono">{fmtEuro(p.einzelpreis)}</div>}
+                                            <div className="du-cell-mono-bold">{fmtEuro(gp)}</div>
+                                            {editMode && <button {...tap(function(){removePosition(idx);})} className="du-remove-btn">X</button>}
                                         </div>
                                     );
                                 })}
                                 {positionen.length > 0 && (
-                                    <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
-                                        <div></div><div></div><div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>SUMME NETTO:</div><div></div>
-                                        <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'13px'}}>{fmtEuro(positionen.reduce(function(s,p){return s+Math.round((p.menge||0)*(p.einzelpreis||0)*100)/100;},0))}</div>
+                                    <div className="du-table-footer positionen">
+                                        <div></div><div></div><div></div><div className="du-cell-right du-cell-muted">SUMME NETTO:</div><div></div>
+                                        <div className="du-cell-mono-bold" style={{fontSize:'13px'}}>{fmtEuro(positionen.reduce(function(s,p){return s+Math.round((p.menge||0)*(p.einzelpreis||0)*100)/100;},0))}</div>
                                     </div>
                                 )}
                             </div>
-                            {editMode && <button {...tap(addPosition)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed var(--accent-blue)',background:'rgba(30,136,229,0.05)',color:'var(--accent-blue)',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neue Position</button>}
-                            {positionen.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83D\uDCCE'}</div><div>Keine Positionen</div></div>}
+                            {editMode && <button {...tap(addPosition)} className="du-add-btn">+ Neue Position</button>}
+                            {positionen.length === 0 && <div className="du-empty-state"><div className="du-empty-icon">{'\uD83D\uDCCE'}</div><div>Keine Positionen</div></div>}
                         </div>
                     )}
 
                     {activeTab === 'raeume' && (
-                        <div style={{overflowX:'auto'}}>
-                            <div style={{minWidth:'420px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'70px 1fr 50px 70px 70px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
-                                    <div>Raum-Nr.</div><div>Bezeichnung</div><div style={{textAlign:'center'}}>Gesch.</div><div style={{textAlign:'right'}}>Flaeche</div><div style={{textAlign:'right'}}>Umfang</div>
+                        <div className="du-table-wrap">
+                            <div className="du-table-inner raeume">
+                                <div className="du-table-header raeume">
+                                    <div>Raum-Nr.</div><div>Bezeichnung</div><div className="du-cell-center">Gesch.</div><div className="du-cell-right">Flaeche</div><div className="du-cell-right">Umfang</div>
                                 </div>
                                 {raeume.map(function(r, idx) { return (
                                     <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '70px 1fr 50px 70px 70px 28px' : '70px 1fr 50px 70px 70px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent', borderBottom:'1px solid var(--border-color)'}}>
-                                        {editMode ? cellEdit(r.nr, function(e){updateRaum(idx,'nr',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px'}}>{r.nr}</div>}
+                                        {editMode ? cellEdit(r.nr, function(e){updateRaum(idx,'nr',e.target.value);}, {fontWeight:'700'}) : <div className="du-cell-bold">{r.nr}</div>}
                                         {editMode ? (
                                             <div style={{display:'flex', gap:'2px'}}>
                                                 <input value={r.bez} onChange={function(e){updateRaum(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
                                                 <MicButton fieldKey={'raum_bez_' + idx} size="small" onResult={function(text){ updateRaum(idx, 'bez', (r.bez ? r.bez + ' ' : '') + text); }} />
                                             </div>
-                                        ) : <div style={{fontSize:'11px'}}>{r.bez}</div>}
-                                        {editMode ? cellEdit(r.geschoss, function(e){updateRaum(idx,'geschoss',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{r.geschoss}</div>}
-                                        {editMode ? zahlInput(r.flaeche, function(v){updateRaum(idx,'flaeche',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(r.flaeche)} m\u00b2</div>}
-                                        {editMode ? zahlInput(r.umfang, function(v){updateRaum(idx,'umfang',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(r.umfang)} m</div>}
-                                        {editMode && <button {...tap(function(){removeRaum(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
+                                        ) : <div className="du-cell-text">{r.bez}</div>}
+                                        {editMode ? cellEdit(r.geschoss, function(e){updateRaum(idx,'geschoss',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div className="du-cell-center du-cell-muted" style={{fontSize:'10px'}}>{r.geschoss}</div>}
+                                        {editMode ? zahlInput(r.flaeche, function(v){updateRaum(idx,'flaeche',v);}) : <div className="du-cell-right" style={{fontSize:'11px'}}>{fmtZahl(r.flaeche)} m\u00b2</div>}
+                                        {editMode ? zahlInput(r.umfang, function(v){updateRaum(idx,'umfang',v);}) : <div className="du-cell-right" style={{fontSize:'11px'}}>{fmtZahl(r.umfang)} m</div>}
+                                        {editMode && <button {...tap(function(){removeRaum(idx);})} className="du-remove-btn">X</button>}
                                     </div>
                                 ); })}
                                 {raeume.length > 0 && (
-                                    <div style={{display:'grid', gridTemplateColumns:'70px 1fr 50px 70px 70px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
-                                        <div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>GESAMT:</div><div></div>
-                                        <div style={{textAlign:'right'}}>{fmtZahl(raeume.reduce(function(s,r){return s+(r.flaeche||0);},0))} m\u00b2</div>
-                                        <div style={{textAlign:'right'}}>{fmtZahl(raeume.reduce(function(s,r){return s+(r.umfang||0);},0))} m</div>
+                                    <div className="du-table-footer raeume">
+                                        <div></div><div className="du-cell-right du-cell-muted">GESAMT:</div><div></div>
+                                        <div className="du-cell-right">{fmtZahl(raeume.reduce(function(s,r){return s+(r.flaeche||0);},0))} m\u00b2</div>
+                                        <div className="du-cell-right">{fmtZahl(raeume.reduce(function(s,r){return s+(r.umfang||0);},0))} m</div>
                                     </div>
                                 )}
                             </div>
-                            {editMode && <button {...tap(addRaum)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed #27ae60',background:'rgba(39,174,96,0.05)',color:'#27ae60',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neuer Raum</button>}
-                            {raeume.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83C\uDFE0'}</div><div>Keine Raeume</div></div>}
+                            {editMode && <button {...tap(addRaum)} className="du-add-btn raum">+ Neuer Raum</button>}
+                            {raeume.length === 0 && <div className="du-empty-state"><div className="du-empty-icon">{'\uD83C\uDFE0'}</div><div>Keine Raeume</div></div>}
                         </div>
                     )}
 
-                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto', marginBottom:'6px'}}>
+                    <div className="du-footer">
+                        <div className="du-footer-row top">
                             {onGoToOrdner && kunde && (kunde._driveFolderId || kunde.id) && (
-                                <button {...tap(function(){ onGoToOrdner(); })} style={Object.assign({flex:1, padding:'8px', borderRadius:'8px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'10px', fontWeight:'700', boxShadow:'0 2px 6px rgba(192,57,43,0.25)', display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'},touchBase)}>{'\uD83D\uDCC1'} Ordner</button>
+                                <button {...tap(function(){ onGoToOrdner(); })} className="du-footer-btn small">{'\uD83D\uDCC1'} Ordner</button>
                             )}
                         </div>
-                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
-                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 2px 8px rgba(192,57,43,0.3)'},touchBase)}>{'\u2190'} Zurueck</button>
-                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} style={Object.assign({flex:1, padding:'12px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #c0392b 0%, #96281b 100%)', color:'white', fontSize:'13px', fontWeight:'700', boxShadow:'0 4px 12px rgba(192,57,43,0.3)'},touchBase)}>{'\uD83D\uDCDA'} Weiter zur Modulauswahl</button>
+                        <div className="du-footer-row">
+                            <button {...tap(function(){ if(onBack) onBack(); })} className="du-footer-btn back">{'\u2190'} Zurueck</button>
+                            <button {...tap(function(){ if(onWeiterZuModulen) onWeiterZuModulen(); })} className="du-footer-btn main">{'\uD83D\uDCDA'} Weiter zur Modulauswahl</button>
                         </div>
                     </div>
                 </div>

@@ -305,93 +305,91 @@
             };
 
             var inputStyle = {width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', boxSizing:'border-box'};
-            var lila = '#8e44ad';
+            var lila = 'var(--accent-lila)';
 
             // ═══ PHASE 1: Kanal-Auswahl ═══
             if (phase === 'kanalwahl') {
                 return (
-                    <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
-                        <div style={{textAlign:'center', marginBottom:'28px'}}>
+                    <div className="page-container sv-page">
+                        <div className="sv-header">
                             <FirmenLogo size="small" />
-                            <div style={{marginTop:'12px', fontSize:'17px', fontWeight:'700', color: lila}}>Schriftverkehr</div>
-                            <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{kunde ? kunde.name : ''}</div>
-                            <div style={{fontSize:'11px', color:'var(--text-muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginTop:'8px'}}>Wie möchten Sie korrespondieren?</div>
+                            <div className="sv-header-title">Schriftverkehr</div>
+                            <div className="sv-header-subtitle">{kunde ? kunde.name : ''}</div>
+                            <div className="sv-header-prompt">Wie m{'\u00F6'}chten Sie korrespondieren?</div>
                         </div>
 
-                        <div style={{display:'flex', gap:'12px', marginBottom:'16px'}}>
-                            <button onClick={function(){ setVersandKanal('mail'); setPhase('formular'); }}
-                                style={{flex:1, padding:'28px 16px', borderRadius:'16px', border:'2px solid rgba(142,68,173,0.2)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-                                <span style={{fontSize:'40px'}}>✉️</span>
-                                <span style={{fontSize:'16px', fontWeight:'700', color: lila}}>E-MAIL</span>
-                                <span style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.4'}}>E-Mail direkt<br/>via Gmail senden</span>
+                        <div className="sv-channel-row">
+                            <button onClick={function(){ setVersandKanal('mail'); setPhase('formular'); }} className="sv-channel-btn">
+                                <span className="sv-channel-icon">{'\u2709\uFE0F'}</span>
+                                <span className="sv-channel-label">E-MAIL</span>
+                                <span className="sv-channel-desc">E-Mail direkt<br/>via Gmail senden</span>
                             </button>
-                            <button onClick={function(){ setVersandKanal('post'); setPhase('formular'); }}
-                                style={{flex:1, padding:'28px 16px', borderRadius:'16px', border:'2px solid rgba(142,68,173,0.2)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-                                <span style={{fontSize:'40px'}}>📄</span>
-                                <span style={{fontSize:'16px', fontWeight:'700', color: lila}}>POST</span>
-                                <span style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.4'}}>Geschäftsbrief<br/>drucken & senden</span>
+                            <button onClick={function(){ setVersandKanal('post'); setPhase('formular'); }} className="sv-channel-btn">
+                                <span className="sv-channel-icon">{'\uD83D\uDCC4'}</span>
+                                <span className="sv-channel-label">POST</span>
+                                <span className="sv-channel-desc">Gesch{'\u00E4'}ftsbrief<br/>drucken & senden</span>
                             </button>
                         </div>
 
-                        <button onClick={onBack} style={{width:'100%', marginTop:'8px', padding:'12px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'13px', cursor:'pointer'}}>← Zurück zur Modulwahl</button>
+                        <button onClick={onBack} className="sv-back-btn">{'\u2190'} Zur{'\u00FC'}ck zur Modulwahl</button>
                     </div>
                 );
             }
 
             // ═══ PHASE 2: Formular ═══
-            var kanalColor = versandKanal === 'mail' ? '#8e44ad' : '#2c3e50';
+            var kanalColor = versandKanal === 'mail' ? 'var(--accent-lila)' : '#2c3e50';
             var kanalLabel = versandKanal === 'mail' ? '✉️ E-Mail' : '📄 Geschäftsbrief';
 
             return (
-                <div className="page-container" style={{padding:'16px', minHeight:'100vh', paddingBottom:'80px'}}>
+                <div className="page-container sv-page formular">
 
                     {/* Header */}
-                    <div style={{textAlign:'center', marginBottom:'14px'}}>
+                    <div className="sv-header formular">
                         <FirmenLogo size="small" />
-                        <div style={{marginTop:'8px', fontSize:'15px', fontWeight:'700', color: kanalColor}}>{kanalLabel}</div>
-                        <div style={{fontSize:'11px', color:'var(--text-muted)'}}>{kunde ? kunde.name : 'Freies Schreiben'}</div>
+                        <div className="sv-formular-title" style={{color: kanalColor}}>{kanalLabel}</div>
+                        <div className="sv-formular-subtitle">{kunde ? kunde.name : 'Freies Schreiben'}</div>
                     </div>
 
-                    {/* Empfänger + Bauvorhaben */}
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'8px'}}>📬 Empfänger</div>
-                        <div style={{display:'grid', gap:'6px'}}>
-                            <div><MicLabel fieldKey="sv_empf" label="Empfänger (Firma/Person)" />
-                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_empf" value={empfaenger} onChange={function(e){setEmpfaenger(e.target.value);}} placeholder="Firma oder Name" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_empf" size="small" onResult={function(t){setEmpfaenger((empfaenger||'')+' '+t);}} /></div></div>
+                    {/* Empfaenger + Bauvorhaben */}
+                    <div className="sv-card">
+                        <div className="sv-card-label" style={{color: kanalColor}}>{'\uD83D\uDCEC'} Empf{'\u00E4'}nger</div>
+                        <div className="sv-card-grid">
+                            <div><MicLabel fieldKey="sv_empf" label="Empf\u00E4nger (Firma/Person)" />
+                                <div className="sv-input-row"><MicInput fieldKey="sv_empf" value={empfaenger} onChange={function(e){setEmpfaenger(e.target.value);}} placeholder="Firma oder Name" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_empf" size="small" onResult={function(t){setEmpfaenger((empfaenger||'')+' '+t);}} /></div></div>
                             <div><MicLabel fieldKey="sv_adr" label="Adresse" />
-                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_adr" value={empfAdresse} onChange={function(e){setEmpfAdresse(e.target.value);}} placeholder="Straße Nr, PLZ Ort" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_adr" size="small" onResult={function(t){setEmpfAdresse((empfAdresse||'')+' '+t);}} /></div></div>
+                                <div className="sv-input-row"><MicInput fieldKey="sv_adr" value={empfAdresse} onChange={function(e){setEmpfAdresse(e.target.value);}} placeholder="Stra\u00DFe Nr, PLZ Ort" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_adr" size="small" onResult={function(t){setEmpfAdresse((empfAdresse||'')+' '+t);}} /></div></div>
                             {versandKanal === 'mail' && (
                                 <div>
-                                    <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>E-Mail-Adresse</label>
+                                    <label className="sv-mini-label">E-Mail-Adresse</label>
                                     <input type="email" value={empfEmail} onChange={function(e){setEmpfEmail(e.target.value);}} placeholder="empfaenger@firma.de" style={inputStyle} />
-                                    {/* Schnell-Buttons für bekannte E-Mails */}
+                                    {/* Schnell-Buttons fuer bekannte E-Mails */}
                                     {kunde && (kunde.ag_email || kunde.bl_email || kunde.arch_email) && (
-                                        <div style={{display:'flex', gap:'4px', marginTop:'4px', flexWrap:'wrap'}}>
-                                            {kunde.ag_email && <button onClick={function(){setEmpfEmail(kunde.ag_email);}} style={{padding:'3px 7px', fontSize:'9px', background:'rgba(30,136,229,0.1)', color:'var(--accent-blue)', border:'1px solid rgba(30,136,229,0.2)', borderRadius:'5px', cursor:'pointer'}}>AG: {kunde.ag_email}</button>}
-                                            {kunde.bl_email && <button onClick={function(){setEmpfEmail(kunde.bl_email);}} style={{padding:'3px 7px', fontSize:'9px', background:'rgba(39,174,96,0.1)', color:'#27ae60', border:'1px solid rgba(39,174,96,0.2)', borderRadius:'5px', cursor:'pointer'}}>BL: {kunde.bl_email}</button>}
-                                            {kunde.arch_email && <button onClick={function(){setEmpfEmail(kunde.arch_email);}} style={{padding:'3px 7px', fontSize:'9px', background:'rgba(230,126,34,0.1)', color:'#e67e22', border:'1px solid rgba(230,126,34,0.2)', borderRadius:'5px', cursor:'pointer'}}>Arch: {kunde.arch_email}</button>}
+                                        <div className="sv-email-btns">
+                                            {kunde.ag_email && <button onClick={function(){setEmpfEmail(kunde.ag_email);}} className="sv-email-btn ag">AG: {kunde.ag_email}</button>}
+                                            {kunde.bl_email && <button onClick={function(){setEmpfEmail(kunde.bl_email);}} className="sv-email-btn bl">BL: {kunde.bl_email}</button>}
+                                            {kunde.arch_email && <button onClick={function(){setEmpfEmail(kunde.arch_email);}} className="sv-email-btn arch">Arch: {kunde.arch_email}</button>}
                                         </div>
                                     )}
                                 </div>
                             )}
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px'}}>
+                            <div className="sv-two-col">
                                 <div><MicLabel fieldKey="sv_bv" label="Bauvorhaben" />
-                                    <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_bv" value={bauvorhaben} onChange={function(e){setBauvorhaben(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_bv" size="small" onResult={function(t){setBauvorhaben((bauvorhaben||'')+' '+t);}} /></div></div>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Datum</label>
+                                    <div className="sv-input-row"><MicInput fieldKey="sv_bv" value={bauvorhaben} onChange={function(e){setBauvorhaben(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_bv" size="small" onResult={function(t){setBauvorhaben((bauvorhaben||'')+' '+t);}} /></div></div>
+                                <div><label className="sv-mini-label">Datum</label>
                                     <input value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={inputStyle} /></div>
                             </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px'}}>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Ihr Zeichen</label>
+                            <div className="sv-two-col">
+                                <div><label className="sv-mini-label">Ihr Zeichen</label>
                                     <input value={ihrZeichen} onChange={function(e){setIhrZeichen(e.target.value);}} placeholder="optional" style={inputStyle} /></div>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Unser Zeichen</label>
+                                <div><label className="sv-mini-label">Unser Zeichen</label>
                                     <input value={unserZeichen} onChange={function(e){setUnserZeichen(e.target.value);}} style={inputStyle} /></div>
                             </div>
                         </div>
                     </div>
 
                     {/* Vorlagen-Auswahl */}
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'6px'}}>📋 Vorlage (optional)</div>
+                    <div className="sv-card">
+                        <div className="sv-card-label vorlage" style={{color: kanalColor}}>{'\uD83D\uDCCB'} Vorlage (optional)</div>
                         <select value={vorlage} onChange={function(e){ applyVorlage(e.target.value); }}
                             style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}>
                             <option value="">-- Freitext (keine Vorlage) --</option>
@@ -400,17 +398,17 @@
                     </div>
 
                     {/* Textbereich */}
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'8px'}}>✏️ Schreiben</div>
+                    <div className="sv-card">
+                        <div className="sv-card-label" style={{color: kanalColor}}>{'\u270F\uFE0F'} Schreiben</div>
 
                         <div><MicLabel fieldKey="sv_betr" label="Betreff" />
-                            <div style={{display:'flex', gap:'3px', marginBottom:'6px'}}><MicInput fieldKey="sv_betr" value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff des Schreibens" style={Object.assign({}, inputStyle, {flex:1, fontWeight:'700'})} /><MicButton fieldKey="sv_betr" size="small" onResult={function(t){setBetreff((betreff||'')+' '+t);}} /></div></div>
+                            <div className="sv-input-row mb"><MicInput fieldKey="sv_betr" value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff des Schreibens" style={Object.assign({}, inputStyle, {flex:1, fontWeight:'700'})} /><MicButton fieldKey="sv_betr" size="small" onResult={function(t){setBetreff((betreff||'')+' '+t);}} /></div></div>
 
                         <div><MicLabel fieldKey="sv_anr" label="Anrede" />
-                            <div style={{display:'flex', gap:'3px', marginBottom:'6px'}}><MicInput fieldKey="sv_anr" value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_anr" size="small" onResult={function(t){setAnrede((anrede||'')+' '+t);}} /></div></div>
+                            <div className="sv-input-row mb"><MicInput fieldKey="sv_anr" value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_anr" size="small" onResult={function(t){setAnrede((anrede||'')+' '+t);}} /></div></div>
 
                         <div><MicLabel fieldKey="sv_text" label="Textinhalt" />
-                            <div style={{display:'flex', gap:'4px', alignItems:'flex-start'}}>
+                            <div className="sv-input-row text">
                                 <MicInput fieldKey="sv_text" multiline={true} value={textBody} onChange={function(e){setTextBody(e.target.value);}} rows={8} placeholder="Hier den Brieftext eingeben..."
                                     style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box', lineHeight:'1.6', minHeight:'160px'}} />
                                 <MicButton fieldKey="sv_text" size="normal" onResult={function(t){setTextBody((textBody||'')+(textBody?' ':'')+t);}} />
@@ -418,13 +416,12 @@
 
                         {/* Bilder */}
                         {bilder.length > 0 && (
-                            <div style={{marginTop:'8px', display:'flex', gap:'8px', flexWrap:'wrap'}}>
+                            <div className="sv-bilder-row">
                                 {bilder.map(function(b, idx) {
                                     return (
-                                        <div key={idx} style={{position:'relative', width:'80px', height:'80px', borderRadius:'8px', overflow:'hidden', border:'1px solid var(--border-color)'}}>
-                                            <img src={b.dataUrl} alt={b.name} style={{width:'100%', height:'100%', objectFit:'cover'}} />
-                                            <button onClick={function(){ removeBild(idx); }}
-                                                style={{position:'absolute', top:'2px', right:'2px', background:'rgba(196,30,30,0.9)', color:'white', border:'none', borderRadius:'50%', width:'20px', height:'20px', fontSize:'11px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'}}>✕</button>
+                                        <div key={idx} className="sv-bild-wrap">
+                                            <img src={b.dataUrl} alt={b.name} className="sv-bild-img" />
+                                            <button onClick={function(){ removeBild(idx); }} className="sv-bild-remove">{'\u2715'}</button>
                                         </div>
                                     );
                                 })}
@@ -432,50 +429,44 @@
                         )}
 
                         {/* Bild-Buttons */}
-                        <div style={{display:'flex', gap:'6px', marginTop:'8px'}}>
-                            <button onClick={function(){ kameraInputRef.current && kameraInputRef.current.click(); }}
-                                style={{flex:1, padding:'8px', background:'rgba(142,68,173,0.08)', color: lila, border:'1px solid rgba(142,68,173,0.2)', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer'}}>
-                                📷 Foto
+                        <div className="sv-bild-btns">
+                            <button onClick={function(){ kameraInputRef.current && kameraInputRef.current.click(); }} className="sv-bild-btn">
+                                {'\uD83D\uDCF7'} Foto
                             </button>
                             <input ref={kameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleBild} style={{display:'none'}} />
-                            <button onClick={function(){ bildInputRef.current && bildInputRef.current.click(); }}
-                                style={{flex:1, padding:'8px', background:'rgba(142,68,173,0.08)', color: lila, border:'1px solid rgba(142,68,173,0.2)', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer'}}>
-                                🖼 Galerie/Dateien
+                            <button onClick={function(){ bildInputRef.current && bildInputRef.current.click(); }} className="sv-bild-btn">
+                                {'\uD83D\uDDBC'} Galerie/Dateien
                             </button>
                             <input ref={bildInputRef} type="file" accept="image/*" onChange={handleBild} style={{display:'none'}} />
                         </div>
 
-                        <div style={{marginTop:'8px'}}><MicLabel fieldKey="sv_gruss" label="Grußformel" />
-                            <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_gruss" value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_gruss" size="small" onResult={function(t){setGrussformel((grussformel||'')+' '+t);}} /></div></div>
+                        <div style={{marginTop:'8px'}}><MicLabel fieldKey="sv_gruss" label="Gru\u00DFformel" />
+                            <div className="sv-input-row"><MicInput fieldKey="sv_gruss" value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_gruss" size="small" onResult={function(t){setGrussformel((grussformel||'')+' '+t);}} /></div></div>
                     </div>
 
                     {/* Versand-Status Toast */}
                     {sendStatus === 'sending' && (
-                        <div style={{position:'fixed', top:'60px', left:'50%', transform:'translateX(-50%)', padding:'12px 24px', background:'linear-gradient(135deg, #8e44ad, #6c3483)', color:'white', borderRadius:'12px', fontSize:'13px', fontWeight:'700', zIndex:200, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'8px'}}>
-                            <span style={{animation:'spin 1s linear infinite', display:'inline-block'}}>⏳</span> Wird gesendet...
+                        <div className="sv-toast sending">
+                            <span style={{animation:'spin 1s linear infinite', display:'inline-block'}}>{'\u23F3'}</span> Wird gesendet...
                         </div>
                     )}
                     {sendStatus === 'sent' && (
-                        <div style={{position:'fixed', top:'60px', left:'50%', transform:'translateX(-50%)', padding:'12px 24px', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', borderRadius:'12px', fontSize:'13px', fontWeight:'700', zIndex:200, boxShadow:'0 4px 16px rgba(0,0,0,0.3)'}}>
-                            ✅ Erfolgreich gesendet!
+                        <div className="sv-toast sent">
+                            {'\u2705'} Erfolgreich gesendet!
                         </div>
                     )}
 
                     {/* Fixed Bottom Bar */}
-                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'10px 16px', background:'var(--bg-primary)', borderTop:'1px solid var(--border-color)', zIndex:100, display:'flex', gap:'6px'}}>
-                        <button onClick={function(){ setPhase('kanalwahl'); }}
-                            style={{padding:'12px 10px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'12px', cursor:'pointer'}}>←</button>
-                        <button onClick={handleSenden}
-                            style={{flex:1, padding:'12px', background:'linear-gradient(135deg, #8e44ad, #6c3483)', color:'white', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', opacity: sendStatus === 'sending' ? 0.6 : 1}}>
-                            ✉️ Senden
+                    <div className="sv-bottom-bar">
+                        <button onClick={function(){ setPhase('kanalwahl'); }} className="sv-bar-back">{'\u2190'}</button>
+                        <button onClick={handleSenden} className="sv-bar-btn senden" style={{opacity: sendStatus === 'sending' ? 0.6 : 1}}>
+                            {'\u2709\uFE0F'} Senden
                         </button>
-                        <button onClick={handleDrucken}
-                            style={{flex:1, padding:'12px', background:'linear-gradient(135deg, #2c3e50, #1a252f)', color:'white', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
-                            🖨 Drucken
+                        <button onClick={handleDrucken} className="sv-bar-btn drucken">
+                            {'\uD83D\uDDA8'} Drucken
                         </button>
-                        <button onClick={handleSpeichern}
-                            style={{padding:'12px 10px', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'3px'}}>
-                            💾
+                        <button onClick={handleSpeichern} className="sv-bar-save">
+                            {'\uD83D\uDCBE'}
                         </button>
                     </div>
                 </div>
