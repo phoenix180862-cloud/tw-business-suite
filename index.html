@@ -18449,6 +18449,60 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
+                    {/* -- GLOBALE SCHNELLNAVIGATION: 3 rote Buttons auf ALLEN Seiten ausser Start -- */}
+                    {page !== 'start' && (
+                        <div style={{display:'flex', gap:'6px', padding:'8px 16px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
+                            <button
+                                onClick={function(){ navigateTo('datenUebersicht'); }}
+                                disabled={!selectedKunde}
+                                style={{
+                                    flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed',
+                                    background: page === 'datenUebersicht' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                    color:'#fff', fontSize:'11px', fontWeight:'600',
+                                    boxShadow: page === 'datenUebersicht' ? '0 0 12px rgba(196,30,30,0.4)' : '0 2px 8px rgba(196,30,30,0.25)',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'4px',
+                                    fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    transition:'all 0.2s ease',
+                                    opacity: selectedKunde ? 1 : 0.4,
+                                }}
+                            >
+                                {'\uD83D\uDCCB'} Kundendaten
+                            </button>
+                            <button
+                                onClick={function(){ navigateTo('ordnerBrowser'); }}
+                                disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
+                                style={{
+                                    flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed',
+                                    background: page === 'ordnerBrowser' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                    color:'#fff', fontSize:'11px', fontWeight:'600',
+                                    boxShadow: page === 'ordnerBrowser' ? '0 0 12px rgba(196,30,30,0.4)' : '0 2px 8px rgba(196,30,30,0.25)',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'4px',
+                                    fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    transition:'all 0.2s ease',
+                                    opacity: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 1 : 0.4,
+                                }}
+                            >
+                                {'\uD83D\uDCC1'} Ordner
+                            </button>
+                            <button
+                                onClick={function(){ navigateTo('modulwahl'); }}
+                                disabled={!selectedKunde}
+                                style={{
+                                    flex:1, padding:'8px 6px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed',
+                                    background: page === 'modulwahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                    color:'#fff', fontSize:'11px', fontWeight:'600',
+                                    boxShadow: page === 'modulwahl' ? '0 0 12px rgba(196,30,30,0.4)' : '0 2px 8px rgba(196,30,30,0.25)',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'4px',
+                                    fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    transition:'all 0.2s ease',
+                                    opacity: selectedKunde ? 1 : 0.4,
+                                }}
+                            >
+                                {'\uD83D\uDCDA'} Module
+                            </button>
+                        </div>
+                    )}
+
                     {renderPage()}
 
                     {showAuth && (
