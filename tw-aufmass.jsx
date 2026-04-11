@@ -4513,11 +4513,23 @@
             const [bodenPlusTuerlaibung, setBodenPlusTuerlaibung] = useState(reEdit ? reEdit.bodenPlusTuerlaibung || false : ((raum && raum.bodenPlusTuerlaibung) || false));
             // ── Raumblatt Tab-Navigation (4-Seiten-Architektur) ──
             const [activeTab, setActiveTab] = useState(0); // 0=Grundriss, 1=Fotos, 2=Oeffnungen, 3=Positionen
+            const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
             const handleTabChange = (tabIdx) => {
                 setActiveTab(tabIdx);
                 const page = document.querySelector('.page-container');
                 if (page) page.scrollTo({ top: 0, behavior: 'smooth' });
             };
+            // Tastatur-Navigation: Strg+1/2/3/4 fuer Tab-Wechsel (Desktop)
+            React.useEffect(() => {
+                const handleKeyNav = (e) => {
+                    if (e.ctrlKey && e.key >= '1' && e.key <= '4') {
+                        e.preventDefault();
+                        handleTabChange(parseInt(e.key) - 1);
+                    }
+                };
+                document.addEventListener('keydown', handleKeyNav);
+                return () => document.removeEventListener('keydown', handleKeyNav);
+            }, []);
             // ── Edit-Modus für Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
             const [wandMasse, setWandMasse] = useState(() => {
@@ -4698,6 +4710,11 @@
             // ── Manueller Rechenweg Modal ──
             const [rwModalPos, setRwModalPos] = useState(null); // pos.pos oder null
             const [rwModalZeilen, setRwModalZeilen] = useState([]);
+
+            // ── Aenderungs-Tracking fuer ungespeicherte Daten ──
+            React.useEffect(() => {
+                setHasUnsavedChanges(true);
+            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits]);
 
             // ═══ LASER DISTO – Tastatur-Modus ═══
             // Enter/Tab vom DISTO → Wert formatieren + nächstes Feld
@@ -6356,18 +6373,22 @@
                     <div className="raumblatt-tabs">
                         <button className={activeTab===0?'tab active':'tab'} onClick={()=>handleTabChange(0)}>
                             <span className="tab-emoji">📐</span> Grundriss
+                            <span className={'tab-status ' + (parseMass(masse.laenge) > 0 && parseMass(masse.breite) > 0 ? 'complete' : parseMass(masse.laenge) > 0 || parseMass(masse.breite) > 0 ? 'partial' : 'empty')}></span>
                         </button>
                         <button className={activeTab===1?'tab active':'tab'} onClick={()=>handleTabChange(1)}>
                             <span className="tab-emoji">📸</span> Fotos
+                            <span className={'tab-status ' + (fotos.filter(f => f.aiAnalysis).length > 0 ? 'complete' : fotos.filter(f => f.image).length > 0 ? 'partial' : 'empty')}></span>
                         </button>
                         <button className={activeTab===2?'tab active':'tab'} onClick={()=>handleTabChange(2)}>
                             <span className="tab-emoji">🚪</span> Oeffnungen
+                            <span className={'tab-status ' + (tueren.length > 0 || fenster.length > 0 ? 'complete' : 'empty')}></span>
                         </button>
                         <button className={activeTab===3?'tab active':'tab'} onClick={()=>handleTabChange(3)}>
                             <span className="tab-emoji">📋</span> Positionen
                             {posCards.length > 0 && (
                                 <span className="tab-badge">{posCards.filter(p => calcPositionResult(p) > 0).length}/{posCards.length}</span>
                             )}
+                            <span className={'tab-status ' + (posCards.length > 0 && posCards.every(p => calcPositionResult(p) > 0) ? 'complete' : posCards.some(p => calcPositionResult(p) > 0) ? 'partial' : 'empty')}></span>
                         </button>
                     </div>
 
@@ -8279,8 +8300,13 @@
                             </span>
                         </button>
 
-                        {/* Zurück */}
-                        <button className="raum-action-btn" onClick={onBack} style={{color:'var(--text-muted)'}}>
+                        {/* Zurueck */}
+                        <button className="raum-action-btn" onClick={() => {
+                            if (hasUnsavedChanges) {
+                                if (!confirm('Es gibt ungespeicherte Aenderungen im Raumblatt. Wirklich verlassen?')) return;
+                            }
+                            onBack();
+                        }} style={{color:'var(--text-muted)'}}>
                             <span className="btn-icon">◀</span>
                             <span className="btn-text">Zurück zur Raumerkennung</span>
                         </button>

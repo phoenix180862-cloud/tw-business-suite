@@ -3537,3 +3537,19 @@
             from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Tab-Status Indikatoren (Punkt) */
+        .tab .tab-status {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-top: 2px;
+            transition: background 0.3s ease;
+        }
+        .tab .tab-status.complete { background: var(--success); box-shadow: 0 0 4px rgba(39,174,96,0.4); }
+        .tab .tab-status.partial { background: var(--accent-orange); box-shadow: 0 0 4px rgba(230,126,34,0.4); }
+        .tab .tab-status.empty { background: var(--text-muted); opacity: 0.25; }
+        .tab.active .tab-status.complete { background: #7dffb3; }
+        .tab.active .tab-status.partial { background: #ffc77d; }
+        .tab.active .tab-status.empty { background: rgba(255,255,255,0.3); }
