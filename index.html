@@ -8152,6 +8152,216 @@
 
             // ── Grundriss-Modus und Handskizze ──
             const [grundrissModus, setGrundrissModus] = useState('manual'); // 'ki', 'manual', 'skizze'
+
+            // ── KI-Grundrisserkennung State ──
+            const [kiGrundrissState, setKiGrundrissState] = useState({
+                status: 'idle',
+                statusText: '',
+                pdfs: [],
+                selectedPdf: null,
+                kiResult: null,
+                errorMsg: '',
+                progress: 0
+            });
+
+            // ── KI-Grundriss: PDFs suchen und analysieren ──
+            const startKiGrundriss = async () => {
+                if (!kunde || !kunde._driveFolderId) {
+                    alert('Kein Google Drive Ordner verknuepft. Bitte zuerst Kundenakte laden.');
+                    return;
+                }
+                if (!window.GoogleDriveService || !window.GoogleDriveService.accessToken) {
+                    alert('Google Drive nicht verbunden. Bitte zuerst auf der Startseite verbinden.');
+                    return;
+                }
+                var geminiKey = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.API_KEY) || localStorage.getItem('gemini_api_key') || '';
+                if (!geminiKey) {
+                    alert('Gemini API-Key nicht konfiguriert. Bitte auf der Startseite verbinden.');
+                    return;
+                }
+
+                var raumNr = (raum && raum.nr) || '';
+                var raumBez = (raum && raum.bez) || raumName || '';
+                var geschoss = (raum && raum.geschoss) || '';
+
+                if (!raumNr && !raumBez) {
+                    alert('Bitte zuerst Raumnummer oder Bezeichnung eingeben.');
+                    return;
+                }
+
+                setKiGrundrissState(function(p) { return Object.assign({}, p, { status: 'suche-pdfs', statusText: 'Suche PDF-Zeichnungen im Kundenordner...', progress: 10 }); });
+
+                try {
+                    var driveService = window.GoogleDriveService;
+                    var folderContents = await driveService.listFolderContents(kunde._driveFolderId);
+                    var pdfFiles = [];
+
+                    var zeichnungsOrdner = (folderContents.folders || []).filter(function(f) {
+                        var name = (f.name || '').toLowerCase();
+                        return name.indexOf('03') >= 0 || name.indexOf('plan') >= 0 || name.indexOf('plaen') >= 0 ||
+                               name.indexOf('zeichn') >= 0 || name.indexOf('grundriss') >= 0;
+                    });
+
+                    var alleFolders = zeichnungsOrdner.concat(
+                        (folderContents.folders || []).filter(function(f) { return zeichnungsOrdner.indexOf(f) < 0; })
+                    );
+
+                    for (var fi = 0; fi < alleFolders.length; fi++) {
+                        var folder = alleFolders[fi];
+                        var subContents = folder.files ? folder : await driveService.listFolderContents(folder.id);
+                        var pdfsInFolder = ((subContents.files || []).concat(subContents.pdfs || [])).filter(function(f) {
+                            return (f.mimeType && f.mimeType.indexOf('pdf') >= 0) || (f.name && f.name.toLowerCase().indexOf('.pdf') >= 0);
+                        });
+                        pdfsInFolder.forEach(function(pdf) {
+                            pdfFiles.push({ id: pdf.id, name: pdf.name, ordner: folder.name });
+                        });
+                    }
+                    // Auch Root-PDFs
+                    ((folderContents.files || []).concat(folderContents.pdfs || [])).forEach(function(f) {
+                        if ((f.mimeType && f.mimeType.indexOf('pdf') >= 0) || (f.name && f.name.toLowerCase().indexOf('.pdf') >= 0)) {
+                            pdfFiles.push({ id: f.id, name: f.name, ordner: 'Hauptordner' });
+                        }
+                    });
+
+                    if (pdfFiles.length === 0) {
+                        setKiGrundrissState(function(p) { return Object.assign({}, p, { status: 'fehler', statusText: 'Keine PDF-Zeichnungen gefunden', errorMsg: 'Im Kundenordner wurden keine PDF-Dateien gefunden.' }); });
+                        return;
+                    }
+
+                    setKiGrundrissState(function(p) { return Object.assign({}, p, { pdfs: pdfFiles, status: 'analyse', statusText: pdfFiles.length + ' PDFs gefunden, starte KI-Analyse...', progress: 25 }); });
+
+                    var proModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
+
+                    for (var pi = 0; pi < pdfFiles.length; pi++) {
+                        var pdf = pdfFiles[pi];
+                        setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                            statusText: 'Analysiere: ' + pdf.name + ' (' + (pi+1) + '/' + pdfFiles.length + ')',
+                            progress: 25 + Math.round((pi / pdfFiles.length) * 60)
+                        }); });
+
+                        try {
+                            var pdfBlob = await driveService.downloadFile(pdf.id);
+                            var pdfBase64 = await new Promise(function(resolve, reject) {
+                                var reader = new FileReader();
+                                reader.onload = function() { resolve(reader.result.split(',')[1]); };
+                                reader.onerror = function() { reject(new Error('PDF lesen fehlgeschlagen')); };
+                                reader.readAsDataURL(pdfBlob);
+                            });
+
+                            var kiPrompt = 'Du bist ein Experte fuer Bauzeichnungen und Grundriss-Erkennung fuer Fliesenlegerarbeiten (DIN 18352).\n\nSuche in dieser PDF-Zeichnung nach dem folgenden Raum:\n- Raumnummer: "' + (raumNr || 'nicht angegeben') + '"\n- Raumbezeichnung: "' + (raumBez || 'nicht angegeben') + '"\n- Geschoss: "' + (geschoss || 'nicht angegeben') + '"\n\nWenn du den Raum findest:\n1. Lies ALLE Wandlaengen ab (in mm UND m)\n2. Erkenne die Raumform (Rechteck oder Polygon)\n3. Zaehle alle Waende und gib ihnen IDs (A, B, C, D...)\n4. Erkenne Tueren und Fenster mit Position und Maszen\n5. Lies den Massstab ab\n6. Erkenne die Raumhoehe falls angegeben\n\nAntworte NUR als JSON ohne Markdown-Backticks:\n{"gefunden":true,"raumNr":"","raumName":"","geschoss":"","massstab":"1:50","raumForm":"rechteck","anzahlWaende":4,"waende":[{"id":"A","laenge_mm":3450,"laenge_m":3.450,"richtung_grad":0}],"tueren":[{"wandId":"A","breite_mm":885,"hoehe_mm":2100,"position_von_links_mm":500}],"fenster":[{"wandId":"C","breite_mm":1200,"hoehe_mm":1400,"bruestung_mm":600,"position_von_links_mm":800}],"masze":{"raumhoehe_mm":2600,"bodenflaeche_m2":0,"laengsteWand_mm":0},"grundrissPolygon":[{"x":0,"y":0},{"x":3450,"y":0},{"x":3450,"y":2100},{"x":0,"y":2100}],"hinweise":[],"confidence":{"raumGefunden":0.9,"masseGenauigkeit":0.8}}\n\nWenn der Raum NICHT gefunden wird:\n{"gefunden":false,"hinweise":["Raum nicht gefunden"],"alternativeRaeume":["0.02 WC","0.03 Flur"]}';
+
+                            var rawText = null;
+                            if (typeof window.callGeminiAPI === 'function') {
+                                rawText = await window.callGeminiAPI(
+                                    [{ content: kiPrompt }],
+                                    8192,
+                                    {
+                                        model: proModelId,
+                                        files: [{ mimeType: 'application/pdf', base64Data: pdfBase64 }],
+                                        jsonMode: true
+                                    }
+                                );
+                            }
+
+                            if (!rawText) continue;
+
+                            rawText = rawText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                            var kiResult = JSON.parse(rawText);
+
+                            if (kiResult.gefunden) {
+                                setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                                    status: 'gefunden',
+                                    statusText: 'Raum ' + (raumNr || raumBez) + ' erkannt!',
+                                    kiResult: kiResult,
+                                    selectedPdf: pdf.name,
+                                    progress: 100
+                                }); });
+                                applyKiGrundrissToRaumblatt(kiResult);
+                                return;
+                            }
+                        } catch(pdfErr) {
+                            console.warn('PDF-Analyse Fehler bei ' + pdf.name + ':', pdfErr);
+                        }
+                    }
+
+                    setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                        status: 'nicht-gefunden',
+                        statusText: 'Raum nicht gefunden',
+                        errorMsg: 'Der Raum "' + (raumNr || '') + ' ' + (raumBez || '') + '" konnte in keiner der ' + pdfFiles.length + ' PDF(s) gefunden werden.',
+                        progress: 100
+                    }); });
+
+                } catch(err) {
+                    console.error('KI-Grundriss Fehler:', err);
+                    setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                        status: 'fehler',
+                        statusText: 'Fehler bei der KI-Analyse',
+                        errorMsg: err.message,
+                        progress: 0
+                    }); });
+                }
+            };
+
+            // ── KI-Ergebnis in Raumblatt-State uebernehmen ──
+            const applyKiGrundrissToRaumblatt = (kiResult) => {
+                if (!kiResult || !kiResult.waende) return;
+
+                var isPolygon = kiResult.raumForm === 'polygon' || kiResult.anzahlWaende > 4;
+
+                if (isPolygon && kiResult.waende.length > 4) {
+                    setRaumFormTyp('polygon');
+                    setIsMultiWall(true);
+                    setWandMasse(kiResult.waende.map(function(w) {
+                        return { id: w.id, l: String((w.laenge_m || 0).toFixed(3)).replace('.', ',') };
+                    }));
+                } else {
+                    setRaumFormTyp('rechteck');
+                    setIsMultiWall(false);
+                    var sortiert = kiResult.waende.slice().sort(function(a, b) { return (b.laenge_mm || 0) - (a.laenge_mm || 0); });
+                    setMasse(function(prev) {
+                        return Object.assign({}, prev, {
+                            laenge: String((sortiert[0] ? sortiert[0].laenge_m : 0).toFixed(3)).replace('.', ','),
+                            breite: String((sortiert[1] ? sortiert[1].laenge_m : 0).toFixed(3)).replace('.', ','),
+                            raumhoehe: kiResult.masze && kiResult.masze.raumhoehe_mm
+                                ? String((kiResult.masze.raumhoehe_mm / 1000).toFixed(3)).replace('.', ',')
+                                : prev.raumhoehe
+                        });
+                    });
+                }
+
+                if (kiResult.tueren && kiResult.tueren.length > 0) {
+                    setTueren(function(prev) {
+                        return kiResult.tueren.map(function(t, i) {
+                            return {
+                                id: 'ki_t_' + i,
+                                wandId: t.wandId || 'A',
+                                breite: t.breite_mm ? String(t.breite_mm) : '885',
+                                hoehe: t.hoehe_mm ? String(t.hoehe_mm) : '2100',
+                                expanded: false,
+                                quelle: 'ki-grundriss'
+                            };
+                        });
+                    });
+                }
+                if (kiResult.fenster && kiResult.fenster.length > 0) {
+                    setFenster(function(prev) {
+                        return kiResult.fenster.map(function(f, i) {
+                            return {
+                                id: 'ki_f_' + i,
+                                wandId: f.wandId || 'C',
+                                breite: f.breite_mm ? String(f.breite_mm) : '1200',
+                                hoehe: f.hoehe_mm ? String(f.hoehe_mm) : '1400',
+                                bruestung: f.bruestung_mm ? String(f.bruestung_mm) : '600',
+                                expanded: false,
+                                quelle: 'ki-grundriss'
+                            };
+                        });
+                    });
+                }
+
+                console.log('[TW KI-Grundriss] Ergebnis angewendet:', kiResult);
+            };
+
             const [skizze, setSkizze] = useState({
                 mode: 'draw', paths: [], currentPath: null,
                 labels: [], currentLabel: null,
@@ -9878,26 +10088,21 @@
                 if (phase === 'rohzustand') {
                     return 'Du bist ein Experte fuer Fliesenlegerarbeiten (DIN 18352). Analysiere dieses Foto vom ROHZUSTAND eines Raumes (vor Arbeitsbeginn). ' + raumInfo + ' Erkenne OHNE Markierungen: 1) Wandflaeche schaetzen (grob, +-10%) 2) Innenecken PRAEZISE zaehlen (einspringend, konkav) - JEDE Ecke zaehlen, auch an Nischen und Vorwaenden! 3) Aussenecken PRAEZISE zaehlen (vorspringend, konvex) - inkl. Fensterleibungen, Vorwandinstallationen, Nischen! 4) Meter Aussenecken schaetzen (Gesamtlaenge aller Aussenecken in lfm) 5) Wandeinschluesse (Nischen, Vorwand-Elemente, Stuetzen) 6) Installationsloecher (Steckdosen, Rohrdurchfuehrungen, Sanitaeranschluesse) 7) Sanitaer-Objekte erkennen (WC, Waschbecken, Dusche, Badewanne). Antworte NUR als JSON: {"wandflaeche_m2":0,"innenecken":0,"aussenecken":0,"aussenecken_lfm":0,"wandeinschluesse":0,"loecher":0,"wandanschluesse":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}';
                 }
-
                 if (phase === 'vorarbeiten') {
-                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten und Abdichtung (DIN 18534). Analysiere dieses Foto NACH VORARBEITEN (Abdichtung/Grundierung). ' + raumInfo + ' Der Nutzer hat farbige Markierungen auf dem Foto angebracht. Erkenne die markierten Bereiche und berechne: BLAU markiert = Wand-Abdichtungsflaeche in m2, GRUEN markiert = Dichtungsband-Laenge an Innen-/Aussenecken in lfm, GELB markiert = Stueckzahl Innen-/Aussenecken (zaehle einzelne Ecken), LILA markiert = Dichtungsmanschetten (Stueckzahl). Falls keine Farbmarkierungen sichtbar: erkenne automatisch Abdichtungsflaechen (dunkle/graue Flaechen), Dichtungsbaender (Streifen an Ecken) und Manschetten (runde Abdichtungen um Durchbrueche). Antworte NUR als JSON: {"farbErgebnisse":{"blau_m2":{"farbe":"blau","beschreibung":"Wand-Abdichtungsflaeche","wert":0,"einheit":"m2"},"gruen_lfm":{"farbe":"gruen","beschreibung":"Dichtungsband Ecken","wert":0,"einheit":"lfm"},"gelb_Stk":{"farbe":"gelb","beschreibung":"Innen-/Aussenecken","wert":0,"einheit":"Stk"},"lila_Stk":{"farbe":"lila","beschreibung":"Dichtungsmanschetten","wert":0,"einheit":"Stk"}},"innenecken":0,"aussenecken":0,"zusammenfassung":""}';
+                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten und Abdichtung (DIN 18534). Analysiere dieses Foto NACH VORARBEITEN (Abdichtung/Grundierung). ' + raumInfo + ' Der Nutzer hat farbige Markierungen auf dem Foto angebracht. Erkenne die markierten Bereiche und berechne: BLAU markiert = Wand-Abdichtungsflaeche in m2, GRUEN markiert = Dichtungsband-Laenge an Innen-/Aussenecken in lfm, GELB markiert = Stueckzahl Innen-/Aussenecken (zaehle einzelne Ecken), LILA markiert = Dichtungsmanschetten (Stueckzahl). Falls keine Farbmarkierungen sichtbar: erkenne automatisch Abdichtungsflaechen, Dichtungsbaender und Manschetten. Antworte NUR als JSON: {"farbErgebnisse":{"blau_m2":{"farbe":"blau","beschreibung":"Wand-Abdichtungsflaeche","wert":0,"einheit":"m2"},"gruen_lfm":{"farbe":"gruen","beschreibung":"Dichtungsband Ecken","wert":0,"einheit":"lfm"},"gelb_Stk":{"farbe":"gelb","beschreibung":"Innen-/Aussenecken","wert":0,"einheit":"Stk"},"lila_Stk":{"farbe":"lila","beschreibung":"Dichtungsmanschetten","wert":0,"einheit":"Stk"}},"innenecken":0,"aussenecken":0,"zusammenfassung":""}';
                 }
-
                 if (phase === 'fertigstellung') {
-                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten (DIN 18352). Analysiere dieses Foto der FERTIGSTELLUNG (nach Fliesenverlegung). ' + raumInfo + ' Der Nutzer hat farbige Markierungen auf dem Foto angebracht. Erkenne die markierten Bereiche und berechne: ROT markiert = Geflieste Wandflaeche in m2, BLAU markiert = Installationsloecher (Stueckzahl), GRUEN markiert = Dehnungsfugen in lfm, GELB markiert = Schienen/Profile in lfm, LILA markiert = Ablagen in lfm, ORANGE markiert = Laibungen in lfm. Falls keine Farbmarkierungen sichtbar: erkenne automatisch die geflieste Flaeche, Loecher/Durchbrueche, Fugen und Profile. Antworte NUR als JSON: {"farbErgebnisse":{"rot_m2":{"farbe":"rot","beschreibung":"Geflieste Wandflaeche","wert":0,"einheit":"m2"},"blau_Stk":{"farbe":"blau","beschreibung":"Installationsloecher","wert":0,"einheit":"Stk"},"gruen_lfm":{"farbe":"gruen","beschreibung":"Dehnungsfugen","wert":0,"einheit":"lfm"},"gelb_lfm":{"farbe":"gelb","beschreibung":"Schienen","wert":0,"einheit":"lfm"},"lila_lfm":{"farbe":"lila","beschreibung":"Ablagen","wert":0,"einheit":"lfm"},"orange_lfm":{"farbe":"orange","beschreibung":"Laibungen","wert":0,"einheit":"lfm"}},"loecher":0,"zusammenfassung":""}';
+                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten (DIN 18352). Analysiere dieses Foto der FERTIGSTELLUNG (nach Fliesenverlegung). ' + raumInfo + ' Der Nutzer hat farbige Markierungen auf dem Foto angebracht. Erkenne die markierten Bereiche und berechne: ROT markiert = Geflieste Wandflaeche in m2, BLAU markiert = Installationsloecher (Stueckzahl), GRUEN markiert = Dehnungsfugen in lfm, GELB markiert = Schienen/Profile in lfm, LILA markiert = Ablagen in lfm, ORANGE markiert = Laibungen in lfm. Falls keine Farbmarkierungen sichtbar: erkenne automatisch die geflieste Flaeche, Loecher, Fugen und Profile. Antworte NUR als JSON: {"farbErgebnisse":{"rot_m2":{"farbe":"rot","beschreibung":"Geflieste Wandflaeche","wert":0,"einheit":"m2"},"blau_Stk":{"farbe":"blau","beschreibung":"Installationsloecher","wert":0,"einheit":"Stk"},"gruen_lfm":{"farbe":"gruen","beschreibung":"Dehnungsfugen","wert":0,"einheit":"lfm"},"gelb_lfm":{"farbe":"gelb","beschreibung":"Schienen","wert":0,"einheit":"lfm"},"lila_lfm":{"farbe":"lila","beschreibung":"Ablagen","wert":0,"einheit":"lfm"},"orange_lfm":{"farbe":"orange","beschreibung":"Laibungen","wert":0,"einheit":"lfm"}},"loecher":0,"zusammenfassung":""}';
                 }
-
-                // Fallback: alter einfacher Prompt
                 if (stufe === 'klein') {
-                    return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle praezise: loecher (Steckdosen, Rohrdurchfuehrungen, Sanitaeranschluesse), wandanschluesse (Fugen an Waenden/Decke/Boden), innenecken (einspringend - auch an Nischen, Vorwaenden!), aussenecken (vorspringend - auch Fensterleibungen!). Erkenne Sanitaer-Objekte. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}';
+                    return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle praezise: loecher, wandanschluesse, innenecken (auch an Nischen!), aussenecken (auch Fensterleibungen!). Erkenne Sanitaer-Objekte. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}';
                 }
-                return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle: loecher, wandanschluesse, innenecken (PRAEZISE!), aussenecken (PRAEZISE!), Sanitaer-Objekte. ZUSAETZLICH schaetze: abdichtung (flaeche_m2, dichtungsbaender_lfm, abdichtungshoehe_m, sichtbar), geflieste_flaeche_m2. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"abdichtung":{"flaeche_m2":0,"dichtungsbaender_lfm":0,"abdichtungshoehe_m":0,"sichtbar":false},"geflieste_flaeche_m2":0,"zusammenfassung":""}';
+                return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle: loecher, wandanschluesse, innenecken, aussenecken, Sanitaer-Objekte. ZUSAETZLICH schaetze: abdichtung (flaeche_m2, dichtungsbaender_lfm), geflieste_flaeche_m2. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"abdichtung":{"flaeche_m2":0,"dichtungsbaender_lfm":0},"geflieste_flaeche_m2":0,"zusammenfassung":""}';
             };
 
             const runKiAnalyse = async (stufe) => {
                 const marked = getMarkedFotos();
                 if (marked.length === 0) { alert('Keine Fotos markiert! Markiere Fotos mit dem Haekchen oben rechts.'); return; }
-                // API-Key pruefen ueber globale Config
                 var geminiApiKey = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.API_KEY) || localStorage.getItem('gemini_api_key') || '';
                 if (!geminiApiKey) {
                     alert('Gemini API-Key nicht konfiguriert. Bitte zuerst auf der Startseite verbinden.'); return;
@@ -9905,7 +10110,6 @@
                 setAnalyseRunning(true);
                 setAnalyseProgress({ current: 0, total: marked.length, wandId: '' });
                 const results = [];
-                // Modell: Gemini 2.5 Pro fuer praezise Analyse
                 var proModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
 
                 for (let i = 0; i < marked.length; i++) {
@@ -9913,24 +10117,15 @@
                     setAnalyseProgress({ current: i + 1, total: marked.length, wandId: m.wandId });
                     try {
                         const imgData = (m.foto.croppedImage || m.foto.image).split(',')[1];
-                        // Phasenspezifischer Prompt
                         const prompt = getPhasePrompt(m.phase, stufe);
 
-                        // callGeminiAPI verwenden (Retries, Modell-Selektion etc.)
                         var rawText = null;
                         if (typeof window.callGeminiAPI === 'function') {
                             rawText = await window.callGeminiAPI(
-                                [{ content: prompt }],
-                                4096,
-                                {
-                                    model: proModelId,
-                                    files: [{ mimeType: 'image/jpeg', base64Data: imgData }],
-                                    jsonMode: true
-                                }
+                                [{ content: prompt }], 4096,
+                                { model: proModelId, files: [{ mimeType: 'image/jpeg', base64Data: imgData }], jsonMode: true }
                             );
                         }
-
-                        // Fallback: direkter API-Call falls callGeminiAPI fehlschlaegt
                         if (!rawText) {
                             var baseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
                             const resp = await fetch(baseUrl + '/models/' + proModelId + ':generateContent?key=' + geminiApiKey, {
@@ -9946,12 +10141,10 @@
                             const data = await resp.json();
                             rawText = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
                         }
-
                         rawText = (rawText || '{}').replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
                         const parsed = JSON.parse(rawText);
                         parsed._phase = m.phase;
                         results.push(parsed);
-                        // Ergebnis am Foto speichern
                         setPhasenFotos(prev => {
                             const updated = { ...prev };
                             if (updated[m.phase] && updated[m.phase][m.wandId]) {
@@ -9966,17 +10159,14 @@
                         results.push({ _phase: m.phase, loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0, zusammenfassung: 'Fehler: ' + err.message });
                     }
                 }
-                // === AGGREGATION: Phasenspezifisch ===
                 const agg = {
                     loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0,
                     aussenecken_lfm: 0, wandeinschluesse: 0, wandflaeche_m2: 0,
                     sanitaerObjekte: [], installationen: [],
                     abdichtungsflaeche_m2: 0, dichtungsbaender_lfm: 0, gefliesteFlaeche_m2: 0,
-                    farbErgebnisse: {},
-                    details: results
+                    farbErgebnisse: {}, details: results
                 };
                 results.forEach(r => {
-                    // Standard-Felder summieren
                     agg.loecher += (r.loecher || 0);
                     agg.wandanschluesse += (r.wandanschluesse || 0);
                     agg.innenecken += (r.innenecken || 0);
@@ -9984,7 +10174,6 @@
                     agg.aussenecken_lfm += (r.aussenecken_lfm || 0);
                     agg.wandeinschluesse += (r.wandeinschluesse || 0);
                     agg.wandflaeche_m2 += (r.wandflaeche_m2 || 0);
-                    // Objekte
                     if (r.objekte) {
                         r.objekte.forEach(obj => {
                             const existing = agg.sanitaerObjekte.find(s => s.typ === obj.typ);
@@ -9992,23 +10181,16 @@
                             else agg.sanitaerObjekte.push({ ...obj });
                         });
                     }
-                    // Alte Abdichtungs-Felder (Rueckwaertskompatibel)
                     if (r.abdichtung) {
                         agg.abdichtungsflaeche_m2 += (r.abdichtung.flaeche_m2 || 0);
                         agg.dichtungsbaender_lfm += (r.abdichtung.dichtungsbaender_lfm || 0);
                     }
-                    if (r.geflieste_flaeche_m2) {
-                        agg.gefliesteFlaeche_m2 += r.geflieste_flaeche_m2;
-                    }
-                    // NEU: Farb-basierte Ergebnisse aggregieren
+                    if (r.geflieste_flaeche_m2) { agg.gefliesteFlaeche_m2 += r.geflieste_flaeche_m2; }
                     if (r.farbErgebnisse) {
                         Object.keys(r.farbErgebnisse).forEach(fKey => {
-                            const fe = r.farbErgebnisse[fKey];
-                            if (!agg.farbErgebnisse[fKey]) {
-                                agg.farbErgebnisse[fKey] = { ...fe };
-                            } else {
-                                agg.farbErgebnisse[fKey].wert = (agg.farbErgebnisse[fKey].wert || 0) + (fe.wert || 0);
-                            }
+                            var fe = r.farbErgebnisse[fKey];
+                            if (!agg.farbErgebnisse[fKey]) { agg.farbErgebnisse[fKey] = Object.assign({}, fe); }
+                            else { agg.farbErgebnisse[fKey].wert = (agg.farbErgebnisse[fKey].wert || 0) + (fe.wert || 0); }
                         });
                     }
                 });
@@ -10612,37 +10794,72 @@
                     alert('Gemini API-Key nicht konfiguriert.'); setSkizze(p => ({...p, mode:'draw'})); return;
                 }
                 const prompt = 'Du bist ein Experte fuer Grundriss-Erkennung aus Handskizzen. AUFGABE: Analysiere diese handgezeichnete Raumskizze auf Millimeterpapier. 1. BEGRADIGE die Linien: Erkenne die gezeichneten Waende als gerade Linien. 2. ERKENNE DIE BESCHRIFTUNG: Waende sind handschriftlich beschriftet in ROT (A,B,C,D bei 4 Waenden oder 1,2,3,4... bei mehr). Waende sind in GRAU gezeichnet. 3. ERKENNE DETAILS: Tueren, Fenster falls gezeichnet. ANTWORTE NUR als JSON: {"waende_erkannt":true,"anzahl_waende":4,"beschriftungstyp":"buchstaben","waende":[{"id":"A","startPunkt":{"x_prozent":0,"y_prozent":0},"endPunkt":{"x_prozent":100,"y_prozent":0},"laenge_relativ":1.0,"richtung":"horizontal"}],"tueren":[{"wandId":"A","position_prozent":50,"breite_relativ":0.3}],"fenster":[{"wandId":"B","position_prozent":40,"breite_relativ":0.4}],"raumForm":"rechteck","hinweise":[]}';
-                var skizzeModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
                 var skizzeBaseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
-                try {
-                    const apiKey = skizzeApiKey;
-                    const res = await fetch(skizzeBaseUrl + '/models/' + skizzeModelId + ':generateContent?key=' + apiKey, {
-                        method:'POST', headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({ contents: [{ parts: [
-                            { inlineData: { mimeType:'image/png', data: imageBase64 } },
-                            { text: prompt }
-                        ]}]})
-                    });
-                    if (!res.ok) throw new Error('API Fehler: ' + res.status);
-                    const data = await res.json();
-                    const text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
-                    const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-                    if (result.waende_erkannt && result.waende && result.waende.length > 0) {
-                        const svg = generateSvgFromKiResult(result);
-                        setSkizze(p => ({...p, mode:'done', processedSvg: svg,
-                            erkannteWaende: result.waende,
-                            erkannteLabels: result.waende.map(w => ({ text: w.id, zuordnung: 'wand_' + result.waende.indexOf(w) }))
-                        }));
-                        applySkizzeToState(result);
-                    } else {
-                        setSkizze(p => ({...p, mode:'draw'}));
-                        alert('Grundriss konnte nicht erkannt werden. Bitte deutlicher zeichnen und Waende beschriften.');
+
+                // Modelle: Pro zuerst, dann Flash als Fallback bei 429
+                var modelsToTry = [
+                    (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro',
+                    (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['flash']) ? GEMINI_CONFIG.MODELS['flash'].id : 'gemini-2.5-flash'
+                ];
+
+                var lastError = null;
+                for (var mi = 0; mi < modelsToTry.length; mi++) {
+                    var currentModel = modelsToTry[mi];
+                    // Bis zu 2 Versuche pro Modell (mit Wartezeit bei 429)
+                    for (var attempt = 0; attempt < 2; attempt++) {
+                        try {
+                            console.log('[TW Skizze] Versuch ' + (attempt+1) + ' mit Modell: ' + currentModel);
+                            const res = await fetch(skizzeBaseUrl + '/models/' + currentModel + ':generateContent?key=' + skizzeApiKey, {
+                                method:'POST', headers:{'Content-Type':'application/json'},
+                                body: JSON.stringify({ contents: [{ parts: [
+                                    { inlineData: { mimeType:'image/png', data: imageBase64 } },
+                                    { text: prompt }
+                                ]}],
+                                generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+                                })
+                            });
+
+                            if (res.status === 429) {
+                                console.warn('[TW Skizze] Rate-Limit (429) bei ' + currentModel);
+                                lastError = new Error('Rate-Limit bei ' + currentModel);
+                                if (attempt === 0) {
+                                    // Erster 429: 3 Sekunden warten und nochmal versuchen
+                                    await new Promise(function(r) { setTimeout(r, 3000); });
+                                    continue;
+                                }
+                                // Zweiter 429: zum naechsten Modell wechseln
+                                break;
+                            }
+
+                            if (!res.ok) throw new Error('API Fehler: ' + res.status);
+
+                            const data = await res.json();
+                            const text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
+                            const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+                            if (result.waende_erkannt && result.waende && result.waende.length > 0) {
+                                const svg = generateSvgFromKiResult(result);
+                                setSkizze(p => ({...p, mode:'done', processedSvg: svg,
+                                    erkannteWaende: result.waende,
+                                    erkannteLabels: result.waende.map(w => ({ text: w.id, zuordnung: 'wand_' + result.waende.indexOf(w) }))
+                                }));
+                                applySkizzeToState(result);
+                                console.log('[TW Skizze] Erfolg mit Modell: ' + currentModel);
+                                return; // Erfolg!
+                            } else {
+                                setSkizze(p => ({...p, mode:'draw'}));
+                                alert('Grundriss konnte nicht erkannt werden. Bitte deutlicher zeichnen und Waende beschriften.');
+                                return;
+                            }
+                        } catch(err) {
+                            lastError = err;
+                            console.warn('[TW Skizze] Fehler bei ' + currentModel + ' Versuch ' + (attempt+1) + ':', err.message);
+                        }
                     }
-                } catch(err) {
-                    console.error('Skizze KI Fehler:', err);
-                    setSkizze(p => ({...p, mode:'draw'}));
-                    alert('KI-Verarbeitung fehlgeschlagen: ' + err.message);
                 }
+                // Alle Versuche fehlgeschlagen
+                console.error('Skizze KI Fehler (alle Modelle):', lastError);
+                setSkizze(p => ({...p, mode:'draw'}));
+                alert('KI-Verarbeitung fehlgeschlagen: ' + (lastError ? lastError.message : 'Unbekannter Fehler') + '\n\nTipp: Warte 30 Sekunden und versuche es erneut (Gemini Rate-Limit).');
             };
 
             // SVG Grundriss
@@ -11123,17 +11340,167 @@
                             </React.Fragment>
                         )}
 
-                        {/* === KI-GRUNDRISS: Platzhalter (spaetere Implementierung) === */}
+                        {/* === KI-GRUNDRISS: Funktionale Implementierung === */}
                         {grundrissModus === 'ki' && (
-                            <div style={{padding:'20px', textAlign:'center'}}>
-                                <div style={{fontSize:'36px', marginBottom:'8px'}}>🧠</div>
-                                <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-white)', marginBottom:'6px'}}>
-                                    KI-Grundrisserkennung
-                                </div>
-                                <div style={{fontSize:'12px', color:'var(--text-muted)', lineHeight:'1.5'}}>
-                                    Gemini Pro analysiert eine vorhandene Zeichnung und erkennt den Raum automatisch.
-                                    <br/>Funktion wird mit der naechsten Version freigeschaltet.
-                                </div>
+                            <div style={{padding:'16px'}}>
+                                {/* Status: idle */}
+                                {kiGrundrissState.status === 'idle' && (
+                                    <div style={{textAlign:'center'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\uD83E\uDDE0'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-white)', marginBottom:'6px'}}>
+                                            KI-Grundrisserkennung
+                                        </div>
+                                        <div style={{fontSize:'12px', color:'var(--text-muted)', lineHeight:'1.5', marginBottom:'16px'}}>
+                                            Gemini Pro durchsucht die Zeichnungen im Kundenordner und erkennt den Raum automatisch.
+                                        </div>
+                                        <button className="raum-action-btn" onClick={startKiGrundriss}
+                                            style={{width:'100%', justifyContent:'center'}}>
+                                            <span className="btn-icon">{'\uD83D\uDD0D'}</span>
+                                            <span className="btn-text">
+                                                KI-Grundriss starten
+                                                <span className="btn-sub">Sucht Raum {(raum && raum.nr) || raumName || '?'} in PDF-Zeichnungen</span>
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Status: suche-pdfs oder analyse */}
+                                {(kiGrundrissState.status === 'suche-pdfs' || kiGrundrissState.status === 'analyse') && (
+                                    <div style={{textAlign:'center'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'8px', animation:'pulse 1.5s infinite'}}>{'\uD83E\uDDE0'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600, color:'var(--accent-blue)', marginBottom:'6px'}}>
+                                            {kiGrundrissState.statusText}
+                                        </div>
+                                        <div style={{
+                                            height:'6px', background:'var(--bg-tertiary)', borderRadius:'3px',
+                                            marginTop:'12px', overflow:'hidden'
+                                        }}>
+                                            <div style={{
+                                                height:'100%', background:'var(--accent-blue)', borderRadius:'3px',
+                                                width: kiGrundrissState.progress + '%', transition:'width 0.5s'
+                                            }} />
+                                        </div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'8px'}}>
+                                            {kiGrundrissState.pdfs.length > 0 ? kiGrundrissState.pdfs.length + ' PDFs gefunden' : 'Ordner wird durchsucht...'}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Status: gefunden */}
+                                {kiGrundrissState.status === 'gefunden' && kiGrundrissState.kiResult && (
+                                    <div>
+                                        <div style={{
+                                            padding:'12px', background:'rgba(39,174,96,0.08)',
+                                            border:'1px solid rgba(39,174,96,0.25)', borderRadius:'12px', marginBottom:'12px'
+                                        }}>
+                                            <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
+                                                <span style={{fontSize:'20px'}}>{'\u2705'}</span>
+                                                <span style={{fontFamily:'Oswald', fontWeight:700, fontSize:'14px', color:'var(--success)'}}>
+                                                    {kiGrundrissState.statusText}
+                                                </span>
+                                            </div>
+                                            <div style={{fontSize:'11px', color:'var(--text-muted)'}}>
+                                                Quelle: {kiGrundrissState.selectedPdf || 'PDF'}
+                                                {kiGrundrissState.kiResult.massstab ? (' | Massstab: ' + kiGrundrissState.kiResult.massstab) : ''}
+                                            </div>
+                                        </div>
+
+                                        {kiGrundrissState.kiResult.waende && (
+                                            <div style={{marginBottom:'10px'}}>
+                                                <div style={{fontSize:'11px', fontWeight:600, color:'var(--accent-blue)',
+                                                    textTransform:'uppercase', marginBottom:'6px'}}>
+                                                    {kiGrundrissState.kiResult.waende.length} Waende erkannt
+                                                </div>
+                                                {kiGrundrissState.kiResult.waende.map(function(w, wi) {
+                                                    return (
+                                                        <div key={wi} style={{
+                                                            display:'flex', alignItems:'center', gap:'8px',
+                                                            padding:'6px 10px', background:'var(--bg-tertiary)',
+                                                            borderRadius:'8px', marginBottom:'3px',
+                                                            border:'1px solid var(--border-subtle)'
+                                                        }}>
+                                                            <span style={{
+                                                                width:'22px', height:'22px', borderRadius:'50%',
+                                                                background:'rgba(230,126,34,0.15)', color:'var(--accent-orange)',
+                                                                display:'flex', alignItems:'center', justifyContent:'center',
+                                                                fontFamily:'Oswald', fontWeight:700, fontSize:'11px'
+                                                            }}>{w.id}</span>
+                                                            <span style={{flex:1, fontSize:'12px', color:'var(--text-secondary)'}}>
+                                                                Wand {w.id}
+                                                            </span>
+                                                            <span style={{fontFamily:'Oswald', fontWeight:700, fontSize:'14px', color:'var(--text-primary)'}}>
+                                                                {w.laenge_m ? (String(w.laenge_m.toFixed(3)).replace('.', ',')) : '?'} m
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {kiGrundrissState.kiResult.hinweise && kiGrundrissState.kiResult.hinweise.length > 0 && (
+                                            <div style={{fontSize:'11px', color:'var(--text-muted)', padding:'8px',
+                                                background:'rgba(30,136,229,0.05)', borderRadius:'8px', marginBottom:'10px'}}>
+                                                {kiGrundrissState.kiResult.hinweise.map(function(h, hi) {
+                                                    return <div key={hi}>{'\u2139\uFE0F'} {h}</div>;
+                                                })}
+                                            </div>
+                                        )}
+
+                                        <div style={{display:'flex', gap:'6px'}}>
+                                            <button className="raum-action-btn finish" onClick={function() { setGrundrissModus('manual'); }}
+                                                style={{flex:1}}>
+                                                <span className="btn-icon">{'\uD83D\uDCD0'}</span>
+                                                <span className="btn-text">
+                                                    Zum Grundriss
+                                                    <span className="btn-sub">Masze pruefen und anpassen</span>
+                                                </span>
+                                            </button>
+                                            <button className="ja-nein-btn" onClick={function() {
+                                                setKiGrundrissState({ status:'idle', statusText:'', pdfs:[], selectedPdf:null, kiResult:null, errorMsg:'', progress:0 });
+                                            }} style={{padding:'8px 12px', fontSize:'11px'}}>
+                                                Neu
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Status: nicht-gefunden */}
+                                {kiGrundrissState.status === 'nicht-gefunden' && (
+                                    <div style={{textAlign:'center'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\u274C'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600, color:'var(--text-white)', marginBottom:'6px'}}>
+                                            {kiGrundrissState.statusText}
+                                        </div>
+                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'16px'}}>
+                                            {kiGrundrissState.errorMsg}
+                                        </div>
+                                        <button className="raum-action-btn" onClick={function() {
+                                            setKiGrundrissState({ status:'idle', statusText:'', pdfs:[], selectedPdf:null, kiResult:null, errorMsg:'', progress:0 });
+                                        }} style={{width:'100%', justifyContent:'center'}}>
+                                            <span className="btn-icon">{'\uD83D\uDD04'}</span>
+                                            <span className="btn-text">Erneut versuchen</span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Status: fehler */}
+                                {kiGrundrissState.status === 'fehler' && (
+                                    <div style={{textAlign:'center'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\u26A0\uFE0F'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600, color:'#e74c3c', marginBottom:'6px'}}>
+                                            {kiGrundrissState.statusText}
+                                        </div>
+                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'16px'}}>
+                                            {kiGrundrissState.errorMsg}
+                                        </div>
+                                        <button className="raum-action-btn" onClick={function() {
+                                            setKiGrundrissState({ status:'idle', statusText:'', pdfs:[], selectedPdf:null, kiResult:null, errorMsg:'', progress:0 });
+                                        }} style={{width:'100%', justifyContent:'center'}}>
+                                            <span className="btn-icon">{'\uD83D\uDD04'}</span>
+                                            <span className="btn-text">Erneut versuchen</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -11852,7 +12219,7 @@
                                             </div>
                                         )}
 
-                                        {/* NEU: Farb-basierte Ergebnisse */}
+                                        {/* Farb-basierte Ergebnisse */}
                                         {kiErgebnisse.farbErgebnisse && Object.keys(kiErgebnisse.farbErgebnisse).length > 0 && (
                                             <div style={{marginBottom:'10px'}}>
                                                 <div style={{fontSize:'11px', fontWeight:600, color:'var(--accent-blue)',
