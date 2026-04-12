@@ -1575,8 +1575,8 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
-                    {/* -- GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe -- */}
-                    {page !== 'start' && (
+                    {/* -- GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe (ALLE Seiten inkl. Start) -- */}
+                    {(true) && (
                         <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
                             <button onClick={function(){ navigateTo('start'); }}
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
