@@ -8020,238 +8020,6 @@
                 setHasUnsavedChanges(true);
             }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos]);
 
-            // ── Akten-Management Handler ──
-            const handleAkteSpeichern = async function() {
-                setSaveStatus('saving');
-                try {
-                    var service = window.GoogleDriveService;
-                    if (!service || !service.accessToken) {
-                        alert('Google Drive nicht verbunden. Bitte zuerst verbinden.');
-                        setSaveStatus('error');
-                        return;
-                    }
-                    // Daten sammeln
-                    var exportData = {
-                        raumName: raumName,
-                        masse: masse,
-                        wandMasse: wandMasse,
-                        wandAnzahl: wandAnzahl,
-                        tueren: tueren,
-                        fenster: fenster,
-                        abzuege: abzuege,
-                        posCards: posCards.map(function(p) { return { nr: p.nr, bezeichnung: p.bezeichnung, einheit: p.einheit, ergebnis: calcPositionResult(p) }; }),
-                        rbTab: rbTab,
-                        datum: new Date().toISOString()
-                    };
-                    // Excel mit SheetJS erstellen
-                    if (typeof XLSX === 'undefined') {
-                        alert('SheetJS nicht geladen. Excel-Export nicht moeglich.');
-                        setSaveStatus('error');
-                        return;
-                    }
-                    var wb = XLSX.utils.book_new();
-                    // Blatt 1: Raumdaten
-                    var raumRows = [
-                        { Feld: 'Raum', Wert: raumName },
-                        { Feld: 'Laenge', Wert: masse.laenge },
-                        { Feld: 'Breite', Wert: masse.breite },
-                        { Feld: 'Hoehe', Wert: masse.hoehe },
-                        { Feld: 'Raumhoehe', Wert: masse.raumhoehe },
-                        { Feld: 'Abdichtungshoehe', Wert: masse.abdichtungshoehe },
-                        { Feld: 'Sockelhoehe', Wert: masse.sockelhoehe },
-                        { Feld: 'Wandanzahl', Wert: wandAnzahl }
-                    ];
-                    wandMasse.forEach(function(w) {
-                        raumRows.push({ Feld: 'Wand ' + w.id, Wert: w.wert || '' });
-                    });
-                    var ws1 = XLSX.utils.json_to_sheet(raumRows);
-                    XLSX.utils.book_append_sheet(wb, ws1, 'Raumdaten');
-                    // Blatt 2: Positionen
-                    var posRows = posCards.map(function(p) {
-                        return { Position: p.nr, Bezeichnung: p.bezeichnung, Einheit: p.einheit, Ergebnis: calcPositionResult(p) };
-                    });
-                    if (posRows.length > 0) {
-                        var ws2 = XLSX.utils.json_to_sheet(posRows);
-                        XLSX.utils.book_append_sheet(wb, ws2, 'Positionen');
-                    }
-                    var xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-                    // In Google Drive speichern
-                    var kundeName = (kunde && kunde.name) || 'Unbekannt';
-                    var now = new Date();
-                    var dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-                    var timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-                    var fileName = kundeName.replace(/[^a-zA-Z0-9]/g, '_') + '_Aufmass_' + dateStr + '_' + timeStr + '.xlsx';
-                    // Kundenordner finden
-                    var kundeOrdnerId = kunde && kunde._driveFolderId;
-                    if (kundeOrdnerId) {
-                        // Unterordner Aufmass finden oder erstellen
-                        var aufmassOrdner = await service.findOrCreateFolder('Aufmass', kundeOrdnerId);
-                        var blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                        await service.uploadFile(blob, fileName, aufmassOrdner.id || aufmassOrdner);
-                    } else {
-                        // Fallback: lokaler Download
-                        var blob2 = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                        var url = URL.createObjectURL(blob2);
-                        var a = document.createElement('a');
-                        a.href = url; a.download = fileName; a.click();
-                        URL.revokeObjectURL(url);
-                    }
-                    setSaveStatus('saved');
-                    setTimeout(function() { setSaveStatus('idle'); }, 3000);
-                } catch (err) {
-                    console.error('Akte speichern fehlgeschlagen:', err);
-                    setSaveStatus('error');
-                    setTimeout(function() { setSaveStatus('idle'); }, 4000);
-                }
-            };
-
-            const loadBearbeiteteAkten = async function() {
-                setAkteLoading(true);
-                try {
-                    var service = window.GoogleDriveService;
-                    if (!service || !service.accessToken) {
-                        setAkteOrdner([]);
-                        setAkteLoading(false);
-                        return;
-                    }
-                    var kundeOrdnerId = kunde && kunde._driveFolderId;
-                    if (!kundeOrdnerId) {
-                        setAkteOrdner([]);
-                        setAkteLoading(false);
-                        return;
-                    }
-                    var modulOrdner = ['Aufmass', 'Rechnung', 'Schriftverkehr', 'Ausgangsbuch', 'Baustelle'];
-                    var ergebnis = [];
-                    for (var oi = 0; oi < modulOrdner.length; oi++) {
-                        var ordnerName = modulOrdner[oi];
-                        try {
-                            var ordner = await service.findFolder(ordnerName, kundeOrdnerId);
-                            if (ordner) {
-                                var files = await service.listFiles(ordner.id || ordner, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-                                if (files && files.length > 0) {
-                                    ergebnis.push({
-                                        name: ordnerName,
-                                        id: ordner.id || ordner,
-                                        modul: ordnerName.toLowerCase(),
-                                        files: files.map(function(f) {
-                                            return { id: f.id, name: f.name, modifiedTime: f.modifiedTime, size: f.size };
-                                        })
-                                    });
-                                }
-                            }
-                        } catch(e) { /* Ordner existiert nicht */ }
-                    }
-                    setAkteOrdner(ergebnis);
-                } catch(e) {
-                    console.error('Akten laden fehlgeschlagen:', e);
-                    setAkteOrdner([]);
-                }
-                setAkteLoading(false);
-            };
-
-            const handleAkteOeffnen = async function(ordner, file) {
-                try {
-                    var service = window.GoogleDriveService;
-                    var xlsxData = await service.downloadFile(file.id);
-                    var wb = XLSX.read(xlsxData, { type: 'array' });
-                    var ws = wb.Sheets[wb.SheetNames[0]];
-                    var jsonData = XLSX.utils.sheet_to_json(ws);
-                    // Daten in State laden
-                    jsonData.forEach(function(row) {
-                        if (row.Feld === 'Raum') setRaumName(row.Wert || '');
-                        if (row.Feld === 'Laenge') setMasse(function(p) { return {...p, laenge: row.Wert || ''}; });
-                        if (row.Feld === 'Breite') setMasse(function(p) { return {...p, breite: row.Wert || ''}; });
-                        if (row.Feld === 'Hoehe') setMasse(function(p) { return {...p, hoehe: row.Wert || ''}; });
-                        if (row.Feld === 'Raumhoehe') setMasse(function(p) { return {...p, raumhoehe: row.Wert || ''}; });
-                        if (row.Feld === 'Abdichtungshoehe') setMasse(function(p) { return {...p, abdichtungshoehe: row.Wert || ''}; });
-                        if (row.Feld === 'Sockelhoehe') setMasse(function(p) { return {...p, sockelhoehe: row.Wert || ''}; });
-                    });
-                    setAktePopupOpen(false);
-                    setAkteSelectedOrdner(null);
-                } catch(e) {
-                    console.error('Akte oeffnen fehlgeschlagen:', e);
-                    alert('Fehler beim Oeffnen der Akte: ' + e.message);
-                }
-            };
-
-            // ── Wandanzahl aendern ──
-            const handleWandAnzahlChange = function(neueAnzahl) {
-                var n = parseInt(neueAnzahl) || 4;
-                if (n < 3) n = 3;
-                if (n > 12) n = 12;
-                setWandAnzahl(n);
-                var buchstaben = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                var neueWandMasse = [];
-                for (var i = 0; i < n; i++) {
-                    var existingWert = (wandMasse[i] && (wandMasse[i].wert || wandMasse[i].l)) || '';
-                    neueWandMasse.push({
-                        id: buchstaben[i],
-                        label: 'Wand ' + buchstaben[i],
-                        l: existingWert,
-                        wert: existingWert
-                    });
-                }
-                setWandMasse(neueWandMasse);
-                setWandAnzahlPopupOpen(false);
-            };
-
-            // ── Wandmass aendern mit Kopier-Logik ──
-            const handleWandMassChange = function(idx, value) {
-                var neueWandMasse = wandMasse.map(function(w) { return {...w}; });
-                neueWandMasse[idx] = { ...neueWandMasse[idx], wert: value, l: value };
-                // Masze-Kopier-Logik (NUR wenn aktiviert)
-                if (masseKopieren) {
-                    if (idx === 0 && neueWandMasse.length > 2) {
-                        neueWandMasse[2] = { ...neueWandMasse[2], wert: value, l: value };
-                    }
-                    if (idx === 1 && neueWandMasse.length > 3) {
-                        neueWandMasse[3] = { ...neueWandMasse[3], wert: value, l: value };
-                    }
-                }
-                setWandMasse(neueWandMasse);
-            };
-
-            // ── Spracheingabe ──
-            const startSpracheingabe = function() {
-                var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SR) {
-                    alert('Spracheingabe wird von diesem Browser nicht unterstuetzt.');
-                    return;
-                }
-                var recognition = new SR();
-                recognition.lang = 'de-DE';
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.onresult = function(event) {
-                    var result = event.results[event.results.length - 1];
-                    if (result.isFinal) {
-                        var text = result[0].transcript.trim();
-                        // Zahlen erkennen und in fokussiertes Eingabefeld eintragen
-                        var zahlenMatch = text.match(/(\d+[\.,]?\d*)/);
-                        if (zahlenMatch) {
-                            var focusedInput = document.activeElement;
-                            if (focusedInput && (focusedInput.classList.contains('masse-input') || focusedInput.tagName === 'INPUT')) {
-                                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                                nativeInputValueSetter.call(focusedInput, zahlenMatch[1].replace(',', '.'));
-                                focusedInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                        }
-                    }
-                };
-                recognition.onerror = function(e) {
-                    console.error('Spracheingabe Fehler:', e);
-                    setSpracheAktiv(false);
-                };
-                recognition.start();
-                setSpeechRecognitionRef(recognition);
-                setSpracheAktiv(true);
-            };
-            const stopSpracheingabe = function() {
-                if (speechRecognitionRef) {
-                    speechRecognitionRef.stop();
-                }
-                setSpracheAktiv(false);
-            };
 
             // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
@@ -10683,6 +10451,234 @@
                 );
             };
 
+            // ── Akten-Management Handler ──
+            const handleAkteSpeichern = async function() {
+                setSaveStatus('saving');
+                try {
+                    var service = window.GoogleDriveService;
+                    if (!service || !service.accessToken) {
+                        alert('Google Drive nicht verbunden. Bitte zuerst verbinden.');
+                        setSaveStatus('error');
+                        return;
+                    }
+                    // Daten sammeln
+                    var exportData = {
+                        raumName: raumName,
+                        masse: masse,
+                        wandMasse: wandMasse,
+                        wandAnzahl: wandAnzahl,
+                        rbTab: rbTab,
+                        datum: new Date().toISOString()
+                    };
+                    // Excel mit SheetJS erstellen
+                    if (typeof XLSX === 'undefined') {
+                        alert('SheetJS nicht geladen. Excel-Export nicht moeglich.');
+                        setSaveStatus('error');
+                        return;
+                    }
+                    var wb = XLSX.utils.book_new();
+                    // Blatt 1: Raumdaten
+                    var raumRows = [
+                        { Feld: 'Raum', Wert: raumName },
+                        { Feld: 'Laenge', Wert: masse.laenge },
+                        { Feld: 'Breite', Wert: masse.breite },
+                        { Feld: 'Hoehe', Wert: masse.hoehe },
+                        { Feld: 'Raumhoehe', Wert: masse.raumhoehe },
+                        { Feld: 'Abdichtungshoehe', Wert: masse.abdichtungshoehe },
+                        { Feld: 'Sockelhoehe', Wert: masse.sockelhoehe },
+                        { Feld: 'Wandanzahl', Wert: wandAnzahl }
+                    ];
+                    wandMasse.forEach(function(w) {
+                        raumRows.push({ Feld: 'Wand ' + w.id, Wert: w.wert || w.l || '' });
+                    });
+                    var ws1 = XLSX.utils.json_to_sheet(raumRows);
+                    XLSX.utils.book_append_sheet(wb, ws1, 'Raumdaten');
+                    // Blatt 2: Positionen (posCards direkt ohne calcPositionResult)
+                    var posRows = posCards.map(function(p) {
+                        return { Position: p.nr || p.pos, Bezeichnung: p.bezeichnung || p.bez, Einheit: p.einheit };
+                    });
+                    if (posRows.length > 0) {
+                        var ws2 = XLSX.utils.json_to_sheet(posRows);
+                        XLSX.utils.book_append_sheet(wb, ws2, 'Positionen');
+                    }
+                    var xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                    // In Google Drive speichern
+                    var kundeName = (kunde && kunde.name) || 'Unbekannt';
+                    var now = new Date();
+                    var dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+                    var timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+                    var fileName = kundeName.replace(/[^a-zA-Z0-9]/g, '_') + '_Aufmass_' + dateStr + '_' + timeStr + '.xlsx';
+                    // Kundenordner finden
+                    var kundeOrdnerId = kunde && kunde._driveFolderId;
+                    if (kundeOrdnerId) {
+                        // Unterordner Aufmass finden oder erstellen
+                        var aufmassOrdner = await service.findOrCreateFolder('Aufmass', kundeOrdnerId);
+                        var blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        await service.uploadFile(blob, fileName, aufmassOrdner.id || aufmassOrdner);
+                    } else {
+                        // Fallback: lokaler Download
+                        var blob2 = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        var url = URL.createObjectURL(blob2);
+                        var a = document.createElement('a');
+                        a.href = url; a.download = fileName; a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    setSaveStatus('saved');
+                    setTimeout(function() { setSaveStatus('idle'); }, 3000);
+                } catch (err) {
+                    console.error('Akte speichern fehlgeschlagen:', err);
+                    setSaveStatus('error');
+                    setTimeout(function() { setSaveStatus('idle'); }, 4000);
+                }
+            };
+
+            const loadBearbeiteteAkten = async function() {
+                setAkteLoading(true);
+                try {
+                    var service = window.GoogleDriveService;
+                    if (!service || !service.accessToken) {
+                        setAkteOrdner([]);
+                        setAkteLoading(false);
+                        return;
+                    }
+                    var kundeOrdnerId = kunde && kunde._driveFolderId;
+                    if (!kundeOrdnerId) {
+                        setAkteOrdner([]);
+                        setAkteLoading(false);
+                        return;
+                    }
+                    var modulOrdner = ['Aufmass', 'Rechnung', 'Schriftverkehr', 'Ausgangsbuch', 'Baustelle'];
+                    var ergebnis = [];
+                    for (var oi = 0; oi < modulOrdner.length; oi++) {
+                        var ordnerName = modulOrdner[oi];
+                        try {
+                            var ordner = await service.findFolder(ordnerName, kundeOrdnerId);
+                            if (ordner) {
+                                var files = await service.listFiles(ordner.id || ordner, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                                if (files && files.length > 0) {
+                                    ergebnis.push({
+                                        name: ordnerName,
+                                        id: ordner.id || ordner,
+                                        modul: ordnerName.toLowerCase(),
+                                        files: files.map(function(f) {
+                                            return { id: f.id, name: f.name, modifiedTime: f.modifiedTime, size: f.size };
+                                        })
+                                    });
+                                }
+                            }
+                        } catch(e) { /* Ordner existiert nicht */ }
+                    }
+                    setAkteOrdner(ergebnis);
+                } catch(e) {
+                    console.error('Akten laden fehlgeschlagen:', e);
+                    setAkteOrdner([]);
+                }
+                setAkteLoading(false);
+            };
+
+            const handleAkteOeffnen = async function(ordner, file) {
+                try {
+                    var service = window.GoogleDriveService;
+                    var xlsxData = await service.downloadFile(file.id);
+                    var wb = XLSX.read(xlsxData, { type: 'array' });
+                    var ws = wb.Sheets[wb.SheetNames[0]];
+                    var jsonData = XLSX.utils.sheet_to_json(ws);
+                    // Daten in State laden
+                    jsonData.forEach(function(row) {
+                        if (row.Feld === 'Raum') setRaumName(row.Wert || '');
+                        if (row.Feld === 'Laenge') setMasse(function(p) { return {...p, laenge: row.Wert || ''}; });
+                        if (row.Feld === 'Breite') setMasse(function(p) { return {...p, breite: row.Wert || ''}; });
+                        if (row.Feld === 'Hoehe') setMasse(function(p) { return {...p, hoehe: row.Wert || ''}; });
+                        if (row.Feld === 'Raumhoehe') setMasse(function(p) { return {...p, raumhoehe: row.Wert || ''}; });
+                        if (row.Feld === 'Abdichtungshoehe') setMasse(function(p) { return {...p, abdichtungshoehe: row.Wert || ''}; });
+                        if (row.Feld === 'Sockelhoehe') setMasse(function(p) { return {...p, sockelhoehe: row.Wert || ''}; });
+                    });
+                    setAktePopupOpen(false);
+                    setAkteSelectedOrdner(null);
+                } catch(e) {
+                    console.error('Akte oeffnen fehlgeschlagen:', e);
+                    alert('Fehler beim Oeffnen der Akte: ' + e.message);
+                }
+            };
+
+            // ── Wandanzahl aendern ──
+            const handleWandAnzahlChange = function(neueAnzahl) {
+                var n = parseInt(neueAnzahl) || 4;
+                if (n < 3) n = 3;
+                if (n > 12) n = 12;
+                setWandAnzahl(n);
+                var buchstaben = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                var neueWandMasse = [];
+                for (var i = 0; i < n; i++) {
+                    var existingWert = (wandMasse[i] && (wandMasse[i].wert || wandMasse[i].l)) || '';
+                    neueWandMasse.push({
+                        id: buchstaben[i],
+                        label: 'Wand ' + buchstaben[i],
+                        l: existingWert,
+                        wert: existingWert
+                    });
+                }
+                setWandMasse(neueWandMasse);
+                setWandAnzahlPopupOpen(false);
+            };
+
+            // ── Wandmass aendern mit Kopier-Logik ──
+            const handleWandMassChange = function(idx, value) {
+                var neueWandMasse = wandMasse.map(function(w) { return {...w}; });
+                neueWandMasse[idx] = { ...neueWandMasse[idx], wert: value, l: value };
+                // Masze-Kopier-Logik (NUR wenn aktiviert)
+                if (masseKopieren) {
+                    if (idx === 0 && neueWandMasse.length > 2) {
+                        neueWandMasse[2] = { ...neueWandMasse[2], wert: value, l: value };
+                    }
+                    if (idx === 1 && neueWandMasse.length > 3) {
+                        neueWandMasse[3] = { ...neueWandMasse[3], wert: value, l: value };
+                    }
+                }
+                setWandMasse(neueWandMasse);
+            };
+
+            // ── Spracheingabe ──
+            const startSpracheingabe = function() {
+                var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) {
+                    alert('Spracheingabe wird von diesem Browser nicht unterstuetzt.');
+                    return;
+                }
+                var recognition = new SR();
+                recognition.lang = 'de-DE';
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.onresult = function(event) {
+                    var result = event.results[event.results.length - 1];
+                    if (result.isFinal) {
+                        var text = result[0].transcript.trim();
+                        // Zahlen erkennen und in fokussiertes Eingabefeld eintragen
+                        var zahlenMatch = text.match(/(\d+[\.,]?\d*)/);
+                        if (zahlenMatch) {
+                            var focusedInput = document.activeElement;
+                            if (focusedInput && (focusedInput.classList.contains('masse-input') || focusedInput.tagName === 'INPUT')) {
+                                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                                nativeInputValueSetter.call(focusedInput, zahlenMatch[1].replace(',', '.'));
+                                focusedInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    }
+                };
+                recognition.onerror = function(e) {
+                    console.error('Spracheingabe Fehler:', e);
+                    setSpracheAktiv(false);
+                };
+                recognition.start();
+                setSpeechRecognitionRef(recognition);
+                setSpracheAktiv(true);
+            };
+            const stopSpracheingabe = function() {
+                if (speechRecognitionRef) {
+                    speechRecognitionRef.stop();
+                }
+                setSpracheAktiv(false);
+            };
             return (
                 <div className="page-container">
                     <div className="breadcrumb">
