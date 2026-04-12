@@ -8164,7 +8164,7 @@
                 progress: 0
             });
 
-            // ── KI-Grundriss: PDFs suchen und analysieren ──
+            // ── KI-Grundriss: NUR im Zeichnungsordner nach PDFs suchen ──
             const startKiGrundriss = async () => {
                 if (!kunde || !kunde._driveFolderId) {
                     alert('Kein Google Drive Ordner verknuepft. Bitte zuerst Kundenakte laden.');
@@ -8189,54 +8189,82 @@
                     return;
                 }
 
-                setKiGrundrissState(function(p) { return Object.assign({}, p, { status: 'suche-pdfs', statusText: 'Suche PDF-Zeichnungen im Kundenordner...', progress: 10 }); });
+                setKiGrundrissState(function(p) { return Object.assign({}, p, { status: 'suche-pdfs', statusText: 'Suche Zeichnungsordner...', progress: 10 }); });
 
                 try {
                     var driveService = window.GoogleDriveService;
+
+                    // ══ SCHRITT 1: NUR den Zeichnungsordner (03_...) finden ══
                     var folderContents = await driveService.listFolderContents(kunde._driveFolderId);
-                    var pdfFiles = [];
+                    var zeichnungsOrdner = null;
 
-                    var zeichnungsOrdner = (folderContents.folders || []).filter(function(f) {
-                        var name = (f.name || '').toLowerCase();
-                        return name.indexOf('03') >= 0 || name.indexOf('plan') >= 0 || name.indexOf('plaen') >= 0 ||
-                               name.indexOf('zeichn') >= 0 || name.indexOf('grundriss') >= 0;
-                    });
-
-                    var alleFolders = zeichnungsOrdner.concat(
-                        (folderContents.folders || []).filter(function(f) { return zeichnungsOrdner.indexOf(f) < 0; })
-                    );
-
+                    // Unterordner durchsuchen - NUR 03_Zeichnungen/Plaene
+                    var alleFolders = folderContents.folders || [];
                     for (var fi = 0; fi < alleFolders.length; fi++) {
-                        var folder = alleFolders[fi];
-                        var subContents = folder.files ? folder : await driveService.listFolderContents(folder.id);
-                        var pdfsInFolder = ((subContents.files || []).concat(subContents.pdfs || [])).filter(function(f) {
-                            return (f.mimeType && f.mimeType.indexOf('pdf') >= 0) || (f.name && f.name.toLowerCase().indexOf('.pdf') >= 0);
-                        });
-                        pdfsInFolder.forEach(function(pdf) {
-                            pdfFiles.push({ id: pdf.id, name: pdf.name, ordner: folder.name });
-                        });
-                    }
-                    // Auch Root-PDFs
-                    ((folderContents.files || []).concat(folderContents.pdfs || [])).forEach(function(f) {
-                        if ((f.mimeType && f.mimeType.indexOf('pdf') >= 0) || (f.name && f.name.toLowerCase().indexOf('.pdf') >= 0)) {
-                            pdfFiles.push({ id: f.id, name: f.name, ordner: 'Hauptordner' });
+                        var folderName = (alleFolders[fi].name || '').toLowerCase();
+                        if (folderName.indexOf('03') >= 0 ||
+                            folderName.indexOf('zeichn') >= 0 ||
+                            folderName.indexOf('plaen') >= 0 ||
+                            folderName.indexOf('plan') >= 0 ||
+                            folderName.indexOf('grundriss') >= 0) {
+                            zeichnungsOrdner = alleFolders[fi];
+                            break;
                         }
-                    });
+                    }
 
-                    if (pdfFiles.length === 0) {
-                        setKiGrundrissState(function(p) { return Object.assign({}, p, { status: 'fehler', statusText: 'Keine PDF-Zeichnungen gefunden', errorMsg: 'Im Kundenordner wurden keine PDF-Dateien gefunden.' }); });
+                    // ══ KEIN ZEICHNUNGSORDNER → SOFORT ABBRECHEN ══
+                    if (!zeichnungsOrdner) {
+                        setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                            status: 'keine-pdfs',
+                            statusText: 'Kein Zeichnungsordner gefunden',
+                            errorMsg: 'Im Kundenordner wurde kein Ordner fuer Zeichnungen gefunden (z.B. "03_Plaene", "Zeichnungen"). Bitte Zeichnungen hochladen oder manuell fortfahren.',
+                            progress: 100
+                        }); });
                         return;
                     }
 
-                    setKiGrundrissState(function(p) { return Object.assign({}, p, { pdfs: pdfFiles, status: 'analyse', statusText: pdfFiles.length + ' PDFs gefunden, starte KI-Analyse...', progress: 25 }); });
+                    setKiGrundrissState(function(p) { return Object.assign({}, p, { statusText: 'Suche PDFs in "' + zeichnungsOrdner.name + '"...', progress: 20 }); });
+
+                    // ══ SCHRITT 2: NUR PDFs im Zeichnungsordner finden ══
+                    var subContents = await driveService.listFolderContents(zeichnungsOrdner.id);
+                    var pdfFiles = [];
+                    var alleDateien = (subContents.files || []).concat(subContents.pdfs || []);
+                    for (var di = 0; di < alleDateien.length; di++) {
+                        var datei = alleDateien[di];
+                        var isPdf = (datei.mimeType && datei.mimeType.indexOf('pdf') >= 0) ||
+                                    (datei.name && datei.name.toLowerCase().endsWith('.pdf'));
+                        if (isPdf) {
+                            pdfFiles.push({ id: datei.id, name: datei.name, ordner: zeichnungsOrdner.name });
+                        }
+                    }
+
+                    // ══ KEINE PDFs IM ZEICHNUNGSORDNER → SOFORT ABBRECHEN ══
+                    if (pdfFiles.length === 0) {
+                        setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                            status: 'keine-pdfs',
+                            statusText: 'Keine PDF-Zeichnungen gefunden',
+                            errorMsg: 'Im Ordner "' + zeichnungsOrdner.name + '" wurden keine PDF-Dateien gefunden. Bitte Zeichnungen als PDF hochladen oder manuell fortfahren.',
+                            progress: 100
+                        }); });
+                        return;
+                    }
+
+                    // ══ SCHRITT 3: PDFs analysieren ══
+                    setKiGrundrissState(function(p) { return Object.assign({}, p, {
+                        pdfs: pdfFiles,
+                        status: 'analyse',
+                        statusText: pdfFiles.length + ' PDF(s) in "' + zeichnungsOrdner.name + '" gefunden, starte KI-Analyse...',
+                        progress: 30
+                    }); });
 
                     var proModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
+                    var flashModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['flash']) ? GEMINI_CONFIG.MODELS['flash'].id : 'gemini-2.5-flash';
 
                     for (var pi = 0; pi < pdfFiles.length; pi++) {
                         var pdf = pdfFiles[pi];
                         setKiGrundrissState(function(p) { return Object.assign({}, p, {
                             statusText: 'Analysiere: ' + pdf.name + ' (' + (pi+1) + '/' + pdfFiles.length + ')',
-                            progress: 25 + Math.round((pi / pdfFiles.length) * 60)
+                            progress: 30 + Math.round((pi / pdfFiles.length) * 60)
                         }); });
 
                         try {
@@ -8250,17 +8278,22 @@
 
                             var kiPrompt = 'Du bist ein Experte fuer Bauzeichnungen und Grundriss-Erkennung fuer Fliesenlegerarbeiten (DIN 18352).\n\nSuche in dieser PDF-Zeichnung nach dem folgenden Raum:\n- Raumnummer: "' + (raumNr || 'nicht angegeben') + '"\n- Raumbezeichnung: "' + (raumBez || 'nicht angegeben') + '"\n- Geschoss: "' + (geschoss || 'nicht angegeben') + '"\n\nWenn du den Raum findest:\n1. Lies ALLE Wandlaengen ab (in mm UND m)\n2. Erkenne die Raumform (Rechteck oder Polygon)\n3. Zaehle alle Waende und gib ihnen IDs (A, B, C, D...)\n4. Erkenne Tueren und Fenster mit Position und Maszen\n5. Lies den Massstab ab\n6. Erkenne die Raumhoehe falls angegeben\n\nAntworte NUR als JSON ohne Markdown-Backticks:\n{"gefunden":true,"raumNr":"","raumName":"","geschoss":"","massstab":"1:50","raumForm":"rechteck","anzahlWaende":4,"waende":[{"id":"A","laenge_mm":3450,"laenge_m":3.450,"richtung_grad":0}],"tueren":[{"wandId":"A","breite_mm":885,"hoehe_mm":2100,"position_von_links_mm":500}],"fenster":[{"wandId":"C","breite_mm":1200,"hoehe_mm":1400,"bruestung_mm":600,"position_von_links_mm":800}],"masze":{"raumhoehe_mm":2600,"bodenflaeche_m2":0,"laengsteWand_mm":0},"grundrissPolygon":[{"x":0,"y":0},{"x":3450,"y":0},{"x":3450,"y":2100},{"x":0,"y":2100}],"hinweise":[],"confidence":{"raumGefunden":0.9,"masseGenauigkeit":0.8}}\n\nWenn der Raum NICHT gefunden wird:\n{"gefunden":false,"hinweise":["Raum nicht gefunden"],"alternativeRaeume":["0.02 WC","0.03 Flur"]}';
 
+                            // Pro versuchen, bei 429 auf Flash fallen
                             var rawText = null;
-                            if (typeof window.callGeminiAPI === 'function') {
-                                rawText = await window.callGeminiAPI(
-                                    [{ content: kiPrompt }],
-                                    8192,
-                                    {
-                                        model: proModelId,
-                                        files: [{ mimeType: 'application/pdf', base64Data: pdfBase64 }],
-                                        jsonMode: true
+                            var modelsForGrundriss = [proModelId, flashModelId];
+                            for (var mgi = 0; mgi < modelsForGrundriss.length; mgi++) {
+                                try {
+                                    if (typeof window.callGeminiAPI === 'function') {
+                                        rawText = await window.callGeminiAPI(
+                                            [{ content: kiPrompt }], 8192,
+                                            { model: modelsForGrundriss[mgi], files: [{ mimeType: 'application/pdf', base64Data: pdfBase64 }], jsonMode: true }
+                                        );
                                     }
-                                );
+                                    if (rawText) break;
+                                } catch(modelErr) {
+                                    console.warn('[TW KI-Grundriss] ' + modelsForGrundriss[mgi] + ' fehlgeschlagen:', modelErr.message);
+                                    if (mgi === 0) await new Promise(function(r) { setTimeout(r, 2000); });
+                                }
                             }
 
                             if (!rawText) continue;
@@ -8284,10 +8317,11 @@
                         }
                     }
 
+                    // Raum in keiner PDF gefunden
                     setKiGrundrissState(function(p) { return Object.assign({}, p, {
                         status: 'nicht-gefunden',
                         statusText: 'Raum nicht gefunden',
-                        errorMsg: 'Der Raum "' + (raumNr || '') + ' ' + (raumBez || '') + '" konnte in keiner der ' + pdfFiles.length + ' PDF(s) gefunden werden.',
+                        errorMsg: 'Der Raum "' + (raumNr || '') + ' ' + (raumBez || '') + '" konnte in keiner der ' + pdfFiles.length + ' PDF-Zeichnung(en) im Ordner "' + zeichnungsOrdner.name + '" gefunden werden.',
                         progress: 100
                     }); });
 
@@ -11483,7 +11517,30 @@
                                     </div>
                                 )}
 
-                                {/* Status: fehler */}
+                                {/* Status: keine-pdfs */}
+                                {kiGrundrissState.status === 'keine-pdfs' && (
+                                    <div style={{textAlign:'center'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\uD83D\uDCC2'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600, color:'var(--accent-orange)', marginBottom:'6px'}}>
+                                            {kiGrundrissState.statusText}
+                                        </div>
+                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'16px', lineHeight:'1.5'}}>
+                                            {kiGrundrissState.errorMsg}
+                                        </div>
+                                        <button className="raum-action-btn" onClick={function() {
+                                            setGrundrissModus('manual');
+                                            setKiGrundrissState({ status:'idle', statusText:'', pdfs:[], selectedPdf:null, kiResult:null, errorMsg:'', progress:0 });
+                                        }} style={{width:'100%', justifyContent:'center'}}>
+                                            <span className="btn-icon">{'\uD83D\uDCD0'}</span>
+                                            <span className="btn-text">
+                                                Manuell fortfahren
+                                                <span className="btn-sub">Masze von Hand eingeben</span>
+                                            </span>
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Status: fehler (technisch) */}
                                 {kiGrundrissState.status === 'fehler' && (
                                     <div style={{textAlign:'center'}}>
                                         <div style={{fontSize:'36px', marginBottom:'8px'}}>{'\u26A0\uFE0F'}</div>
