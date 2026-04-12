@@ -4465,8 +4465,10 @@
             const [kiErgebnisse, setKiErgebnisse] = useState(
                 reEdit && reEdit.kiErgebnisse ? reEdit.kiErgebnisse : {
                     loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0,
+                    aussenecken_lfm: 0, wandeinschluesse: 0, wandflaeche_m2: 0,
                     sanitaerObjekte: [], installationen: [],
                     abdichtungsflaeche_m2: 0, dichtungsbaender_lfm: 0, gefliesteFlaeche_m2: 0,
+                    farbErgebnisse: {},
                     details: []
                 }
             );
@@ -6455,36 +6457,85 @@
                 setCropState(null);
             };
 
+            // === PHASENSPEZIFISCHE KI-FOTO-PROMPTS (Gemini Pro) ===
+            const getPhasePrompt = (phase, stufe) => {
+                const raumInfo = 'Raummasze: Laenge=' + (masse.laenge||'?') + 'm, Breite=' + (masse.breite||'?') + 'm, Hoehe=' + (masse.hoehe||'?') + 'm.';
+
+                if (phase === 'rohzustand') {
+                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten (DIN 18352). Analysiere dieses Foto vom ROHZUSTAND eines Raumes (vor Arbeitsbeginn). ' + raumInfo + ' Erkenne OHNE Markierungen: 1) Wandflaeche schaetzen (grob, +-10%) 2) Innenecken PRAEZISE zaehlen (einspringend, konkav) - JEDE Ecke zaehlen, auch an Nischen und Vorwaenden! 3) Aussenecken PRAEZISE zaehlen (vorspringend, konvex) - inkl. Fensterleibungen, Vorwandinstallationen, Nischen! 4) Meter Aussenecken schaetzen (Gesamtlaenge aller Aussenecken in lfm) 5) Wandeinschluesse (Nischen, Vorwand-Elemente, Stuetzen) 6) Installationsloecher (Steckdosen, Rohrdurchfuehrungen, Sanitaeranschluesse) 7) Sanitaer-Objekte erkennen (WC, Waschbecken, Dusche, Badewanne). Antworte NUR als JSON: {"wandflaeche_m2":0,"innenecken":0,"aussenecken":0,"aussenecken_lfm":0,"wandeinschluesse":0,"loecher":0,"wandanschluesse":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}';
+                }
+
+                if (phase === 'vorarbeiten') {
+                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten und Abdichtung (DIN 18534). Analysiere dieses Foto NACH VORARBEITEN (Abdichtung/Grundierung). ' + raumInfo + ' Der Nutzer hat farbige Markierungen auf dem Foto angebracht. Erkenne die markierten Bereiche und berechne: BLAU markiert = Wand-Abdichtungsflaeche in m2, GRUEN markiert = Dichtungsband-Laenge an Innen-/Aussenecken in lfm, GELB markiert = Stueckzahl Innen-/Aussenecken (zaehle einzelne Ecken), LILA markiert = Dichtungsmanschetten (Stueckzahl). Falls keine Farbmarkierungen sichtbar: erkenne automatisch Abdichtungsflaechen (dunkle/graue Flaechen), Dichtungsbaender (Streifen an Ecken) und Manschetten (runde Abdichtungen um Durchbrueche). Antworte NUR als JSON: {"farbErgebnisse":{"blau_m2":{"farbe":"blau","beschreibung":"Wand-Abdichtungsflaeche","wert":0,"einheit":"m2"},"gruen_lfm":{"farbe":"gruen","beschreibung":"Dichtungsband Ecken","wert":0,"einheit":"lfm"},"gelb_Stk":{"farbe":"gelb","beschreibung":"Innen-/Aussenecken","wert":0,"einheit":"Stk"},"lila_Stk":{"farbe":"lila","beschreibung":"Dichtungsmanschetten","wert":0,"einheit":"Stk"}},"innenecken":0,"aussenecken":0,"zusammenfassung":""}';
+                }
+
+                if (phase === 'fertigstellung') {
+                    return 'Du bist ein Experte fuer Fliesenlegerarbeiten (DIN 18352). Analysiere dieses Foto der FERTIGSTELLUNG (nach Fliesenverlegung). ' + raumInfo + ' Der Nutzer hat farbige Markierungen auf dem Foto angebracht. Erkenne die markierten Bereiche und berechne: ROT markiert = Geflieste Wandflaeche in m2, BLAU markiert = Installationsloecher (Stueckzahl), GRUEN markiert = Dehnungsfugen in lfm, GELB markiert = Schienen/Profile in lfm, LILA markiert = Ablagen in lfm, ORANGE markiert = Laibungen in lfm. Falls keine Farbmarkierungen sichtbar: erkenne automatisch die geflieste Flaeche, Loecher/Durchbrueche, Fugen und Profile. Antworte NUR als JSON: {"farbErgebnisse":{"rot_m2":{"farbe":"rot","beschreibung":"Geflieste Wandflaeche","wert":0,"einheit":"m2"},"blau_Stk":{"farbe":"blau","beschreibung":"Installationsloecher","wert":0,"einheit":"Stk"},"gruen_lfm":{"farbe":"gruen","beschreibung":"Dehnungsfugen","wert":0,"einheit":"lfm"},"gelb_lfm":{"farbe":"gelb","beschreibung":"Schienen","wert":0,"einheit":"lfm"},"lila_lfm":{"farbe":"lila","beschreibung":"Ablagen","wert":0,"einheit":"lfm"},"orange_lfm":{"farbe":"orange","beschreibung":"Laibungen","wert":0,"einheit":"lfm"}},"loecher":0,"zusammenfassung":""}';
+                }
+
+                // Fallback: alter einfacher Prompt
+                if (stufe === 'klein') {
+                    return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle praezise: loecher (Steckdosen, Rohrdurchfuehrungen, Sanitaeranschluesse), wandanschluesse (Fugen an Waenden/Decke/Boden), innenecken (einspringend - auch an Nischen, Vorwaenden!), aussenecken (vorspringend - auch Fensterleibungen!). Erkenne Sanitaer-Objekte. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}';
+                }
+                return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle: loecher, wandanschluesse, innenecken (PRAEZISE!), aussenecken (PRAEZISE!), Sanitaer-Objekte. ZUSAETZLICH schaetze: abdichtung (flaeche_m2, dichtungsbaender_lfm, abdichtungshoehe_m, sichtbar), geflieste_flaeche_m2. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"abdichtung":{"flaeche_m2":0,"dichtungsbaender_lfm":0,"abdichtungshoehe_m":0,"sichtbar":false},"geflieste_flaeche_m2":0,"zusammenfassung":""}';
+            };
+
             const runKiAnalyse = async (stufe) => {
                 const marked = getMarkedFotos();
                 if (marked.length === 0) { alert('Keine Fotos markiert! Markiere Fotos mit dem Haekchen oben rechts.'); return; }
-                if (!window.GEMINI_CONFIG || !window.GEMINI_CONFIG.apiKey) {
+                // API-Key pruefen ueber globale Config
+                var geminiApiKey = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.API_KEY) || localStorage.getItem('gemini_api_key') || '';
+                if (!geminiApiKey) {
                     alert('Gemini API-Key nicht konfiguriert. Bitte zuerst auf der Startseite verbinden.'); return;
                 }
                 setAnalyseRunning(true);
                 setAnalyseProgress({ current: 0, total: marked.length, wandId: '' });
                 const results = [];
+                // Modell: Gemini 2.5 Pro fuer praezise Analyse
+                var proModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
+
                 for (let i = 0; i < marked.length; i++) {
                     const m = marked[i];
                     setAnalyseProgress({ current: i + 1, total: marked.length, wandId: m.wandId });
                     try {
                         const imgData = (m.foto.croppedImage || m.foto.image).split(',')[1];
-                        const prompt = stufe === 'klein'
-                            ? 'Analysiere dieses Bild einer Wand/Boden in einem Badezimmer/Raum. Zaehle: loecher (Steckdosen, Rohrdurchfuehrungen, Sanitaeranschluesse), wandanschluesse (Fugen an Waenden/Decke/Boden), innenecken (einspringend), aussenecken (vorspringend). Erkenne Sanitaer-Objekte (WC, Waschbecken, Dusche, Badewanne). Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"zusammenfassung":""}'
-                            : 'Analysiere dieses Bild einer Wand/Boden. Zaehle: loecher, wandanschluesse, innenecken, aussenecken, Sanitaer-Objekte. ZUSAETZLICH schaetze: abdichtung (flaeche_m2, dichtungsbaender_lfm, abdichtungshoehe_m, sichtbar), geflieste_flaeche_m2. Raummasze zur Plausibilitaet: Laenge=' + (masse.laenge||'?') + 'm, Breite=' + (masse.breite||'?') + 'm, Hoehe=' + (masse.hoehe||'?') + 'm. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"abdichtung":{"flaeche_m2":0,"dichtungsbaender_lfm":0,"abdichtungshoehe_m":0,"sichtbar":false},"geflieste_flaeche_m2":0,"zusammenfassung":""}';
-                        const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + window.GEMINI_CONFIG.apiKey, {
-                            method: 'POST', headers: {'Content-Type':'application/json'},
-                            body: JSON.stringify({
-                                contents: [{ parts: [
-                                    { inlineData: { mimeType: 'image/jpeg', data: imgData } },
-                                    { text: prompt }
-                                ]}]
-                            })
-                        });
-                        const data = await resp.json();
-                        let text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
-                        text = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-                        const parsed = JSON.parse(text);
+                        // Phasenspezifischer Prompt
+                        const prompt = getPhasePrompt(m.phase, stufe);
+
+                        // callGeminiAPI verwenden (Retries, Modell-Selektion etc.)
+                        var rawText = null;
+                        if (typeof window.callGeminiAPI === 'function') {
+                            rawText = await window.callGeminiAPI(
+                                [{ content: prompt }],
+                                4096,
+                                {
+                                    model: proModelId,
+                                    files: [{ mimeType: 'image/jpeg', base64Data: imgData }],
+                                    jsonMode: true
+                                }
+                            );
+                        }
+
+                        // Fallback: direkter API-Call falls callGeminiAPI fehlschlaegt
+                        if (!rawText) {
+                            var baseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
+                            const resp = await fetch(baseUrl + '/models/' + proModelId + ':generateContent?key=' + geminiApiKey, {
+                                method: 'POST', headers: {'Content-Type':'application/json'},
+                                body: JSON.stringify({
+                                    contents: [{ parts: [
+                                        { inline_data: { mime_type: 'image/jpeg', data: imgData } },
+                                        { text: prompt }
+                                    ]}],
+                                    generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' }
+                                })
+                            });
+                            const data = await resp.json();
+                            rawText = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
+                        }
+
+                        rawText = (rawText || '{}').replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+                        const parsed = JSON.parse(rawText);
+                        parsed._phase = m.phase;
                         results.push(parsed);
                         // Ergebnis am Foto speichern
                         setPhasenFotos(prev => {
@@ -6497,22 +6548,29 @@
                             return updated;
                         });
                     } catch(err) {
-                        console.error('KI-Analyse Fehler:', err);
-                        results.push({ loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0, zusammenfassung: 'Fehler: ' + err.message });
+                        console.error('KI-Analyse Fehler Wand ' + m.wandId + ':', err);
+                        results.push({ _phase: m.phase, loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0, zusammenfassung: 'Fehler: ' + err.message });
                     }
                 }
-                // Aggregation
+                // === AGGREGATION: Phasenspezifisch ===
                 const agg = {
                     loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0,
+                    aussenecken_lfm: 0, wandeinschluesse: 0, wandflaeche_m2: 0,
                     sanitaerObjekte: [], installationen: [],
                     abdichtungsflaeche_m2: 0, dichtungsbaender_lfm: 0, gefliesteFlaeche_m2: 0,
+                    farbErgebnisse: {},
                     details: results
                 };
                 results.forEach(r => {
+                    // Standard-Felder summieren
                     agg.loecher += (r.loecher || 0);
                     agg.wandanschluesse += (r.wandanschluesse || 0);
                     agg.innenecken += (r.innenecken || 0);
                     agg.aussenecken += (r.aussenecken || 0);
+                    agg.aussenecken_lfm += (r.aussenecken_lfm || 0);
+                    agg.wandeinschluesse += (r.wandeinschluesse || 0);
+                    agg.wandflaeche_m2 += (r.wandflaeche_m2 || 0);
+                    // Objekte
                     if (r.objekte) {
                         r.objekte.forEach(obj => {
                             const existing = agg.sanitaerObjekte.find(s => s.typ === obj.typ);
@@ -6520,16 +6578,29 @@
                             else agg.sanitaerObjekte.push({ ...obj });
                         });
                     }
-                    if (stufe === 'gross' && r.abdichtung) {
+                    // Alte Abdichtungs-Felder (Rueckwaertskompatibel)
+                    if (r.abdichtung) {
                         agg.abdichtungsflaeche_m2 += (r.abdichtung.flaeche_m2 || 0);
                         agg.dichtungsbaender_lfm += (r.abdichtung.dichtungsbaender_lfm || 0);
                     }
-                    if (stufe === 'gross' && r.geflieste_flaeche_m2) {
+                    if (r.geflieste_flaeche_m2) {
                         agg.gefliesteFlaeche_m2 += r.geflieste_flaeche_m2;
+                    }
+                    // NEU: Farb-basierte Ergebnisse aggregieren
+                    if (r.farbErgebnisse) {
+                        Object.keys(r.farbErgebnisse).forEach(fKey => {
+                            const fe = r.farbErgebnisse[fKey];
+                            if (!agg.farbErgebnisse[fKey]) {
+                                agg.farbErgebnisse[fKey] = { ...fe };
+                            } else {
+                                agg.farbErgebnisse[fKey].wert = (agg.farbErgebnisse[fKey].wert || 0) + (fe.wert || 0);
+                            }
+                        });
                     }
                 });
                 setKiErgebnisse(agg);
                 setAnalyseRunning(false);
+                console.log('[TW KI] Analyse abgeschlossen:', agg);
             };
 
             const transferKiErgebnisseToPositions = () => {
@@ -7122,13 +7193,16 @@
                 const canvas = skizzeCanvasRef.current;
                 if (!canvas) { setSkizze(p => ({...p, mode:'draw'})); return; }
                 const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
-                if (!window.GEMINI_CONFIG || !window.GEMINI_CONFIG.apiKey) {
+                var skizzeApiKey = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.API_KEY) || localStorage.getItem('gemini_api_key') || '';
+                if (!skizzeApiKey) {
                     alert('Gemini API-Key nicht konfiguriert.'); setSkizze(p => ({...p, mode:'draw'})); return;
                 }
                 const prompt = 'Du bist ein Experte fuer Grundriss-Erkennung aus Handskizzen. AUFGABE: Analysiere diese handgezeichnete Raumskizze auf Millimeterpapier. 1. BEGRADIGE die Linien: Erkenne die gezeichneten Waende als gerade Linien. 2. ERKENNE DIE BESCHRIFTUNG: Waende sind handschriftlich beschriftet in ROT (A,B,C,D bei 4 Waenden oder 1,2,3,4... bei mehr). Waende sind in GRAU gezeichnet. 3. ERKENNE DETAILS: Tueren, Fenster falls gezeichnet. ANTWORTE NUR als JSON: {"waende_erkannt":true,"anzahl_waende":4,"beschriftungstyp":"buchstaben","waende":[{"id":"A","startPunkt":{"x_prozent":0,"y_prozent":0},"endPunkt":{"x_prozent":100,"y_prozent":0},"laenge_relativ":1.0,"richtung":"horizontal"}],"tueren":[{"wandId":"A","position_prozent":50,"breite_relativ":0.3}],"fenster":[{"wandId":"B","position_prozent":40,"breite_relativ":0.4}],"raumForm":"rechteck","hinweise":[]}';
+                var skizzeModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
+                var skizzeBaseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
                 try {
-                    const apiKey = window.GEMINI_CONFIG.apiKey;
-                    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + apiKey, {
+                    const apiKey = skizzeApiKey;
+                    const res = await fetch(skizzeBaseUrl + '/models/' + skizzeModelId + ':generateContent?key=' + apiKey, {
                         method:'POST', headers:{'Content-Type':'application/json'},
                         body: JSON.stringify({ contents: [{ parts: [
                             { inlineData: { mimeType:'image/png', data: imageBase64 } },
@@ -8291,11 +8365,15 @@
                                         {/* 4er-Grid Zaehlungen */}
                                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px', marginBottom:'10px'}}>
                                             {[
-                                                {label:'Durchbrueche', val: kiErgebnisse.loecher, icon:'🕳️'},
-                                                {label:'Wandanschluesse', val: kiErgebnisse.wandanschluesse, icon:'📏'},
-                                                {label:'Innenecken', val: kiErgebnisse.innenecken, icon:'◣'},
-                                                {label:'Aussenecken', val: kiErgebnisse.aussenecken, icon:'◢'}
-                                            ].map(item => (
+                                                {label:'Durchbrueche', val: kiErgebnisse.loecher, icon:'\uD83D\uDD73\uFE0F'},
+                                                {label:'Wandanschluesse', val: kiErgebnisse.wandanschluesse, icon:'\uD83D\uDCCF'},
+                                                {label:'Innenecken', val: kiErgebnisse.innenecken, icon:'\u25E3'},
+                                                {label:'Aussenecken', val: kiErgebnisse.aussenecken, icon:'\u25E2'}
+                                            ].concat(
+                                                kiErgebnisse.wandflaeche_m2 > 0 ? [{label:'Wandflaeche', val: fmtDe(kiErgebnisse.wandflaeche_m2) + ' m\u00B2', icon:'\uD83D\uDCD0'}] : [],
+                                                kiErgebnisse.aussenecken_lfm > 0 ? [{label:'Aussenecken lfm', val: fmtDe(kiErgebnisse.aussenecken_lfm) + ' lfm', icon:'\uD83D\uDCCF'}] : [],
+                                                kiErgebnisse.wandeinschluesse > 0 ? [{label:'Wandeinschluesse', val: kiErgebnisse.wandeinschluesse, icon:'\uD83E\uDDF1'}] : []
+                                            ).map(item => (
                                                 <div key={item.label} style={{
                                                     display:'flex', justifyContent:'space-between', alignItems:'center',
                                                     padding:'8px 10px', background:'var(--bg-tertiary)',
@@ -8357,6 +8435,41 @@
                                                         border:'1px solid rgba(39,174,96,0.2)', fontWeight:600
                                                     }}>{obj.typ} ({obj.anzahl}x)</span>
                                                 ))}
+                                            </div>
+                                        )}
+
+                                        {/* NEU: Farb-basierte Ergebnisse */}
+                                        {kiErgebnisse.farbErgebnisse && Object.keys(kiErgebnisse.farbErgebnisse).length > 0 && (
+                                            <div style={{marginBottom:'10px'}}>
+                                                <div style={{fontSize:'11px', fontWeight:600, color:'var(--accent-blue)',
+                                                    textTransform:'uppercase', marginBottom:'6px', letterSpacing:'0.5px'}}>
+                                                    Markierungs-Ergebnisse
+                                                </div>
+                                                {Object.values(kiErgebnisse.farbErgebnisse).map((fe, idx) => {
+                                                    var farbHex = {'rot':'#e63535','blau':'#1e88e5','gruen':'#2ecc71','gelb':'#f1c40f','lila':'#9b59b6','orange':'#e67e22'}[fe.farbe] || '#888';
+                                                    return (
+                                                        <div key={idx} style={{
+                                                            display:'flex', alignItems:'center', gap:'8px',
+                                                            padding:'8px 10px', background:'var(--bg-tertiary)',
+                                                            borderRadius:'8px', border:'1px solid var(--border-subtle)',
+                                                            marginBottom:'4px'
+                                                        }}>
+                                                            <div style={{
+                                                                width:'14px', height:'14px', borderRadius:'50%',
+                                                                background: farbHex, flexShrink:0
+                                                            }} />
+                                                            <span style={{flex:1, fontSize:'11px', color:'var(--text-secondary)'}}>
+                                                                {fe.beschreibung}
+                                                            </span>
+                                                            <span style={{fontFamily:'Oswald', fontWeight:700, fontSize:'14px', color:'var(--text-primary)'}}>
+                                                                {typeof fe.wert === 'number' ? fmtDe(fe.wert) : fe.wert}
+                                                            </span>
+                                                            <span style={{fontSize:'10px', color:'var(--text-muted)'}}>
+                                                                {fe.einheit}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
 
