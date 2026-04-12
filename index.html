@@ -10687,6 +10687,9 @@
                         </div>
                     )}
 
+                    {/* ═══ STICKY WRAPPER fuer beide Leisten ═══ */}
+                    <div style={{position:'sticky', top:'95px', zIndex:98, background:'var(--bg-primary)', paddingBottom:'4px', borderBottom:'1px solid var(--border-subtle)'}}>
+
                     {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raum fertig, Aufmass beenden) ═══ */}
                     <div className="rb-nav-red" style={{
                         display:'flex', gap:'3px', padding:'4px 0', marginBottom:'2px'
@@ -10707,7 +10710,7 @@
 
                     {/* ═══ LEISTE 3: BLAUE TAB-NAVIGATION (6 Buttons in 1 Reihe) ═══ */}
                     <div className="rb-nav-blue" style={{
-                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'8px'
+                        display:'flex', gap:'3px', padding:'4px 0'
                     }}>
                         {[
                             {id: 0, label: 'Grundriss'},
@@ -10732,6 +10735,7 @@
                             Masse kop. {masseKopieren ? 'JA' : 'NEIN'}
                         </button>
                     </div>
+                    </div>{/* Ende Sticky Wrapper */}
 
                     {/* Save-Status Toast */}
                     {saveStatus !== 'idle' && (
@@ -10804,8 +10808,8 @@
                                     Anzahl der Waende
                                 </h3>
                                 <div className="masse-input-wrap" style={{marginBottom:'16px'}}>
-                                    <input className="masse-input" type="number" min="3" max="12" value={wandAnzahl}
-                                        onChange={function(e) { setWandAnzahl(parseInt(e.target.value) || 4); }}
+                                    <input className="masse-input" type="text" inputMode="numeric" value={wandAnzahl}
+                                        onChange={function(e) { var v = e.target.value.replace(/[^0-9]/g, ''); setWandAnzahl(v === '' ? '' : parseInt(v) || 4); }}
                                         style={{textAlign:'center', fontSize:'24px', fontWeight:700}} />
                                 </div>
                                 <div style={{fontSize:'12px', color:'var(--text-muted)', textAlign:'center', marginBottom:'16px'}}>
@@ -11181,8 +11185,8 @@
                                     </div>
                                 )}
 
-                                {/* Abdichtungshöhe + Raumhoch + Umlaufend (nur bei Wandabdichtung) */}
-                                {hatWandabdichtung && (
+                                {/* Abdichtungshoehe + Raumhoch + Umlaufend (IMMER sichtbar!) */}
+                                {(true) && (
                                     <div className="masse-hoehe-row">
                                         <div className="masse-field" style={{flex:1}}>
                                             <span className="masse-label">Abdichtungshöhe</span>
@@ -11451,8 +11455,49 @@
                         )}
                     </div>
 
-                    </React.Fragment>)}
+                    {/* ═══ DYNAMISCHE WAND-EINGABEFELDER (basierend auf wandAnzahl) ═══ */}
+                    <div className="masse-section" style={{marginTop:'8px'}}>
+                        <div className="masse-section-title">Wandmasse ({wandAnzahl} Waende)</div>
+                        <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                            {wandMasse.slice(0, wandAnzahl).map(function(wand, idx) {
+                                return (
+                                    <div key={wand.id || idx} style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                        <span style={{
+                                            fontFamily:'Oswald', fontWeight:700, fontSize:'14px',
+                                            color:'var(--accent-blue)', minWidth:'55px'
+                                        }}>
+                                            Wand {wand.id || 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[idx]}
+                                        </span>
+                                        <div className="masse-input-wrap" style={{flex:1}}>
+                                            <input className="masse-input" type="text" inputMode="decimal"
+                                                placeholder="Laenge in m"
+                                                data-laser-field={'wand_' + idx}
+                                                value={wand.l || ''}
+                                                onChange={function(e) { handleWandMassChangeNew(idx, e.target.value); }}
+                                                onBlur={function() {
+                                                    setWandMasse(function(prev) {
+                                                        return prev.map(function(ww, i) {
+                                                            if (i !== idx) return ww;
+                                                            if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
+                                                            return ww;
+                                                        });
+                                                    });
+                                                }}
+                                            />
+                                            <span className="masse-unit">m</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        {masseKopieren && (
+                            <div style={{fontSize:'10px', color:'var(--accent-blue)', marginTop:'6px', fontStyle:'italic'}}>
+                                Masse kopieren aktiv: A &#8594; C, B &#8594; D
+                            </div>
+                        )}
+                    </div>
 
+                    </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
                     {rbTab === 1 && (
                         <div>
