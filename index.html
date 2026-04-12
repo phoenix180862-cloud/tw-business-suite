@@ -8377,8 +8377,8 @@
             // VOB-konforme Rundung: 2 Dezimalstellen bei Flächen/Längen
             const vobRound = (val) => Math.round(val * 100) / 100;
 
-            const L = parseMass(masse.laenge);
-            const B = parseMass(masse.breite);
+            const L = parseMass((wandMasse[0] && wandMasse[0].l) || masse.laenge);
+            const B = parseMass((wandMasse[1] && wandMasse[1].l) || masse.breite);
             const RH = parseMass(masse.raumhoehe); // Raumhöhe
             const H = fliesenDeckenhoch ? RH : parseMass(masse.hoehe); // Fliesenhöhe (bei Raumhoch = Raumhöhe)
             const AH = abdichtungDeckenhoch ? RH : parseMass(masse.abdichtungshoehe); // Abdichtungshöhe (bei Raumhoch = Raumhöhe)
@@ -9405,7 +9405,7 @@
             // ── Tab-Status Indikatoren ──
             const getTabStatus = (tabIdx) => {
                 switch(tabIdx) {
-                    case 0: return (parseMass(masse.laenge) > 0 || parseMass(masse.hoehe) > 0) ? 'complete' : 'empty';
+                    case 0: return (parseMass((wandMasse[0] && wandMasse[0].l) || '') > 0 || parseMass(masse.hoehe) > 0) ? 'complete' : 'empty';
                     case 1: {
                         const totalPhotos = FOTO_PHASEN.reduce((sum, p) => sum + countPhasePhotos(p.key), 0);
                         if (kiErgebnisse.details && kiErgebnisse.details.length > 0) return 'complete';
@@ -9609,6 +9609,9 @@
                     }
                 }
                 setWandMasse(neueWandMasse);
+                // Sync mit masse.laenge/breite fuer Grundriss-Berechnung
+                if (idx === 0) setMasse(function(p) { return {...p, laenge: value}; });
+                if (idx === 1) setMasse(function(p) { return {...p, breite: value}; });
             };
 
             // ══════════════════════════════════════════════════════
@@ -10853,9 +10856,12 @@
                     {rbTab === 0 && (<React.Fragment>
 
                     {/* Grundriss */}
-                    {/* 3er-Modus-Toggle fuer Grundriss */}
+                    {/* 3er-Modus-Toggle fuer Grundriss — STICKY */}
                     <div style={{
-                        display:'flex', gap:'4px', marginBottom:'8px',
+                        position:'sticky', top:'170px', zIndex:97, background:'var(--bg-primary)', paddingTop:'4px', paddingBottom:'4px'
+                    }}>
+                    <div style={{
+                        display:'flex', gap:'4px',
                         background:'var(--bg-tertiary)', borderRadius:'12px', padding:'4px'
                     }}>
                         <button className={'ja-nein-btn ' + (grundrissModus === 'manual' ? 'active ja' : '')}
@@ -10874,6 +10880,7 @@
                             KI-Grundriss
                         </button>
                     </div>
+                    </div>{/* Ende Sticky Modus-Toggle */}
 
                     <div className="grundriss-card">
                         {/* === MANUELL: Bestehender SVG-Grundriss === */}
@@ -10910,10 +10917,11 @@
                                 <div className="grundriss-card-title">
                                     <span>Handskizze</span>
                                 </div>
-                                {/* ═══ NEUE HANDSKIZZE TOOLBAR (1 Reihe, BLAU, 6 Buttons proportional) ═══ */}
+                                {/* ═══ NEUE HANDSKIZZE TOOLBAR (1 Reihe, BLAU, 6 Buttons proportional) — STICKY ═══ */}
                                 <div style={{
                                     display:'flex', gap:'3px', margin:'0 0 8px', padding:'4px',
-                                    background:'var(--bg-tertiary)', borderRadius:'10px'
+                                    background:'var(--bg-tertiary)', borderRadius:'10px',
+                                    position:'sticky', top:'210px', zIndex:96
                                 }}>
                                     <button className={'rb-nav-btn rb-nav-blue-btn' + (zeichnenAktiv ? ' active' : '')}
                                         style={{fontSize:'10px', minHeight:'32px', padding:'5px 4px'}}
@@ -11107,27 +11115,7 @@
                         <div className="masse-section-title">📏 Raummaße</div>
                         {!isMultiWall ? (
                             <React.Fragment>
-                                <div className="masse-grid three-col">
-                                    <div className="masse-field">
-                                        <span className="masse-label">Länge (A/C)</span>
-                                        <div className="masse-input-wrap">
-                                            <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                data-laser-field="laenge" value={masse.laenge} onChange={e => setMasse(p => ({...p, laenge: e.target.value}))}
-                                                onBlur={handleBlurFormat(setMasse, 'laenge')}
-                                                />
-                                            <span className="masse-unit">m</span>
-                                        </div>
-                                    </div>
-                                    <div className="masse-field">
-                                        <span className="masse-label">Breite (B/D)</span>
-                                        <div className="masse-input-wrap">
-                                            <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                data-laser-field="breite" value={masse.breite} onChange={e => setMasse(p => ({...p, breite: e.target.value}))}
-                                                onBlur={handleBlurFormat(setMasse, 'breite')}
-                                                />
-                                            <span className="masse-unit">m</span>
-                                        </div>
-                                    </div>
+                                <div className="masse-grid">
                                     <div className="masse-field">
                                         <span className="masse-label">Raumhöhe</span>
                                         <div className="masse-input-wrap">
