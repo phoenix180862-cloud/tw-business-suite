@@ -4473,9 +4473,158 @@
                 }
             );
             const [expandedPhases, setExpandedPhases] = useState({ rohzustand: true, vorarbeiten: false, fertigstellung: false });
-            const [cropState, setCropState] = useState(null); // { phase, wandId, image, cropRect, dragging, dragCorner }
+            const [cropState, setCropState] = useState(null);
             const cropCanvasRef = React.useRef(null);
             const cropImageRef = React.useRef(null);
+
+            // ── Markierungsfarben und Farb-Zuordnung ──
+            const MARKIERUNGS_FARBEN = [
+                { id: 'rot',     hex: '#e63535', name: 'Rot' },
+                { id: 'blau',    hex: '#1e88e5', name: 'Blau' },
+                { id: 'gruen',   hex: '#2ecc71', name: 'Gruen' },
+                { id: 'gelb',    hex: '#f1c40f', name: 'Gelb' },
+                { id: 'lila',    hex: '#9b59b6', name: 'Lila' },
+                { id: 'orange',  hex: '#e67e22', name: 'Orange' }
+            ];
+
+            const [farbZuordnung, setFarbZuordnung] = useState(() => {
+                if (reEdit && reEdit.farbZuordnung) return reEdit.farbZuordnung;
+                return {
+                    rohzustand: [],
+                    vorarbeiten: [
+                        { farbe: 'blau',  position: '', beschreibung: 'Wand-Abdichtungsflaeche', einheit: 'm2' },
+                        { farbe: 'gruen', position: '', beschreibung: 'Dichtungsband (Ecken)', einheit: 'lfm' },
+                        { farbe: 'gelb',  position: '', beschreibung: 'Innen-/Aussenecken', einheit: 'Stk' },
+                        { farbe: 'lila',  position: '', beschreibung: 'Dichtungsmanschetten', einheit: 'Stk' }
+                    ],
+                    fertigstellung: [
+                        { farbe: 'rot',    position: '', beschreibung: 'Geflieste Wandflaeche', einheit: 'm2' },
+                        { farbe: 'blau',   position: '', beschreibung: 'Installationsloecher', einheit: 'Stk' },
+                        { farbe: 'gruen',  position: '', beschreibung: 'Dehnungsfugen', einheit: 'lfm' },
+                        { farbe: 'gelb',   position: '', beschreibung: 'Schienen', einheit: 'lfm' },
+                        { farbe: 'lila',   position: '', beschreibung: 'Ablagen', einheit: 'lfm' },
+                        { farbe: 'orange', position: '', beschreibung: 'Laibungen', einheit: 'lfm' }
+                    ]
+                };
+            });
+            const [farbPopupOpen, setFarbPopupOpen] = useState(null);
+
+            // ── Vollbild-Editor State ──
+            const [fullscreenEdit, setFullscreenEdit] = useState({
+                active: false, phase: null, wandId: null, image: null,
+                editMode: 'crop', drawColor: '#e63535', drawWidth: 4,
+                drawings: [], currentDraw: null,
+                cropRect: null, cropDragging: false, cropCorner: null
+            });
+            const fullscreenCanvasRef = React.useRef(null);
+            const fullscreenImgRef = React.useRef(null);
+
+            // ── Vollbild-Editor oeffnen ──
+            const openFullscreenEdit = (phase, wandId) => {
+                const foto = phasenFotos[phase] && phasenFotos[phase][wandId];
+                if (!foto) return;
+                setFullscreenEdit({
+                    active: true, phase: phase, wandId: wandId,
+                    image: foto.image, editMode: 'crop',
+                    drawColor: '#e63535', drawWidth: 4,
+                    drawings: foto.drawings || [], currentDraw: null,
+                    cropRect: null, cropDragging: false, cropCorner: null
+                });
+            };
+
+            // ── Vollbild-Editor speichern ──
+            const saveFullscreenEdit = () => {
+                const fs = fullscreenEdit;
+                if (!fs.active || !fs.phase || !fs.wandId) return;
+
+                // Crop anwenden wenn vorhanden
+                if (fs.cropRect && fs.image) {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const r = fs.cropRect;
+                        const sx = r.x * img.width; const sy = r.y * img.height;
+                        const sw = r.w * img.width; const sh = r.h * img.height;
+                        canvas.width = Math.max(1, Math.round(sw));
+                        canvas.height = Math.max(1, Math.round(sh));
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+                        // Zeichnungen aufs Canvas malen
+                        if (fs.drawings.length > 0) {
+                            fs.drawings.forEach(d => {
+                                if (!d.points || d.points.length < 2) return;
+                                ctx.strokeStyle = d.color || '#e63535';
+                                ctx.lineWidth = d.width || 4;
+                                ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                                ctx.beginPath();
+                                ctx.moveTo((d.points[0].x - r.x) / r.w * canvas.width, (d.points[0].y - r.y) / r.h * canvas.height);
+                                for (var pi = 1; pi < d.points.length; pi++) {
+                                    ctx.lineTo((d.points[pi].x - r.x) / r.w * canvas.width, (d.points[pi].y - r.y) / r.h * canvas.height);
+                                }
+                                ctx.stroke();
+                            });
+                        }
+
+                        const croppedImage = canvas.toDataURL('image/jpeg', 0.85);
+                        setPhasenFotos(prev => {
+                            const updated = {...prev};
+                            if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
+                                updated[fs.phase] = {...updated[fs.phase],
+                                    [fs.wandId]: {...updated[fs.phase][fs.wandId], croppedImage: croppedImage, drawings: fs.drawings}
+                                };
+                            }
+                            return updated;
+                        });
+                        setFullscreenEdit(p => ({...p, active: false}));
+                    };
+                    img.src = fs.image;
+                } else if (fs.drawings.length > 0 && fs.image) {
+                    // Nur Zeichnungen, kein Crop
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width; canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        fs.drawings.forEach(d => {
+                            if (!d.points || d.points.length < 2) return;
+                            ctx.strokeStyle = d.color || '#e63535';
+                            ctx.lineWidth = d.width || 4;
+                            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                            ctx.beginPath();
+                            ctx.moveTo(d.points[0].x * canvas.width, d.points[0].y * canvas.height);
+                            for (var pi = 1; pi < d.points.length; pi++) {
+                                ctx.lineTo(d.points[pi].x * canvas.width, d.points[pi].y * canvas.height);
+                            }
+                            ctx.stroke();
+                        });
+                        const editedImage = canvas.toDataURL('image/jpeg', 0.85);
+                        setPhasenFotos(prev => {
+                            const updated = {...prev};
+                            if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
+                                updated[fs.phase] = {...updated[fs.phase],
+                                    [fs.wandId]: {...updated[fs.phase][fs.wandId], croppedImage: editedImage, drawings: fs.drawings}
+                                };
+                            }
+                            return updated;
+                        });
+                        setFullscreenEdit(p => ({...p, active: false}));
+                    };
+                    img.src = fs.image;
+                } else {
+                    setPhasenFotos(prev => {
+                        const updated = {...prev};
+                        if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
+                            updated[fs.phase] = {...updated[fs.phase],
+                                [fs.wandId]: {...updated[fs.phase][fs.wandId], drawings: fs.drawings}
+                            };
+                        }
+                        return updated;
+                    });
+                    setFullscreenEdit(p => ({...p, active: false}));
+                }
+            };
 
             const [masse, setMasse] = useState(() => {
                 // ═══ RE-EDIT aus Gesamtliste: Gespeicherte Maße direkt übernehmen ═══
@@ -8608,6 +8757,31 @@
                                                     background: photoCount > 0 ? 'rgba(39,174,96,0.12)' : 'rgba(255,255,255,0.06)',
                                                     color: photoCount > 0 ? 'var(--success)' : 'var(--text-muted)', fontWeight:600
                                                 }}>{photoCount}/{wallIds.length}</span>
+                                                {/* Bearbeiten + Farben Buttons */}
+                                                {photoCount > 0 && (
+                                                    <React.Fragment>
+                                                        <button onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            var markedInPhase = Object.entries(phasenFotos[phase.key] || {}).find(function(entry) { return entry[1] && entry[1].marked; });
+                                                            if (markedInPhase) { openFullscreenEdit(phase.key, markedInPhase[0]); }
+                                                            else {
+                                                                var firstPhoto = Object.entries(phasenFotos[phase.key] || {}).find(function(entry) { return entry[1] && entry[1].image; });
+                                                                if (firstPhoto) openFullscreenEdit(phase.key, firstPhoto[0]);
+                                                            }
+                                                        }} style={{
+                                                            padding:'3px 8px', borderRadius:'6px', border:'none', cursor:'pointer',
+                                                            background:'rgba(231,76,60,0.15)', color:'#e74c3c',
+                                                            fontSize:'10px', fontWeight:700, fontFamily:'Oswald',
+                                                            textTransform:'uppercase', letterSpacing:'0.3px'
+                                                        }}>Bearbeiten</button>
+                                                        <button onClick={(e) => { e.stopPropagation(); setFarbPopupOpen(phase.key); }} style={{
+                                                            padding:'3px 8px', borderRadius:'6px', border:'none', cursor:'pointer',
+                                                            background:'rgba(231,76,60,0.15)', color:'#e74c3c',
+                                                            fontSize:'10px', fontWeight:700, fontFamily:'Oswald',
+                                                            textTransform:'uppercase', letterSpacing:'0.3px'
+                                                        }}>{'\uD83C\uDFA8'} Farben</button>
+                                                    </React.Fragment>
+                                                )}
                                                 <span style={{fontSize:'14px', marginLeft:'6px', transition:'transform 0.2s',
                                                     transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)'}}>
                                                     {isExpanded ? '\u25B2' : '\u25BC'}
@@ -9011,6 +9185,279 @@
                                                 Zuschnitt speichern
                                             </button>
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ═══ VOLLBILD-EDITOR ═══ */}
+                            {fullscreenEdit.active && (
+                                <div style={{
+                                    position:'fixed', top:0, left:0, right:0, bottom:0,
+                                    zIndex:10000, background:'rgba(0,0,0,0.95)',
+                                    display:'flex', flexDirection:'column'
+                                }}>
+                                    {/* Obere Toolbar */}
+                                    <div style={{
+                                        display:'flex', alignItems:'center', gap:'6px',
+                                        padding:'8px 12px', background:'rgba(0,0,0,0.8)',
+                                        borderBottom:'1px solid rgba(255,255,255,0.1)', flexShrink:0
+                                    }}>
+                                        <button onClick={() => setFullscreenEdit(p => ({...p, active:false}))} style={{
+                                            background:'none', border:'none', color:'white',
+                                            fontSize:'14px', cursor:'pointer', padding:'6px'
+                                        }}>{'\u2190'} Zurueck</button>
+                                        <div style={{flex:1, textAlign:'center', fontFamily:'Oswald', fontSize:'13px', color:'white', textTransform:'uppercase'}}>
+                                            Wand {fullscreenEdit.wandId} — {FOTO_PHASEN.find(p => p.key === fullscreenEdit.phase)?.label || ''}
+                                        </div>
+                                        <button onClick={saveFullscreenEdit} style={{
+                                            background:'rgba(231,76,60,0.9)', border:'none', color:'white',
+                                            fontSize:'12px', cursor:'pointer', padding:'6px 14px', borderRadius:'8px',
+                                            fontFamily:'Oswald', fontWeight:700, textTransform:'uppercase'
+                                        }}>Speichern</button>
+                                    </div>
+
+                                    {/* Modus-Toggle */}
+                                    <div style={{
+                                        display:'flex', gap:'4px', padding:'6px 12px',
+                                        background:'rgba(0,0,0,0.6)', flexShrink:0
+                                    }}>
+                                        <button onClick={() => setFullscreenEdit(p => ({...p, editMode:'crop'}))} style={{
+                                            flex:1, padding:'6px', borderRadius:'6px', border:'none', cursor:'pointer',
+                                            fontSize:'11px', fontWeight:600,
+                                            background: fullscreenEdit.editMode === 'crop' ? 'rgba(30,136,229,0.3)' : 'rgba(255,255,255,0.08)',
+                                            color: fullscreenEdit.editMode === 'crop' ? '#1e88e5' : '#aaa'
+                                        }}>{'\u2702\uFE0F'} Zuschneiden</button>
+                                        <button onClick={() => setFullscreenEdit(p => ({...p, editMode:'draw'}))} style={{
+                                            flex:1, padding:'6px', borderRadius:'6px', border:'none', cursor:'pointer',
+                                            fontSize:'11px', fontWeight:600,
+                                            background: fullscreenEdit.editMode === 'draw' ? 'rgba(231,76,60,0.3)' : 'rgba(255,255,255,0.08)',
+                                            color: fullscreenEdit.editMode === 'draw' ? '#e74c3c' : '#aaa'
+                                        }}>{'\u270F\uFE0F'} Markieren</button>
+                                    </div>
+
+                                    {/* Farb-Palette (nur im Markieren-Modus) */}
+                                    {fullscreenEdit.editMode === 'draw' && (
+                                        <div style={{
+                                            display:'flex', gap:'6px', padding:'6px 12px',
+                                            background:'rgba(0,0,0,0.5)', alignItems:'center', flexShrink:0
+                                        }}>
+                                            {MARKIERUNGS_FARBEN.map(f => (
+                                                <button key={f.id} onClick={() => setFullscreenEdit(p => ({...p, drawColor: f.hex}))} style={{
+                                                    width:'30px', height:'30px', borderRadius:'50%', border:'3px solid',
+                                                    borderColor: fullscreenEdit.drawColor === f.hex ? 'white' : 'transparent',
+                                                    background: f.hex, cursor:'pointer',
+                                                    boxShadow: fullscreenEdit.drawColor === f.hex ? '0 0 8px ' + f.hex : 'none'
+                                                }} />
+                                            ))}
+                                            <div style={{width:'1px', height:'24px', background:'rgba(255,255,255,0.2)', margin:'0 4px'}} />
+                                            {[2, 4, 8, 12].map(w => (
+                                                <button key={w} onClick={() => setFullscreenEdit(p => ({...p, drawWidth: w}))} style={{
+                                                    width:'28px', height:'28px', borderRadius:'50%', border:'none', cursor:'pointer',
+                                                    background: fullscreenEdit.drawWidth === w ? 'rgba(255,255,255,0.25)' : 'transparent',
+                                                    display:'flex', alignItems:'center', justifyContent:'center'
+                                                }}>
+                                                    <div style={{
+                                                        width: Math.max(4, w) + 'px', height: Math.max(4, w) + 'px',
+                                                        borderRadius:'50%', background:'white'
+                                                    }} />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Bild-Bereich (Vollbild) */}
+                                    <div style={{flex:1, position:'relative', overflow:'hidden', touchAction:'none'}}
+                                        onMouseDown={(e) => {
+                                            var rect = e.currentTarget.getBoundingClientRect();
+                                            var px = (e.clientX - rect.left) / rect.width;
+                                            var py = (e.clientY - rect.top) / rect.height;
+                                            if (fullscreenEdit.editMode === 'draw') {
+                                                setFullscreenEdit(p => ({...p, currentDraw: {points:[{x:px,y:py}], color:p.drawColor, width:p.drawWidth}}));
+                                            } else if (fullscreenEdit.editMode === 'crop') {
+                                                setFullscreenEdit(p => ({...p, cropRect: {x:px, y:py, w:0, h:0}, cropDragging:true}));
+                                            }
+                                        }}
+                                        onMouseMove={(e) => {
+                                            var rect = e.currentTarget.getBoundingClientRect();
+                                            var px = (e.clientX - rect.left) / rect.width;
+                                            var py = (e.clientY - rect.top) / rect.height;
+                                            if (fullscreenEdit.editMode === 'draw' && fullscreenEdit.currentDraw) {
+                                                setFullscreenEdit(p => ({...p, currentDraw: {...p.currentDraw, points: [...p.currentDraw.points, {x:px,y:py}]}}));
+                                            } else if (fullscreenEdit.editMode === 'crop' && fullscreenEdit.cropDragging) {
+                                                setFullscreenEdit(p => ({...p, cropRect: {...p.cropRect, w: px - p.cropRect.x, h: py - p.cropRect.y}}));
+                                            }
+                                        }}
+                                        onMouseUp={() => {
+                                            if (fullscreenEdit.currentDraw && fullscreenEdit.currentDraw.points.length > 1) {
+                                                setFullscreenEdit(p => ({...p, drawings: [...p.drawings, p.currentDraw], currentDraw:null}));
+                                            } else { setFullscreenEdit(p => ({...p, currentDraw:null, cropDragging:false})); }
+                                        }}
+                                        onTouchStart={(e) => {
+                                            e.preventDefault();
+                                            var t = e.touches[0]; var rect = e.currentTarget.getBoundingClientRect();
+                                            var px = (t.clientX - rect.left) / rect.width;
+                                            var py = (t.clientY - rect.top) / rect.height;
+                                            if (fullscreenEdit.editMode === 'draw') {
+                                                setFullscreenEdit(p => ({...p, currentDraw: {points:[{x:px,y:py}], color:p.drawColor, width:p.drawWidth}}));
+                                            } else if (fullscreenEdit.editMode === 'crop') {
+                                                setFullscreenEdit(p => ({...p, cropRect: {x:px, y:py, w:0, h:0}, cropDragging:true}));
+                                            }
+                                        }}
+                                        onTouchMove={(e) => {
+                                            e.preventDefault();
+                                            var t = e.touches[0]; var rect = e.currentTarget.getBoundingClientRect();
+                                            var px = (t.clientX - rect.left) / rect.width;
+                                            var py = (t.clientY - rect.top) / rect.height;
+                                            if (fullscreenEdit.editMode === 'draw' && fullscreenEdit.currentDraw) {
+                                                setFullscreenEdit(p => ({...p, currentDraw: {...p.currentDraw, points: [...p.currentDraw.points, {x:px,y:py}]}}));
+                                            } else if (fullscreenEdit.editMode === 'crop' && fullscreenEdit.cropDragging) {
+                                                setFullscreenEdit(p => ({...p, cropRect: {...p.cropRect, w: px - p.cropRect.x, h: py - p.cropRect.y}}));
+                                            }
+                                        }}
+                                        onTouchEnd={() => {
+                                            if (fullscreenEdit.currentDraw && fullscreenEdit.currentDraw.points.length > 1) {
+                                                setFullscreenEdit(p => ({...p, drawings: [...p.drawings, p.currentDraw], currentDraw:null}));
+                                            } else { setFullscreenEdit(p => ({...p, currentDraw:null, cropDragging:false})); }
+                                        }}
+                                    >
+                                        {fullscreenEdit.image && (
+                                            <img src={fullscreenEdit.image} style={{width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none'}} />
+                                        )}
+                                        {/* Zeichnungen als SVG-Overlay */}
+                                        <svg style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none'}}>
+                                            {fullscreenEdit.drawings.map((d, di) => (
+                                                d.points && d.points.length > 1 ? (
+                                                    <polyline key={di}
+                                                        points={d.points.map(p => (p.x*100)+'%,'+(p.y*100)+'%').join(' ')}
+                                                        fill="none" stroke={d.color} strokeWidth={d.width} strokeLinecap="round" strokeLinejoin="round" />
+                                                ) : null
+                                            ))}
+                                            {fullscreenEdit.currentDraw && fullscreenEdit.currentDraw.points.length > 1 && (
+                                                <polyline
+                                                    points={fullscreenEdit.currentDraw.points.map(p => (p.x*100)+'%,'+(p.y*100)+'%').join(' ')}
+                                                    fill="none" stroke={fullscreenEdit.currentDraw.color} strokeWidth={fullscreenEdit.currentDraw.width}
+                                                    strokeLinecap="round" strokeLinejoin="round" />
+                                            )}
+                                            {/* Crop-Rechteck */}
+                                            {fullscreenEdit.editMode === 'crop' && fullscreenEdit.cropRect && fullscreenEdit.cropRect.w !== 0 && (
+                                                <React.Fragment>
+                                                    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.5)" />
+                                                    <rect
+                                                        x={(Math.min(fullscreenEdit.cropRect.x, fullscreenEdit.cropRect.x + fullscreenEdit.cropRect.w)*100)+'%'}
+                                                        y={(Math.min(fullscreenEdit.cropRect.y, fullscreenEdit.cropRect.y + fullscreenEdit.cropRect.h)*100)+'%'}
+                                                        width={(Math.abs(fullscreenEdit.cropRect.w)*100)+'%'}
+                                                        height={(Math.abs(fullscreenEdit.cropRect.h)*100)+'%'}
+                                                        fill="transparent" stroke="#1e88e5" strokeWidth="2" />
+                                                </React.Fragment>
+                                            )}
+                                        </svg>
+                                    </div>
+
+                                    {/* Untere Toolbar */}
+                                    <div style={{
+                                        display:'flex', gap:'6px', padding:'8px 12px',
+                                        background:'rgba(0,0,0,0.8)', borderTop:'1px solid rgba(255,255,255,0.1)', flexShrink:0
+                                    }}>
+                                        {fullscreenEdit.drawings.length > 0 && (
+                                            <button onClick={() => setFullscreenEdit(p => ({...p, drawings: p.drawings.slice(0,-1)}))} style={{
+                                                flex:1, padding:'8px', borderRadius:'8px', border:'1px solid rgba(255,255,255,0.2)',
+                                                background:'transparent', color:'white', fontSize:'11px', cursor:'pointer'
+                                            }}>Rueckgaengig</button>
+                                        )}
+                                        {fullscreenEdit.cropRect && (
+                                            <button onClick={() => setFullscreenEdit(p => ({...p, cropRect:null}))} style={{
+                                                flex:1, padding:'8px', borderRadius:'8px', border:'1px solid rgba(255,255,255,0.2)',
+                                                background:'transparent', color:'white', fontSize:'11px', cursor:'pointer'
+                                            }}>Crop zuruecksetzen</button>
+                                        )}
+                                        <button onClick={saveFullscreenEdit} style={{
+                                            flex:2, padding:'10px', borderRadius:'8px', border:'none',
+                                            background:'rgba(231,76,60,0.9)', color:'white', fontSize:'13px',
+                                            cursor:'pointer', fontFamily:'Oswald', fontWeight:700, textTransform:'uppercase'
+                                        }}>Speichern</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ═══ FARB-ZUORDNUNGS-POPUP ═══ */}
+                            {farbPopupOpen && (
+                                <div className="modal-overlay" style={{zIndex:9000}} onClick={() => setFarbPopupOpen(null)}>
+                                    <div onClick={e => e.stopPropagation()} style={{
+                                        maxWidth:'380px', width:'90%', maxHeight:'85vh', overflow:'auto',
+                                        borderRadius:'20px', padding:'20px',
+                                        background:'var(--bg-primary)', border:'1px solid var(--border-subtle)'
+                                    }}>
+                                        <div style={{
+                                            fontFamily:'Oswald', fontWeight:700, fontSize:'16px',
+                                            textTransform:'uppercase', letterSpacing:'0.5px',
+                                            color:'var(--text-primary)', marginBottom:'16px',
+                                            display:'flex', alignItems:'center', gap:'8px'
+                                        }}>
+                                            <span style={{fontSize:'20px'}}>{'\uD83C\uDFA8'}</span>
+                                            Farb-Zuordnung: {FOTO_PHASEN.find(p => p.key === farbPopupOpen)?.label || ''}
+                                        </div>
+
+                                        <div style={{
+                                            fontSize:'12px', color:'var(--text-secondary)', lineHeight:1.5,
+                                            marginBottom:'16px', padding:'10px',
+                                            background:'rgba(30,136,229,0.06)', borderRadius:'10px',
+                                            border:'1px solid rgba(30,136,229,0.15)'
+                                        }}>
+                                            Ordne jede Markierungsfarbe einer Position zu. Die KI erkennt die markierten Bereiche und berechnet das Ergebnis in der zugeordneten Einheit.
+                                        </div>
+
+                                        {(farbZuordnung[farbPopupOpen] || []).map((zuordnung, idx) => {
+                                            var farbObj = MARKIERUNGS_FARBEN.find(f => f.id === zuordnung.farbe);
+                                            return (
+                                                <div key={idx} style={{
+                                                    display:'flex', alignItems:'center', gap:'8px',
+                                                    marginBottom:'10px', padding:'10px',
+                                                    background:'var(--bg-tertiary)', borderRadius:'12px',
+                                                    border:'1px solid var(--border-subtle)'
+                                                }}>
+                                                    <div style={{
+                                                        width:'28px', height:'28px', borderRadius:'50%',
+                                                        background: farbObj ? farbObj.hex : '#888',
+                                                        flexShrink:0, border:'2px solid rgba(255,255,255,0.2)'
+                                                    }} />
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'12px', fontWeight:600, color:'var(--text-primary)', marginBottom:'4px'}}>
+                                                            {zuordnung.beschreibung}
+                                                        </div>
+                                                        <select value={zuordnung.position} onChange={e => {
+                                                            setFarbZuordnung(prev => {
+                                                                var updated = Object.assign({}, prev);
+                                                                var arr = (updated[farbPopupOpen] || []).slice();
+                                                                arr[idx] = Object.assign({}, arr[idx], {position: e.target.value});
+                                                                updated[farbPopupOpen] = arr;
+                                                                return updated;
+                                                            });
+                                                        }} style={{
+                                                            width:'100%', padding:'6px 8px',
+                                                            background:'var(--bg-primary)', border:'1px solid var(--border-subtle)',
+                                                            borderRadius:'8px', color:'var(--text-primary)', fontSize:'11px'
+                                                        }}>
+                                                            <option value="">-- Position waehlen --</option>
+                                                            {posCards.map(p => (
+                                                                <option key={p.pos} value={p.pos}>{p.pos} - {(p.bez || 'Position').substring(0, 40)}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div style={{
+                                                        padding:'3px 8px', borderRadius:'6px',
+                                                        background:'rgba(255,255,255,0.08)',
+                                                        fontSize:'10px', color:'var(--text-muted)', fontWeight:600, flexShrink:0
+                                                    }}>{zuordnung.einheit}</div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        <button onClick={() => setFarbPopupOpen(null)} style={{
+                                            width:'100%', padding:'12px', marginTop:'10px', borderRadius:'12px',
+                                            border:'none', cursor:'pointer', fontFamily:'Oswald', fontWeight:700,
+                                            fontSize:'14px', textTransform:'uppercase',
+                                            background:'var(--accent-blue)', color:'white'
+                                        }}>Fertig</button>
                                     </div>
                                 </div>
                             )}
