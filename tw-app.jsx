@@ -1575,32 +1575,40 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
-                    {/* -- GLOBALE SCHNELLNAVIGATION: 6 rote Buttons in einer Reihe -- */}
+                    {/* -- GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe -- */}
                     {page !== 'start' && (
-                        <div style={{display:'flex', gap:'4px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
+                        <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
                             <button onClick={function(){ navigateTo('start'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
-                                {'\uD83C\uDFE0'} Start
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Start
                             </button>
                             <button onClick={function(){ navigateTo('kundenModus'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
-                                {'\uD83D\uDC77'} Kunden
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Kunden
                             </button>
                             <button onClick={function(){ navigateTo('auswahl'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
-                                {'\uD83D\uDCC2'} Baustellen
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Baustell.
                             </button>
                             <button onClick={function(){ navigateTo('datenUebersicht'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0}}>
-                                {'\uD83D\uDCCB'} Daten
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Daten
                             </button>
                             <button onClick={function(){ navigateTo('ordnerBrowser'); }} disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: page === 'ordnerBrowser' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 1 : 0.4, minWidth:0}}>
-                                {'\uD83D\uDCC1'} Ordner
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: page === 'ordnerBrowser' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Ordner
                             </button>
                             <button onClick={function(){ navigateTo('modulwahl'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0}}>
-                                {'\uD83D\uDCDA'} Module
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Module
+                            </button>
+                            <button onClick={function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); }}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Akte
+                            </button>
+                            <button onClick={function(){ if (window._akteSpeichernHandler) window._akteSpeichernHandler(); }}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Speich.
                             </button>
                         </div>
                     )}

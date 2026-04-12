@@ -7951,51 +7951,26 @@
             const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
             const [kiFotoErgebnisse, setKiFotoErgebnisse] = useState(null);
 
-            // ── Akten-Management (Skill: aufmass-details-erweiterung) ──
+            // ── NEU: Akten-Management States ──
             const [aktePopupOpen, setAktePopupOpen] = useState(false);
             const [akteOrdner, setAkteOrdner] = useState([]);
             const [akteSelectedOrdner, setAkteSelectedOrdner] = useState(null);
             const [akteLoading, setAkteLoading] = useState(false);
             const [saveStatus, setSaveStatus] = useState('idle');
 
-            // ── Wand-Verwaltung (dynamische Wandanzahl) ──
-            const [wandAnzahl, setWandAnzahl] = useState(() => {
-                if (reEdit && reEdit.wandAnzahl) return reEdit.wandAnzahl;
-                if (reEdit && reEdit.wandMasse) return reEdit.wandMasse.length;
-                if (hasData && raum.waende) return raum.waende.length;
-                if (raum && raum.waende && raum.waende.length > 0) return raum.waende.length;
-                return 4;
-            });
+            // ── NEU: Wand-Verwaltung States ──
+            const [wandAnzahl, setWandAnzahl] = useState(4);
             const [wandAnzahlPopupOpen, setWandAnzahlPopupOpen] = useState(false);
             const [masseKopieren, setMasseKopieren] = useState(false);
-            const [wandMasse, setWandMasse] = useState(() => {
-                // RE-EDIT: gespeicherte Wandmasse uebernehmen
-                if (reEdit && reEdit.wandMasse) return reEdit.wandMasse.map(function(w) { return {...w, l: w.l || w.wert || '', wert: w.wert || w.l || ''}; });
-                // Aus erkanntem Raum
-                if (hasData && raum.waende && raum.waende.length > 0) {
-                    return raum.waende.map(function(w) { return { id: w.id, label: 'Wand ' + w.id, l: formatMass(w.l), wert: formatMass(w.l) }; });
-                }
-                // Manuell eingegebene Waende
-                if (raum && raum.waende && raum.waende.length > 0) {
-                    return raum.waende.map(function(w) { return { id: w.id, label: 'Wand ' + w.id, l: formatMass(w.l), wert: formatMass(w.l) }; });
-                }
-                // Default: 4 leere Waende
-                var buchstaben = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                var arr = [];
-                for (var i = 0; i < 4; i++) {
-                    arr.push({ id: buchstaben[i], label: 'Wand ' + buchstaben[i], l: '', wert: '' });
-                }
-                return arr;
-            });
 
-            // ── Handskizze erweitert ──
-            const [zeichnenAktiv, setZeichnenAktiv] = useState(false); // DEFAULT: AUS!
+            // ── NEU: Handskizze erweiterte States ──
+            const [zeichnenAktiv, setZeichnenAktiv] = useState(false);
             const [loeschModus, setLoeschModus] = useState(null);
             const [loeschMenuOpen, setLoeschMenuOpen] = useState(false);
             const [stiftEmpfindlichkeit, setStiftEmpfindlichkeit] = useState(5);
             const [empfindlichkeitPopupOpen, setEmpfindlichkeitPopupOpen] = useState(false);
             const [spracheAktiv, setSpracheAktiv] = useState(false);
-            const [speechRecognitionRef, setSpeechRecognitionRef] = useState(null);
+            const [speechRecognitionInst, setSpeechRecognitionInst] = useState(null);
 
             const handleTabChange = (tabIdx) => {
                 setRbTab(tabIdx);
@@ -8020,9 +7995,21 @@
                 setHasUnsavedChanges(true);
             }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos]);
 
-
             // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
+            const [wandMasse, setWandMasse] = useState(() => {
+                if (reEdit && reEdit.wandMasse) return reEdit.wandMasse.map(w => ({...w}));
+                if (hasData) {
+                    return raum.waende.map(w => ({ id: w.id, l: formatMass(w.l) }));
+                }
+                // Auch manuell eingegebene Wände übernehmen (z.B. aus Raumerkennung)
+                if (raum && raum.waende && raum.waende.length > 0) {
+                    return raum.waende.map(w => ({ id: w.id, l: formatMass(w.l) }));
+                }
+                // WICHTIG: KEINE Wandmaße aus Vorraum übernehmen!
+                // Neuer Raum beginnt immer mit leeren Wandmaßen
+                return [];
+            });
             const [abzuege, setAbzuege] = useState(() => {
                 // ═══ RE-EDIT: Gespeicherte Daten direkt übernehmen ═══
                 if (reEdit && reEdit.abzuege) return reEdit.abzuege.map(a => ({...a}));
@@ -9465,6 +9452,208 @@
                 }
             };
 
+            // ══════════════════════════════════════════════════════
+            // ── NEU: Akten-Management Handler (Skill Punkt 2+3) ──
+            // ══════════════════════════════════════════════════════
+
+            var handleAkteSpeichern = async function() {
+                setSaveStatus('saving');
+                try {
+                    var service = window.GoogleDriveService;
+                    if (!service || !service.accessToken) {
+                        alert('Google Drive nicht verbunden. Bitte zuerst verbinden.');
+                        setSaveStatus('error');
+                        setTimeout(function() { setSaveStatus('idle'); }, 3000);
+                        return;
+                    }
+                    if (typeof XLSX === 'undefined') {
+                        alert('SheetJS nicht geladen. Excel-Export nicht moeglich.');
+                        setSaveStatus('error');
+                        return;
+                    }
+                    var wb = XLSX.utils.book_new();
+                    var raumRows = [
+                        { Feld: 'Raum', Wert: raumName },
+                        { Feld: 'Laenge', Wert: masse.laenge },
+                        { Feld: 'Breite', Wert: masse.breite },
+                        { Feld: 'Hoehe', Wert: masse.hoehe },
+                        { Feld: 'Raumhoehe', Wert: masse.raumhoehe },
+                        { Feld: 'Abdichtungshoehe', Wert: masse.abdichtungshoehe },
+                        { Feld: 'Sockelhoehe', Wert: masse.sockelhoehe },
+                        { Feld: 'Wandanzahl', Wert: wandAnzahl }
+                    ];
+                    wandMasse.forEach(function(w) {
+                        raumRows.push({ Feld: 'Wand ' + w.id, Wert: w.l || '' });
+                    });
+                    var ws1 = XLSX.utils.json_to_sheet(raumRows);
+                    XLSX.utils.book_append_sheet(wb, ws1, 'Raumdaten');
+                    var posRows = posCards.map(function(p) {
+                        return { Position: p.nr || p.pos, Bezeichnung: p.bezeichnung || p.bez, Einheit: p.einheit, Ergebnis: calcPositionResult(p) };
+                    });
+                    if (posRows.length > 0) {
+                        var ws2 = XLSX.utils.json_to_sheet(posRows);
+                        XLSX.utils.book_append_sheet(wb, ws2, 'Positionen');
+                    }
+                    var xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                    var kundeName = (kunde && kunde.name) || 'Unbekannt';
+                    var now = new Date();
+                    var dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+                    var timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+                    var fileName = kundeName.replace(/[^a-zA-Z0-9]/g, '_') + '_Aufmass_' + dateStr + '_' + timeStr + '.xlsx';
+                    var kundeOrdnerId = kunde && kunde._driveFolderId;
+                    if (kundeOrdnerId) {
+                        var aufmassOrdner = await service.findOrCreateFolder('Aufmass', kundeOrdnerId);
+                        var ordnerId = aufmassOrdner.id || aufmassOrdner;
+                        var blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        await service.uploadFile(blob, fileName, ordnerId);
+                    } else {
+                        var blob2 = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                        var url = URL.createObjectURL(blob2);
+                        var a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                    setSaveStatus('saved');
+                    setTimeout(function() { setSaveStatus('idle'); }, 3000);
+                } catch (err) {
+                    console.error('Akte speichern fehlgeschlagen:', err);
+                    setSaveStatus('error');
+                    setTimeout(function() { setSaveStatus('idle'); }, 4000);
+                }
+            };
+
+            var loadBearbeiteteAkten = async function() {
+                setAkteLoading(true);
+                try {
+                    var service = window.GoogleDriveService;
+                    if (!service || !service.accessToken || !(kunde && kunde._driveFolderId)) {
+                        setAkteOrdner([]);
+                        setAkteLoading(false);
+                        return;
+                    }
+                    var modulOrdner = ['Aufmass', 'Rechnung', 'Schriftverkehr', 'Ausgangsbuch', 'Baustelle'];
+                    var ergebnis = [];
+                    for (var oi = 0; oi < modulOrdner.length; oi++) {
+                        try {
+                            var ordnerName = modulOrdner[oi];
+                            var ordner = await service.findFolder(ordnerName, kunde._driveFolderId);
+                            if (ordner) {
+                                var files = await service.listFiles(ordner.id || ordner, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                                if (files && files.length > 0) {
+                                    ergebnis.push({
+                                        name: ordnerName, id: ordner.id || ordner, modul: ordnerName.toLowerCase(),
+                                        files: files.map(function(f) { return { id: f.id, name: f.name, modifiedTime: f.modifiedTime, size: f.size }; })
+                                    });
+                                }
+                            }
+                        } catch(e) { /* Ordner existiert nicht */ }
+                    }
+                    setAkteOrdner(ergebnis);
+                } catch(e) { console.error('Akten laden fehlgeschlagen:', e); setAkteOrdner([]); }
+                setAkteLoading(false);
+            };
+
+            var handleAkteOeffnen = async function(ordner, file) {
+                try {
+                    var service = window.GoogleDriveService;
+                    var xlsxData = await service.downloadFile(file.id);
+                    var wb = XLSX.read(xlsxData, { type: 'array' });
+                    var ws = wb.Sheets[wb.SheetNames[0]];
+                    var jsonData = XLSX.utils.sheet_to_json(ws);
+                    jsonData.forEach(function(row) {
+                        if (row.Feld === 'Raum') setRaumName(row.Wert || '');
+                        if (row.Feld === 'Laenge') setMasse(function(p) { return {...p, laenge: row.Wert || ''}; });
+                        if (row.Feld === 'Breite') setMasse(function(p) { return {...p, breite: row.Wert || ''}; });
+                        if (row.Feld === 'Hoehe') setMasse(function(p) { return {...p, hoehe: row.Wert || ''}; });
+                        if (row.Feld === 'Raumhoehe') setMasse(function(p) { return {...p, raumhoehe: row.Wert || ''}; });
+                        if (row.Feld === 'Abdichtungshoehe') setMasse(function(p) { return {...p, abdichtungshoehe: row.Wert || ''}; });
+                        if (row.Feld === 'Sockelhoehe') setMasse(function(p) { return {...p, sockelhoehe: row.Wert || ''}; });
+                    });
+                    setAktePopupOpen(false);
+                    setAkteSelectedOrdner(null);
+                } catch(e) {
+                    console.error('Akte oeffnen fehlgeschlagen:', e);
+                    alert('Fehler beim Oeffnen der Akte: ' + e.message);
+                }
+            };
+
+            // ══════════════════════════════════════════════════════
+            // ── NEU: Wandanzahl + Masse kopieren (Skill Punkt 4) ──
+            // ══════════════════════════════════════════════════════
+
+            var handleWandAnzahlChange = function(neueAnzahl) {
+                var n = parseInt(neueAnzahl) || 4;
+                if (n < 3) n = 3;
+                if (n > 12) n = 12;
+                setWandAnzahl(n);
+                var buchstaben = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                var neueWandMasse = [];
+                for (var i = 0; i < n; i++) {
+                    neueWandMasse.push({
+                        id: buchstaben[i],
+                        l: (wandMasse[i] && wandMasse[i].l) || '',
+                    });
+                }
+                setWandMasse(neueWandMasse);
+                setWandAnzahlPopupOpen(false);
+            };
+
+            var handleWandMassChangeNew = function(idx, value) {
+                var neueWandMasse = wandMasse.map(function(w) { return {...w}; });
+                neueWandMasse[idx] = { ...neueWandMasse[idx], l: value };
+                if (masseKopieren) {
+                    if (idx === 0 && neueWandMasse.length > 2) {
+                        neueWandMasse[2] = { ...neueWandMasse[2], l: value };
+                    }
+                    if (idx === 1 && neueWandMasse.length > 3) {
+                        neueWandMasse[3] = { ...neueWandMasse[3], l: value };
+                    }
+                }
+                setWandMasse(neueWandMasse);
+            };
+
+            // ══════════════════════════════════════════════════════
+            // ── NEU: Spracheingabe (Skill Punkt 5.6) ──
+            // ══════════════════════════════════════════════════════
+
+            var startSpracheingabe = function() {
+                var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SR) { alert('Spracheingabe wird von diesem Browser nicht unterstuetzt.'); return; }
+                var recognition = new SR();
+                recognition.lang = 'de-DE';
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.onresult = function(event) {
+                    var result = event.results[event.results.length - 1];
+                    if (result.isFinal) {
+                        var text = result[0].transcript.trim();
+                        var zahlenMatch = text.match(/(\d+[\.,]?\d*)/);
+                        if (zahlenMatch) {
+                            var focusedInput = document.activeElement;
+                            if (focusedInput && (focusedInput.classList.contains('masse-input') || focusedInput.tagName === 'INPUT')) {
+                                var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                                setter.call(focusedInput, zahlenMatch[1].replace(',', '.'));
+                                focusedInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        }
+                    }
+                };
+                recognition.onerror = function() { setSpracheAktiv(false); };
+                recognition.start();
+                setSpeechRecognitionInst(recognition);
+                setSpracheAktiv(true);
+            };
+            var stopSpracheingabe = function() {
+                if (speechRecognitionInst) { speechRecognitionInst.stop(); }
+                setSpracheAktiv(false);
+            };
+
+            // ── Window-Handler fuer Haupt-Nav Akte-Buttons ──
+            useEffect(function() {
+                window._akteOeffnenHandler = function() { setAktePopupOpen(true); loadBearbeiteteAkten(); };
+                window._akteSpeichernHandler = handleAkteSpeichern;
+                return function() { delete window._akteOeffnenHandler; delete window._akteSpeichernHandler; };
+            }, []);
+
             // ── 3-Phasen Foto-Handler ──
             const getWallIds = () => {
                 if (wandMasse && wandMasse.length > 0) {
@@ -10209,17 +10398,30 @@
             useEffect(() => { if (grundrissModus === 'skizze') skizzeRedraw(); }, [skizze, grundrissModus]);
 
             const handleSkizzeStart = (e) => {
+                if (!zeichnenAktiv) return; // Zeichnen muss aktiviert sein!
                 e.preventDefault();
+                // Empfindlichkeits-Filter
+                var pressure = e.pressure || 0.5;
+                var minPressure = stiftEmpfindlichkeit / 20;
+                if (pressure < minPressure) return;
                 const pos = skizzeSnap(skizzeGetPos(e));
                 setSkizze(prev => ({...prev, currentPath: { points: [pos], color: prev.penColor, width: prev.penWidth }}));
             };
             const handleSkizzeMove = (e) => {
+                if (!zeichnenAktiv) return;
                 if (!skizze.currentPath) return;
                 e.preventDefault();
                 const pos = skizzeGetPos(e);
+                // Mindest-Bewegungsdistanz
+                var lastPt = skizze.currentPath.points[skizze.currentPath.points.length - 1];
+                var minDist = 11 - stiftEmpfindlichkeit;
+                var dx = pos.x - lastPt.x;
+                var dy = pos.y - lastPt.y;
+                if (Math.sqrt(dx*dx + dy*dy) < minDist) return;
                 setSkizze(prev => ({...prev, currentPath: {...prev.currentPath, points: [...prev.currentPath.points, pos]}}));
             };
             const handleSkizzeEnd = () => {
+                if (!zeichnenAktiv) return;
                 if (!skizze.currentPath) return;
                 const path = {...skizze.currentPath};
                 const last = path.points[path.points.length - 1];
@@ -10451,234 +10653,6 @@
                 );
             };
 
-            // ── Akten-Management Handler ──
-            const handleAkteSpeichern = async function() {
-                setSaveStatus('saving');
-                try {
-                    var service = window.GoogleDriveService;
-                    if (!service || !service.accessToken) {
-                        alert('Google Drive nicht verbunden. Bitte zuerst verbinden.');
-                        setSaveStatus('error');
-                        return;
-                    }
-                    // Daten sammeln
-                    var exportData = {
-                        raumName: raumName,
-                        masse: masse,
-                        wandMasse: wandMasse,
-                        wandAnzahl: wandAnzahl,
-                        rbTab: rbTab,
-                        datum: new Date().toISOString()
-                    };
-                    // Excel mit SheetJS erstellen
-                    if (typeof XLSX === 'undefined') {
-                        alert('SheetJS nicht geladen. Excel-Export nicht moeglich.');
-                        setSaveStatus('error');
-                        return;
-                    }
-                    var wb = XLSX.utils.book_new();
-                    // Blatt 1: Raumdaten
-                    var raumRows = [
-                        { Feld: 'Raum', Wert: raumName },
-                        { Feld: 'Laenge', Wert: masse.laenge },
-                        { Feld: 'Breite', Wert: masse.breite },
-                        { Feld: 'Hoehe', Wert: masse.hoehe },
-                        { Feld: 'Raumhoehe', Wert: masse.raumhoehe },
-                        { Feld: 'Abdichtungshoehe', Wert: masse.abdichtungshoehe },
-                        { Feld: 'Sockelhoehe', Wert: masse.sockelhoehe },
-                        { Feld: 'Wandanzahl', Wert: wandAnzahl }
-                    ];
-                    wandMasse.forEach(function(w) {
-                        raumRows.push({ Feld: 'Wand ' + w.id, Wert: w.wert || w.l || '' });
-                    });
-                    var ws1 = XLSX.utils.json_to_sheet(raumRows);
-                    XLSX.utils.book_append_sheet(wb, ws1, 'Raumdaten');
-                    // Blatt 2: Positionen (posCards direkt ohne calcPositionResult)
-                    var posRows = posCards.map(function(p) {
-                        return { Position: p.nr || p.pos, Bezeichnung: p.bezeichnung || p.bez, Einheit: p.einheit };
-                    });
-                    if (posRows.length > 0) {
-                        var ws2 = XLSX.utils.json_to_sheet(posRows);
-                        XLSX.utils.book_append_sheet(wb, ws2, 'Positionen');
-                    }
-                    var xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-                    // In Google Drive speichern
-                    var kundeName = (kunde && kunde.name) || 'Unbekannt';
-                    var now = new Date();
-                    var dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
-                    var timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-                    var fileName = kundeName.replace(/[^a-zA-Z0-9]/g, '_') + '_Aufmass_' + dateStr + '_' + timeStr + '.xlsx';
-                    // Kundenordner finden
-                    var kundeOrdnerId = kunde && kunde._driveFolderId;
-                    if (kundeOrdnerId) {
-                        // Unterordner Aufmass finden oder erstellen
-                        var aufmassOrdner = await service.findOrCreateFolder('Aufmass', kundeOrdnerId);
-                        var blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                        await service.uploadFile(blob, fileName, aufmassOrdner.id || aufmassOrdner);
-                    } else {
-                        // Fallback: lokaler Download
-                        var blob2 = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                        var url = URL.createObjectURL(blob2);
-                        var a = document.createElement('a');
-                        a.href = url; a.download = fileName; a.click();
-                        URL.revokeObjectURL(url);
-                    }
-                    setSaveStatus('saved');
-                    setTimeout(function() { setSaveStatus('idle'); }, 3000);
-                } catch (err) {
-                    console.error('Akte speichern fehlgeschlagen:', err);
-                    setSaveStatus('error');
-                    setTimeout(function() { setSaveStatus('idle'); }, 4000);
-                }
-            };
-
-            const loadBearbeiteteAkten = async function() {
-                setAkteLoading(true);
-                try {
-                    var service = window.GoogleDriveService;
-                    if (!service || !service.accessToken) {
-                        setAkteOrdner([]);
-                        setAkteLoading(false);
-                        return;
-                    }
-                    var kundeOrdnerId = kunde && kunde._driveFolderId;
-                    if (!kundeOrdnerId) {
-                        setAkteOrdner([]);
-                        setAkteLoading(false);
-                        return;
-                    }
-                    var modulOrdner = ['Aufmass', 'Rechnung', 'Schriftverkehr', 'Ausgangsbuch', 'Baustelle'];
-                    var ergebnis = [];
-                    for (var oi = 0; oi < modulOrdner.length; oi++) {
-                        var ordnerName = modulOrdner[oi];
-                        try {
-                            var ordner = await service.findFolder(ordnerName, kundeOrdnerId);
-                            if (ordner) {
-                                var files = await service.listFiles(ordner.id || ordner, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-                                if (files && files.length > 0) {
-                                    ergebnis.push({
-                                        name: ordnerName,
-                                        id: ordner.id || ordner,
-                                        modul: ordnerName.toLowerCase(),
-                                        files: files.map(function(f) {
-                                            return { id: f.id, name: f.name, modifiedTime: f.modifiedTime, size: f.size };
-                                        })
-                                    });
-                                }
-                            }
-                        } catch(e) { /* Ordner existiert nicht */ }
-                    }
-                    setAkteOrdner(ergebnis);
-                } catch(e) {
-                    console.error('Akten laden fehlgeschlagen:', e);
-                    setAkteOrdner([]);
-                }
-                setAkteLoading(false);
-            };
-
-            const handleAkteOeffnen = async function(ordner, file) {
-                try {
-                    var service = window.GoogleDriveService;
-                    var xlsxData = await service.downloadFile(file.id);
-                    var wb = XLSX.read(xlsxData, { type: 'array' });
-                    var ws = wb.Sheets[wb.SheetNames[0]];
-                    var jsonData = XLSX.utils.sheet_to_json(ws);
-                    // Daten in State laden
-                    jsonData.forEach(function(row) {
-                        if (row.Feld === 'Raum') setRaumName(row.Wert || '');
-                        if (row.Feld === 'Laenge') setMasse(function(p) { return {...p, laenge: row.Wert || ''}; });
-                        if (row.Feld === 'Breite') setMasse(function(p) { return {...p, breite: row.Wert || ''}; });
-                        if (row.Feld === 'Hoehe') setMasse(function(p) { return {...p, hoehe: row.Wert || ''}; });
-                        if (row.Feld === 'Raumhoehe') setMasse(function(p) { return {...p, raumhoehe: row.Wert || ''}; });
-                        if (row.Feld === 'Abdichtungshoehe') setMasse(function(p) { return {...p, abdichtungshoehe: row.Wert || ''}; });
-                        if (row.Feld === 'Sockelhoehe') setMasse(function(p) { return {...p, sockelhoehe: row.Wert || ''}; });
-                    });
-                    setAktePopupOpen(false);
-                    setAkteSelectedOrdner(null);
-                } catch(e) {
-                    console.error('Akte oeffnen fehlgeschlagen:', e);
-                    alert('Fehler beim Oeffnen der Akte: ' + e.message);
-                }
-            };
-
-            // ── Wandanzahl aendern ──
-            const handleWandAnzahlChange = function(neueAnzahl) {
-                var n = parseInt(neueAnzahl) || 4;
-                if (n < 3) n = 3;
-                if (n > 12) n = 12;
-                setWandAnzahl(n);
-                var buchstaben = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                var neueWandMasse = [];
-                for (var i = 0; i < n; i++) {
-                    var existingWert = (wandMasse[i] && (wandMasse[i].wert || wandMasse[i].l)) || '';
-                    neueWandMasse.push({
-                        id: buchstaben[i],
-                        label: 'Wand ' + buchstaben[i],
-                        l: existingWert,
-                        wert: existingWert
-                    });
-                }
-                setWandMasse(neueWandMasse);
-                setWandAnzahlPopupOpen(false);
-            };
-
-            // ── Wandmass aendern mit Kopier-Logik ──
-            const handleWandMassChange = function(idx, value) {
-                var neueWandMasse = wandMasse.map(function(w) { return {...w}; });
-                neueWandMasse[idx] = { ...neueWandMasse[idx], wert: value, l: value };
-                // Masze-Kopier-Logik (NUR wenn aktiviert)
-                if (masseKopieren) {
-                    if (idx === 0 && neueWandMasse.length > 2) {
-                        neueWandMasse[2] = { ...neueWandMasse[2], wert: value, l: value };
-                    }
-                    if (idx === 1 && neueWandMasse.length > 3) {
-                        neueWandMasse[3] = { ...neueWandMasse[3], wert: value, l: value };
-                    }
-                }
-                setWandMasse(neueWandMasse);
-            };
-
-            // ── Spracheingabe ──
-            const startSpracheingabe = function() {
-                var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SR) {
-                    alert('Spracheingabe wird von diesem Browser nicht unterstuetzt.');
-                    return;
-                }
-                var recognition = new SR();
-                recognition.lang = 'de-DE';
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.onresult = function(event) {
-                    var result = event.results[event.results.length - 1];
-                    if (result.isFinal) {
-                        var text = result[0].transcript.trim();
-                        // Zahlen erkennen und in fokussiertes Eingabefeld eintragen
-                        var zahlenMatch = text.match(/(\d+[\.,]?\d*)/);
-                        if (zahlenMatch) {
-                            var focusedInput = document.activeElement;
-                            if (focusedInput && (focusedInput.classList.contains('masse-input') || focusedInput.tagName === 'INPUT')) {
-                                var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                                nativeInputValueSetter.call(focusedInput, zahlenMatch[1].replace(',', '.'));
-                                focusedInput.dispatchEvent(new Event('input', { bubbles: true }));
-                            }
-                        }
-                    }
-                };
-                recognition.onerror = function(e) {
-                    console.error('Spracheingabe Fehler:', e);
-                    setSpracheAktiv(false);
-                };
-                recognition.start();
-                setSpeechRecognitionRef(recognition);
-                setSpracheAktiv(true);
-            };
-            const stopSpracheingabe = function() {
-                if (speechRecognitionRef) {
-                    speechRecognitionRef.stop();
-                }
-                setSpracheAktiv(false);
-            };
             return (
                 <div className="page-container">
                     <div className="breadcrumb">
@@ -10713,149 +10687,106 @@
                         </div>
                     )}
 
-                    {/* ═══ HAUPT-NAVIGATIONSLEISTE (8 Buttons, 2 Zeilen) ═══ */}
-                    <div className="nav-toolbar-wrapper">
-                        {/* Zeile 1: Standard-Navigation (6 Buttons) */}
-                        <div className="nav-toolbar-row">
-                            {onBack && (
-                                <button className="nav-toolbar-btn" onClick={onBack}>Zurueck</button>
-                            )}
-                            {onShowGesamtliste && (
-                                <button className="nav-toolbar-btn" onClick={function() { onShowGesamtliste(); }}>Gesamtliste</button>
-                            )}
-                            {onFinishRaum && (
-                                <button className="nav-toolbar-btn" onClick={function() {
-                                    handleTabChange(3);
-                                }}>Raum fertig</button>
-                            )}
-                            {onAufmassBeenden && (
-                                <button className="nav-toolbar-btn" onClick={onAufmassBeenden}>Aufmass beenden</button>
-                            )}
-                        </div>
-                        {/* Zeile 2: Akten-Management (2 Buttons) */}
-                        <div className="nav-toolbar-row">
-                            <button className="nav-toolbar-btn akte-action"
-                                onClick={function() { setAktePopupOpen(true); loadBearbeiteteAkten(); }}>
-                                Bearbeitete Akte oeffnen
-                            </button>
-                            <button className="nav-toolbar-btn akte-action"
-                                onClick={handleAkteSpeichern}>
-                                {saveStatus === 'saving' ? 'Speichert...' : 'Akte speichern'}
-                            </button>
-                        </div>
+                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raum fertig, Aufmass beenden) ═══ */}
+                    <div className="rb-nav-red" style={{
+                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'2px'
+                    }}>
+                        {onBack && (
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={onBack}>Zurueck</button>
+                        )}
+                        {onShowGesamtliste && (
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { onShowGesamtliste(); }}>Gesamtliste</button>
+                        )}
+                        {onFinishRaum && (
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { handleTabChange(3); }}>Raum fertig</button>
+                        )}
+                        {onAufmassBeenden && (
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={onAufmassBeenden}>Aufmass beenden</button>
+                        )}
                     </div>
 
-                    {/* ═══ RAUMBLATT SUB-NAVIGATION (6 Buttons, 2 Zeilen) ═══ */}
-                    <div className="raumblatt-sub-nav">
-                        {/* Zeile 1: Tab-Buttons (Grundriss, Fotos, Oeffnungen, Positionen) */}
-                        <div className="nav-toolbar-row">
-                            {[
-                                {id: 0, label: 'Grundriss'},
-                                {id: 1, label: 'Fotos'},
-                                {id: 2, label: 'Oeffnungen'},
-                                {id: 3, label: 'Positionen'}
-                            ].map(function(tab) {
-                                var isActive = rbTab === tab.id;
-                                return (
-                                    <button key={tab.id}
-                                        className={'nav-toolbar-btn' + (isActive ? ' active' : '')}
-                                        onClick={function() { handleTabChange(tab.id); }}>
-                                        {tab.label}
-                                        {tab.id === 3 && posCards.length > 0 ? ' (' + posCards.filter(function(p) { return calcPositionResult(p) > 0; }).length + '/' + posCards.length + ')' : ''}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {/* Zeile 2: Wandanzahl + Masze kopieren */}
-                        <div className="nav-toolbar-row">
-                            <button className="nav-toolbar-btn"
-                                onClick={function() { setWandAnzahlPopupOpen(true); }}>
-                                Waende: {wandAnzahl}
-                            </button>
-                            <button className={'nav-toolbar-btn' + (masseKopieren ? ' active' : '')}
-                                onClick={function() { setMasseKopieren(!masseKopieren); }}>
-                                Masze kopieren {masseKopieren ? 'JA' : 'NEIN'}
-                            </button>
-                        </div>
+                    {/* ═══ LEISTE 3: BLAUE TAB-NAVIGATION (6 Buttons in 1 Reihe) ═══ */}
+                    <div className="rb-nav-blue" style={{
+                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'8px'
+                    }}>
+                        {[
+                            {id: 0, label: 'Grundriss'},
+                            {id: 1, label: 'Fotos'},
+                            {id: 2, label: 'Oeffnungen'},
+                            {id: 3, label: 'Pos. (' + posCards.filter(function(p) { return calcPositionResult(p) > 0; }).length + '/' + posCards.length + ')'}
+                        ].map(function(tab) {
+                            return (
+                                <button key={tab.id}
+                                    className={'rb-nav-btn rb-nav-blue-btn' + (rbTab === tab.id ? ' active' : '')}
+                                    onClick={function() { handleTabChange(tab.id); }}>
+                                    {tab.label}
+                                </button>
+                            );
+                        })}
+                        <button className="rb-nav-btn rb-nav-blue-btn"
+                            onClick={function() { setWandAnzahlPopupOpen(true); }}>
+                            Waende: {wandAnzahl}
+                        </button>
+                        <button className={'rb-nav-btn rb-nav-blue-btn' + (masseKopieren ? ' active' : '')}
+                            onClick={function() { setMasseKopieren(!masseKopieren); }}>
+                            Masse kop. {masseKopieren ? 'JA' : 'NEIN'}
+                        </button>
                     </div>
 
                     {/* Save-Status Toast */}
                     {saveStatus !== 'idle' && (
-                        <div className={'save-toast ' + saveStatus}>
+                        <div style={{
+                            textAlign:'center', padding:'8px', marginBottom:'6px', borderRadius:'8px', fontSize:'12px', fontWeight:600,
+                            background: saveStatus === 'saving' ? 'rgba(77,166,255,0.12)' : saveStatus === 'saved' ? 'rgba(39,174,96,0.12)' : 'rgba(196,30,30,0.12)',
+                            color: saveStatus === 'saving' ? 'var(--accent-blue)' : saveStatus === 'saved' ? '#27ae60' : 'var(--accent-red-light)',
+                            border: '1px solid ' + (saveStatus === 'saving' ? 'rgba(77,166,255,0.25)' : saveStatus === 'saved' ? 'rgba(39,174,96,0.25)' : 'rgba(196,30,30,0.25)')
+                        }}>
                             {saveStatus === 'saving' && 'Speichert auf Google Drive...'}
                             {saveStatus === 'saved' && 'Akte gespeichert!'}
                             {saveStatus === 'error' && 'Fehler beim Speichern!'}
                         </div>
                     )}
 
-                    {/* ═══ POPUP: Bearbeitete Akte oeffnen ═══ */}
+                    {/* ═══ POPUP: Bearbeitete Akte oeffnen (Skill Punkt 3) ═══ */}
                     {aktePopupOpen && (
                         <div className="modal-overlay" onClick={function() { setAktePopupOpen(false); setAkteSelectedOrdner(null); }}>
                             <div className="modal-content" onClick={function(e) { e.stopPropagation(); }}
                                 style={{maxWidth:'500px', maxHeight:'80vh', overflow:'auto'}}>
                                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
-                                    <h3 style={{fontFamily:'Oswald', fontSize:'18px', fontWeight:700,
-                                        textTransform:'uppercase', letterSpacing:'1px',
-                                        color:'var(--text-white)', margin:0}}>
+                                    <h3 style={{fontFamily:'Oswald', fontSize:'18px', fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', color:'var(--text-white)', margin:0}}>
                                         Bearbeitete Akten
                                     </h3>
-                                    <button style={{background:'none', border:'none', color:'var(--text-muted)',
-                                        fontSize:'20px', cursor:'pointer', padding:'4px'}}
-                                        onClick={function() { setAktePopupOpen(false); setAkteSelectedOrdner(null); }}>
-                                        ✕
-                                    </button>
+                                    <button style={{background:'none', border:'none', color:'var(--text-muted)', fontSize:'20px', cursor:'pointer'}}
+                                        onClick={function() { setAktePopupOpen(false); setAkteSelectedOrdner(null); }}>&#10005;</button>
                                 </div>
-
                                 {akteLoading ? (
-                                    <div style={{padding:'40px', textAlign:'center', color:'var(--text-muted)'}}>
-                                        Lade Akten...
-                                    </div>
+                                    <div style={{padding:'40px', textAlign:'center', color:'var(--text-muted)'}}>Lade Akten...</div>
                                 ) : akteOrdner.length === 0 ? (
-                                    <div style={{padding:'40px', textAlign:'center', color:'var(--text-muted)'}}>
-                                        Keine bearbeiteten Akten fuer diesen Kunden gefunden.
-                                    </div>
+                                    <div style={{padding:'40px', textAlign:'center', color:'var(--text-muted)'}}>Keine bearbeiteten Akten gefunden.</div>
                                 ) : !akteSelectedOrdner ? (
                                     <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
                                         {akteOrdner.map(function(ordner, i) {
-                                            return (
-                                                <button key={i} className="akte-popup-ordner"
-                                                    onClick={function() { setAkteSelectedOrdner(ordner); }}>
-                                                    <div>
-                                                        <div style={{fontFamily:'Oswald', fontSize:'16px', fontWeight:600,
-                                                            color:'var(--text-white)'}}>
-                                                            {ordner.name}
-                                                        </div>
-                                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                                            {ordner.files.length} Dokument{ordner.files.length !== 1 ? 'e' : ''}
-                                                        </div>
-                                                    </div>
-                                                    <span style={{color:'var(--text-muted)', fontSize:'18px'}}>&#8594;</span>
-                                                </button>
-                                            );
+                                            return (<button key={i} style={{cursor:'pointer', textAlign:'left', padding:'16px', display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--bg-card)', border:'1px solid var(--border-color)', borderRadius:'10px'}}
+                                                onClick={function() { setAkteSelectedOrdner(ordner); }}>
+                                                <div>
+                                                    <div style={{fontFamily:'Oswald', fontSize:'16px', fontWeight:600, color:'var(--text-white)'}}>{ordner.name}</div>
+                                                    <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{ordner.files.length} Dokument{ordner.files.length !== 1 ? 'e' : ''}</div>
+                                                </div>
+                                                <span style={{color:'var(--text-muted)', fontSize:'18px'}}>&#8594;</span>
+                                            </button>);
                                         })}
                                     </div>
                                 ) : (
                                     <div>
-                                        <button style={{marginBottom:'12px', padding:'8px 16px', background:'var(--bg-tertiary)',
-                                            border:'none', borderRadius:'8px', color:'var(--text-light)', cursor:'pointer',
-                                            fontFamily:'Oswald', fontSize:'13px', fontWeight:600}}
-                                            onClick={function() { setAkteSelectedOrdner(null); }}>
-                                            &#8592; Zurueck
-                                        </button>
+                                        <button style={{marginBottom:'12px', padding:'8px 16px', background:'var(--bg-tertiary)', border:'none', borderRadius:'8px', color:'var(--text-light)', cursor:'pointer', fontFamily:'Oswald', fontSize:'13px', fontWeight:600}}
+                                            onClick={function() { setAkteSelectedOrdner(null); }}>&#8592; Zurueck</button>
                                         <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
                                             {akteSelectedOrdner.files.map(function(file, i) {
-                                                return (
-                                                    <button key={i} className="akte-popup-file"
-                                                        onClick={function() { handleAkteOeffnen(akteSelectedOrdner, file); }}>
-                                                        <div style={{fontFamily:'Oswald', fontSize:'14px', fontWeight:600,
-                                                            color:'var(--text-white)'}}>
-                                                            {file.name}
-                                                        </div>
-                                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                                            Zuletzt bearbeitet: {file.modifiedTime ? new Date(file.modifiedTime).toLocaleString('de-DE') : '--'}
-                                                        </div>
-                                                    </button>
-                                                );
+                                                return (<button key={i} style={{cursor:'pointer', textAlign:'left', padding:'12px', background:'var(--bg-card)', border:'1px solid var(--border-color)', borderRadius:'10px'}}
+                                                    onClick={function() { handleAkteOeffnen(akteSelectedOrdner, file); }}>
+                                                    <div style={{fontFamily:'Oswald', fontSize:'14px', fontWeight:600, color:'var(--text-white)'}}>{file.name}</div>
+                                                    <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px'}}>Zuletzt: {file.modifiedTime ? new Date(file.modifiedTime).toLocaleString('de-DE') : '--'}</div>
+                                                </button>);
                                             })}
                                         </div>
                                     </div>
@@ -10864,31 +10795,23 @@
                         </div>
                     )}
 
-                    {/* ═══ POPUP: Wandanzahl ═══ */}
+                    {/* ═══ POPUP: Wandanzahl (Skill Punkt 4.5) ═══ */}
                     {wandAnzahlPopupOpen && (
                         <div className="modal-overlay" onClick={function() { setWandAnzahlPopupOpen(false); }}>
                             <div className="modal-content" onClick={function(e) { e.stopPropagation(); }}
                                 style={{maxWidth:'320px', padding:'24px'}}>
-                                <h3 style={{fontFamily:'Oswald', fontSize:'18px', fontWeight:700,
-                                    textTransform:'uppercase', color:'var(--text-white)',
-                                    marginBottom:'16px', textAlign:'center'}}>
+                                <h3 style={{fontFamily:'Oswald', fontSize:'18px', fontWeight:700, textTransform:'uppercase', color:'var(--text-white)', marginBottom:'16px', textAlign:'center'}}>
                                     Anzahl der Waende
                                 </h3>
                                 <div className="masse-input-wrap" style={{marginBottom:'16px'}}>
-                                    <input className="masse-input" type="number" min="3" max="12"
-                                        value={wandAnzahl}
+                                    <input className="masse-input" type="number" min="3" max="12" value={wandAnzahl}
                                         onChange={function(e) { setWandAnzahl(parseInt(e.target.value) || 4); }}
-                                        style={{textAlign:'center', fontSize:'24px', fontWeight:700}}
-                                    />
+                                        style={{textAlign:'center', fontSize:'24px', fontWeight:700}} />
                                 </div>
-                                <div style={{fontSize:'12px', color:'var(--text-muted)', textAlign:'center',
-                                    marginBottom:'16px'}}>
-                                    {wandAnzahl} Waende = Eingabefelder{' '}
-                                    {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0, Math.min(wandAnzahl, 26)).split('').join(', ')}
+                                <div style={{fontSize:'12px', color:'var(--text-muted)', textAlign:'center', marginBottom:'16px'}}>
+                                    {wandAnzahl} Waende = {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.slice(0, Math.min(wandAnzahl, 26)).split('').join(', ')}
                                 </div>
-                                <button style={{width:'100%', padding:'12px', border:'none', borderRadius:'10px',
-                                    background:'var(--accent-blue)', color:'white', fontFamily:'Oswald',
-                                    fontSize:'14px', fontWeight:700, cursor:'pointer'}}
+                                <button style={{width:'100%', padding:'12px', border:'none', borderRadius:'10px', background:'var(--accent-blue)', color:'white', fontFamily:'Oswald', fontSize:'14px', fontWeight:700, cursor:'pointer'}}
                                     onClick={function() { handleWandAnzahlChange(wandAnzahl); }}>
                                     Uebernehmen
                                 </button>
@@ -10896,36 +10819,25 @@
                         </div>
                     )}
 
-                    {/* ═══ POPUP: Stift-Empfindlichkeit ═══ */}
+                    {/* ═══ POPUP: Stift-Empfindlichkeit (Skill Punkt 5.5) ═══ */}
                     {empfindlichkeitPopupOpen && (
                         <div className="modal-overlay" onClick={function() { setEmpfindlichkeitPopupOpen(false); }}>
                             <div className="modal-content" onClick={function(e) { e.stopPropagation(); }}
                                 style={{maxWidth:'320px', padding:'24px'}}>
-                                <h3 style={{fontFamily:'Oswald', fontSize:'18px', fontWeight:700,
-                                    textTransform:'uppercase', color:'var(--text-white)',
-                                    marginBottom:'16px', textAlign:'center'}}>
+                                <h3 style={{fontFamily:'Oswald', fontSize:'18px', fontWeight:700, textTransform:'uppercase', color:'var(--text-white)', marginBottom:'16px', textAlign:'center'}}>
                                     Stift-Empfindlichkeit
                                 </h3>
                                 <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
                                     <span style={{color:'var(--text-muted)', fontSize:'12px'}}>Gering</span>
                                     <input type="range" min="1" max="10" value={stiftEmpfindlichkeit}
                                         onChange={function(e) { setStiftEmpfindlichkeit(parseInt(e.target.value)); }}
-                                        className="empfindlichkeit-slider"
-                                    />
+                                        style={{flex:1, accentColor:'var(--accent-blue)'}} />
                                     <span style={{color:'var(--text-muted)', fontSize:'12px'}}>Hoch</span>
                                 </div>
-                                <div style={{textAlign:'center', fontFamily:'Oswald', fontSize:'24px',
-                                    fontWeight:700, color:'var(--accent-blue)', marginBottom:'16px'}}>
+                                <div style={{textAlign:'center', fontFamily:'Oswald', fontSize:'24px', fontWeight:700, color:'var(--accent-blue)', marginBottom:'16px'}}>
                                     {stiftEmpfindlichkeit}
                                 </div>
-                                <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center',
-                                    marginBottom:'16px'}}>
-                                    Niedrig = weniger Reaktion auf leichte Beruehrung.
-                                    Hoch = reagiert auf jede Beruehrung.
-                                </div>
-                                <button style={{width:'100%', padding:'12px', border:'none', borderRadius:'10px',
-                                    background:'var(--accent-blue)', color:'white', fontFamily:'Oswald',
-                                    fontSize:'14px', fontWeight:700, cursor:'pointer'}}
+                                <button style={{width:'100%', padding:'12px', border:'none', borderRadius:'10px', background:'var(--accent-blue)', color:'white', fontFamily:'Oswald', fontSize:'14px', fontWeight:700, cursor:'pointer'}}
                                     onClick={function() { setEmpfindlichkeitPopupOpen(false); }}>
                                     Uebernehmen
                                 </button>
@@ -10992,39 +10904,51 @@
                         {grundrissModus === 'skizze' && (
                             <React.Fragment>
                                 <div className="grundriss-card-title">
-                                    <span>✏️ Handskizze</span>
+                                    <span>Handskizze</span>
                                 </div>
-                                {/* ═══ NEUE HANDSKIZZE TOOLBAR (4 Buttons) ═══ */}
-                                <div className="skizze-toolbar-new">
-                                    <button className={'nav-toolbar-btn' + (zeichnenAktiv ? ' active' : '')}
+                                {/* ═══ NEUE HANDSKIZZE TOOLBAR (1 Reihe, BLAU, 6 Buttons proportional) ═══ */}
+                                <div style={{
+                                    display:'flex', gap:'3px', margin:'0 0 8px', padding:'4px',
+                                    background:'var(--bg-tertiary)', borderRadius:'10px'
+                                }}>
+                                    <button className={'rb-nav-btn rb-nav-blue-btn' + (zeichnenAktiv ? ' active' : '')}
+                                        style={{fontSize:'10px', minHeight:'32px', padding:'5px 4px'}}
                                         onClick={function() {
                                             setZeichnenAktiv(!zeichnenAktiv);
                                             if (!zeichnenAktiv) setSkizze(function(p) { return {...p, mode:'draw'}; });
                                         }}>
-                                        {zeichnenAktiv ? 'Zeichnen AUS' : 'Zeichnen EIN'}
+                                        {zeichnenAktiv ? 'Zeichn. AUS' : 'Zeichn. EIN'}
                                     </button>
-
-                                    <div style={{position:'relative', flex:'1 1 45%'}}>
-                                        <button className="nav-toolbar-btn"
+                                    <button className={'rb-nav-btn rb-nav-blue-btn' + (skizze.mode === 'label' ? ' active' : '')}
+                                        style={{fontSize:'10px', minHeight:'32px', padding:'5px 4px'}}
+                                        onClick={function() {
+                                            setZeichnenAktiv(true);
+                                            setSkizze(function(p) { return {...p, mode: p.mode === 'label' ? 'draw' : 'label'}; });
+                                        }}>
+                                        Beschriften
+                                    </button>
+                                    <div style={{position:'relative', flex:1}}>
+                                        <button className="rb-nav-btn rb-nav-blue-btn"
+                                            style={{fontSize:'10px', minHeight:'32px', padding:'5px 4px', width:'100%'}}
                                             onClick={function() { setLoeschMenuOpen(!loeschMenuOpen); }}>
-                                            Loesch-Taste
+                                            Loeschen
                                         </button>
                                         {loeschMenuOpen && (
                                             <div style={{
-                                                position:'absolute', top:'100%', left:0, zIndex:200,
+                                                position:'absolute', top:'100%', left:0, zIndex:200, marginTop:'2px',
                                                 background:'var(--bg-card)', border:'1px solid var(--border-color)',
-                                                borderRadius:'10px', padding:'8px', minWidth:'200px',
+                                                borderRadius:'10px', padding:'6px', minWidth:'180px',
                                                 boxShadow:'0 8px 24px rgba(0,0,0,0.4)'
                                             }}>
-                                                <button className="nav-toolbar-btn" style={{width:'100%', marginBottom:'4px', minHeight:'40px', fontSize:'12px'}}
+                                                <button className="rb-nav-btn rb-nav-blue-btn" style={{width:'100%', marginBottom:'4px', fontSize:'11px', minHeight:'34px'}}
                                                     onClick={function() { setLoeschModus('radiergummi'); setLoeschMenuOpen(false); }}>
                                                     Radiergummi
                                                 </button>
-                                                <button className="nav-toolbar-btn" style={{width:'100%', marginBottom:'4px', minHeight:'40px', fontSize:'12px'}}
+                                                <button className="rb-nav-btn rb-nav-blue-btn" style={{width:'100%', marginBottom:'4px', fontSize:'11px', minHeight:'34px'}}
                                                     onClick={function() { handleSkizzeUndo(); setLoeschMenuOpen(false); }}>
-                                                    Loeschfunktion (Undo)
+                                                    Letzte Aktion rueckgaengig
                                                 </button>
-                                                <button className="nav-toolbar-btn" style={{width:'100%', minHeight:'40px', fontSize:'12px',
+                                                <button className="rb-nav-btn" style={{width:'100%', fontSize:'11px', minHeight:'34px',
                                                     background:'rgba(196,30,30,0.15)', color:'var(--accent-red-light)'}}
                                                     onClick={function() {
                                                         if (confirm('Gesamte Zeichnung unwiderruflich loeschen?')) {
@@ -11032,34 +10956,20 @@
                                                         }
                                                         setLoeschMenuOpen(false);
                                                     }}>
-                                                    Ganze Zeichnung loeschen
+                                                    Alles loeschen
                                                 </button>
                                             </div>
                                         )}
                                     </div>
-
-                                    <button className="nav-toolbar-btn"
+                                    <button className="rb-nav-btn rb-nav-blue-btn"
+                                        style={{fontSize:'10px', minHeight:'32px', padding:'5px 4px'}}
                                         onClick={function() { setEmpfindlichkeitPopupOpen(true); }}>
-                                        Empfindl. ({stiftEmpfindlichkeit})
+                                        Empf. ({stiftEmpfindlichkeit})
                                     </button>
-
-                                    <button className={'nav-toolbar-btn' + (spracheAktiv ? ' active' : '')}
+                                    <button className={'rb-nav-btn rb-nav-blue-btn' + (spracheAktiv ? ' active' : '')}
+                                        style={{fontSize:'10px', minHeight:'32px', padding:'5px 4px'}}
                                         onClick={function() { spracheAktiv ? stopSpracheingabe() : startSpracheingabe(); }}>
-                                        {spracheAktiv ? 'Sprache STOP' : 'Spracheingabe'}
-                                    </button>
-                                </div>
-
-                                {/* Beschriften-Toggle (bleibt erhalten) */}
-                                <div style={{display:'flex', gap:'4px', marginBottom:'8px'}}>
-                                    <button className={'nav-toolbar-btn' + (skizze.mode === 'draw' ? ' active' : '')}
-                                        style={{minHeight:'40px', fontSize:'12px'}}
-                                        onClick={function() { setSkizze(function(p) { return {...p, mode:'draw'}; }); }}>
-                                        Zeichnen
-                                    </button>
-                                    <button className={'nav-toolbar-btn' + (skizze.mode === 'label' ? ' active' : '')}
-                                        style={{minHeight:'40px', fontSize:'12px', background: skizze.mode === 'label' ? '#e74c3c' : undefined}}
-                                        onClick={function() { setSkizze(function(p) { return {...p, mode:'label'}; }); }}>
-                                        Beschriften (A,B,C...)
+                                        {spracheAktiv ? 'Sprache STOP' : 'Sprache'}
                                     </button>
                                 </div>
 
@@ -12835,7 +12745,7 @@
                             });
                             // Kompletten Raumzustand für spätere Bearbeitung speichern
                             const raumState = {
-                                masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})), wandAnzahl: wandAnzahl,
+                                masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})),
                                 tueren: tueren.map(t => ({...t})), fenster: fenster.map(f => ({...f})),
                                 abzuege: abzuege.map(a => ({...a})), posCards: posCards.map(p => ({...p})),
                                 posRechenwegEdits: {...posRechenwegEdits},
@@ -12920,7 +12830,7 @@
                                 };
                             });
                             const raumState = {
-                                masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})), wandAnzahl: wandAnzahl,
+                                masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})),
                                 tueren: tueren.map(t => ({...t})), fenster: fenster.map(f => ({...f})),
                                 abzuege: abzuege.map(a => ({...a})), posCards: posCards.map(p => ({...p})),
                                 posRechenwegEdits: {...posRechenwegEdits},
@@ -18878,32 +18788,40 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
-                    {/* -- GLOBALE SCHNELLNAVIGATION: 6 rote Buttons in einer Reihe -- */}
+                    {/* -- GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe -- */}
                     {page !== 'start' && (
-                        <div style={{display:'flex', gap:'4px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
+                        <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
                             <button onClick={function(){ navigateTo('start'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
-                                {'\uD83C\uDFE0'} Start
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Start
                             </button>
                             <button onClick={function(){ navigateTo('kundenModus'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
-                                {'\uD83D\uDC77'} Kunden
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Kunden
                             </button>
                             <button onClick={function(){ navigateTo('auswahl'); }}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0}}>
-                                {'\uD83D\uDCC2'} Baustellen
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Baustell.
                             </button>
                             <button onClick={function(){ navigateTo('datenUebersicht'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0}}>
-                                {'\uD83D\uDCCB'} Daten
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Daten
                             </button>
                             <button onClick={function(){ navigateTo('ordnerBrowser'); }} disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: page === 'ordnerBrowser' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 1 : 0.4, minWidth:0}}>
-                                {'\uD83D\uDCC1'} Ordner
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: page === 'ordnerBrowser' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Ordner
                             </button>
                             <button onClick={function(){ navigateTo('modulwahl'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'6px 2px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'600', display:'flex', alignItems:'center', justifyContent:'center', gap:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0}}>
-                                {'\uD83D\uDCDA'} Module
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Module
+                            </button>
+                            <button onClick={function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); }}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Akte
+                            </button>
+                            <button onClick={function(){ if (window._akteSpeichernHandler) window._akteSpeichernHandler(); }}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                Speich.
                             </button>
                         </div>
                     )}

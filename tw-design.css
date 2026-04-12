@@ -6305,177 +6305,51 @@
             transform: translateY(-1px);
         }
 
-        /* ═══ HAUPT-NAVIGATIONSLEISTE — 8 Buttons, 2 Zeilen ═══ */
-        .nav-toolbar-wrapper {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: var(--bg-primary);
-            padding: 6px 0 8px;
-            border-bottom: 1px solid var(--border-subtle);
-        }
-        .nav-toolbar-row {
-            display: flex;
-            gap: 4px;
-            margin-bottom: 4px;
-        }
-        .nav-toolbar-row:last-child {
-            margin-bottom: 0;
-        }
-        .nav-toolbar-btn {
+        /* ═══ RAUMBLATT NAVIGATIONS-BUTTONS (Leiste 2 + 3 + Handskizze) ═══ */
+        .rb-nav-btn {
+            flex: 1;
+            padding: 7px 4px;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Oswald', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
-            text-align: center;
-            min-height: 52px;
-            padding: 10px 8px;
-            border: none;
-            border-radius: 10px;
-            background: var(--bg-tertiary);
-            color: #ffffff;
-            font-family: 'Oswald', sans-serif;
-            font-size: 14px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            white-space: normal;
-            line-height: 1.2;
-            flex: 1;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+            min-width: 0;
             touch-action: manipulation;
+            white-space: nowrap;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }
-        .nav-toolbar-btn:hover {
-            background: var(--bg-hover);
+        .rb-nav-btn:hover {
             transform: translateY(-1px);
+            filter: brightness(1.1);
         }
-        .nav-toolbar-btn.active {
+        /* ROTE Leiste (Zurueck, Gesamtliste, Raum fertig, Aufmass beenden) */
+        .rb-nav-red-btn {
+            background: linear-gradient(135deg, var(--accent-red-light), var(--accent-red));
+        }
+        .rb-nav-red-btn:hover {
+            box-shadow: 0 2px 8px rgba(196, 30, 30, 0.3);
+        }
+        /* BLAUE Leiste (Grundriss, Fotos, Oeffnungen, Positionen, Waende, Masse) */
+        .rb-nav-blue-btn {
+            background: var(--bg-tertiary);
+        }
+        .rb-nav-blue-btn.active {
             background: var(--accent-blue);
-            color: #ffffff;
             box-shadow: 0 2px 8px rgba(77, 166, 255, 0.3);
         }
-        .nav-toolbar-btn.akte-action {
-            background: linear-gradient(135deg, var(--accent-red-light), var(--accent-red));
-            box-shadow: 0 2px 10px rgba(196, 30, 30, 0.25);
-        }
-        .nav-toolbar-btn.akte-action:hover {
-            box-shadow: 0 4px 15px rgba(196, 30, 30, 0.4);
-        }
-
-        /* ═══ RAUMBLATT SUB-NAVIGATION — 6 Buttons, 2 Zeilen ═══ */
-        .raumblatt-sub-nav {
-            position: sticky;
-            top: 120px;
-            z-index: 99;
-            background: var(--bg-primary);
-            padding: 4px 0 8px;
-            border-bottom: 1px solid var(--border-subtle);
-        }
-        .raumblatt-sub-nav .nav-toolbar-row {
-            display: flex;
-            gap: 3px;
-            margin-bottom: 4px;
-        }
-        .raumblatt-sub-nav .nav-toolbar-row:last-child {
-            margin-bottom: 0;
-        }
-
-        /* ═══ HANDSKIZZE TOOLBAR — 4 Buttons ═══ */
-        .skizze-toolbar-new {
-            position: sticky;
-            top: 230px;
-            z-index: 98;
-            display: flex;
-            gap: 4px;
-            margin-bottom: 8px;
-            flex-wrap: wrap;
-            background: var(--bg-primary);
-            padding: 4px 0;
-        }
-        .skizze-toolbar-new .nav-toolbar-btn {
-            flex: 1 1 45%;
-            min-height: 44px;
-            font-size: 12px;
-        }
-
-        /* ═══ AKTE POPUP / MODAL ═══ */
-        .akte-popup-ordner {
-            cursor: pointer;
-            text-align: left;
-            padding: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            transition: all 0.15s ease;
-        }
-        .akte-popup-ordner:hover {
-            border-color: var(--accent-blue);
+        .rb-nav-blue-btn:hover {
             background: var(--bg-hover);
         }
-        .akte-popup-file {
-            cursor: pointer;
-            text-align: left;
-            padding: 12px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            transition: all 0.15s ease;
-        }
-        .akte-popup-file:hover {
-            border-color: var(--accent-blue);
-            background: var(--bg-hover);
-        }
-
-        /* ═══ WAND-EINGABEFELDER dynamisch ═══ */
-        .wand-feld-label {
-            font-family: 'Oswald', sans-serif;
-            font-weight: 700;
-            font-size: 16px;
-            color: var(--accent-blue);
-            min-width: 60px;
-        }
-
-        /* ═══ EMPFINDLICHKEIT SLIDER ═══ */
-        .empfindlichkeit-slider {
-            flex: 1;
-            accent-color: var(--accent-blue);
-            height: 6px;
-        }
-
-        /* ═══ SAVE-STATUS TOAST ═══ */
-        .save-toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-family: 'Oswald', sans-serif;
-            font-size: 14px;
-            font-weight: 600;
-            z-index: 1000;
-            animation: toastIn 0.3s ease;
-        }
-        .save-toast.saving {
-            background: rgba(77,166,255,0.15);
-            border: 1px solid rgba(77,166,255,0.3);
-            color: var(--accent-blue);
-        }
-        .save-toast.saved {
-            background: rgba(39,174,96,0.15);
-            border: 1px solid rgba(39,174,96,0.3);
-            color: #27ae60;
-        }
-        .save-toast.error {
-            background: rgba(196,30,30,0.15);
-            border: 1px solid rgba(196,30,30,0.3);
-            color: var(--accent-red-light);
-        }
-        @keyframes toastIn {
-            from { opacity: 0; transform: translateX(-50%) translateY(20px); }
-            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .rb-nav-blue-btn.active:hover {
+            background: var(--accent-blue);
         }
