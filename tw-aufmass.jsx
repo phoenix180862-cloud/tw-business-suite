@@ -4490,7 +4490,12 @@
             const [farbZuordnung, setFarbZuordnung] = useState(() => {
                 if (reEdit && reEdit.farbZuordnung) return reEdit.farbZuordnung;
                 return {
-                    rohzustand: [],
+                    rohzustand: [
+                        { farbe: 'rot',    position: '', beschreibung: 'Bodenflaeche', einheit: 'm2' },
+                        { farbe: 'blau',   position: '', beschreibung: 'Wandflaeche', einheit: 'm2' },
+                        { farbe: 'gruen',  position: '', beschreibung: 'Sockel / Borduere', einheit: 'lfm' },
+                        { farbe: 'gelb',   position: '', beschreibung: 'Tuer- / Fensterlaibung', einheit: 'lfm' }
+                    ],
                     vorarbeiten: [
                         { farbe: 'blau',  position: '', beschreibung: 'Wand-Abdichtungsflaeche', einheit: 'm2' },
                         { farbe: 'gruen', position: '', beschreibung: 'Dichtungsband (Ecken)', einheit: 'lfm' },
@@ -8769,20 +8774,22 @@
                                                                 if (firstPhoto) openFullscreenEdit(phase.key, firstPhoto[0]);
                                                             }
                                                         }} style={{
-                                                            padding:'3px 8px', borderRadius:'6px', border:'none', cursor:'pointer',
+                                                            padding:'6px 14px', borderRadius:'8px', border:'none', cursor:'pointer',
                                                             background:'rgba(231,76,60,0.15)', color:'#e74c3c',
-                                                            fontSize:'10px', fontWeight:700, fontFamily:'Oswald',
-                                                            textTransform:'uppercase', letterSpacing:'0.3px'
+                                                            fontSize:'12px', fontWeight:700, fontFamily:'Oswald',
+                                                            textTransform:'uppercase', letterSpacing:'0.3px',
+                                                            minHeight:'32px'
                                                         }}>Bearbeiten</button>
                                                         <button onClick={(e) => { e.stopPropagation(); setFarbPopupOpen(phase.key); }} style={{
-                                                            padding:'3px 8px', borderRadius:'6px', border:'none', cursor:'pointer',
+                                                            padding:'6px 14px', borderRadius:'8px', border:'none', cursor:'pointer',
                                                             background:'rgba(231,76,60,0.15)', color:'#e74c3c',
-                                                            fontSize:'10px', fontWeight:700, fontFamily:'Oswald',
-                                                            textTransform:'uppercase', letterSpacing:'0.3px'
+                                                            fontSize:'12px', fontWeight:700, fontFamily:'Oswald',
+                                                            textTransform:'uppercase', letterSpacing:'0.3px',
+                                                            minHeight:'32px'
                                                         }}>{'\uD83C\uDFA8'} Farben</button>
                                                     </React.Fragment>
                                                 )}
-                                                <span style={{fontSize:'14px', marginLeft:'6px', transition:'transform 0.2s',
+                                                <span style={{fontSize:'20px', marginLeft:'8px', transition:'transform 0.2s',
                                                     transform: isExpanded ? 'rotate(180deg)' : 'rotate(0)'}}>
                                                     {isExpanded ? '\u25B2' : '\u25BC'}
                                                 </span>
@@ -9383,7 +9390,7 @@
                             {farbPopupOpen && (
                                 <div className="modal-overlay" style={{zIndex:9000}} onClick={() => setFarbPopupOpen(null)}>
                                     <div onClick={e => e.stopPropagation()} style={{
-                                        maxWidth:'380px', width:'90%', maxHeight:'85vh', overflow:'auto',
+                                        maxWidth:'500px', width:'94%', maxHeight:'85vh', overflow:'auto',
                                         borderRadius:'20px', padding:'20px',
                                         background:'var(--bg-primary)', border:'1px solid var(--border-subtle)'
                                     }}>
@@ -9421,9 +9428,19 @@
                                                         flexShrink:0, border:'2px solid rgba(255,255,255,0.2)'
                                                     }} />
                                                     <div style={{flex:1, minWidth:0}}>
-                                                        <div style={{fontSize:'12px', fontWeight:600, color:'var(--text-primary)', marginBottom:'4px'}}>
-                                                            {zuordnung.beschreibung}
-                                                        </div>
+                                                        <input type="text" value={zuordnung.beschreibung} onChange={e => {
+                                                            setFarbZuordnung(prev => {
+                                                                var updated = Object.assign({}, prev);
+                                                                var arr = (updated[farbPopupOpen] || []).slice();
+                                                                arr[idx] = Object.assign({}, arr[idx], {beschreibung: e.target.value});
+                                                                updated[farbPopupOpen] = arr;
+                                                                return updated;
+                                                            });
+                                                        }} placeholder="Beschreibung eingeben" style={{
+                                                            width:'100%', padding:'6px 8px', marginBottom:'4px',
+                                                            background:'var(--bg-primary)', border:'1px solid var(--border-subtle)',
+                                                            borderRadius:'8px', color:'var(--text-primary)', fontSize:'12px', fontWeight:600
+                                                        }} />
                                                         <select value={zuordnung.position} onChange={e => {
                                                             setFarbZuordnung(prev => {
                                                                 var updated = Object.assign({}, prev);
@@ -9435,7 +9452,7 @@
                                                         }} style={{
                                                             width:'100%', padding:'6px 8px',
                                                             background:'var(--bg-primary)', border:'1px solid var(--border-subtle)',
-                                                            borderRadius:'8px', color:'var(--text-primary)', fontSize:'11px'
+                                                            borderRadius:'8px', color:'var(--text-primary)', fontSize:'12px'
                                                         }}>
                                                             <option value="">-- Position waehlen --</option>
                                                             {posCards.map(p => (
@@ -9443,14 +9460,69 @@
                                                             ))}
                                                         </select>
                                                     </div>
-                                                    <div style={{
-                                                        padding:'3px 8px', borderRadius:'6px',
-                                                        background:'rgba(255,255,255,0.08)',
-                                                        fontSize:'10px', color:'var(--text-muted)', fontWeight:600, flexShrink:0
-                                                    }}>{zuordnung.einheit}</div>
+                                                    <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', flexShrink:0}}>
+                                                        <select value={zuordnung.einheit} onChange={e => {
+                                                            setFarbZuordnung(prev => {
+                                                                var updated = Object.assign({}, prev);
+                                                                var arr = (updated[farbPopupOpen] || []).slice();
+                                                                arr[idx] = Object.assign({}, arr[idx], {einheit: e.target.value});
+                                                                updated[farbPopupOpen] = arr;
+                                                                return updated;
+                                                            });
+                                                        }} style={{
+                                                            padding:'3px 6px', borderRadius:'6px',
+                                                            background:'var(--bg-primary)', border:'1px solid var(--border-subtle)',
+                                                            fontSize:'11px', color:'var(--text-primary)', fontWeight:600
+                                                        }}>
+                                                            <option value="m2">m2</option>
+                                                            <option value="lfm">lfm</option>
+                                                            <option value="Stk">Stk</option>
+                                                            <option value="psch">psch</option>
+                                                        </select>
+                                                        <button onClick={() => {
+                                                            setFarbZuordnung(prev => {
+                                                                var updated = Object.assign({}, prev);
+                                                                var arr = (updated[farbPopupOpen] || []).slice();
+                                                                arr.splice(idx, 1);
+                                                                updated[farbPopupOpen] = arr;
+                                                                return updated;
+                                                            });
+                                                        }} style={{
+                                                            width:'24px', height:'24px', borderRadius:'50%', border:'none',
+                                                            background:'rgba(196,30,30,0.15)', color:'#e74c3c',
+                                                            fontSize:'12px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'
+                                                        }}>{'\u2715'}</button>
+                                                    </div>
                                                 </div>
                                             );
                                         })}
+
+                                        {/* Farbe hinzufuegen Button */}
+                                        {(() => {
+                                            var usedFarben = (farbZuordnung[farbPopupOpen] || []).map(z => z.farbe);
+                                            var verfuegbar = MARKIERUNGS_FARBEN.filter(f => usedFarben.indexOf(f.id) === -1);
+                                            if (verfuegbar.length === 0) return null;
+                                            return (
+                                                <button onClick={() => {
+                                                    setFarbZuordnung(prev => {
+                                                        var updated = Object.assign({}, prev);
+                                                        var arr = (updated[farbPopupOpen] || []).slice();
+                                                        arr.push({ farbe: verfuegbar[0].id, position: '', beschreibung: '', einheit: 'm2' });
+                                                        updated[farbPopupOpen] = arr;
+                                                        return updated;
+                                                    });
+                                                }} style={{
+                                                    width:'100%', padding:'10px', marginTop:'6px', borderRadius:'10px',
+                                                    border:'2px dashed var(--border-subtle)', cursor:'pointer',
+                                                    background:'transparent', color:'var(--text-secondary)',
+                                                    fontFamily:'Oswald', fontWeight:600, fontSize:'12px',
+                                                    textTransform:'uppercase', letterSpacing:'0.5px',
+                                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                                }}>
+                                                    <span style={{fontSize:'16px'}}>+</span> Farbe hinzufuegen ({verfuegbar.length} verfuegbar)
+                                                </button>
+                                            );
+                                        })()}
 
                                         <button onClick={() => setFarbPopupOpen(null)} style={{
                                             width:'100%', padding:'12px', marginTop:'10px', borderRadius:'12px',
