@@ -7959,13 +7959,33 @@
             const openFullscreenEdit = (phase, wandId) => {
                 const foto = phasenFotos[phase] && phasenFotos[phase][wandId];
                 if (!foto) return;
+                // Zoom zuruecksetzen (verhindert Zoom-Falle)
+                try {
+                    var vp = document.querySelector('meta[name="viewport"]');
+                    if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+                    document.body.style.overflow = 'hidden';
+                    document.body.style.touchAction = 'none';
+                    window.scrollTo(0, 0);
+                } catch(e) {}
                 setFullscreenEdit({
                     active: true, phase: phase, wandId: wandId,
-                    image: foto.image, editMode: 'crop',
+                    image: foto.croppedImage || foto.image, editMode: 'crop',
+                    originalImage: foto.image,
                     drawColor: '#e63535', drawWidth: 4,
                     drawings: foto.drawings || [], currentDraw: null,
                     cropRect: null, cropDragging: false, cropCorner: null
                 });
+            };
+
+            // ── Vollbild-Editor schliessen (Zoom wiederherstellen) ──
+            const closeFullscreenEdit = () => {
+                try {
+                    var vp = document.querySelector('meta[name="viewport"]');
+                    if (vp) vp.setAttribute('content', 'width=device-width, initial-scale=1');
+                    document.body.style.overflow = '';
+                    document.body.style.touchAction = '';
+                } catch(e) {}
+                setFullscreenEdit(p => ({...p, active: false}));
             };
 
             // ── Vollbild-Editor speichern ──
@@ -7973,17 +7993,41 @@
                 const fs = fullscreenEdit;
                 if (!fs.active || !fs.phase || !fs.wandId) return;
 
-                // Crop anwenden wenn vorhanden
-                if (fs.cropRect && fs.image) {
+                // Crop-Rect normalisieren (negative Breite/Hoehe korrigieren)
+                var normCrop = null;
+                if (fs.cropRect && fs.cropRect.w !== 0 && fs.cropRect.h !== 0) {
+                    var cr = fs.cropRect;
+                    normCrop = {
+                        x: cr.w < 0 ? cr.x + cr.w : cr.x,
+                        y: cr.h < 0 ? cr.y + cr.h : cr.y,
+                        w: Math.abs(cr.w),
+                        h: Math.abs(cr.h)
+                    };
+                    // Sicherheit: Werte auf 0-1 begrenzen
+                    normCrop.x = Math.max(0, Math.min(1, normCrop.x));
+                    normCrop.y = Math.max(0, Math.min(1, normCrop.y));
+                    normCrop.w = Math.min(normCrop.w, 1 - normCrop.x);
+                    normCrop.h = Math.min(normCrop.h, 1 - normCrop.y);
+                }
+
+                var sourceImage = fs.image || fs.originalImage;
+
+                // Crop + Zeichnungen anwenden
+                if ((normCrop || fs.drawings.length > 0) && sourceImage) {
                     const img = new Image();
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const r = fs.cropRect;
-                        const sx = r.x * img.width; const sy = r.y * img.height;
-                        const sw = r.w * img.width; const sh = r.h * img.height;
+                        const ctx = canvas.getContext('2d');
+                        var sx = 0, sy = 0, sw = img.width, sh = img.height;
+
+                        if (normCrop) {
+                            sx = normCrop.x * img.width;
+                            sy = normCrop.y * img.height;
+                            sw = normCrop.w * img.width;
+                            sh = normCrop.h * img.height;
+                        }
                         canvas.width = Math.max(1, Math.round(sw));
                         canvas.height = Math.max(1, Math.round(sh));
-                        const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
                         // Zeichnungen aufs Canvas malen
@@ -7991,64 +8035,53 @@
                             fs.drawings.forEach(d => {
                                 if (!d.points || d.points.length < 2) return;
                                 ctx.strokeStyle = d.color || '#e63535';
-                                ctx.lineWidth = d.width || 4;
+                                ctx.lineWidth = (d.width || 4) * (canvas.width / 1000);
                                 ctx.lineCap = 'round'; ctx.lineJoin = 'round';
                                 ctx.beginPath();
-                                ctx.moveTo((d.points[0].x - r.x) / r.w * canvas.width, (d.points[0].y - r.y) / r.h * canvas.height);
-                                for (var pi = 1; pi < d.points.length; pi++) {
-                                    ctx.lineTo((d.points[pi].x - r.x) / r.w * canvas.width, (d.points[pi].y - r.y) / r.h * canvas.height);
+                                if (normCrop) {
+                                    ctx.moveTo((d.points[0].x - normCrop.x) / normCrop.w * canvas.width, (d.points[0].y - normCrop.y) / normCrop.h * canvas.height);
+                                    for (var pi = 1; pi < d.points.length; pi++) {
+                                        ctx.lineTo((d.points[pi].x - normCrop.x) / normCrop.w * canvas.width, (d.points[pi].y - normCrop.y) / normCrop.h * canvas.height);
+                                    }
+                                } else {
+                                    ctx.moveTo(d.points[0].x * canvas.width, d.points[0].y * canvas.height);
+                                    for (var pi2 = 1; pi2 < d.points.length; pi2++) {
+                                        ctx.lineTo(d.points[pi2].x * canvas.width, d.points[pi2].y * canvas.height);
+                                    }
                                 }
                                 ctx.stroke();
                             });
                         }
 
-                        const croppedImage = canvas.toDataURL('image/jpeg', 0.85);
-                        setPhasenFotos(prev => {
-                            const updated = {...prev};
-                            if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
-                                updated[fs.phase] = {...updated[fs.phase],
-                                    [fs.wandId]: {...updated[fs.phase][fs.wandId], croppedImage: croppedImage, drawings: fs.drawings}
-                                };
-                            }
-                            return updated;
-                        });
-                        setFullscreenEdit(p => ({...p, active: false}));
-                    };
-                    img.src = fs.image;
-                } else if (fs.drawings.length > 0 && fs.image) {
-                    // Nur Zeichnungen, kein Crop
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width; canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        fs.drawings.forEach(d => {
-                            if (!d.points || d.points.length < 2) return;
-                            ctx.strokeStyle = d.color || '#e63535';
-                            ctx.lineWidth = d.width || 4;
-                            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-                            ctx.beginPath();
-                            ctx.moveTo(d.points[0].x * canvas.width, d.points[0].y * canvas.height);
-                            for (var pi = 1; pi < d.points.length; pi++) {
-                                ctx.lineTo(d.points[pi].x * canvas.width, d.points[pi].y * canvas.height);
-                            }
-                            ctx.stroke();
-                        });
                         const editedImage = canvas.toDataURL('image/jpeg', 0.85);
                         setPhasenFotos(prev => {
                             const updated = {...prev};
                             if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
+                                var existing = updated[fs.phase][fs.wandId];
+                                // Original-Bild als Backup behalten (Versionshistorie)
+                                var history = existing.imageHistory || [];
+                                if (existing.image && history.indexOf(existing.image) === -1) {
+                                    history = history.concat([existing.image]);
+                                }
+                                if (existing.croppedImage && history.indexOf(existing.croppedImage) === -1) {
+                                    history = history.concat([existing.croppedImage]);
+                                }
                                 updated[fs.phase] = {...updated[fs.phase],
-                                    [fs.wandId]: {...updated[fs.phase][fs.wandId], croppedImage: editedImage, drawings: fs.drawings}
+                                    [fs.wandId]: {
+                                        ...existing,
+                                        croppedImage: editedImage,
+                                        drawings: fs.drawings,
+                                        imageHistory: history
+                                    }
                                 };
                             }
                             return updated;
                         });
-                        setFullscreenEdit(p => ({...p, active: false}));
+                        closeFullscreenEdit();
                     };
-                    img.src = fs.image;
+                    img.src = sourceImage;
                 } else {
+                    // Nur Drawings-State speichern (kein Bild-Export noetig)
                     setPhasenFotos(prev => {
                         const updated = {...prev};
                         if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
@@ -8058,7 +8091,7 @@
                         }
                         return updated;
                     });
-                    setFullscreenEdit(p => ({...p, active: false}));
+                    closeFullscreenEdit();
                 }
             };
 
@@ -12632,25 +12665,27 @@
                                 <div style={{
                                     position:'fixed', top:0, left:0, right:0, bottom:0,
                                     zIndex:10000, background:'rgba(0,0,0,0.95)',
-                                    display:'flex', flexDirection:'column'
+                                    display:'flex', flexDirection:'column',
+                                    touchAction:'manipulation', overscrollBehavior:'none'
                                 }}>
                                     {/* Obere Toolbar */}
                                     <div style={{
                                         display:'flex', alignItems:'center', gap:'6px',
-                                        padding:'8px 12px', background:'rgba(0,0,0,0.8)',
-                                        borderBottom:'1px solid rgba(255,255,255,0.1)', flexShrink:0
+                                        padding:'10px 14px', background:'rgba(0,0,0,0.8)',
+                                        borderBottom:'1px solid rgba(255,255,255,0.1)', flexShrink:0,
+                                        zIndex:10001
                                     }}>
-                                        <button onClick={() => setFullscreenEdit(p => ({...p, active:false}))} style={{
+                                        <button onClick={closeFullscreenEdit} style={{
                                             background:'none', border:'none', color:'white',
-                                            fontSize:'14px', cursor:'pointer', padding:'6px'
+                                            fontSize:'16px', cursor:'pointer', padding:'8px', minHeight:'40px'
                                         }}>{'\u2190'} Zurueck</button>
-                                        <div style={{flex:1, textAlign:'center', fontFamily:'Oswald', fontSize:'13px', color:'white', textTransform:'uppercase'}}>
+                                        <div style={{flex:1, textAlign:'center', fontFamily:'Oswald', fontSize:'14px', color:'white', textTransform:'uppercase'}}>
                                             Wand {fullscreenEdit.wandId} — {FOTO_PHASEN.find(p => p.key === fullscreenEdit.phase)?.label || ''}
                                         </div>
                                         <button onClick={saveFullscreenEdit} style={{
                                             background:'rgba(231,76,60,0.9)', border:'none', color:'white',
-                                            fontSize:'12px', cursor:'pointer', padding:'6px 14px', borderRadius:'8px',
-                                            fontFamily:'Oswald', fontWeight:700, textTransform:'uppercase'
+                                            fontSize:'14px', cursor:'pointer', padding:'8px 18px', borderRadius:'8px',
+                                            fontFamily:'Oswald', fontWeight:700, textTransform:'uppercase', minHeight:'40px'
                                         }}>Speichern</button>
                                     </div>
 
@@ -12762,19 +12797,19 @@
                                             <img src={fullscreenEdit.image} style={{width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none'}} />
                                         )}
                                         {/* Zeichnungen als SVG-Overlay */}
-                                        <svg style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none'}}>
+                                        <svg viewBox="0 0 1000 1000" preserveAspectRatio="none" style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', pointerEvents:'none'}}>
                                             {fullscreenEdit.drawings.map((d, di) => (
                                                 d.points && d.points.length > 1 ? (
                                                     <polyline key={di}
-                                                        points={d.points.map(p => (p.x*100)+'%,'+(p.y*100)+'%').join(' ')}
-                                                        fill="none" stroke={d.color} strokeWidth={d.width} strokeLinecap="round" strokeLinejoin="round" />
+                                                        points={d.points.map(p => Math.round(p.x*1000)+','+Math.round(p.y*1000)).join(' ')}
+                                                        fill="none" stroke={d.color} strokeWidth={d.width * 2} strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
                                                 ) : null
                                             ))}
                                             {fullscreenEdit.currentDraw && fullscreenEdit.currentDraw.points.length > 1 && (
                                                 <polyline
-                                                    points={fullscreenEdit.currentDraw.points.map(p => (p.x*100)+'%,'+(p.y*100)+'%').join(' ')}
-                                                    fill="none" stroke={fullscreenEdit.currentDraw.color} strokeWidth={fullscreenEdit.currentDraw.width}
-                                                    strokeLinecap="round" strokeLinejoin="round" />
+                                                    points={fullscreenEdit.currentDraw.points.map(p => Math.round(p.x*1000)+','+Math.round(p.y*1000)).join(' ')}
+                                                    fill="none" stroke={fullscreenEdit.currentDraw.color} strokeWidth={fullscreenEdit.currentDraw.width * 2}
+                                                    strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
                                             )}
                                             {/* Crop-Rechteck */}
                                             {fullscreenEdit.editMode === 'crop' && fullscreenEdit.cropRect && fullscreenEdit.cropRect.w !== 0 && (
