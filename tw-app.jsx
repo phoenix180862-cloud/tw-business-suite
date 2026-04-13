@@ -29,6 +29,32 @@
             const [isOrdnerAnalyseRunning, setIsOrdnerAnalyseRunning] = useState(false);
             const [selectedOrdnerNr, setSelectedOrdnerNr] = useState(null);
 
+            // ── Akte & Speichern (WIP) ──
+            const [showAkteModal, setShowAkteModal] = useState(false);
+            const [akteData, setAkteData] = useState({ wips: [], appDateien: [] });
+            const [akteSaveToast, setAkteSaveToast] = useState(null);
+
+            var PAGE_TO_MODUL = {
+                'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
+                'rechnung': 'rechnung', 'ausgangsbuch': 'ausgangsbuch',
+                'schriftverkehr': 'schriftverkehr', 'baustelle': 'baustelle'
+            };
+            var MODUL_ICONS = {
+                'aufmass': '\uD83D\uDCD0', 'rechnung': '\uD83D\uDCB6',
+                'schriftverkehr': '\u2709\uFE0F', 'ausgangsbuch': '\uD83D\uDCD2',
+                'baustelle': '\uD83D\uDCF1'
+            };
+            var MODUL_LABELS = {
+                'aufmass': 'Aufma\u00df', 'rechnung': 'Rechnung',
+                'schriftverkehr': 'Schriftverkehr', 'ausgangsbuch': 'Ausgangsbuch',
+                'baustelle': 'Baustelle'
+            };
+            var MODUL_PAGES = {
+                'aufmass': 'raumerkennung', 'rechnung': 'rechnung',
+                'schriftverkehr': 'schriftverkehr', 'ausgangsbuch': 'ausgangsbuch',
+                'baustelle': 'baustelle'
+            };
+
             /* ══════════════════════════════════════════════════
                LOKALER SPEICHER (TWStorage / IndexedDB)
                Automatische Persistenz aller Arbeitsdaten
@@ -1386,6 +1412,110 @@
                 navigateTo('raumerkennung');
             };
 
+            /* ══════════════════════════════════════════════════
+               AKTE & SPEICHERN — Bearbeitungsstand (WIP)
+               ══════════════════════════════════════════════════ */
+
+            // ── "Speichern"-Button Handler ──
+            window._akteSpeichernHandler = function() {
+                if (!selectedKunde) { alert('Bitte zuerst einen Kunden w\u00e4hlen.'); return; }
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                var modulName = PAGE_TO_MODUL[page];
+                if (!modulName) { alert('Auf dieser Seite gibt es nichts zu speichern.'); return; }
+                if (!window.TWStorage || !window.TWStorage.isReady()) { alert('Speicher nicht bereit.'); return; }
+
+                // State vom aktiven Modul einsammeln via Event-Bus
+                var stateData = null;
+                if (window.TW && window.TW.emit) {
+                    TW.emit('wip:collectState', {
+                        modulName: modulName,
+                        callback: function(data) { stateData = data; }
+                    });
+                }
+
+                // Fallback: Basis-Daten aus App-State (fuer Module ohne Listener)
+                if (!stateData) {
+                    stateData = {
+                        moduleState: {
+                            gesamtliste: gesamtliste || [],
+                            importResult: importResult || null,
+                            fertigeRaeume: fertigeRaeume || [],
+                            selectedPositions: selectedPositions || [],
+                            aufmassGespeichert: aufmassGespeichert
+                        },
+                        meta: {
+                            beschreibung: MODUL_LABELS[modulName] + ' (Basis-Daten)',
+                            icon: MODUL_ICONS[modulName] || '\uD83D\uDCBE'
+                        }
+                    };
+                }
+
+                TWStorage.saveWip(kundeId, modulName, stateData.moduleState, page, stateData.meta)
+                    .then(function() {
+                        setAkteSaveToast('Gespeichert!');
+                        setTimeout(function() { setAkteSaveToast(null); }, 2000);
+                    })
+                    .catch(function(err) {
+                        alert('Speichern fehlgeschlagen: ' + err.message);
+                    });
+            };
+
+            // ── "Akte"-Button Handler ──
+            window._akteOeffnenHandler = function() {
+                if (!selectedKunde) { alert('Bitte zuerst einen Kunden w\u00e4hlen.'); return; }
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                if (!window.TWStorage || !window.TWStorage.isReady()) { alert('Speicher nicht bereit.'); return; }
+
+                Promise.all([
+                    TWStorage.listWips(kundeId),
+                    TWStorage.loadAppDateien(kundeId)
+                ]).then(function(results) {
+                    setAkteData({ wips: results[0] || [], appDateien: results[1] || [] });
+                    setShowAkteModal(true);
+                }).catch(function(err) {
+                    console.warn('Akte laden:', err);
+                    setAkteData({ wips: [], appDateien: [] });
+                    setShowAkteModal(true);
+                });
+            };
+
+            // ── WIP wiederherstellen (aus Akte heraus) ──
+            var handleWipRestore = function(wip) {
+                if (!wip || !wip.moduleState) return;
+                var targetPage = wip.page || MODUL_PAGES[wip.modulName] || 'modulwahl';
+
+                // Aufmass-spezifisch: Basis-State wiederherstellen
+                if (wip.modulName === 'aufmass' && wip.moduleState) {
+                    if (wip.moduleState.gesamtliste) setGesamtliste(wip.moduleState.gesamtliste);
+                    if (wip.moduleState.fertigeRaeume) setFertigeRaeume(wip.moduleState.fertigeRaeume);
+                    if (wip.moduleState.selectedPositions) setSelectedPositions(wip.moduleState.selectedPositions);
+                    if (wip.moduleState.aufmassGespeichert) setAufmassGespeichert(wip.moduleState.aufmassGespeichert);
+                }
+
+                setShowAkteModal(false);
+                navigateTo(targetPage);
+
+                // Nach Navigation: WIP-State ins Modul injizieren via Event-Bus
+                setTimeout(function() {
+                    if (window.TW && window.TW.emit) {
+                        TW.emit('wip:restoreState', {
+                            modulName: wip.modulName,
+                            moduleState: wip.moduleState
+                        });
+                    }
+                }, 300);
+            };
+
+            // ── App-Datei oeffnen (PDF, HTML etc.) ──
+            var handleOpenAppDatei = function(dateiId) {
+                if (!window.TWStorage) return;
+                TWStorage.openAppDatei(dateiId).then(function(result) {
+                    if (result && result.url) {
+                        window.open(result.url, '_blank');
+                    }
+                });
+            };
+
             const renderPage = () => {
                 switch(page) {
                     case 'start':
@@ -1644,6 +1774,113 @@
                             ? selectedKunde.name.split(' – ')[0]
                             : null
                     } />
+
+                    {/* ═══ AKTE MODAL ═══ */}
+                    {showAkteModal && (
+                        <div className="modal-overlay" style={{zIndex:3500}} onClick={function(e){ if(e.target === e.currentTarget) setShowAkteModal(false); }}>
+                            <div style={{width:'100%', maxWidth:'500px', maxHeight:'90vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'20px'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'16px'}}>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'18px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        Akte {selectedKunde ? '- ' + (selectedKunde.name || '').split(' \u2013 ')[0].substring(0,25) : ''}
+                                    </div>
+                                    <button onClick={function(){ setShowAkteModal(false); }}
+                                        style={{width:'36px', height:'36px', borderRadius:'50%', border:'none', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-secondary)'}}>
+                                        \u2715
+                                    </button>
+                                </div>
+
+                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'16px', padding:'8px 12px', background:'var(--bg-secondary)', borderRadius:'8px'}}>
+                                    Nur lokal erstellte Dokumente \u2014 keine Google Drive Originale
+                                </div>
+
+                                {/* WIP-Eintraege (Bearbeitungsstaende) */}
+                                {akteData.wips && akteData.wips.length > 0 && (
+                                    <div style={{marginBottom:'16px'}}>
+                                        <div style={{fontSize:'12px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'8px', fontFamily:'Oswald, sans-serif'}}>
+                                            Bearbeitungsst\u00e4nde
+                                        </div>
+                                        {akteData.wips.map(function(wip) {
+                                            return (
+                                                <button key={wip.id} onClick={function(){ handleWipRestore(wip); }}
+                                                    style={{width:'100%', textAlign:'left', padding:'12px 14px', marginBottom:'6px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px', transition:'all 0.15s ease'}}>
+                                                    <span style={{fontSize:'24px'}}>{(wip.meta && wip.meta.icon) || MODUL_ICONS[wip.modulName] || '\uD83D\uDCBE'}</span>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'14px', fontWeight:600, color:'var(--text-primary)', fontFamily:'Oswald, sans-serif'}}>
+                                                            {MODUL_LABELS[wip.modulName] || wip.modulName}
+                                                        </div>
+                                                        <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                            {(wip.meta && wip.meta.beschreibung) || 'Gespeicherter Stand'}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{textAlign:'right', flexShrink:0}}>
+                                                        <div style={{fontSize:'11px', color:'var(--text-muted)'}}>
+                                                            {wip.savedAt ? new Date(wip.savedAt).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'}) : ''}
+                                                        </div>
+                                                        <div style={{fontSize:'10px', color:'var(--text-muted)'}}>
+                                                            {wip.savedAt ? new Date(wip.savedAt).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : ''}
+                                                        </div>
+                                                    </div>
+                                                    <span style={{color:'var(--accent-blue)', fontSize:'12px', fontWeight:700, flexShrink:0}}>\u25B6</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* App-Dateien (fertige Dokumente) */}
+                                {akteData.appDateien && akteData.appDateien.length > 0 && (
+                                    <div style={{marginBottom:'16px'}}>
+                                        <div style={{fontSize:'12px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'8px', fontFamily:'Oswald, sans-serif'}}>
+                                            Erstellte Dokumente
+                                        </div>
+                                        {akteData.appDateien.map(function(datei) {
+                                            var icon = datei.fileType === 'pdf' ? '\uD83D\uDCC4' : datei.fileType === 'xlsx' ? '\uD83D\uDCCA' : datei.mimeType && datei.mimeType.indexOf('html') >= 0 ? '\uD83C\uDF10' : '\uD83D\uDCC1';
+                                            return (
+                                                <button key={datei.id} onClick={function(){ handleOpenAppDatei(datei.id); }}
+                                                    style={{width:'100%', textAlign:'left', padding:'10px 14px', marginBottom:'4px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'10px', transition:'all 0.15s ease'}}>
+                                                    <span style={{fontSize:'18px'}}>{icon}</span>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'13px', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                            {datei.name}
+                                                        </div>
+                                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'1px'}}>
+                                                            {datei.ordnerName || ''} {datei.sizeBytes ? '\u00b7 ' + Math.round(datei.sizeBytes / 1024) + ' KB' : ''}
+                                                        </div>
+                                                    </div>
+                                                    <span style={{fontSize:'11px', color:'var(--text-muted)', flexShrink:0}}>
+                                                        {datei.syncedAt ? new Date(datei.syncedAt).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'}) : ''}
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Leer-Zustand */}
+                                {(!akteData.wips || akteData.wips.length === 0) && (!akteData.appDateien || akteData.appDateien.length === 0) && (
+                                    <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'12px'}}>\uD83D\uDCC2</div>
+                                        <div style={{fontSize:'14px', fontWeight:600}}>Noch keine lokalen Dokumente</div>
+                                        <div style={{fontSize:'12px', marginTop:'6px'}}>
+                                            Erstelle ein Aufma\u00df, eine Rechnung oder einen Brief und dr\u00fccke "Speich." \u2014 dann erscheinen sie hier.
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button onClick={function(){ setShowAkteModal(false); }}
+                                    style={{width:'100%', padding:'12px', marginTop:'8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                    Schlie\u00dfen
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ SPEICHERN TOAST ═══ */}
+                    {akteSaveToast && (
+                        <div style={{position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'#27ae60', color:'#fff', padding:'10px 24px', borderRadius:'12px', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'8px', animation:'fadeIn 0.2s ease'}}>
+                            <span style={{fontSize:'18px'}}>\u2713</span> {akteSaveToast}
+                        </div>
+                    )}
 
                     {/* KI-Ordneranalyse Fortschritts-Overlay */}
                     {isOrdnerAnalyseRunning && (

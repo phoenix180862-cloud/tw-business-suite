@@ -17,7 +17,7 @@
     'use strict';
 
     var DB_NAME = 'TWBusinessSuite';
-    var DB_VERSION = 4;
+    var DB_VERSION = 5;
     var _db = null;
     var _ready = false;
     var _readyCallbacks = [];
@@ -65,7 +65,9 @@
         driveOrdner:    { keyPath: 'id', indices: ['kundeId', 'parentId', 'updatedAt'] },
         driveDateien:   { keyPath: 'id', indices: ['kundeId', 'ordnerId', 'fileType', 'updatedAt'] },
         appDateien:     { keyPath: 'id', indices: ['kundeId', 'ordnerName', 'docType', 'updatedAt', 'deviceId'] },
-        syncLog:        { keyPath: 'id', indices: ['kundeId', 'action', 'deviceId', 'syncedAt', 'updatedAt'] }
+        syncLog:        { keyPath: 'id', indices: ['kundeId', 'action', 'deviceId', 'syncedAt', 'updatedAt'] },
+        wip:            { keyPath: 'id', indices: ['kundeId', 'modulName', 'savedAt', 'deviceId'] },
+        ausgangsbuch:   { keyPath: 'id', indices: ['kundeId', 'status', 'datum', 'updatedAt'] }
     };
 
     // ================================================================
@@ -257,6 +259,123 @@
     }
     function loadDriveCache(type, id) {
         return getItem('driveCache', type + '_' + id).then(function(r) { return r ? r.data : null; });
+    }
+
+    // ================================================================
+    // BEARBEITUNGSSTAND (WIP) — Mittendrin aufhoeren und spaeter weitermachen
+    // ================================================================
+    function saveWip(kundeId, modulName, moduleState, page, meta) {
+        var id = 'wip_' + kundeId + '_' + modulName;
+        var record = {
+            id: id,
+            kundeId: kundeId,
+            modulName: modulName,
+            deviceId: _deviceId,
+            savedAt: new Date().toISOString(),
+            version: 1,
+            page: page || null,
+            moduleState: moduleState,
+            meta: meta || {},
+            updatedAt: new Date().toISOString()
+        };
+        return putItem('wip', record).then(function() {
+            logSyncAction(kundeId, 'wip_save', modulName, id, (meta && meta.beschreibung) || '');
+            return record;
+        });
+    }
+
+    function loadWip(kundeId, modulName) {
+        var id = 'wip_' + kundeId + '_' + modulName;
+        return getItem('wip', id).then(function(record) {
+            if (!record) return null;
+            return {
+                id: record.id,
+                kundeId: record.kundeId,
+                modulName: record.modulName,
+                moduleState: record.moduleState,
+                page: record.page,
+                meta: record.meta,
+                savedAt: record.savedAt,
+                deviceId: record.deviceId
+            };
+        });
+    }
+
+    function deleteWip(kundeId, modulName) {
+        var id = 'wip_' + kundeId + '_' + modulName;
+        return deleteItem('wip', id).then(function() {
+            logSyncAction(kundeId, 'wip_delete', modulName, id, '');
+            return true;
+        });
+    }
+
+    function listWips(kundeId) {
+        return getByIndex('wip', 'kundeId', kundeId).then(function(records) {
+            return records.map(function(r) {
+                return {
+                    id: r.id,
+                    modulName: r.modulName,
+                    page: r.page,
+                    savedAt: r.savedAt,
+                    meta: r.meta,
+                    deviceId: r.deviceId
+                };
+            }).sort(function(a, b) { return (b.savedAt || '').localeCompare(a.savedAt || ''); });
+        });
+    }
+
+    function hasWip(kundeId, modulName) {
+        var id = 'wip_' + kundeId + '_' + modulName;
+        return getItem('wip', id).then(function(record) {
+            return !!record;
+        });
+    }
+
+    // ================================================================
+    // AUSGANGSBUCH — IndexedDB statt localStorage
+    // ================================================================
+    function saveAusgangsbuchEintrag(eintrag) {
+        if (!eintrag || !eintrag.id) return Promise.reject('Kein Eintrag oder ID');
+        eintrag.updatedAt = new Date().toISOString();
+        return putItem('ausgangsbuch', eintrag);
+    }
+
+    function loadAusgangsbuch(kundeId) {
+        if (kundeId) {
+            return getByIndex('ausgangsbuch', 'kundeId', kundeId).then(function(records) {
+                return records.sort(function(a, b) { return (b.datum || '').localeCompare(a.datum || ''); });
+            });
+        }
+        return getAllItems('ausgangsbuch').then(function(records) {
+            return records.sort(function(a, b) { return (b.datum || '').localeCompare(a.datum || ''); });
+        });
+    }
+
+    function deleteAusgangsbuchEintrag(id) {
+        return deleteItem('ausgangsbuch', id);
+    }
+
+    function migrateAusgangsbuchFromLocalStorage() {
+        try {
+            var lsData = localStorage.getItem('tw_ausgangsbuch');
+            if (!lsData) return Promise.resolve({ migrated: 0 });
+            var eintraege = JSON.parse(lsData);
+            if (!Array.isArray(eintraege) || eintraege.length === 0) return Promise.resolve({ migrated: 0 });
+            console.log('[TW-Storage] Migriere ' + eintraege.length + ' Ausgangsbuch-Eintraege von localStorage nach IndexedDB...');
+            var now = new Date().toISOString();
+            eintraege.forEach(function(e) {
+                if (!e.updatedAt) e.updatedAt = now;
+                if (!e.datum) e.datum = now.split('T')[0];
+            });
+            return putBatch('ausgangsbuch', eintraege).then(function(count) {
+                localStorage.removeItem('tw_ausgangsbuch');
+                console.log('%c[TW-Storage] Ausgangsbuch-Migration abgeschlossen: ' + count + ' Eintraege', 'color: #2ecc71; font-weight: bold;');
+                return { migrated: count };
+            });
+        } catch(e) {
+            console.warn('[TW-Storage] Ausgangsbuch-Migration fehlgeschlagen:', e);
+            return Promise.resolve({ migrated: 0, error: e.message });
+        }
     }
 
     // ================================================================
@@ -746,7 +865,7 @@
 
     function deleteKundeData(kundeId) {
         var storesWithKundeId = ['aufmass', 'rechnungen', 'raeume', 'gesamtlisten',
-            'positionen', 'schriftverkehr', 'kiAkten', 'driveOrdner', 'driveDateien', 'appDateien', 'syncLog'];
+            'positionen', 'schriftverkehr', 'kiAkten', 'driveOrdner', 'driveDateien', 'appDateien', 'syncLog', 'wip', 'ausgangsbuch'];
         var promises = storesWithKundeId.map(function(storeName) {
             return getByIndex(storeName, 'kundeId', kundeId).then(function(items) {
                 return Promise.all(items.map(function(item) { return deleteItem(storeName, item.id); }));
@@ -948,6 +1067,11 @@
         // Sync-Framework
         DriveUploadSync: DriveUploadSync,
         logSyncAction: logSyncAction, getUnsyncedChanges: getUnsyncedChanges, markAsSynced: markAsSynced,
+        // Bearbeitungsstand (WIP)
+        saveWip: saveWip, loadWip: loadWip, deleteWip: deleteWip, listWips: listWips, hasWip: hasWip,
+        // Ausgangsbuch (IndexedDB statt localStorage)
+        saveAusgangsbuchEintrag: saveAusgangsbuchEintrag, loadAusgangsbuch: loadAusgangsbuch,
+        deleteAusgangsbuchEintrag: deleteAusgangsbuchEintrag, migrateAusgangsbuchFromLocalStorage: migrateAusgangsbuchFromLocalStorage,
         deviceId: _deviceId,
         getStorageInfo: getStorageInfo, requestPersistentStorage: requestPersistentStorage,
         getRecordCounts: getRecordCounts, clearAllData: clearAllData, deleteKundeData: deleteKundeData,
@@ -959,6 +1083,12 @@
     initDB().then(function() {
         requestPersistentStorage();
         setupEventListeners();
+        // Einmalige Migration: Ausgangsbuch von localStorage nach IndexedDB
+        migrateAusgangsbuchFromLocalStorage().then(function(result) {
+            if (result.migrated > 0) {
+                console.log('%c[TW-Storage] Ausgangsbuch erfolgreich migriert: ' + result.migrated + ' Eintraege', 'color: #27ae60; font-weight: bold;');
+            }
+        });
     }).catch(function(e) {
         console.error('[TW-Storage] Initialisierung fehlgeschlagen:', e);
     });

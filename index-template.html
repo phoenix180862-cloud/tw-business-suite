@@ -95,6 +95,23 @@
         DISCOVERY_DOC: 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
     };
 
+    // ── Google Drive Ordnernamen (echte Kundenordner-Struktur) ──
+    // WICHTIG: Diese Namen muessen EXAKT mit den Ordnern auf Google Drive uebereinstimmen!
+    // Quelle: Screenshots Thomas, 13.04.2026
+    const DRIVE_ORDNER = {
+        kundenDaten:      'Kunden-Daten',
+        baustellenausw:   'Baustellenauswertung',
+        angeboteNachtr:   'Angebote-Nachtraege-Leistungsverzeichnis',
+        zeichnungen:      'Zeichnungen',
+        stundennachweis:  'Stundennachweis',
+        schriftverkehr:   'Schriftverkehr-Mail-Protokolle-Bauzeitenplan',
+        rechnung:         'Rechnung-A.Kontozahlung',
+        lieferanten:      'Lieferanten',
+        aufmass:          'Aufma\u00df',
+        bilder:           'Bilder'
+    };
+    window.DRIVE_ORDNER = DRIVE_ORDNER;
+
     // ── Gmail-Konfiguration ──
     const GMAIL_CONFIG = {
         ABSENDER_EMAIL: localStorage.getItem('gmail_absender') || 'phoenix180862@gmail.com',
@@ -561,7 +578,7 @@
             const safeName = kundenName.replace(/[^a-zA-Z0-9äöüÄÖÜß ]/g, '').replace(/ +/g, '_').substring(0, 30);
 
             // Aufmaß-Unterordner erstellen/finden
-            const aufmassFolderId = await this.findOrCreateFolder(kundeFolderId, 'Aufmaß');
+            const aufmassFolderId = await this.findOrCreateFolder(kundeFolderId, DRIVE_ORDNER.aufmass);
 
             const results = [];
             if (pdfBlob) {

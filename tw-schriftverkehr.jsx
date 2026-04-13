@@ -239,7 +239,7 @@
                         // Archivierung in Google Drive
                         try {
                             if (service.isConnected() && kunde && kunde._driveFolderId) {
-                                var schriftOrdnerId = await service.findOrCreateFolder(kunde._driveFolderId, '04_Schriftverkehr');
+                                var schriftOrdnerId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan');
                                 var mailOrdnerId = await service.findOrCreateFolder(schriftOrdnerId, versandKanal === 'mail' ? 'Mail' : 'Briefe');
                                 var datumFile = new Date().toISOString().slice(0,10).replace(/-/g,'');
                                 var betreffKurz = (betreff || 'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9äöüÄÖÜß\- ]/g, '').replace(/ /g, '_');
@@ -280,14 +280,14 @@
                 try {
                     var service = window.GoogleDriveService;
                     if (service.isConnected() && kunde && kunde._driveFolderId) {
-                        var schriftOrdnerId = await service.findOrCreateFolder(kunde._driveFolderId, '04_Schriftverkehr');
+                        var schriftOrdnerId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan');
                         var unterOrdnerId = await service.findOrCreateFolder(schriftOrdnerId, versandKanal === 'mail' ? 'Mail' : 'Briefe');
                         var datumFile = new Date().toISOString().slice(0,10).replace(/-/g,'');
                         var betreffKurz = (betreff || 'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9äöüÄÖÜß\- ]/g, '').replace(/ /g, '_');
                         var prefix = versandKanal === 'mail' ? 'Mail' : 'Brief';
                         var fileName = prefix + '_' + datumFile + '_' + betreffKurz + '.html';
                         await service.uploadFile(unterOrdnerId, fileName, 'text/html', new Blob([buildBriefHTML()], {type:'text/html'}));
-                        alert('✅ ' + prefix + ' gespeichert in 04_Schriftverkehr/' + (versandKanal === 'mail' ? 'Mail' : 'Briefe') + '/');
+                        alert('\u2705 ' + prefix + ' gespeichert in Schriftverkehr/' + (versandKanal === 'mail' ? 'Mail' : 'Briefe') + '/');
                     } else {
                         // Fallback: Lokaler Download
                         var blob = new Blob([buildBriefHTML()], { type: 'text/html' });

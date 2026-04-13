@@ -2035,7 +2035,7 @@
                         var parsed = JSON.parse(localData);
 
                         // JSON-Backup nach Drive hochladen
-                        var syncOrdnerId = await window.GoogleDriveService.findOrCreateFolder(kunde._driveFolderId, '06_Aufmass');
+                        var syncOrdnerId = await window.GoogleDriveService.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.aufmass) || 'Aufma\u00df');
                         var datumStr = new Date().toISOString().split('T')[0];
                         var jsonBlob = new Blob([JSON.stringify(parsed, null, 2)], {type: 'application/json'});
                         await window.GoogleDriveService.uploadFile(syncOrdnerId, 'Offline_Sync_' + datumStr + '.json', 'application/json', jsonBlob);
@@ -7957,9 +7957,9 @@
                                 </div>
                                 {isDrawMode ? (
                                     <canvas ref={canvasRef} width="340" height="280"
-                                        style={{width:'100%', maxWidth:'340px', height:'280px', margin:'0 auto', display:'block', background:'rgba(255,255,255,0.02)', border:'1px solid var(--border-color)', borderRadius:'6px', touchAction:'none', cursor:'crosshair'}} />
+                                        style={{width:'100%', maxWidth:'600px', height:'auto', minHeight:'280px', margin:'0 auto', display:'block', background:'rgba(255,255,255,0.02)', border:'1px solid var(--border-color)', borderRadius:'6px', touchAction:'none', cursor:'crosshair'}} />
                                 ) : (
-                                    <svg className="grundriss-svg" viewBox={`0 0 ${svgW} ${svgH}`} style={{maxWidth:'340px', minHeight:'260px'}}>
+                                    <svg className="grundriss-svg" viewBox={`0 0 ${svgW} ${svgH}`} style={{width:'100%', maxWidth:'600px', minHeight:'260px', margin:'0 auto', display:'block'}}>
                                         {drawGrundriss()}
                                         {!hasData && L <= 0 && (
                                             <text x={svgW/2} y={svgH/2} textAnchor="middle" fill="#7a8a9e" fontSize="13">

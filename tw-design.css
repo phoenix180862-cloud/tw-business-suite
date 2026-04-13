@@ -6346,15 +6346,131 @@
         }
         /* BLAUE Leiste (Grundriss, Fotos, Oeffnungen, Positionen, Waende, Masse) */
         .rb-nav-blue-btn {
-            background: var(--bg-tertiary);
+            background: rgba(30, 136, 229, 0.55);
         }
         .rb-nav-blue-btn.active {
             background: var(--accent-blue);
             box-shadow: 0 2px 8px rgba(77, 166, 255, 0.3);
         }
         .rb-nav-blue-btn:hover {
-            background: var(--bg-hover);
+            background: rgba(30, 136, 229, 0.75);
         }
         .rb-nav-blue-btn.active:hover {
             background: var(--accent-blue);
+        }
+
+        /* ═══════════════════════════════════════════
+           TABLET-OPTIMIERUNG (ab 700px Breite)
+           Alle Elemente skalieren auf Tablet-Groesse
+           ═══════════════════════════════════════════ */
+        @media (min-width: 700px) {
+
+            /* ── Globale Schriftgroesse und Abstaende ── */
+            .page-container {
+                padding: 24px 28px;
+            }
+            .page-title {
+                font-size: 28px;
+            }
+            .page-subtitle {
+                font-size: 16px;
+            }
+            .breadcrumb {
+                font-size: 14px;
+            }
+
+            /* ── Header & Navigation ── */
+            .app-header {
+                padding: 10px 20px;
+            }
+            .header-title {
+                font-size: 20px;
+            }
+            .nav-btn {
+                font-size: 20px;
+                width: 40px;
+                height: 40px;
+            }
+
+            /* ── StatusBar ── */
+            .status-bar {
+                font-size: 13px;
+                padding: 8px 20px;
+            }
+
+            /* ── Raumblatt Navigation ── */
+            .rb-nav-btn {
+                padding: 10px 8px;
+                font-size: 13px;
+                border-radius: 10px;
+            }
+
+            /* ── Eingabefelder groesser ── */
+            input[type="text"],
+            input[type="number"],
+            input[type="email"],
+            input[type="tel"],
+            input[type="search"],
+            select,
+            textarea {
+                font-size: 16px !important;
+                padding: 10px 12px !important;
+                min-height: 44px;
+            }
+
+            /* ── Buttons groesser ── */
+            button {
+                min-height: 42px;
+            }
+
+            /* ── Karten & Listen ── */
+            .ba-card {
+                padding: 20px;
+            }
+            .ba-card-title {
+                font-size: 17px;
+            }
+            .ba-row {
+                padding: 14px 18px;
+                font-size: 15px;
+            }
+
+            /* ── Foto-Thumbnails groesser ── */
+            .foto-thumb-container {
+                width: 110px;
+                height: 110px;
+            }
+
+            /* ── Modul-Kacheln (Modulwahl) ── */
+            .modul-kachel {
+                padding: 24px 18px;
+            }
+
+            /* ── Gesamtliste Modal ── */
+            .modal-overlay > div {
+                max-width: 90vw;
+            }
+        }
+
+        /* ═══════════════════════════════════════════
+           GROSSES TABLET / DESKTOP (ab 1024px Breite)
+           ═══════════════════════════════════════════ */
+        @media (min-width: 1024px) {
+            .page-container {
+                padding: 28px 40px;
+            }
+            .rb-nav-btn {
+                padding: 12px 14px;
+                font-size: 14px;
+            }
+            .page-title {
+                font-size: 32px;
+            }
+            input[type="text"],
+            input[type="number"],
+            input[type="email"],
+            select,
+            textarea {
+                font-size: 17px !important;
+            }
         }
