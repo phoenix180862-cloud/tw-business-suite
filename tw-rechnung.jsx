@@ -254,7 +254,7 @@
                     var lastPageIdx = pages.length - 1;
                     var zwischensumme = 0;
                     // Grid-Spalten: breitere Spalten fuer bessere Lesbarkeit
-                    var gridCols = '50px 75px 50px 1fr 85px 95px';
+                    var gridCols = '70px 100px 50px 1fr 90px 100px';
                     // Tabellenkopf-Komponente
                     var tHead = React.createElement('div', {style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',fontSize:'8pt',fontWeight:700,color:'#fff',background:'#2d3436',padding:'6px 6px',textTransform:'uppercase',letterSpacing:'0.3px'}},
                         React.createElement('span',{style:{textAlign:'center'}},'Pos.'),
