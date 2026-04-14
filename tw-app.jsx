@@ -1743,6 +1743,16 @@
                         </div>
                     )}
 
+                    {/* ═══ GLOBALER KUNDENNAME — sichtbar auf allen Bearbeitungsseiten ═══ */}
+                    {selectedKunde && page !== 'start' && page !== 'kundenModus' && (
+                        <div style={{padding:'8px 16px', background:'rgba(30,136,229,0.08)', borderBottom:'1px solid rgba(30,136,229,0.15)', display:'flex', alignItems:'center', gap:'10px'}}>
+                            <span style={{fontSize:'18px'}}>{'\uD83C\uDFD7\uFE0F'}</span>
+                            <div style={{fontSize:'18px', fontWeight:'700', color:'var(--accent-blue)', fontFamily:'Oswald, sans-serif', letterSpacing:'0.5px', textTransform:'uppercase', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                {(selectedKunde.name || selectedKunde.auftraggeber || 'Kunde').split(' \u2013 ')[0]}
+                            </div>
+                        </div>
+                    )}
+
                     {renderPage()}
 
                     {showAuth && (

@@ -801,7 +801,7 @@
 
                     {/* Zurueck */}
                     {path.length > 0 && (
-                        <button onClick={goUp} style={{display:'flex', alignItems:'center', gap:'8px', width:'100%', padding:'12px', marginBottom:'10px', borderRadius:'10px', border:'1px dashed var(--border-color)', background:'transparent', cursor:'pointer', color:'var(--text-muted)', fontSize:'13px', fontWeight:'600', touchAction:'manipulation'}}>
+                        <button onClick={goUp} style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', width:'100%', padding:'16px 20px', marginBottom:'12px', borderRadius:'14px', border:'2px solid var(--accent-blue)', background:'rgba(30,136,229,0.08)', cursor:'pointer', color:'var(--accent-blue)', fontSize:'16px', fontWeight:'700', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', touchAction:'manipulation', boxShadow:'0 2px 10px rgba(30,136,229,0.15)'}}>
                             {'\u2B06\uFE0F'} {'\u00DCbergeordneter Ordner'}
                         </button>
                     )}
