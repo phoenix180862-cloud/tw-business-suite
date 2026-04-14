@@ -4445,6 +4445,9 @@
             const hasData = raum && !raum.manuell && raum.waende && raum.waende.length > 0;
             const reEdit = (raum && raum.reEditState) || null; // Gespeicherter Zustand aus Gesamtliste
 
+            // ── Alle LV-Positionen des Kunden (fuer Farb-Zuordnung etc.) ──
+            const allLvPositionen = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
+
             // ── Globaler Enter-Key Handler für ALLE Eingabefelder im Raumblatt ──
             React.useEffect(() => {
                 const inputSelector = 'input:not([disabled]):not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([readonly]),textarea:not([disabled]):not([readonly]),select:not([disabled])';
@@ -9515,10 +9518,16 @@
                                                             borderRadius:'8px', color:'var(--text-primary)', fontSize:'12px', fontWeight:600
                                                         }} />
                                                         <select value={zuordnung.position} onChange={e => {
+                                                            var selectedPos = e.target.value;
+                                                            var posObj = allLvPositionen.find(function(p){ return p.pos === selectedPos; })
+                                                                || posCards.find(function(p){ return p.pos === selectedPos; });
                                                             setFarbZuordnung(prev => {
                                                                 var updated = Object.assign({}, prev);
                                                                 var arr = (updated[farbPopupOpen] || []).slice();
-                                                                arr[idx] = Object.assign({}, arr[idx], {position: e.target.value});
+                                                                var changes = {position: selectedPos};
+                                                                if (posObj && posObj.bez) changes.beschreibung = posObj.bez;
+                                                                if (posObj && posObj.einheit) changes.einheit = posObj.einheit === 'm\u00b2' ? 'm2' : (posObj.einheit || 'm2');
+                                                                arr[idx] = Object.assign({}, arr[idx], changes);
                                                                 updated[farbPopupOpen] = arr;
                                                                 return updated;
                                                             });
@@ -9528,9 +9537,22 @@
                                                             borderRadius:'8px', color:'var(--text-primary)', fontSize:'12px'
                                                         }}>
                                                             <option value="">-- Position waehlen --</option>
-                                                            {posCards.map(p => (
-                                                                <option key={p.pos} value={p.pos}>{p.pos} - {(p.bez || 'Position').substring(0, 40)}</option>
-                                                            ))}
+                                                            {posCards.length > 0 && (
+                                                                <optgroup label="Ausgewaehlte Positionen">
+                                                                    {posCards.map(p => (
+                                                                        <option key={'pc-' + p.pos} value={p.pos}>{p.pos} - {(p.bez || 'Position').substring(0, 50)}</option>
+                                                                    ))}
+                                                                </optgroup>
+                                                            )}
+                                                            {allLvPositionen.length > 0 && (
+                                                                <optgroup label="Alle LV-Positionen">
+                                                                    {allLvPositionen.filter(function(lp) {
+                                                                        return !posCards.some(function(pc){ return pc.pos === lp.pos; });
+                                                                    }).map(p => (
+                                                                        <option key={'lv-' + p.pos} value={p.pos}>{p.pos} - {(p.bez || p.titel || 'Position').substring(0, 50)}</option>
+                                                                    ))}
+                                                                </optgroup>
+                                                            )}
                                                         </select>
                                                     </div>
                                                     <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', flexShrink:0}}>
