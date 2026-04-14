@@ -217,8 +217,7 @@
                         return React.createElement('div', { key: field.key, style: { marginBottom: '10px' } },
                             React.createElement('label', { style: { fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' } }, field.label),
                             React.createElement('input', {
-                                type: field.type, value: settings[field.key] || '',
-                                inputMode: field.isNum ? 'numeric' : undefined,
+                                type: field.type, inputMode: field.isNum ? "numeric" : undefined, value: settings[field.key] || '',
                                 onChange: function(e) { update(field.key, field.isNum ? parseFloat(e.target.value) || 0 : e.target.value); },
                                 style: iStyle
                             })
@@ -245,14 +244,14 @@
                             { key: 'datum', label: 'Rechnungsdatum', type: 'date' },
                             { key: 'kunde', label: 'Kunde', type: 'text' },
                             { key: 'bauvorhaben', label: 'Bauvorhaben', type: 'text' },
-                            { key: 'nettoBetrag', label: 'Netto (\u20AC)', type: 'text', isNum: true },
+                            { key: 'nettoBetrag', label: 'Netto (€)', type: 'text', isNum: true },
                             { key: 'mwstSatz', label: 'MwSt (%)', type: 'text', isNum: true },
-                            { key: 'bruttoBetrag', label: 'Brutto (\u20AC)', type: 'text', isNum: true },
+                            { key: 'bruttoBetrag', label: 'Brutto (€)', type: 'text', isNum: true },
                             { key: 'zahlungszielTage', label: 'Zahlungsziel (Tage)', type: 'text', isNum: true },
                             { key: 'zahlungszielDatum', label: 'Zahlungsziel Datum', type: 'date' },
                             { key: 'status', label: 'Status', type: 'select', options: ['offen', 'bezahlt', 'gemahnt', 'storniert'] },
                             { key: 'zahlungsDatum', label: 'Zahlung eingegangen am', type: 'date' },
-                            { key: 'zahlungsBetrag', label: 'Zahlungsbetrag (\u20AC)', type: 'text', isNum: true },
+                            { key: 'zahlungsBetrag', label: 'Zahlungsbetrag (€)', type: 'text', isNum: true },
                             { key: 'notiz', label: 'Notiz', type: 'text' },
                         ].map(function(f) {
                             if (f.type === 'select') {
@@ -266,8 +265,7 @@
                             return React.createElement('div', { key: f.key, style: { marginBottom: '8px' } },
                                 React.createElement('label', { style: { fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' } }, f.label),
                                 React.createElement('input', {
-                                    type: f.type, value: d[f.key] != null ? d[f.key] : '',
-                                    inputMode: f.isNum ? 'numeric' : undefined,
+                                    type: f.type, inputMode: f.isNum ? "numeric" : undefined, value: d[f.key] != null ? d[f.key] : '',
                                     onChange: function(e) { set(f.key, f.isNum ? parseFloat(e.target.value) || 0 : e.target.value); },
                                     style: iStyle
                                 })
