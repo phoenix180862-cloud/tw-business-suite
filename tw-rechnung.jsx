@@ -235,47 +235,101 @@
                     </div>}
                 </div>
 
-                {/* --- POSITIONEN-BEREICH --- */}
+                {/* --- POSITIONEN-BEREICH: Mehrseitige A4-Darstellung --- */}
                 {!positionenGeladen ? (
                     <div style={{border:'2px dashed #ccc',borderRadius:'8px',padding:'28px 16px',textAlign:'center',marginBottom:'12px'}}>
                         <div style={{color:'#999',fontSize:'11px',marginBottom:'12px'}}>Positionen werden nach "Daten laden" hier angezeigt.</div>
                         <button onClick={function(){setShowDatenLaden(true);}} style={{padding:'14px 28px',background:'linear-gradient(135deg, #1E88E5, #1565C0)',color:'white',border:'none',borderRadius:'10px',fontSize:'14px',fontWeight:700,cursor:'pointer',boxShadow:'0 4px 12px rgba(30,136,229,0.3)'}}>{'\uD83D\uDCE5'} Daten laden</button>
                     </div>
-                ) : (
-                    <div style={{marginBottom:'12px'}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
-                            <div style={{fontSize:'9px',fontWeight:700,color:'#555',textTransform:'uppercase',letterSpacing:'0.5px'}}>Positionen ({aktivePosn.length})</div>
-                            <button onClick={addPosition} style={{padding:'3px 10px',fontSize:'9px',background:'#2d3436',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',fontWeight:600}}>+ Neu</button>
-                        </div>
-                        {/* Tabellenkopf wie im Ausdruck */}
-                        <div style={{display:'grid',gridTemplateColumns:'35px 55px 35px 1fr 65px 75px',gap:'0',fontSize:'7.5pt',fontWeight:700,color:'#fff',background:'#2d3436',padding:'5px 4px',textTransform:'uppercase',letterSpacing:'0.3px'}}>
-                            <span style={{textAlign:'center'}}>Pos.</span><span style={{textAlign:'right'}}>Menge</span><span style={{textAlign:'center'}}>Einh.</span><span style={{paddingLeft:'6px'}}>Bezeichnung</span><span style={{textAlign:'right'}}>EP</span><span style={{textAlign:'right'}}>GP</span>
-                        </div>
-                        {/* Alle Positionen editierbar */}
-                        {positionen.map(function(p){
-                            var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
-                            return(<div key={p.id} style={{display:'grid',gridTemplateColumns:'35px 55px 35px 1fr 65px 75px',gap:'0',padding:'4px',borderBottom:'1px solid #e0e0e0',alignItems:'start',fontSize:'8.5pt',opacity:p.aktiv?1:0.3}}>
-                                <input type="text" value={p.pos} onChange={function(e){updatePos(p.id,'pos',e.target.value);}} style={{padding:'2px 3px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',fontWeight:700,textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
-                                <input type="text" inputMode="decimal" value={p.menge||''} onChange={function(e){updatePos(p.id,'menge',e.target.value);}} onBlur={function(e){var v=parseFloat(e.target.value);updatePos(p.id,'menge',isNaN(v)?0:Number(v.toFixed(2)));}} style={{padding:'2px 3px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
-                                <input type="text" value={p.einheit} onChange={function(e){updatePos(p.id,'einheit',e.target.value);}} style={{padding:'2px 2px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'7.5pt',textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
-                                <input type="text" value={p.bez} onChange={function(e){updatePos(p.id,'bez',e.target.value);}} style={{padding:'2px 6px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
-                                <input type="text" inputMode="decimal" value={p.einzelpreis||''} onChange={function(e){updatePos(p.id,'einzelpreis',e.target.value);}} onBlur={function(e){var v=parseFloat(e.target.value);updatePos(p.id,'einzelpreis',isNaN(v)?0:Number(v.toFixed(2)));}} style={{padding:'2px 3px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
-                                <div style={{fontWeight:700,textAlign:'right',padding:'3px 2px',fontSize:'8.5pt'}}>{fmt(gp)} {'\u20AC'}</div>
-                            </div>);
-                        })}
-                        {/* Summenblock */}
-                        <div style={{marginLeft:'auto',width:'50%',marginTop:'6px',fontSize:'9.5pt'}}>
-                            <div style={{display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>Nettobetrag:</span><span style={{fontWeight:600}}>{fmt(nettoSumme)} {'\u20AC'}</span></div>
-                            <div style={{display:'flex',justifyContent:'space-between',padding:'2px 0',fontSize:'8.5pt',color:'#777'}}><span>zzgl. {mwstSatz}% MwSt.:</span><span>{fmt(mwstBetrag)} {'\u20AC'}</span></div>
-                            <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:700,fontSize:'12pt',borderTop:'2.5px double #222',marginTop:'2px'}}><span>Bruttobetrag:</span><span>{fmt(bruttoSumme)} {'\u20AC'}</span></div>
-                            {istRechnung && sicherheitseinbehalt>0 && <div style={{display:'flex',justifyContent:'space-between',fontSize:'8.5pt',color:'#777'}}><span>abzgl. Einbehalt {sicherheitseinbehalt}%:</span><span>{'\u2013'} {fmt(sicherheitBetrag)} {'\u20AC'}</span></div>}
-                            {istRechnung && <React.Fragment>
-                                <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,color:'#c41e1e'}}><span>Skonto ({skontoProzent}%, {skontoTage}T):</span><span>{fmt(zahlbetragMitSkonto)} {'\u20AC'}</span></div>
-                                <div style={{display:'flex',justifyContent:'space-between',fontWeight:700}}><span>Netto ({zahlungszielTage}T):</span><span>{fmt(zahlbetragOhneSkonto)} {'\u20AC'}</span></div>
-                            </React.Fragment>}
-                        </div>
-                    </div>
-                )}
+                ) : (function(){
+                    // Positionen auf Seiten aufteilen
+                    var ROWS_PAGE1 = 10;
+                    var ROWS_NEXT = 16;
+                    var pages = [];
+                    var pos = positionen.slice();
+                    // Seite 1: weniger Platz wegen Header
+                    pages.push(pos.splice(0, ROWS_PAGE1));
+                    // Folgeseiten
+                    while (pos.length > 0) { pages.push(pos.splice(0, ROWS_NEXT)); }
+                    var lastPageIdx = pages.length - 1;
+                    var zwischensumme = 0;
+                    // Grid-Spalten: breitere Spalten fuer bessere Lesbarkeit
+                    var gridCols = '50px 75px 50px 1fr 85px 95px';
+                    // Tabellenkopf-Komponente
+                    var tHead = React.createElement('div', {style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',fontSize:'8pt',fontWeight:700,color:'#fff',background:'#2d3436',padding:'6px 6px',textTransform:'uppercase',letterSpacing:'0.3px'}},
+                        React.createElement('span',{style:{textAlign:'center'}},'Pos.'),
+                        React.createElement('span',{style:{textAlign:'right',paddingRight:'6px'}},'Menge'),
+                        React.createElement('span',{style:{textAlign:'center'}},'Einh.'),
+                        React.createElement('span',{style:{paddingLeft:'8px'}},'Bezeichnung'),
+                        React.createElement('span',{style:{textAlign:'right',paddingRight:'4px'}},  'EP (\u20AC)'),
+                        React.createElement('span',{style:{textAlign:'right',paddingRight:'4px'}},'GP (\u20AC)')
+                    );
+                    // Fusszeile-Komponente
+                    var tFoot = React.createElement('div', {style:{borderTop:'1.5px solid #c41e1e',paddingTop:'2mm',fontSize:'7.5pt',color:'#666',lineHeight:1.7,marginTop:'auto',paddingBottom:'4px'}},
+                        React.createElement('div',{style:{display:'flex',justifyContent:'space-between'}},
+                            React.createElement('span',{style:{fontWeight:700,color:'#c41e1e'}},'Thomas Willwacher Fliesenlegermeister e.K.'),
+                            React.createElement('span',null,'Steuernummer: 30/220/1234/5')
+                        ),
+                        React.createElement('div',{style:{color:'#555',marginTop:'1mm'}},'Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1')
+                    );
+                    // Positionszeile rendern
+                    var renderRow = function(p) {
+                        var gp = (parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
+                        zwischensumme += p.aktiv ? gp : 0;
+                        return React.createElement('div', {key:p.id, style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',padding:'5px 6px',borderBottom:'1px solid #e0e0e0',alignItems:'start',fontSize:'9pt',opacity:p.aktiv?1:0.3}},
+                            React.createElement('input',{type:'text',value:p.pos,onChange:function(e){updatePos(p.id,'pos',e.target.value);},style:{padding:'3px 4px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'9pt',fontWeight:700,textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
+                            React.createElement('input',{type:'text',inputMode:'decimal',value:p.menge===0?'0,00':(typeof p.menge==='number'?p.menge.toFixed(2).replace('.',','):p.menge),onChange:function(e){updatePos(p.id,'menge',e.target.value.replace(',','.'));},onBlur:function(e){var v=parseFloat(e.target.value.replace(',','.'));updatePos(p.id,'menge',isNaN(v)?0:Number(v.toFixed(2)));},style:{padding:'3px 6px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'9pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
+                            React.createElement('input',{type:'text',value:p.einheit,onChange:function(e){updatePos(p.id,'einheit',e.target.value);},style:{padding:'3px 4px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
+                            React.createElement('textarea',{value:p.bez,onChange:function(e){updatePos(p.id,'bez',e.target.value);},rows:Math.max(1,Math.ceil((p.bez||'').length/60)),style:{padding:'3px 8px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',width:'100%',boxSizing:'border-box',background:'#fafafa',resize:'vertical',lineHeight:'1.4',fontFamily:'"Source Sans 3",sans-serif',minHeight:'24px'}}),
+                            React.createElement('input',{type:'text',inputMode:'decimal',value:p.einzelpreis===0?'0,00':(typeof p.einzelpreis==='number'?p.einzelpreis.toFixed(2).replace('.',','):p.einzelpreis),onChange:function(e){updatePos(p.id,'einzelpreis',e.target.value.replace(',','.'));},onBlur:function(e){var v=parseFloat(e.target.value.replace(',','.'));updatePos(p.id,'einzelpreis',isNaN(v)?0:Number(v.toFixed(2)));},style:{padding:'3px 6px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'9pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
+                            React.createElement('div',{style:{fontWeight:700,textAlign:'right',padding:'4px 4px',fontSize:'9pt'}},fmt(gp)+' \u20AC')
+                        );
+                    };
+                    return React.createElement('div', {style:{marginBottom:'12px'}},
+                        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
+                            React.createElement('div',{style:{fontSize:'9px',fontWeight:700,color:'#555',textTransform:'uppercase',letterSpacing:'0.5px'}},'Positionen ('+positionen.length+')'),
+                            React.createElement('button',{onClick:addPosition,style:{padding:'4px 12px',fontSize:'9px',background:'#2d3436',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',fontWeight:600}},  '+ Position')
+                        ),
+                        // Alle Seiten rendern
+                        pages.map(function(pagePositionen, pageIdx) {
+                            var isLast = pageIdx === lastPageIdx;
+                            var pageZwischensummeStart = zwischensumme;
+                            return React.createElement('div', {key:'page_'+pageIdx, style:{background:'#fff',borderRadius:pageIdx===0?'0':'8px',padding:pageIdx===0?'0':'20px 20px 16px',marginTop:pageIdx===0?'0':'16px',boxShadow:pageIdx===0?'none':'0 2px 12px rgba(0,0,0,0.15)',border:pageIdx===0?'none':'1px solid #ddd',minHeight:pageIdx===0?'auto':'400px',display:'flex',flexDirection:'column',position:'relative'}},
+                                // Seitenheader (nur ab Seite 2)
+                                pageIdx > 0 && React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'8px',paddingBottom:'6px',borderBottom:'1px solid #eee',fontSize:'8pt',color:'#888'}},
+                                    React.createElement('span',null,'Seite '+(pageIdx+1)),
+                                    React.createElement('span',{style:{fontStyle:'italic'}},'Uebertrag von Seite '+pageIdx+': '+fmt(pageZwischensummeStart)+' \u20AC')
+                                ),
+                                // Tabellenkopf
+                                tHead,
+                                // Positionszeilen
+                                pagePositionen.map(renderRow),
+                                // Uebertrag am Seitenende (wenn nicht letzte Seite)
+                                !isLast && React.createElement('div',{style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',padding:'6px 6px',borderTop:'1.5px solid #222',marginTop:'4px',fontSize:'9pt',fontWeight:700,color:'#555'}},
+                                    React.createElement('span',{style:{gridColumn:'1 / 6',textAlign:'right',paddingRight:'8px'}},'Uebertrag auf Seite '+(pageIdx+2)+':'),
+                                    React.createElement('span',{style:{textAlign:'right',paddingRight:'4px'}},fmt(zwischensumme)+' \u20AC')
+                                ),
+                                // Auf letzter Seite: Summenblock mit viel Platz
+                                isLast && React.createElement('div',{style:{marginTop:'20px',paddingTop:'16px'}},
+                                    React.createElement('div',{style:{marginLeft:'auto',width:'55%',fontSize:'10pt'}},
+                                        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',padding:'3px 0'}},React.createElement('span',null,'Nettobetrag:'),React.createElement('span',{style:{fontWeight:600}},fmt(nettoSumme)+' \u20AC')),
+                                        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:'9pt',color:'#777'}},React.createElement('span',null,'zzgl. '+mwstSatz+'% MwSt.:'),React.createElement('span',null,fmt(mwstBetrag)+' \u20AC')),
+                                        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',padding:'6px 0',fontWeight:700,fontSize:'13pt',borderTop:'2.5px double #222',marginTop:'4px'}},React.createElement('span',null,'Bruttobetrag:'),React.createElement('span',null,fmt(bruttoSumme)+' \u20AC')),
+                                        istRechnung && sicherheitseinbehalt>0 && React.createElement('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'9pt',color:'#777',padding:'3px 0'}},React.createElement('span',null,'abzgl. Sicherheitseinbehalt '+sicherheitseinbehalt+'%:'),React.createElement('span',null,'\u2013 '+fmt(sicherheitBetrag)+' \u20AC')),
+                                        rechnungsTyp==='schluss' && kontoSumme>0 && React.createElement('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'9pt',color:'#27ae60',fontWeight:600,padding:'3px 0'}},React.createElement('span',null,'abzgl. Kontozahlungen:'),React.createElement('span',null,'\u2013 '+fmt(kontoSumme)+' \u20AC')),
+                                        istRechnung && React.createElement(React.Fragment,null,
+                                            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',fontWeight:700,color:'#c41e1e',padding:'4px 0',marginTop:'4px',fontSize:'10pt'}},React.createElement('span',null,'Zahlbar innerh. '+skontoTage+' Tage ('+skontoProzent+'% Skonto):'),React.createElement('span',null,fmt(zahlbetragMitSkonto)+' \u20AC')),
+                                            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',fontWeight:700,padding:'4px 0',fontSize:'10pt'}},React.createElement('span',null,'Zahlbar innerh. '+zahlungszielTage+' Tage netto:'),React.createElement('span',null,fmt(zahlbetragOhneSkonto)+' \u20AC'))
+                                        )
+                                    )
+                                ),
+                                // Fusszeile auf jeder Seite (mit Abstand)
+                                React.createElement('div',{style:{flexGrow:1,minHeight:isLast?'40px':'20px'}}),
+                                pageIdx > 0 && tFoot
+                            );
+                        })
+                    );
+                })()}
 
                 {/* Schlussrechnung: Kontozahlungen */}
                 {rechnungsTyp==='schluss'&&(<button onClick={function(){setShowKontoDialog(true);ladeKontozahlungen();}} style={{width:'100%',padding:'8px',marginBottom:'8px',borderRadius:'8px',border:'1px solid #27ae60',background:'rgba(39,174,96,0.06)',color:'#27ae60',fontSize:'10px',fontWeight:700,cursor:'pointer'}}>Kontozahlungen anzeigen ({kontozahlungen.length})</button>)}
