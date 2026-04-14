@@ -3690,10 +3690,10 @@
                         </div>
                     )}
 
-                    {/* ═══ DIREKT AUFMASS STARTEN (ohne Raum/Position) ═══ */}
+                    {/* Direkt Aufmass starten */}
                     <div style={{padding:'0 0 16px 0'}}>
                         <button
-                            onClick={() => {
+                            onClick={function() {
                                 var direktRaum = {
                                     nr: '',
                                     geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
@@ -3718,13 +3718,11 @@
                                 boxShadow:'0 4px 16px rgba(30,136,229,0.35)',
                                 display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
                                 fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
-                                transition:'all 0.2s ease',
                             }}>
-                            <span style={{fontSize:'20px'}}>&#x1F4D0;</span>
-                            Aufmass direkt starten
+                            {'\uD83D\uDCD0'} Aufmass direkt starten
                         </button>
                         <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'6px'}}>
-                            Ohne Raumauswahl und Positionsauswahl — alles manuell im Raumblatt eingeben
+                            Ohne Raumauswahl und Positionsauswahl
                         </div>
                     </div>
 
@@ -4443,10 +4441,10 @@
            ═══════════════════════════════════════════ */
         function Raumblatt({ kunde, raum, onFinishRaum, onBack, selectedPositions: initPositions, lastRaumData, gesamtliste, onShowGesamtliste, onAufmassBeenden }) {
             const hasData = raum && !raum.manuell && raum.waende && raum.waende.length > 0;
-            const reEdit = (raum && raum.reEditState) || null; // Gespeicherter Zustand aus Gesamtliste
+            const reEdit = (raum && raum.reEditState) || null;
 
-            // ── Alle LV-Positionen des Kunden (fuer Farb-Zuordnung etc.) ──
-            const allLvPositionen = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
+            // Alle LV-Positionen des Kunden (fuer Farb-Zuordnung Dropdown)
+            var allLvPos = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
 
             // ── Globaler Enter-Key Handler für ALLE Eingabefelder im Raumblatt ──
             React.useEffect(() => {
@@ -9517,16 +9515,17 @@
                                                             background:'var(--bg-primary)', border:'1px solid var(--border-subtle)',
                                                             borderRadius:'8px', color:'var(--text-primary)', fontSize:'12px', fontWeight:600
                                                         }} />
-                                                        <select value={zuordnung.position} onChange={e => {
-                                                            var selectedPos = e.target.value;
-                                                            var posObj = allLvPositionen.find(function(p){ return p.pos === selectedPos; })
-                                                                || posCards.find(function(p){ return p.pos === selectedPos; });
-                                                            setFarbZuordnung(prev => {
+                                                        <select value={zuordnung.position} onChange={function(e) {
+                                                            var val = e.target.value;
+                                                            var found = null;
+                                                            for (var ai = 0; ai < allLvPos.length; ai++) { if (allLvPos[ai].pos === val) { found = allLvPos[ai]; break; } }
+                                                            if (!found) { for (var bi = 0; bi < posCards.length; bi++) { if (posCards[bi].pos === val) { found = posCards[bi]; break; } } }
+                                                            setFarbZuordnung(function(prev) {
                                                                 var updated = Object.assign({}, prev);
                                                                 var arr = (updated[farbPopupOpen] || []).slice();
-                                                                var changes = {position: selectedPos};
-                                                                if (posObj && posObj.bez) changes.beschreibung = posObj.bez;
-                                                                if (posObj && posObj.einheit) changes.einheit = posObj.einheit === 'm\u00b2' ? 'm2' : (posObj.einheit || 'm2');
+                                                                var changes = {position: val};
+                                                                if (found && (found.bez || found.titel)) { changes.beschreibung = found.bez || found.titel; }
+                                                                if (found && found.einheit) { changes.einheit = found.einheit === 'm\u00b2' ? 'm2' : (found.einheit || 'm2'); }
                                                                 arr[idx] = Object.assign({}, arr[idx], changes);
                                                                 updated[farbPopupOpen] = arr;
                                                                 return updated;
@@ -9537,22 +9536,12 @@
                                                             borderRadius:'8px', color:'var(--text-primary)', fontSize:'12px'
                                                         }}>
                                                             <option value="">-- Position waehlen --</option>
-                                                            {posCards.length > 0 && (
-                                                                <optgroup label="Ausgewaehlte Positionen">
-                                                                    {posCards.map(p => (
-                                                                        <option key={'pc-' + p.pos} value={p.pos}>{p.pos} - {(p.bez || 'Position').substring(0, 50)}</option>
-                                                                    ))}
-                                                                </optgroup>
-                                                            )}
-                                                            {allLvPositionen.length > 0 && (
-                                                                <optgroup label="Alle LV-Positionen">
-                                                                    {allLvPositionen.filter(function(lp) {
-                                                                        return !posCards.some(function(pc){ return pc.pos === lp.pos; });
-                                                                    }).map(p => (
-                                                                        <option key={'lv-' + p.pos} value={p.pos}>{p.pos} - {(p.bez || p.titel || 'Position').substring(0, 50)}</option>
-                                                                    ))}
-                                                                </optgroup>
-                                                            )}
+                                                            {posCards.map(function(p) { return (
+                                                                <option key={'pc-' + p.pos} value={p.pos}>{p.pos} - {(p.bez || 'Position').substring(0, 50)}</option>
+                                                            ); })}
+                                                            {allLvPos.filter(function(lp) { return !posCards.some(function(pc) { return pc.pos === lp.pos; }); }).map(function(p) { return (
+                                                                <option key={'lv-' + p.pos} value={p.pos}>{p.pos} - {(p.bez || p.titel || 'Position').substring(0, 50)}</option>
+                                                            ); })}
                                                         </select>
                                                     </div>
                                                     <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'4px', flexShrink:0}}>
