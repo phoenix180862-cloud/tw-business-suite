@@ -128,10 +128,10 @@
                         <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>{stammFelder.bauherr_firma || (kunde && kunde.name) || 'Kundendaten'}</div>
                         <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{stammFelder.objekt_bauvorhaben || 'Projekt'}</div>
                     </div>
-                    {savedMsg && (<div style={{padding:'10px 16px', background:'rgba(196,30,30,0.12)', border:'1px solid rgba(196,30,30,0.3)', borderRadius:'10px', marginBottom:'12px', fontSize:'13px', color:'var(--accent-red-light)', fontWeight:'600', textAlign:'center'}}>{savedMsg}</div>)}
+                    {savedMsg && (<div style={{padding:'10px 16px', background:'rgba(30,136,229,0.12)', border:'1px solid rgba(30,136,229,0.3)', borderRadius:'10px', marginBottom:'12px', fontSize:'13px', color:'#1E88E5', fontWeight:'600', textAlign:'center'}}>{savedMsg}</div>)}
                     <div style={{display:'flex', gap:'4px', marginBottom:'12px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
                         {tabs.map(function(tab) { var isActive = activeTab === tab.id; return (
-                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border:'none', cursor:'pointer', background: isActive ? 'var(--accent-red)' : 'transparent', color: isActive ? 'white' : 'var(--text-muted)', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease' }, touchBase)}>
+                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border: isActive ? '1px solid rgba(255,255,255,0.2)' : 'none', cursor:'pointer', background: isActive ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'rgba(30,136,229,0.15)', color: isActive ? 'white' : '#1E88E5', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease', boxShadow: isActive ? '0 0 10px rgba(30,136,229,0.4), 0 2px 6px rgba(21,101,192,0.3)' : 'none' }, touchBase)}>
                                 <span style={{fontSize:'16px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
                                 {tab.label}{tab.count !== null && <span style={{marginLeft:'4px', fontSize:'10px', opacity:0.8}}>({tab.count})</span>}
                             </button>
@@ -139,9 +139,9 @@
                     </div>
                     <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
                         {!editMode ? (
-                            <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(196,30,30,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
+                            <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
                         ) : (
-                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(196,30,30,0.3)' }, touchBase)}>Bearbeitung beenden & Daten in Module laden</button>
+                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beenden & Daten in Module laden</button>
                         )}
                     </div>
 

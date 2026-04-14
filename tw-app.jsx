@@ -1706,42 +1706,64 @@
                     />
 
                     {/* -- GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe (ALLE Seiten inkl. Start) -- */}
-                    {(true) && (
+                    {(true) && (() => {
+                        // Aktiver Button = hell leuchtend, Rest = gedaempft
+                        var navBtn = function(targetPage, label, onClick, disabled) {
+                            var isActive = (targetPage && page === targetPage);
+                            return {
+                                flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: isActive ? '1px solid rgba(255,255,255,0.3)' : 'none',
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                                background: isActive
+                                    ? 'linear-gradient(135deg, #e84040, #ff5252)'
+                                    : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                color:'#fff', fontSize:'10px', fontWeight:'700',
+                                display:'flex', alignItems:'center', justifyContent:'center',
+                                fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px',
+                                transition:'all 0.2s ease', minWidth:0,
+                                textShadow: isActive ? '0 0 6px rgba(255,255,255,0.6)' : '0 1px 2px rgba(0,0,0,0.3)',
+                                opacity: disabled ? 0.4 : (isActive ? 1 : 0.55),
+                                boxShadow: isActive ? '0 0 12px rgba(255,68,68,0.5), 0 2px 8px rgba(196,30,30,0.4), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
+                                transform: isActive ? 'scale(1.06)' : 'scale(1)',
+                                zIndex: isActive ? 2 : 1,
+                            };
+                        };
+                        return (
                         <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
                             <button onClick={function(){ navigateTo('start'); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'start' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn('start', 'Start')}>
                                 Start
                             </button>
                             <button onClick={function(){ navigateTo('kundenModus'); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'kundenModus' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn('kundenModus', 'Kunden')}>
                                 Kunden
                             </button>
                             <button onClick={function(){ navigateTo('auswahl'); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background: page === 'auswahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn('auswahl', 'Baustell.')}>
                                 Baustell.
                             </button>
                             <button onClick={function(){ navigateTo('datenUebersicht'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn('datenUebersicht', 'Daten', null, !selectedKunde)}>
                                 Daten
                             </button>
                             <button onClick={function(){ navigateTo('ordnerBrowser'); }} disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: page === 'ordnerBrowser' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn('ordnerBrowser', 'Ordner', null, !selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id))}>
                                 Ordner
                             </button>
                             <button onClick={function(){ navigateTo('modulwahl'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'var(--accent-red)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', opacity: selectedKunde ? 1 : 0.4, minWidth:0, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn('modulwahl', 'Module', null, !selectedKunde)}>
                                 Module
                             </button>
                             <button onClick={function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn(null, 'Akte')}>
                                 Akte
                             </button>
                             <button onClick={function(){ if (window._akteSpeichernHandler) window._akteSpeichernHandler(); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
+                                style={navBtn(null, 'Speich.')}>
                                 Speich.
                             </button>
                         </div>
-                    )}
+                        );
+                    })()}
 
                     {renderPage()}
 

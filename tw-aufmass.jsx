@@ -544,9 +544,9 @@
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
                     desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
-                    color: 'var(--accent-red-light)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.25)',
+                    color: '#1E88E5',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
@@ -556,9 +556,9 @@
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
-                    color: 'var(--accent-red-light)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.25)',
+                    color: '#1E88E5',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: null,
                     disabled: false,
                     disabledHint: null,
@@ -608,7 +608,7 @@
                                         <div style={{fontSize:'16px', fontWeight:'600', marginBottom:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>{m.title}</div>
                                         <div style={{fontSize:'12px', opacity: m.disabled ? 0.7 : 0.9, lineHeight:'1.5', fontFamily:'Source Sans 3, sans-serif'}}>{m.desc}</div>
                                         {m.disabled && m.disabledHint && (
-                                            <div style={{fontSize:'10px', marginTop:'6px', padding:'3px 8px', background:'rgba(196,30,30,0.12)', borderRadius:'var(--radius-sm)', display:'inline-block', color:'var(--accent-red-light)', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                            <div style={{fontSize:'10px', marginTop:'6px', padding:'3px 8px', background:'rgba(30,136,229,0.12)', borderRadius:'var(--radius-sm)', display:'inline-block', color:'#1E88E5', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
                                                 {'\u26A0'} {m.disabledHint}
                                             </div>
                                         )}
@@ -3689,6 +3689,44 @@
                             <span><strong>{erkannteRaeume.length} Räume</strong> erkannt – Raum antippen → Positionen auswählen → Aufmaß starten</span>
                         </div>
                     )}
+
+                    {/* ═══ DIREKT AUFMASS STARTEN (ohne Raum/Position) ═══ */}
+                    <div style={{padding:'0 0 16px 0'}}>
+                        <button
+                            onClick={() => {
+                                var direktRaum = {
+                                    nr: '',
+                                    geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
+                                    bez: '',
+                                    quelle: 'Direkt',
+                                    waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                    hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                    fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                    raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
+                                    abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
+                                    sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
+                                    fliesenUmlaufend: true,
+                                    abdichtungUmlaufend: true,
+                                    manuell: true,
+                                };
+                                onSelectRaum(direktRaum, []);
+                            }}
+                            style={{
+                                width:'100%', padding:'16px 20px', borderRadius:'14px', border:'none', cursor:'pointer',
+                                background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                color:'white', fontSize:'15px', fontWeight:'700',
+                                boxShadow:'0 4px 16px rgba(30,136,229,0.35)',
+                                display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+                                fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                transition:'all 0.2s ease',
+                            }}>
+                            <span style={{fontSize:'20px'}}>&#x1F4D0;</span>
+                            Aufmass direkt starten
+                        </button>
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'6px'}}>
+                            Ohne Raumauswahl und Positionsauswahl — alles manuell im Raumblatt eingeben
+                        </div>
+                    </div>
 
                     {Object.entries(grouped).map(([geschoss, raeume]) => (
                         <React.Fragment key={geschoss}>
