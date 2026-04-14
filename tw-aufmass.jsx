@@ -4512,6 +4512,20 @@
                 }
             );
             const [expandedPhases, setExpandedPhases] = useState({ rohzustand: true, vorarbeiten: false, fertigstellung: false });
+
+            // Objekt-Fotos (allgemeine Gebaeude-Fotos, gleiche Struktur wie Wand-Fotos)
+            const [objektPhasenFotos, setObjektPhasenFotos] = useState(function() {
+                if (reEdit && reEdit.objektPhasenFotos) return reEdit.objektPhasenFotos;
+                var init = {}; FOTO_PHASEN.forEach(function(ph) { init[ph.key] = {}; }); return init;
+            });
+            const [objektExpandedPhases, setObjektExpandedPhases] = useState({ rohzustand: true, vorarbeiten: false, fertigstellung: false });
+            const [fotoModus, setFotoModus] = useState('waende');
+
+            // Aktive Foto-Daten je nach Modus
+            var aktFotos = fotoModus === 'objekt' ? objektPhasenFotos : phasenFotos;
+            var setAktFotos = fotoModus === 'objekt' ? setObjektPhasenFotos : setPhasenFotos;
+            var aktExpanded = fotoModus === 'objekt' ? objektExpandedPhases : expandedPhases;
+            var setAktExpanded = fotoModus === 'objekt' ? setObjektExpandedPhases : setExpandedPhases;
             const [cropState, setCropState] = useState(null);
             const cropCanvasRef = React.useRef(null);
             const cropImageRef = React.useRef(null);
@@ -4565,7 +4579,7 @@
 
             // ── Vollbild-Editor oeffnen ──
             const openFullscreenEdit = (phase, wandId) => {
-                const foto = phasenFotos[phase] && phasenFotos[phase][wandId];
+                const foto = aktFotos[phase] && aktFotos[phase][wandId];
                 if (!foto) return;
                 // Zoom zuruecksetzen (verhindert Zoom-Falle)
                 try {
@@ -4662,7 +4676,7 @@
                         }
 
                         const editedImage = canvas.toDataURL('image/jpeg', 0.85);
-                        setPhasenFotos(prev => {
+                        setAktFotos(prev => {
                             const updated = {...prev};
                             if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
                                 var existing = updated[fs.phase][fs.wandId];
@@ -4690,7 +4704,7 @@
                     img.src = sourceImage;
                 } else {
                     // Nur Drawings-State speichern (kein Bild-Export noetig)
-                    setPhasenFotos(prev => {
+                    setAktFotos(prev => {
                         const updated = {...prev};
                         if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
                             updated[fs.phase] = {...updated[fs.phase],
@@ -4788,6 +4802,8 @@
 
             const handleTabChange = (tabIdx) => {
                 setRbTab(tabIdx);
+                if (tabIdx === 1) setFotoModus('waende');
+                else if (tabIdx === 4) setFotoModus('objekt');
                 const page = document.querySelector('.page-container');
                 if (page) page.scrollTo({ top: 0, behavior: 'smooth' });
             };
@@ -4795,7 +4811,7 @@
             // ── Tastatur-Navigation: Strg+1/2/3/4 fuer Tab-Wechsel ──
             useEffect(() => {
                 const handleKeyNav = (e) => {
-                    if (e.ctrlKey && e.key >= '1' && e.key <= '4') {
+                    if (e.ctrlKey && e.key >= '1' && e.key <= '5') {
                         e.preventDefault();
                         handleTabChange(parseInt(e.key) - 1);
                     }
@@ -4807,7 +4823,7 @@
             // ── Ungespeicherte-Aenderungen Tracking ──
             useEffect(() => {
                 setHasUnsavedChanges(true);
-            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos]);
+            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos, objektPhasenFotos]);
 
             // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
@@ -6727,7 +6743,7 @@
             };
 
             const countPhasePhotos = (phaseKey) => {
-                const phaseData = phasenFotos[phaseKey] || {};
+                const phaseData = aktFotos[phaseKey] || {};
                 return Object.keys(phaseData).length;
             };
 
@@ -6741,7 +6757,7 @@
                 if (!file || !fotoContext) return;
                 const reader = new FileReader();
                 reader.onload = (ev) => {
-                    setPhasenFotos(prev => {
+                    setAktFotos(prev => {
                         const updated = { ...prev };
                         updated[fotoContext.phase] = {
                             ...updated[fotoContext.phase],
@@ -6760,7 +6776,7 @@
 
             const handlePhotoDelete = (phaseKey, wandId) => {
                 if (!confirm('Foto loeschen?')) return;
-                setPhasenFotos(prev => {
+                setAktFotos(prev => {
                     const updated = { ...prev };
                     const phaseData = { ...updated[phaseKey] };
                     delete phaseData[wandId];
@@ -6770,7 +6786,7 @@
             };
 
             const togglePhotoMark = (phaseKey, wandId) => {
-                setPhasenFotos(prev => {
+                setAktFotos(prev => {
                     const updated = { ...prev };
                     const foto = updated[phaseKey][wandId];
                     if (foto) {
@@ -6785,7 +6801,7 @@
             const getMarkedFotos = () => {
                 const marked = [];
                 FOTO_PHASEN.forEach(phase => {
-                    const phaseData = phasenFotos[phase.key] || {};
+                    const phaseData = aktFotos[phase.key] || {};
                     Object.entries(phaseData).forEach(([wandId, foto]) => {
                         if (foto && foto.marked && (foto.croppedImage || foto.image)) {
                             marked.push({ phase: phase.key, wandId, foto });
@@ -6796,7 +6812,7 @@
             };
 
             const markAllPhotos = (markState) => {
-                setPhasenFotos(prev => {
+                setAktFotos(prev => {
                     const updated = {};
                     FOTO_PHASEN.forEach(phase => {
                         updated[phase.key] = {};
@@ -6811,7 +6827,7 @@
 
             // ── Foto-Crop-Tool ──
             const openCropModal = (phase, wandId) => {
-                const foto = phasenFotos[phase] && phasenFotos[phase][wandId];
+                const foto = aktFotos[phase] && aktFotos[phase][wandId];
                 if (!foto || !foto.image) return;
                 setCropState({
                     phase, wandId, image: foto.image,
@@ -6915,7 +6931,7 @@
                 ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
                 const croppedImage = canvas.toDataURL('image/jpeg', 0.85);
                 // Save cropped image
-                setPhasenFotos(prev => {
+                setAktFotos(prev => {
                     const updated = {...prev};
                     if (updated[cropState.phase] && updated[cropState.phase][cropState.wandId]) {
                         updated[cropState.phase] = {...updated[cropState.phase],
@@ -6991,7 +7007,7 @@
                         const parsed = JSON.parse(rawText);
                         parsed._phase = m.phase;
                         results.push(parsed);
-                        setPhasenFotos(prev => {
+                        setAktFotos(prev => {
                             const updated = { ...prev };
                             if (updated[m.phase] && updated[m.phase][m.wandId]) {
                                 updated[m.phase] = { ...updated[m.phase],
@@ -7854,7 +7870,8 @@
                     }}>
                         {[
                             {id: 0, label: 'Grundriss'},
-                            {id: 1, label: 'Fotos'},
+                            {id: 1, label: 'Fotos - Waende'},
+                            {id: 4, label: 'Fotos Objekt'},
                             {id: 2, label: 'Oeffnungen'},
                             {id: 3, label: 'Pos. (' + posCards.filter(function(p) { return calcPositionResult(p) > 0; }).length + '/' + posCards.length + ')'}
                         ].map(function(tab) {
@@ -8375,7 +8392,7 @@
                     </div>
 
                     {/* Fotos & KI → jetzt auf Tab 2 (Fotos) */}
-                    {(fotos.length > 0 || Object.values(phasenFotos).some(p => Object.keys(p).length > 0)) && (
+                    {(fotos.length > 0 || Object.values(aktFotos).some(p => Object.keys(p).length > 0)) && (
                         <div style={{
                             padding:'10px 14px', marginBottom:'10px',
                             background:'rgba(30,136,229,0.06)', border:'1px solid rgba(30,136,229,0.15)',
@@ -8797,22 +8814,35 @@
 
                     </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
-                    {rbTab === 1 && (
+                    {(rbTab === 1 || rbTab === 4) && (
                         <div>
                             {/* Hidden file input fuer Phasen-Fotos */}
                             <input type="file" accept="image/*" capture="environment"
                                 ref={fotoInputRef2} style={{display:'none'}}
                                 onChange={handlePhotoFileChange} />
 
+                            {/* Modus-Anzeige */}
+                            <div style={{
+                                padding:'10px 14px', marginBottom:'8px', borderRadius:'10px',
+                                background: fotoModus === 'objekt' ? 'rgba(142,68,173,0.1)' : 'rgba(30,136,229,0.08)',
+                                border: '1px solid ' + (fotoModus === 'objekt' ? 'rgba(142,68,173,0.25)' : 'rgba(30,136,229,0.15)'),
+                                display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', fontWeight:600,
+                                color: fotoModus === 'objekt' ? '#8e44ad' : 'var(--accent-blue)',
+                                fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'
+                            }}>
+                                <span style={{fontSize:'18px'}}>{fotoModus === 'objekt' ? '\uD83C\uDFE2' : '\uD83E\uDDF1'}</span>
+                                {fotoModus === 'objekt' ? 'Objekt-Fotos (allgemein)' : 'Wand-Fotos (raumbezogen)'}
+                            </div>
+
                             <div className="foto-phasen-container">
                                 {FOTO_PHASEN.map(phase => {
                                     const wallIds = getWallIds();
                                     const photoCount = countPhasePhotos(phase.key);
-                                    const isExpanded = expandedPhases[phase.key];
+                                    const isExpanded = aktExpanded[phase.key];
                                     return (
                                         <div key={phase.key} className="foto-phase">
                                             <div className="foto-phase-header"
-                                                onClick={() => setExpandedPhases(prev => ({...prev, [phase.key]: !prev[phase.key]}))}>
+                                                onClick={() => setAktExpanded(prev => ({...prev, [phase.key]: !prev[phase.key]}))}>
                                                 <div style={{display:'flex', alignItems:'center', gap:'8px', flex:1}}>
                                                     <span className="phase-nummer" style={{
                                                         background: phase.color.replace(')', ',0.15)').replace('var(', 'rgba(').replace('--accent-orange', '230,126,34').replace('--accent-blue', '30,136,229').replace('--success', '39,174,96'),
@@ -8839,10 +8869,10 @@
                                                     <React.Fragment>
                                                         <button onClick={(e) => {
                                                             e.stopPropagation();
-                                                            var markedInPhase = Object.entries(phasenFotos[phase.key] || {}).find(function(entry) { return entry[1] && entry[1].marked; });
+                                                            var markedInPhase = Object.entries(aktFotos[phase.key] || {}).find(function(entry) { return entry[1] && entry[1].marked; });
                                                             if (markedInPhase) { openFullscreenEdit(phase.key, markedInPhase[0]); }
                                                             else {
-                                                                var firstPhoto = Object.entries(phasenFotos[phase.key] || {}).find(function(entry) { return entry[1] && entry[1].image; });
+                                                                var firstPhoto = Object.entries(aktFotos[phase.key] || {}).find(function(entry) { return entry[1] && entry[1].image; });
                                                                 if (firstPhoto) openFullscreenEdit(phase.key, firstPhoto[0]);
                                                             }
                                                         }} style={{
@@ -8872,7 +8902,7 @@
                                                         display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:'8px'
                                                     }}>
                                                         {wallIds.map(wandId => {
-                                                            const foto = phasenFotos[phase.key] && phasenFotos[phase.key][wandId];
+                                                            const foto = aktFotos[phase.key] && aktFotos[phase.key][wandId];
                                                             return (
                                                                 <div key={wandId} className={'foto-wand-slot' + (foto ? ' has-photo' : '') + (foto && foto.marked ? ' marked' : '')}
                                                                     style={{
@@ -10511,7 +10541,7 @@
                                 fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
                                 raumhoehe: masse.raumhoehe,
-                                phasenFotos: phasenFotos,
+                                phasenFotos: phasenFotos, objektPhasenFotos: objektPhasenFotos,
                                 kiErgebnisse: kiErgebnisse,
                                 kiFotoErgebnisse: kiFotoErgebnisse
                             };
@@ -10596,7 +10626,7 @@
                                 fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
                                 raumhoehe: masse.raumhoehe,
-                                phasenFotos: phasenFotos,
+                                phasenFotos: phasenFotos, objektPhasenFotos: objektPhasenFotos,
                                 kiErgebnisse: kiErgebnisse,
                                 kiFotoErgebnisse: kiFotoErgebnisse
                             };
