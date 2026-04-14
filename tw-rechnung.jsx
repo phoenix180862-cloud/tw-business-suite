@@ -30,6 +30,30 @@
             const [showFormatWahl, setShowFormatWahl] = useState(false);
             const [showMailDialog, setShowMailDialog] = useState(false);
             const [mailAdresse, setMailAdresse] = useState('');
+            // Editierbare Adress-States (werden aus Kundendaten initialisiert)
+            const [empfName, setEmpfName] = useState('');
+            const [empfZusatz, setEmpfZusatz] = useState('');
+            const [empfStrasse, setEmpfStrasse] = useState('');
+            const [empfPlzOrt, setEmpfPlzOrt] = useState('');
+            const [bauvorhabenText, setBauvorhabenText] = useState('');
+            // Adresse aus Kundendaten initialisieren wenn Kunde wechselt
+            useEffect(function() {
+                if (!kunde) return;
+                var n = kunde.auftraggeber || kunde.name || '';
+                if (n.indexOf('Datum') === 0 || n.indexOf('Unterschrift') !== -1) n = kunde.name || '';
+                setEmpfName(n);
+                var ad = kunde.ag_adresse || kunde.adresse || '';
+                if (ad.indexOf('Datum') !== -1) ad = kunde.adresse || '';
+                var lines = [];
+                if (ad) {
+                    var m = ad.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/);
+                    if (m) { lines.push(m[1].trim()); lines.push(m[2].trim()); }
+                    else { ad.split(',').forEach(function(s) { if (s.trim()) lines.push(s.trim()); }); }
+                }
+                setEmpfStrasse(lines[0] || '');
+                setEmpfPlzOrt(lines[1] || '');
+                setBauvorhabenText(kunde.adresse || kunde.baumassnahme || kunde.name || '');
+            }, [kunde]);
             var lvPositionen = [];
             if (importResult && importResult.positionen && importResult.positionen.length > 0) { lvPositionen = importResult.positionen; }
             else if (kunde && kunde._lvPositionen && kunde._lvPositionen.length > 0) { lvPositionen = kunde._lvPositionen; }
@@ -85,14 +109,14 @@
                 h+='.logo-block{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4mm}.logo-inner{display:inline-flex;flex-direction:column;align-items:flex-start}.logo-thomas{font-family:"Source Sans 3",serif;font-style:italic;font-weight:700;color:#c41e1e;font-size:16px;margin-bottom:-17px;padding-left:1px;position:relative;z-index:2}.logo-word{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1}.logo-word .lw{font-size:58px}.logo-word .li-wrap{position:relative;font-size:58px;display:inline-block}.logo-word .li-char{font-size:58px;color:#111}.logo-word .li-dot{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:9px;height:9px;background:#c41e1e}.logo-word .lLL{font-size:76px;letter-spacing:1px;line-height:0.75}.logo-word .lwa{font-size:58px}.logo-sub{display:flex;justify-content:flex-end;width:100%;margin-top:2px}.logo-sub span{font-family:"Source Sans 3",sans-serif;font-weight:600;color:#c41e1e;font-size:14px;letter-spacing:2.5px}.logo-right{text-align:right;font-size:9.5pt;color:#333;line-height:1.7;padding-top:5mm}';
                 h+='.sep{border:none;border-top:2.5px solid #c41e1e;margin:3mm 0 2mm}.abs{font-size:7pt;color:#aaa;border-bottom:0.5px solid #ccc;display:inline-block;padding-bottom:1px;margin-bottom:5mm}';
                 h+='.addr-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6mm}.addr-name{font-weight:700;font-size:12pt;margin-bottom:1mm}.addr-street{font-size:10pt;color:#333;line-height:1.6}.doc-data{font-size:9pt;line-height:2;min-width:50mm;text-align:right}.doc-data .dd-l{display:inline-block;width:38mm;color:#888;text-align:left}.doc-data .dd-v{font-weight:600;color:#222}';
-                h+='.doc-title{font-size:17pt;font-weight:700;margin-bottom:2mm;color:#111}.bauvorhaben{font-size:13pt;font-weight:700;color:#c41e1e;margin-bottom:5mm}';
+                h+='.doc-title{font-size:17pt;font-weight:700;margin-bottom:2mm;color:#111}.bauvorhaben{font-size:13pt;font-weight:700;color:#111;margin-bottom:5mm}';
                 h+='table.p{width:100%;border-collapse:collapse;margin-bottom:6mm;font-size:8.5pt}table.p thead th{background:#2d3436;color:#fff;font-weight:700;padding:7px 6px;font-size:8pt;text-transform:uppercase;letter-spacing:0.3px}table.p tbody td{padding:6px;border-bottom:1px solid #e0e0e0;vertical-align:top;font-variant-numeric:tabular-nums}';
                 h+='.su{margin-left:auto;width:88mm;font-size:9.5pt;margin-bottom:6mm}.su .r{display:flex;justify-content:space-between;padding:2px 0}.su .r .v{font-variant-numeric:tabular-nums;text-align:right;min-width:34mm}.su .r.br{font-weight:700;font-size:12pt;padding:4px 0;border-top:2.5px double #222;margin-top:2px}.su .r.sk{color:#c41e1e;font-weight:700}.su .r.nz{font-weight:700}.su .r.kl{font-size:8.5pt;color:#777}.bm{font-size:8.5pt;color:#555;margin-bottom:8mm;line-height:1.5}';
                 h+='.ft{position:absolute;bottom:12mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7.5pt;color:#666;line-height:1.7}.ft-row{display:flex;justify-content:space-between;flex-wrap:wrap}.ft-firma{font-weight:700;color:#c41e1e}.ft-bank{color:#555;margin-top:1mm}</style></head><body>';
                 h+='<div class="page">';
                 h+='<div class="logo-block"><div class="logo-inner"><div class="logo-thomas">Thomas</div><div class="logo-word"><span class="lw">w</span><span class="li-wrap"><span class="li-char">\u0131</span><span class="li-dot"></span></span><span class="lLL">LL</span><span class="lwa">wacher</span></div><div class="logo-sub"><span>Fliesenlegermeister e.K.</span></div></div><div class="logo-right">Flurweg 14a<br>56472 Nisterau<br>Tel. 02661-63101<br>Mobil 0170-2024161</div></div>';
                 h+='<hr class="sep"><div class="abs">Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau</div>';
-                h+='<div class="addr-row"><div><div class="addr-name">'+kName+'</div><div class="addr-street">'+aLines.join('<br>')+'</div></div><div class="doc-data">';
+                h+='<div class="addr-row"><div><div class="addr-name">'+empfName+'</div><div class="addr-street">'+(empfZusatz?empfZusatz+'<br>':'')+(empfStrasse?empfStrasse+'<br>':'')+empfPlzOrt+'</div></div><div class="doc-data">';
                 h+='<div><span class="dd-l">Datum:</span><span class="dd-v">'+new Date(rechnungsDatum).toLocaleDateString('de-DE')+'</span></div>';
                 if(leistungszeitraum)h+='<div><span class="dd-l">Leistungszeitraum:</span><span class="dd-v">'+leistungszeitraum+'</span></div>';
                 if(istRechnung)h+='<div><span class="dd-l">Rechnungs-Nr.:</span><span class="dd-v">'+rechnungsNr+'</span></div>';
@@ -101,7 +125,7 @@
                 if(auftragsnummer)h+='<div><span class="dd-l">Auftragsnummer:</span><span class="dd-v">'+auftragsnummer+'</span></div>';
                 if(kostenstelle)h+='<div><span class="dd-l">Kostenstelle:</span><span class="dd-v">'+kostenstelle+'</span></div>';
                 h+='<div><span class="dd-l">Steuernummer:</span><span class="dd-v">30/220/1234/5</span></div></div></div>';
-                h+='<div class="doc-title">'+typLabel+'</div><div class="bauvorhaben">Bauvorhaben: '+bauvorhaben+'</div>';
+                h+='<div class="doc-title">'+typLabel+'</div><div class="bauvorhaben">Bauvorhaben: '+bauvorhabenText+'</div>';
                 h+='<table class="p"><thead><tr><th style="text-align:center;width:30px">Pos.</th><th style="text-align:right;width:55px">Menge</th><th style="text-align:center;width:35px">Einh.</th><th style="text-align:left">Bezeichnung</th><th style="text-align:right;width:65px">EP (\u20AC)</th><th style="text-align:right;width:75px">GP (\u20AC)</th></tr></thead><tbody>'+posR+'</tbody></table>';
                 h+='<div class="su"><div class="r"><span>Nettobetrag:</span><span class="v">'+fmt(nettoSumme)+' \u20AC</span></div><div class="r kl"><span>zzgl. '+mwstSatz+'% MwSt.:</span><span class="v">'+fmt(mwstBetrag)+' \u20AC</span></div><div class="r br"><span>Bruttobetrag:</span><span class="v">'+fmt(bruttoSumme)+' \u20AC</span></div>';
                 if(istRechnung){if(sicherheitseinbehalt>0)h+='<div class="r kl"><span>abzgl. Sicherheitseinbehalt '+sicherheitseinbehalt+'%:</span><span class="v">\u2013 '+fmt(sicherheitBetrag)+' \u20AC</span></div>';if(rechnungsTyp==='schluss'&&kontoSumme>0){h+='<div class="r kl"><span>abzgl. Kontozahlungen:</span><span class="v">\u2013 '+fmt(kontoSumme)+' \u20AC</span></div>';h+='<div class="r nz"><span>Restforderung:</span><span class="v">'+fmt(bruttoSumme-sicherheitBetrag-kontoSumme)+' \u20AC</span></div>';}h+='<div class="r sk"><span>Zahlbar '+skontoTage+' Tage ('+skontoProzent+'% Skonto):</span><span class="v">'+fmt(zahlbetragMitSkonto)+' \u20AC</span></div><div class="r nz"><span>Zahlbar '+zahlungszielTage+' Tage netto:</span><span class="v">'+fmt(zahlbetragOhneSkonto)+' \u20AC</span></div>';}
@@ -150,14 +174,13 @@
                 <hr style={{border:'none',borderTop:'2.5px solid #c41e1e',margin:'3mm 0 2mm'}} />
                 <div style={{fontSize:'7pt',color:'#aaa',borderBottom:'0.5px solid #ccc',display:'inline-block',paddingBottom:'1px',marginBottom:'5mm'}}>Thomas Willwacher Fliesenlegermeister e.K. {'\u00B7'} Flurweg 14a {'\u00B7'} 56472 Nisterau</div>
 
-                {/* --- EMPFAENGER (editierbar) + DATUM rechts --- */}
+                {/* --- EMPFAENGER (editierbar mit State) + DATUM rechts --- */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6mm'}}>
                     <div style={{flex:1,maxWidth:'55%'}}>
-                        <div style={{marginBottom:'4px'}}>
-                            <input type="text" value={kName} onChange={function(e){if(kunde)kunde.auftraggeber=e.target.value;}} placeholder="Firma / Name des Kunden" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'12px'})} />
-                        </div>
-                        <input type="text" value={aLines[0]||''} onChange={function(){}} placeholder="Strasse + Hausnummer" style={Object.assign({},pdfInput,{marginBottom:'3px'})} />
-                        <input type="text" value={aLines[1]||''} onChange={function(){}} placeholder="PLZ Ort" style={pdfInput} />
+                        <input type="text" value={empfName} onChange={function(e){setEmpfName(e.target.value);}} placeholder="Firma / Name des Kunden" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'12px',marginBottom:'3px'})} />
+                        <input type="text" value={empfZusatz} onChange={function(e){setEmpfZusatz(e.target.value);}} placeholder="z.Hd. Ansprechpartner (optional)" style={Object.assign({},pdfInput,{marginBottom:'3px',fontStyle:empfZusatz?'normal':'italic'})} />
+                        <input type="text" value={empfStrasse} onChange={function(e){setEmpfStrasse(e.target.value);}} placeholder="Strasse + Hausnummer" style={Object.assign({},pdfInput,{marginBottom:'3px'})} />
+                        <input type="text" value={empfPlzOrt} onChange={function(e){setEmpfPlzOrt(e.target.value);}} placeholder="PLZ Ort" style={pdfInput} />
                     </div>
                     <div style={{textAlign:'right',minWidth:'35%'}}>
                         <div style={{fontSize:'7.5pt',color:'#999',marginBottom:'1px'}}>Datum</div>
@@ -196,7 +219,7 @@
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                         <span style={{display:'inline-block',width:'38mm',color:'#888',flexShrink:0}}>Bauvorhaben:</span>
-                        <input type="text" value={bauvorhaben} onChange={function(){}} style={Object.assign({},pdfInputSm,{flex:1,fontWeight:700,color:'#c41e1e',fontSize:'11px'})} />
+                        <input type="text" value={bauvorhabenText} onChange={function(e){setBauvorhabenText(e.target.value);}} style={Object.assign({},pdfInputSm,{flex:1,fontWeight:700,color:'#222',fontSize:'11px'})} />
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                         <span style={{display:'inline-block',width:'38mm',color:'#888',flexShrink:0}}>Steuernummer:</span>
@@ -220,13 +243,37 @@
                     </div>
                 ) : (
                     <div style={{marginBottom:'12px'}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
-                            <div style={{fontSize:'10px',fontWeight:700,color:'#555'}}>{aktivePosn.length} Positionen geladen</div>
-                            <button onClick={function(){setPhase('formular');}} style={{padding:'4px 12px',background:typColor,color:'white',border:'none',borderRadius:'6px',fontSize:'10px',fontWeight:700,cursor:'pointer'}}>Bearbeiten {'\u2192'}</button>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+                            <div style={{fontSize:'9px',fontWeight:700,color:'#555',textTransform:'uppercase',letterSpacing:'0.5px'}}>Positionen ({aktivePosn.length})</div>
+                            <button onClick={addPosition} style={{padding:'3px 10px',fontSize:'9px',background:'#2d3436',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',fontWeight:600}}>+ Neu</button>
                         </div>
-                        {aktivePosn.slice(0,5).map(function(p){var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);return(<div key={p.id} style={{display:'flex',justifyContent:'space-between',fontSize:'8.5pt',padding:'3px 0',borderBottom:'1px solid #eee'}}><span style={{fontWeight:700,color:'#555',width:'30px'}}>{p.pos}</span><span style={{flex:1,color:'#333'}}>{p.bez}</span><span style={{fontWeight:700,minWidth:'60px',textAlign:'right'}}>{fmt(gp)} {'\u20AC'}</span></div>);})}
-                        {aktivePosn.length>5&&<div style={{fontSize:'8px',color:'#999',textAlign:'center',marginTop:'3px'}}>... und {aktivePosn.length-5} weitere Positionen</div>}
-                        <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:'10pt',borderTop:'2px solid #222',marginTop:'6px',paddingTop:'4px'}}><span>Bruttobetrag:</span><span>{fmt(bruttoSumme)} {'\u20AC'}</span></div>
+                        {/* Tabellenkopf wie im Ausdruck */}
+                        <div style={{display:'grid',gridTemplateColumns:'35px 55px 35px 1fr 65px 75px',gap:'0',fontSize:'7.5pt',fontWeight:700,color:'#fff',background:'#2d3436',padding:'5px 4px',textTransform:'uppercase',letterSpacing:'0.3px'}}>
+                            <span style={{textAlign:'center'}}>Pos.</span><span style={{textAlign:'right'}}>Menge</span><span style={{textAlign:'center'}}>Einh.</span><span style={{paddingLeft:'6px'}}>Bezeichnung</span><span style={{textAlign:'right'}}>EP</span><span style={{textAlign:'right'}}>GP</span>
+                        </div>
+                        {/* Alle Positionen editierbar */}
+                        {positionen.map(function(p){
+                            var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
+                            return(<div key={p.id} style={{display:'grid',gridTemplateColumns:'35px 55px 35px 1fr 65px 75px',gap:'0',padding:'4px',borderBottom:'1px solid #e0e0e0',alignItems:'start',fontSize:'8.5pt',opacity:p.aktiv?1:0.3}}>
+                                <input type="text" value={p.pos} onChange={function(e){updatePos(p.id,'pos',e.target.value);}} style={{padding:'2px 3px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',fontWeight:700,textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
+                                <input type="text" inputMode="decimal" value={p.menge||''} onChange={function(e){updatePos(p.id,'menge',e.target.value);}} onBlur={function(e){var v=parseFloat(e.target.value);updatePos(p.id,'menge',isNaN(v)?0:Number(v.toFixed(2)));}} style={{padding:'2px 3px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
+                                <input type="text" value={p.einheit} onChange={function(e){updatePos(p.id,'einheit',e.target.value);}} style={{padding:'2px 2px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'7.5pt',textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
+                                <input type="text" value={p.bez} onChange={function(e){updatePos(p.id,'bez',e.target.value);}} style={{padding:'2px 6px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
+                                <input type="text" inputMode="decimal" value={p.einzelpreis||''} onChange={function(e){updatePos(p.id,'einzelpreis',e.target.value);}} onBlur={function(e){var v=parseFloat(e.target.value);updatePos(p.id,'einzelpreis',isNaN(v)?0:Number(v.toFixed(2)));}} style={{padding:'2px 3px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}} />
+                                <div style={{fontWeight:700,textAlign:'right',padding:'3px 2px',fontSize:'8.5pt'}}>{fmt(gp)} {'\u20AC'}</div>
+                            </div>);
+                        })}
+                        {/* Summenblock */}
+                        <div style={{marginLeft:'auto',width:'50%',marginTop:'6px',fontSize:'9.5pt'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'2px 0'}}><span>Nettobetrag:</span><span style={{fontWeight:600}}>{fmt(nettoSumme)} {'\u20AC'}</span></div>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'2px 0',fontSize:'8.5pt',color:'#777'}}><span>zzgl. {mwstSatz}% MwSt.:</span><span>{fmt(mwstBetrag)} {'\u20AC'}</span></div>
+                            <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:700,fontSize:'12pt',borderTop:'2.5px double #222',marginTop:'2px'}}><span>Bruttobetrag:</span><span>{fmt(bruttoSumme)} {'\u20AC'}</span></div>
+                            {istRechnung && sicherheitseinbehalt>0 && <div style={{display:'flex',justifyContent:'space-between',fontSize:'8.5pt',color:'#777'}}><span>abzgl. Einbehalt {sicherheitseinbehalt}%:</span><span>{'\u2013'} {fmt(sicherheitBetrag)} {'\u20AC'}</span></div>}
+                            {istRechnung && <React.Fragment>
+                                <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,color:'#c41e1e'}}><span>Skonto ({skontoProzent}%, {skontoTage}T):</span><span>{fmt(zahlbetragMitSkonto)} {'\u20AC'}</span></div>
+                                <div style={{display:'flex',justifyContent:'space-between',fontWeight:700}}><span>Netto ({zahlungszielTage}T):</span><span>{fmt(zahlbetragOhneSkonto)} {'\u20AC'}</span></div>
+                            </React.Fragment>}
+                        </div>
                     </div>
                 )}
 
