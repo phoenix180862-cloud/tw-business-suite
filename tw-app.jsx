@@ -1732,6 +1732,19 @@
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'modulwahl' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : (page === 'modulwahl' ? 1 : 0.55), textShadow: page === 'modulwahl' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'modulwahl' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'modulwahl' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'modulwahl' ? 2 : 1}}>
                                 Module
                             </button>
+                            <button onClick={function(){
+                                if (page === 'raumblatt') {
+                                    if (window._fotoTabHandler) window._fotoTabHandler();
+                                } else if (selectedRaum) {
+                                    navigateTo('raumblatt');
+                                    setTimeout(function() { if (window._fotoTabHandler) window._fotoTabHandler(); }, 200);
+                                } else {
+                                    alert('Bitte zuerst einen Raum auswaehlen.');
+                                }
+                            }} disabled={!selectedKunde}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: (page === 'raumblatt') ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: (page === 'raumblatt') ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : ((page === 'raumblatt') ? 1 : 0.55), textShadow: (page === 'raumblatt') ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: (page === 'raumblatt') ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none'}}>
+                                Foto
+                            </button>
                             <button onClick={function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); }}
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', opacity:0.55, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
                                 Akte

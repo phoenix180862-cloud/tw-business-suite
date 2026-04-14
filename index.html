@@ -7943,19 +7943,31 @@
             );
             const [expandedPhases, setExpandedPhases] = useState({ rohzustand: true, vorarbeiten: false, fertigstellung: false });
 
-            // Objekt-Fotos (allgemeine Gebaeude-Fotos, gleiche Struktur wie Wand-Fotos)
-            const [objektPhasenFotos, setObjektPhasenFotos] = useState(function() {
-                if (reEdit && reEdit.objektPhasenFotos) return reEdit.objektPhasenFotos;
-                var init = {}; FOTO_PHASEN.forEach(function(ph) { init[ph.key] = {}; }); return init;
+            // Objekt-Fotos: 20 Foto-Slots fuer allgemeine Gebaeude-Dokumentation
+            const [objektFotos, setObjektFotos] = useState(function() {
+                if (reEdit && reEdit.objektFotos) return reEdit.objektFotos;
+                return Array.from({length: 20}, function(_, i) { return { nr: i + 1, image: null, croppedImage: null, marked: false, zeit: '' }; });
             });
+            const [objektArchivListe, setObjektArchivListe] = useState([]);
+            const [showArchivModal, setShowArchivModal] = useState(false);
+            const [archivLaden, setArchivLaden] = useState(false);
+            const [archivViewFotos, setArchivViewFotos] = useState(null);
+            const objektFotoInputRef = React.useRef(null);
+            const objektFotoTarget = React.useRef(null);
+
+            // Fullscreen Foto-Viewer (fuer beide Seiten)
+            const [fullscreenImg, setFullscreenImg] = useState(null);
+            const [fullscreenZoom, setFullscreenZoom] = useState(1);
+            const [fullscreenPan, setFullscreenPan] = useState({x:0, y:0});
+
             const [objektExpandedPhases, setObjektExpandedPhases] = useState({ rohzustand: true, vorarbeiten: false, fertigstellung: false });
             const [fotoModus, setFotoModus] = useState('waende');
 
-            // Aktive Foto-Daten je nach Modus
-            var aktFotos = fotoModus === 'objekt' ? objektPhasenFotos : phasenFotos;
-            var setAktFotos = fotoModus === 'objekt' ? setObjektPhasenFotos : setPhasenFotos;
-            var aktExpanded = fotoModus === 'objekt' ? objektExpandedPhases : expandedPhases;
-            var setAktExpanded = fotoModus === 'objekt' ? setObjektExpandedPhases : setExpandedPhases;
+            // Aktive Foto-Daten (Waende-Modus nutzt diese, Objekt hat eigene UI)
+            var aktFotos = phasenFotos;
+            var setAktFotos = setPhasenFotos;
+            var aktExpanded = expandedPhases;
+            var setAktExpanded = setExpandedPhases;
             const [cropState, setCropState] = useState(null);
             const cropCanvasRef = React.useRef(null);
             const cropImageRef = React.useRef(null);
@@ -8253,7 +8265,7 @@
             // ── Ungespeicherte-Aenderungen Tracking ──
             useEffect(() => {
                 setHasUnsavedChanges(true);
-            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos, objektPhasenFotos]);
+            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos, objektFotos]);
 
             // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
@@ -10158,7 +10170,8 @@
             useEffect(function() {
                 window._akteOeffnenHandler = function() { setAktePopupOpen(true); loadBearbeiteteAkten(); };
                 window._akteSpeichernHandler = handleAkteSpeichern;
-                return function() { delete window._akteOeffnenHandler; delete window._akteSpeichernHandler; };
+                window._fotoTabHandler = function() { handleTabChange(1); };
+                return function() { delete window._akteOeffnenHandler; delete window._akteSpeichernHandler; delete window._fotoTabHandler; };
             }, []);
 
             // ── 3-Phasen Foto-Handler ──
@@ -12244,25 +12257,12 @@
 
                     </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
-                    {(rbTab === 1 || rbTab === 4) && (
+                    {rbTab === 1 && (
                         <div>
                             {/* Hidden file input fuer Phasen-Fotos */}
                             <input type="file" accept="image/*" capture="environment"
                                 ref={fotoInputRef2} style={{display:'none'}}
                                 onChange={handlePhotoFileChange} />
-
-                            {/* Modus-Anzeige */}
-                            <div style={{
-                                padding:'10px 14px', marginBottom:'8px', borderRadius:'10px',
-                                background: fotoModus === 'objekt' ? 'rgba(142,68,173,0.1)' : 'rgba(30,136,229,0.08)',
-                                border: '1px solid ' + (fotoModus === 'objekt' ? 'rgba(142,68,173,0.25)' : 'rgba(30,136,229,0.15)'),
-                                display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', fontWeight:600,
-                                color: fotoModus === 'objekt' ? '#8e44ad' : 'var(--accent-blue)',
-                                fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'
-                            }}>
-                                <span style={{fontSize:'18px'}}>{fotoModus === 'objekt' ? '\uD83C\uDFE2' : '\uD83E\uDDF1'}</span>
-                                {fotoModus === 'objekt' ? 'Objekt-Fotos (allgemein)' : 'Wand-Fotos (raumbezogen)'}
-                            </div>
 
                             <div className="foto-phasen-container">
                                 {FOTO_PHASEN.map(phase => {
@@ -12355,7 +12355,8 @@
                                                                     {foto ? (
                                                                         <React.Fragment>
                                                                             <img src={foto.croppedImage || foto.image}
-                                                                                style={{width:'100%', height:'100%', objectFit:'cover'}} />
+                                                                                onClick={function() { setFullscreenImg({image: foto.croppedImage || foto.image, label: 'Wand ' + wandId + ' - ' + phase.label}); }}
+                                                                                style={{width:'100%', height:'100%', objectFit:'cover', cursor:'pointer'}} />
                                                                             {/* Mark-Button */}
                                                                             <button onClick={(e) => { e.stopPropagation(); togglePhotoMark(phase.key, wandId); }}
                                                                                 style={{
@@ -13074,6 +13075,290 @@
                                             fontSize:'14px', textTransform:'uppercase',
                                             background:'var(--accent-blue)', color:'white'
                                         }}>Fertig</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ═══ FULLSCREEN FOTO-VIEWER (fuer beide Seiten) ═══ */}
+                    {fullscreenImg && (
+                        <div style={{
+                            position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:10000,
+                            background:'rgba(0,0,0,0.95)', display:'flex', alignItems:'center', justifyContent:'center',
+                            touchAction:'none'
+                        }} onClick={function() { setFullscreenImg(null); setFullscreenZoom(1); setFullscreenPan({x:0,y:0}); }}>
+                            <div style={{position:'absolute', top:'10px', right:'10px', zIndex:10001, display:'flex', gap:'8px'}}>
+                                <button onClick={function(e) { e.stopPropagation(); setFullscreenZoom(function(z) { return Math.min(z + 0.5, 5); }); }}
+                                    style={{width:'44px', height:'44px', borderRadius:'50%', border:'none', background:'rgba(255,255,255,0.15)', color:'white', fontSize:'22px', cursor:'pointer'}}>+</button>
+                                <button onClick={function(e) { e.stopPropagation(); setFullscreenZoom(function(z) { return Math.max(z - 0.5, 0.5); }); setFullscreenPan({x:0,y:0}); }}
+                                    style={{width:'44px', height:'44px', borderRadius:'50%', border:'none', background:'rgba(255,255,255,0.15)', color:'white', fontSize:'22px', cursor:'pointer'}}>-</button>
+                                <button onClick={function(e) { e.stopPropagation(); setFullscreenImg(null); setFullscreenZoom(1); setFullscreenPan({x:0,y:0}); }}
+                                    style={{width:'44px', height:'44px', borderRadius:'50%', border:'none', background:'rgba(231,76,60,0.6)', color:'white', fontSize:'20px', cursor:'pointer'}}>{'\u2715'}</button>
+                            </div>
+                            {fullscreenImg.label && (
+                                <div style={{position:'absolute', top:'14px', left:'14px', color:'white', fontSize:'14px', fontFamily:'Oswald', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.5px', textShadow:'0 2px 4px rgba(0,0,0,0.5)'}}>
+                                    {fullscreenImg.label}
+                                </div>
+                            )}
+                            <div style={{overflow:'hidden', width:'100%', height:'100%', display:'flex', alignItems:'center', justifyContent:'center'}}
+                                onClick={function(e) { e.stopPropagation(); }}>
+                                <img src={fullscreenImg.image} style={{
+                                    maxWidth: fullscreenZoom === 1 ? '95%' : 'none', maxHeight: fullscreenZoom === 1 ? '90vh' : 'none',
+                                    width: fullscreenZoom > 1 ? (fullscreenZoom * 100) + '%' : 'auto',
+                                    transform: 'translate(' + fullscreenPan.x + 'px, ' + fullscreenPan.y + 'px)',
+                                    transition: 'transform 0.1s ease', objectFit:'contain', borderRadius:'4px'
+                                }}
+                                onTouchStart={function(e) {
+                                    if (fullscreenZoom <= 1) return;
+                                    var touch = e.touches[0];
+                                    window._fsPanStart = {x: touch.clientX - fullscreenPan.x, y: touch.clientY - fullscreenPan.y};
+                                }}
+                                onTouchMove={function(e) {
+                                    if (fullscreenZoom <= 1 || !window._fsPanStart) return;
+                                    e.preventDefault();
+                                    var touch = e.touches[0];
+                                    setFullscreenPan({x: touch.clientX - window._fsPanStart.x, y: touch.clientY - window._fsPanStart.y});
+                                }}
+                                onDoubleClick={function() { setFullscreenZoom(function(z) { return z >= 2 ? 1 : z + 1; }); setFullscreenPan({x:0,y:0}); }}
+                                />
+                            </div>
+                            <div style={{position:'absolute', bottom:'16px', left:'50%', transform:'translateX(-50%)', color:'rgba(255,255,255,0.5)', fontSize:'11px', fontFamily:'Oswald', letterSpacing:'1px'}}>
+                                ZOOM: {Math.round(fullscreenZoom * 100)}% — Doppeltippen zum Zoomen
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ TAB 4: OBJEKT-FOTOS (20 Slots) ═══ */}
+                    {rbTab === 4 && (
+                        <div style={{padding:'0 4px'}}>
+                            {/* Hidden file input */}
+                            <input type="file" accept="image/*" capture="environment"
+                                ref={objektFotoInputRef} style={{display:'none'}}
+                                onChange={function(e) {
+                                    var file = e.target.files && e.target.files[0];
+                                    var nr = objektFotoTarget.current;
+                                    if (!file || nr === null) return;
+                                    var reader = new FileReader();
+                                    reader.onload = function(ev) {
+                                        setObjektFotos(function(prev) {
+                                            return prev.map(function(slot) {
+                                                if (slot.nr === nr) return Object.assign({}, slot, {
+                                                    image: ev.target.result, croppedImage: null,
+                                                    zeit: new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'}),
+                                                    marked: false
+                                                });
+                                                return slot;
+                                            });
+                                        });
+                                        objektFotoTarget.current = null;
+                                    };
+                                    reader.readAsDataURL(file);
+                                }} />
+
+                            {/* Modus-Header */}
+                            <div style={{
+                                padding:'10px 14px', marginBottom:'10px', borderRadius:'10px',
+                                background:'rgba(142,68,173,0.1)', border:'1px solid rgba(142,68,173,0.25)',
+                                display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', fontWeight:600,
+                                color:'#8e44ad', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'
+                            }}>
+                                <span style={{fontSize:'18px'}}>{'\uD83C\uDFE2'}</span>
+                                Objekt-Dokumentation — {objektFotos.filter(function(s) { return s.image; }).length}/20 Fotos
+                            </div>
+
+                            {/* Archiv-Buttons */}
+                            <div style={{display:'flex', gap:'6px', marginBottom:'12px'}}>
+                                <button onClick={function() {
+                                    var mitBild = objektFotos.filter(function(s) { return s.image; });
+                                    if (mitBild.length === 0) { alert('Keine Fotos zum Archivieren vorhanden.'); return; }
+                                    if (!confirm(mitBild.length + ' Fotos auf Google Drive archivieren?\n\nDie Fotos werden im Ordner \"Bilder\" gespeichert und hier geloescht.')) return;
+                                    var svc = window.GoogleDriveService;
+                                    if (!svc || !svc.accessToken) { alert('Google Drive nicht verbunden.'); return; }
+                                    var driveId = kunde._driveFolderId || kunde.id;
+                                    if (!driveId) { alert('Kein Kundenordner vorhanden.'); return; }
+                                    (async function() {
+                                        try {
+                                            var folders = await svc._fetchJSON('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("'" + driveId + "' in parents and name='Bilder' and mimeType='application/vnd.google-apps.folder' and trashed=false") + '&fields=files(id,name)');
+                                            var bilderFolder = (folders.files && folders.files[0]) ? folders.files[0].id : null;
+                                            if (!bilderFolder) {
+                                                var created = await svc._fetchJSON('https://www.googleapis.com/drive/v3/files', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:'Bilder', mimeType:'application/vnd.google-apps.folder', parents:[driveId]})});
+                                                bilderFolder = created.id;
+                                            }
+                                            var ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+                                            var archivF = await svc._fetchJSON('https://www.googleapis.com/drive/v3/files', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:'Archiv_' + ts, mimeType:'application/vnd.google-apps.folder', parents:[bilderFolder]})});
+                                            for (var fi = 0; fi < mitBild.length; fi++) {
+                                                var foto = mitBild[fi];
+                                                var imgData = (foto.croppedImage || foto.image);
+                                                var blob = await fetch(imgData).then(function(r) { return r.blob(); });
+                                                var metadata = JSON.stringify({name: 'Foto_' + String(foto.nr).padStart(2, '0') + '.jpg', parents: [archivF.id]});
+                                                var formData = new FormData();
+                                                formData.append('metadata', new Blob([metadata], {type:'application/json'}));
+                                                formData.append('file', blob);
+                                                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer ' + svc.accessToken}, body:formData});
+                                            }
+                                            setObjektFotos(Array.from({length: 20}, function(_, i) { return { nr: i + 1, image: null, croppedImage: null, marked: false, zeit: '' }; }));
+                                            alert(mitBild.length + ' Fotos erfolgreich archiviert!');
+                                        } catch(err) { alert('Archivierung fehlgeschlagen: ' + err.message); }
+                                    })();
+                                }} style={{
+                                    flex:1, padding:'12px', borderRadius:'10px', border:'none', cursor:'pointer',
+                                    background:'linear-gradient(135deg, #8e44ad, #6c3483)', color:'white',
+                                    fontSize:'12px', fontWeight:700, fontFamily:'Oswald, sans-serif',
+                                    textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow:'0 3px 10px rgba(142,68,173,0.3)'
+                                }}>
+                                    {'\uD83D\uDCE4'} Fotos archivieren
+                                </button>
+                                <button onClick={function() {
+                                    var svc = window.GoogleDriveService;
+                                    if (!svc || !svc.accessToken) { alert('Google Drive nicht verbunden.'); return; }
+                                    var driveId = kunde._driveFolderId || kunde.id;
+                                    if (!driveId) { alert('Kein Kundenordner.'); return; }
+                                    setArchivLaden(true); setShowArchivModal(true);
+                                    (async function() {
+                                        try {
+                                            var folders = await svc._fetchJSON('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("'" + driveId + "' in parents and name='Bilder' and mimeType='application/vnd.google-apps.folder' and trashed=false") + '&fields=files(id,name)');
+                                            var bilderFolder = (folders.files && folders.files[0]) ? folders.files[0].id : null;
+                                            if (!bilderFolder) { setObjektArchivListe([]); setArchivLaden(false); return; }
+                                            var archivs = await svc._fetchJSON('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("'" + bilderFolder + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false") + '&fields=files(id,name,createdTime)&orderBy=createdTime desc');
+                                            setObjektArchivListe((archivs.files || []).map(function(f) { return {id: f.id, name: f.name, datum: f.createdTime ? new Date(f.createdTime).toLocaleDateString('de-DE') : ''}; }));
+                                        } catch(err) { setObjektArchivListe([]); }
+                                        setArchivLaden(false);
+                                    })();
+                                }} style={{
+                                    flex:1, padding:'12px', borderRadius:'10px', border:'2px solid #8e44ad', cursor:'pointer',
+                                    background:'rgba(142,68,173,0.08)', color:'#8e44ad',
+                                    fontSize:'12px', fontWeight:700, fontFamily:'Oswald, sans-serif',
+                                    textTransform:'uppercase', letterSpacing:'0.5px'
+                                }}>
+                                    {'\uD83D\uDCC2'} Archivierte Fotos
+                                </button>
+                            </div>
+
+                            {/* 20 Foto-Slots Grid */}
+                            <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'6px'}}>
+                                {(archivViewFotos || objektFotos).map(function(slot) {
+                                    var hasImage = !!(slot.image || slot.croppedImage);
+                                    var displayImg = slot.croppedImage || slot.image;
+                                    var isArchiv = !!archivViewFotos;
+                                    return (
+                                        <div key={slot.nr} style={{
+                                            borderRadius:'10px', border: hasImage ? '2px solid rgba(142,68,173,0.4)' : '2px dashed rgba(142,68,173,0.2)',
+                                            background: hasImage ? 'var(--bg-secondary)' : 'rgba(142,68,173,0.04)',
+                                            overflow:'hidden', position:'relative', aspectRatio:'1'
+                                        }}>
+                                            {/* Nummer-Badge */}
+                                            <div style={{
+                                                position:'absolute', top:'4px', left:'4px', zIndex:2,
+                                                width:'22px', height:'22px', borderRadius:'50%',
+                                                background: hasImage ? '#8e44ad' : 'rgba(142,68,173,0.2)',
+                                                color:'white', fontSize:'11px', fontWeight:700,
+                                                display:'flex', alignItems:'center', justifyContent:'center',
+                                                fontFamily:'Oswald'
+                                            }}>{slot.nr}</div>
+
+                                            {hasImage ? (
+                                                <React.Fragment>
+                                                    <img src={displayImg} style={{width:'100%', height:'100%', objectFit:'cover', cursor:'pointer'}}
+                                                        onClick={function() { setFullscreenImg({image: displayImg, label: 'Foto ' + slot.nr + (slot.zeit ? ' - ' + slot.zeit : '')}); }} />
+                                                    {!isArchiv && (
+                                                        <React.Fragment>
+                                                            <div style={{position:'absolute', bottom:'2px', left:'4px', fontSize:'9px', color:'white', textShadow:'0 1px 3px rgba(0,0,0,0.8)'}}>{slot.zeit}</div>
+                                                            <button onClick={function(e) { e.stopPropagation();
+                                                                if (!confirm('Foto ' + slot.nr + ' loeschen?')) return;
+                                                                setObjektFotos(function(prev) { return prev.map(function(s) { return s.nr === slot.nr ? Object.assign({}, s, {image:null, croppedImage:null, zeit:'', marked:false}) : s; }); });
+                                                            }} style={{
+                                                                position:'absolute', top:'3px', right:'3px', width:'20px', height:'20px',
+                                                                borderRadius:'50%', border:'none', background:'rgba(231,76,60,0.7)',
+                                                                color:'white', fontSize:'11px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', zIndex:3
+                                                            }}>{'\u2715'}</button>
+                                                        </React.Fragment>
+                                                    )}
+                                                </React.Fragment>
+                                            ) : (
+                                                <div onClick={function() {
+                                                    if (isArchiv) return;
+                                                    objektFotoTarget.current = slot.nr;
+                                                    if (objektFotoInputRef.current) { objektFotoInputRef.current.value = ''; objektFotoInputRef.current.click(); }
+                                                }} style={{
+                                                    width:'100%', height:'100%', display:'flex', flexDirection:'column',
+                                                    alignItems:'center', justifyContent:'center', cursor: isArchiv ? 'default' : 'pointer',
+                                                    color:'rgba(142,68,173,0.3)', gap:'4px'
+                                                }}>
+                                                    <span style={{fontSize:'24px'}}>{'\uD83D\uDCF7'}</span>
+                                                    <span style={{fontSize:'9px', fontWeight:600}}>Foto</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Archiv-View Header */}
+                            {archivViewFotos && (
+                                <button onClick={function() { setArchivViewFotos(null); }} style={{
+                                    width:'100%', padding:'12px', marginTop:'10px', borderRadius:'10px',
+                                    border:'2px solid #8e44ad', background:'rgba(142,68,173,0.08)',
+                                    color:'#8e44ad', cursor:'pointer', fontFamily:'Oswald', fontWeight:700,
+                                    fontSize:'13px', textTransform:'uppercase'
+                                }}>{'\u2190'} Zurueck zu aktuellen Fotos</button>
+                            )}
+
+                            {/* Archiv-Auswahl Modal */}
+                            {showArchivModal && (
+                                <div className="modal-overlay" style={{zIndex:9500}} onClick={function() { setShowArchivModal(false); }}>
+                                    <div onClick={function(e) { e.stopPropagation(); }} style={{
+                                        maxWidth:'420px', width:'92%', maxHeight:'80vh', overflow:'auto',
+                                        borderRadius:'20px', padding:'20px',
+                                        background:'var(--bg-primary)', border:'1px solid var(--border-subtle)'
+                                    }}>
+                                        <div style={{fontFamily:'Oswald', fontWeight:700, fontSize:'16px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#8e44ad', marginBottom:'16px', display:'flex', alignItems:'center', gap:'8px'}}>
+                                            <span style={{fontSize:'20px'}}>{'\uD83D\uDCC2'}</span> Archivierte Fotos
+                                        </div>
+                                        {archivLaden && <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)'}}>Lade Archive...</div>}
+                                        {!archivLaden && objektArchivListe.length === 0 && <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)'}}>Keine archivierten Fotos vorhanden.</div>}
+                                        {!archivLaden && objektArchivListe.map(function(archiv) {
+                                            return (
+                                                <button key={archiv.id} onClick={function() {
+                                                    setShowArchivModal(false);
+                                                    var svc = window.GoogleDriveService;
+                                                    (async function() {
+                                                        try {
+                                                            var files = await svc._fetchJSON('https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent("'" + archiv.id + "' in parents and trashed=false") + '&fields=files(id,name,mimeType)&orderBy=name');
+                                                            var imgFiles = (files.files || []).filter(function(f) { return f.mimeType && f.mimeType.indexOf('image') >= 0; });
+                                                            var loaded = [];
+                                                            for (var li = 0; li < Math.min(imgFiles.length, 20); li++) {
+                                                                try {
+                                                                    var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + imgFiles[li].id + '?alt=media', {headers:{'Authorization':'Bearer ' + svc.accessToken}});
+                                                                    var blob = await resp.blob();
+                                                                    var dataUrl = await new Promise(function(res) { var r = new FileReader(); r.onload = function() { res(r.result); }; r.readAsDataURL(blob); });
+                                                                    loaded.push({nr: li + 1, image: dataUrl, croppedImage: null, marked: false, zeit: archiv.datum});
+                                                                } catch(e) { loaded.push({nr: li + 1, image: null, croppedImage: null, marked: false, zeit: ''}); }
+                                                            }
+                                                            while (loaded.length < 20) { loaded.push({nr: loaded.length + 1, image: null, croppedImage: null, marked: false, zeit: ''}); }
+                                                            setArchivViewFotos(loaded);
+                                                        } catch(err) { alert('Fehler beim Laden: ' + err.message); }
+                                                    })();
+                                                }} style={{
+                                                    display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px',
+                                                    marginBottom:'6px', borderRadius:'12px', border:'1px solid rgba(142,68,173,0.2)',
+                                                    background:'rgba(142,68,173,0.05)', cursor:'pointer', textAlign:'left'
+                                                }}>
+                                                    <span style={{fontSize:'24px'}}>{'\uD83D\uDCC1'}</span>
+                                                    <div style={{flex:1}}>
+                                                        <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-primary)'}}>{archiv.name}</div>
+                                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>{archiv.datum}</div>
+                                                    </div>
+                                                    <span style={{color:'var(--text-muted)'}}>{'\u203A'}</span>
+                                                </button>
+                                            );
+                                        })}
+                                        <button onClick={function() { setShowArchivModal(false); }} style={{
+                                            width:'100%', padding:'12px', marginTop:'8px', borderRadius:'10px',
+                                            border:'none', background:'var(--bg-secondary)', color:'var(--text-secondary)',
+                                            cursor:'pointer', fontFamily:'Oswald', fontWeight:600, fontSize:'13px', textTransform:'uppercase'
+                                        }}>Schliessen</button>
                                     </div>
                                 </div>
                             )}
@@ -13971,7 +14256,7 @@
                                 fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
                                 raumhoehe: masse.raumhoehe,
-                                phasenFotos: phasenFotos, objektPhasenFotos: objektPhasenFotos,
+                                phasenFotos: phasenFotos, objektFotos: objektFotos,
                                 kiErgebnisse: kiErgebnisse,
                                 kiFotoErgebnisse: kiFotoErgebnisse
                             };
@@ -14056,7 +14341,7 @@
                                 fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
                                 raumhoehe: masse.raumhoehe,
-                                phasenFotos: phasenFotos, objektPhasenFotos: objektPhasenFotos,
+                                phasenFotos: phasenFotos, objektFotos: objektFotos,
                                 kiErgebnisse: kiErgebnisse,
                                 kiFotoErgebnisse: kiFotoErgebnisse
                             };
@@ -20163,6 +20448,19 @@
                             <button onClick={function(){ navigateTo('modulwahl'); }} disabled={!selectedKunde}
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'modulwahl' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'modulwahl' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : (page === 'modulwahl' ? 1 : 0.55), textShadow: page === 'modulwahl' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'modulwahl' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'modulwahl' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'modulwahl' ? 2 : 1}}>
                                 Module
+                            </button>
+                            <button onClick={function(){
+                                if (page === 'raumblatt') {
+                                    if (window._fotoTabHandler) window._fotoTabHandler();
+                                } else if (selectedRaum) {
+                                    navigateTo('raumblatt');
+                                    setTimeout(function() { if (window._fotoTabHandler) window._fotoTabHandler(); }, 200);
+                                } else {
+                                    alert('Bitte zuerst einen Raum auswaehlen.');
+                                }
+                            }} disabled={!selectedKunde}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: (page === 'raumblatt') ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: (page === 'raumblatt') ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : ((page === 'raumblatt') ? 1 : 0.55), textShadow: (page === 'raumblatt') ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: (page === 'raumblatt') ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none'}}>
+                                Foto
                             </button>
                             <button onClick={function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); }}
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', opacity:0.55, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
