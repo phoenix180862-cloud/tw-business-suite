@@ -118,8 +118,9 @@
                     doc.text('Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1',ML,PH-MB+10);
                     doc.text('Seite '+pn,rx,PH-MB+10,{align:'right'});
                 };
-                // === SEITE 1: BRIEFKOPF ===
+                // === SEITE 1: BRIEFKOPF (mit genuegend Platz fuer alle Angaben) ===
                 var y=MT;
+                // --- LOGO ---
                 doc.setFont('times','italic');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Thomas',ML,y+4);
                 doc.setFont('helvetica','bold');doc.setFontSize(32);doc.setTextColor(17,17,17);
@@ -127,35 +128,41 @@
                 var logoW=doc.getTextWidth('wiLLwacher');
                 doc.setFont('times','normal');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Fliesenlegermeister e.K.',ML+logoW,y+21,{align:'right'});
+                // Kontaktdaten rechts neben Logo
                 doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
                 doc.text('Flurweg 14a',rx,y+5,{align:'right'});
                 doc.text('56472 Nisterau',rx,y+9,{align:'right'});
                 doc.text('Tel. 02661-63101',rx,y+13,{align:'right'});
                 doc.text('Mobil 0170-2024161',rx,y+17,{align:'right'});
-                y+=25;
-                doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=3;
-                doc.setFontSize(6);doc.setTextColor(170,170,170);
-                doc.text('Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau',ML,y);y+=7;
-                // Empfaenger LINKS
-                doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(17,17,17);
+                y+=26;
+                // --- Rote Trennlinie ---
+                doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=4;
+                // --- Absenderzeile (klein, grau) ---
+                doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(170,170,170);
+                doc.text('Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau',ML,y);y+=6;
+                // --- EMPFAENGER-BLOCK (links) + DATUM (rechts, auf gleicher Hoehe) ---
+                var addrStartY=y;
+                doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,17,17);
                 doc.text(empfName||'',ML,y);y+=5;
                 doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(51,51,51);
-                if(empfZusatz){doc.text(empfZusatz,ML,y);y+=4.5;}
-                if(empfStrasse){doc.text(empfStrasse,ML,y);y+=4.5;}
-                if(empfPlzOrt){doc.text(empfPlzOrt,ML,y);y+=4.5;}
-                // Datum NUR rechts
-                doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(136,136,136);
-                doc.text('Datum:',rx-28,MT+32);
+                if(empfZusatz){doc.text(empfZusatz,ML,y);y+=5;}
+                if(empfStrasse){doc.text(empfStrasse,ML,y);y+=5;}
+                if(empfPlzOrt){doc.text(empfPlzOrt,ML,y);y+=5;}
+                // Datum rechts, auf Hoehe vom Empfaenger-Start
+                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(136,136,136);
+                doc.text('Datum:',rx-30,addrStartY);
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);
-                doc.text(new Date(rechnungsDatum).toLocaleDateString('de-DE'),rx,MT+32,{align:'right'});
-                y+=6;
-                // TITEL
-                doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(17,17,17);
-                doc.text(typLabel2,ML,y);y+=7;
-                // BAUVORHABEN
+                doc.text(new Date(rechnungsDatum).toLocaleDateString('de-DE'),rx,addrStartY,{align:'right'});
+                // Sicherstellen dass y mindestens 20mm nach Adress-Start ist
+                y=Math.max(y, addrStartY+20);
+                y+=8;
+                // --- TITEL (gross) ---
+                doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
+                doc.text(typLabel2,ML,y);y+=8;
+                // --- BAUVORHABEN ---
                 doc.setFontSize(11);
-                doc.text('Bauvorhaben: '+(bauvorhabenText||''),ML,y);y+=6;
-                // META-FELDER links unter Bauvorhaben
+                doc.text('Bauvorhaben: '+(bauvorhabenText||''),ML,y);y+=8;
+                // --- META-FELDER links unter Bauvorhaben ---
                 doc.setFontSize(9);
                 var mf=[];
                 if(leistungszeitraum)mf.push(['Leistungszeitraum:',leistungszeitraum]);
@@ -168,10 +175,10 @@
                 if(rechnungsTyp==='abschlag')mf.push(['Abschlags-Nr.:',String(abschlagNr)]);
                 mf.forEach(function(f){
                     doc.setFont('helvetica','normal');doc.setTextColor(136,136,136);doc.text(f[0],ML,y);
-                    doc.setFont('helvetica','bold');doc.setTextColor(34,34,34);doc.text(f[1],ML+40,y);
-                    y+=4.5;
+                    doc.setFont('helvetica','bold');doc.setTextColor(34,34,34);doc.text(f[1],ML+42,y);
+                    y+=5;
                 });
-                y+=4;
+                y+=6;
                 // === POSITIONSTABELLE MIT AUTOTABLE ===
                 // Laufende Zwischensumme berechnen
                 var laufendeSummen=[];var ls=0;
