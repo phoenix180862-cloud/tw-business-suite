@@ -1,45 +1,98 @@
         function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta, onDatenBearbeiten, onOrdnerBrowser }) {
-            const module = [
-                { id: 'aufmass', icon: '\uD83D\uDCD0', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', color: 'var(--accent-blue)', ready: true },
-                { id: 'rechnung', icon: '\uD83D\uDCB6', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', color: 'var(--success)', ready: true },
-                { id: 'ausgangsbuch', icon: '\uD83D\uDCD2', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', color: 'var(--accent-orange)', ready: true },
-                { id: 'schriftverkehr', icon: '\u2709\uFE0F', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', color: '#8e44ad', ready: true },
-                { id: 'baustelle', icon: '\uD83D\uDCF1', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', color: 'var(--accent-red-light)', ready: true },
+            var module = [
+                { id: 'aufmass', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
+                { id: 'rechnung', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', gradient: 'linear-gradient(135deg, #27ae60, #1e8449)', shadow: 'rgba(39,174,96,0.30)', ready: true },
+                { id: 'ausgangsbuch', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', gradient: 'linear-gradient(135deg, #e67e22, #d35400)', shadow: 'rgba(230,126,34,0.30)', ready: true },
+                { id: 'schriftverkehr', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', gradient: 'linear-gradient(135deg, #8e44ad, #6c3483)', shadow: 'rgba(142,68,173,0.30)', ready: true },
+                { id: 'baustelle', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', gradient: 'linear-gradient(135deg, #e63535, #c41e1e)', shadow: 'rgba(196,30,30,0.30)', ready: true },
             ];
+            var renderIcon = function(id) {
+                var s = {width:'32px',height:'32px',flexShrink:0};
+                if (id === 'aufmass') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
+                    React.createElement('rect',{x:'4',y:'4',width:'24',height:'24',rx:'3',stroke:'white',strokeWidth:'2',fill:'none'}),
+                    React.createElement('line',{x1:'4',y1:'16',x2:'28',y2:'16',stroke:'white',strokeWidth:'1.5',strokeDasharray:'3 2'}),
+                    React.createElement('line',{x1:'16',y1:'4',x2:'16',y2:'28',stroke:'white',strokeWidth:'1.5',strokeDasharray:'3 2'}),
+                    React.createElement('path',{d:'M6 26L26 6',stroke:'rgba(255,255,255,0.6)',strokeWidth:'1.5'}),
+                    React.createElement('circle',{cx:'8',cy:'8',r:'2',fill:'white'}),
+                    React.createElement('circle',{cx:'24',cy:'24',r:'2',fill:'white'})
+                );
+                if (id === 'rechnung') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
+                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2',fill:'none'}),
+                    React.createElement('line',{x1:'10',y1:'10',x2:'22',y2:'10',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'10',y1:'14',x2:'22',y2:'14',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'10',y1:'18',x2:'18',y2:'18',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('text',{x:'16',y:'26',fill:'white',fontSize:'9',fontWeight:'700',textAnchor:'middle',fontFamily:'Oswald, sans-serif'},'\u20AC')
+                );
+                if (id === 'ausgangsbuch') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
+                    React.createElement('rect',{x:'5',y:'4',width:'22',height:'24',rx:'2',stroke:'white',strokeWidth:'2',fill:'none'}),
+                    React.createElement('rect',{x:'3',y:'4',width:'4',height:'24',rx:'1',fill:'rgba(255,255,255,0.3)'}),
+                    React.createElement('line',{x1:'10',y1:'10',x2:'24',y2:'10',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'10',y1:'14',x2:'24',y2:'14',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'10',y1:'18',x2:'20',y2:'18',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'10',y1:'22',x2:'22',y2:'22',stroke:'white',strokeWidth:'1.5'})
+                );
+                if (id === 'schriftverkehr') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
+                    React.createElement('rect',{x:'3',y:'8',width:'26',height:'18',rx:'2',stroke:'white',strokeWidth:'2',fill:'none'}),
+                    React.createElement('path',{d:'M3 10L16 19L29 10',stroke:'white',strokeWidth:'2',fill:'none'}),
+                    React.createElement('line',{x1:'3',y1:'26',x2:'12',y2:'18',stroke:'rgba(255,255,255,0.4)',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'29',y1:'26',x2:'20',y2:'18',stroke:'rgba(255,255,255,0.4)',strokeWidth:'1.5'})
+                );
+                if (id === 'baustelle') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
+                    React.createElement('rect',{x:'8',y:'4',width:'16',height:'24',rx:'3',stroke:'white',strokeWidth:'2',fill:'none'}),
+                    React.createElement('line',{x1:'8',y1:'8',x2:'24',y2:'8',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'8',y1:'24',x2:'24',y2:'24',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('circle',{cx:'16',cy:'26',r:'1.5',fill:'white'}),
+                    React.createElement('rect',{x:'11',y:'12',width:'10',height:'8',rx:'1',stroke:'rgba(255,255,255,0.6)',strokeWidth:'1',fill:'none'}),
+                    React.createElement('line',{x1:'13',y1:'15',x2:'19',y2:'15',stroke:'rgba(255,255,255,0.5)',strokeWidth:'1'}),
+                    React.createElement('line',{x1:'13',y1:'17',x2:'17',y2:'17',stroke:'rgba(255,255,255,0.5)',strokeWidth:'1'})
+                );
+                return null;
+            };
             return (
                 <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
-                    <div style={{textAlign:'center', marginBottom:'20px'}}>
+                    <div style={{textAlign:'center', marginBottom:'24px'}}>
                         <FirmenLogo size="small" />
-                        <div style={{marginTop:'12px', fontSize:'15px', fontWeight:'600', color:'var(--text-primary)', fontFamily:'Oswald, sans-serif'}}>
+                        <div style={{marginTop:'12px', fontSize:'17px', fontWeight:'700', color:'var(--text-white)', fontFamily:'Oswald, sans-serif', letterSpacing:'0.5px'}}>
                             {kunde ? kunde.name : 'Kunde'}
                         </div>
-                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'1.5px', textTransform:'uppercase', fontFamily:'Oswald, sans-serif', fontWeight:'500'}}>
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'2px', textTransform:'uppercase', fontFamily:'Oswald, sans-serif', fontWeight:'500'}}>
                             Modul w\u00e4hlen
                         </div>
                     </div>
 
-                    {/* Modul-Kacheln */}
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
+                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                         {module.map(function(m) {
                             return (
                                 <button key={m.id} onClick={function() { if (m.ready) onSelectModul(m.id); }}
                                     style={{
-                                        padding:'20px 14px', borderRadius:'var(--radius-lg)', border:'1px solid var(--border-color)', cursor: m.ready ? 'pointer' : 'default',
-                                        background: m.ready ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
+                                        width:'100%',
+                                        padding:'18px 16px',
+                                        borderRadius:'var(--radius-lg)',
+                                        border:'1px solid transparent',
+                                        cursor: m.ready ? 'pointer' : 'not-allowed',
+                                        background: m.ready ? m.gradient : 'var(--bg-secondary)',
+                                        color: m.ready ? '#fff' : 'var(--text-muted)',
                                         opacity: m.ready ? 1 : 0.4,
-                                        display:'flex', flexDirection:'column', alignItems:'center', gap:'8px',
-                                        boxShadow: m.ready ? 'var(--shadow-md)' : 'none',
+                                        display:'flex',
+                                        alignItems:'center',
+                                        gap:'14px',
+                                        textAlign:'left',
+                                        boxShadow: m.ready ? ('0 6px 20px ' + m.shadow) : 'none',
                                         transition:'all 0.25s ease',
-                                        position:'relative'
+                                        position:'relative',
+                                        overflow:'hidden',
+                                        touchAction:'manipulation',
                                     }}>
-                                    <span style={{fontSize:'32px'}}>{m.icon}</span>
-                                    <span style={{fontSize:'14px', fontWeight:'600', color: m.ready ? m.color : 'var(--text-muted)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>{m.name}</span>
-                                    <span style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.3', fontFamily:'Source Sans 3, sans-serif'}}>{m.desc}</span>
-                                    {!m.ready && (
-                                        <span style={{position:'absolute', top:'8px', right:'8px', fontSize:'9px', background:'rgba(196,30,30,0.12)', color:'var(--accent-red-light)', padding:'2px 6px', borderRadius:'var(--radius-sm)', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                            BALD
-                                        </span>
-                                    )}
+                                    {renderIcon(m.id)}
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'16px', fontWeight:'600', marginBottom:'3px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                            {m.name}
+                                        </div>
+                                        <div style={{fontSize:'12px', opacity:0.85, lineHeight:'1.4', fontFamily:'Source Sans 3, sans-serif'}}>
+                                            {m.desc}
+                                        </div>
+                                    </div>
+                                    <span style={{fontSize:'20px', opacity:0.7}}>{'\u2192'}</span>
                                 </button>
                             );
                         })}
@@ -56,10 +109,9 @@
             return (
                 <div className="modal-overlay" style={{zIndex:5000, background:'rgba(10,15,25,0.95)', display:'flex', alignItems:'center', justifyContent:'center'}}>
                     <div style={{width:'90%', maxWidth:'400px', textAlign:'center', color:'white'}}>
-                        <div style={{fontSize:'48px', marginBottom:'16px'}}>🤖</div>
+                        <div style={{fontSize:'48px', marginBottom:'16px'}}>&#129302;</div>
                         <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px'}}>KI-Analyse l\u00e4uft...</div>
 
-                        {/* Fortschrittsbalken */}
                         <div style={{width:'100%', height:'8px', background:'rgba(255,255,255,0.1)', borderRadius:'4px', overflow:'hidden', marginBottom:'12px'}}>
                             <div style={{width: pct + '%', height:'100%', background:'linear-gradient(90deg, var(--accent-blue), var(--accent-orange))', borderRadius:'4px', transition:'width 0.5s ease'}}></div>
                         </div>
@@ -68,13 +120,12 @@
                         </div>
                         <div style={{fontSize:'13px', fontWeight:'600', marginBottom:'12px'}}>{pct}%</div>
 
-                        {/* Detail-Liste */}
                         {details && details.length > 0 && (
                             <div style={{textAlign:'left', fontSize:'12px', lineHeight:'1.8'}}>
                                 {details.map(function(d, i) {
                                     return (
                                         <div key={i} style={{color: d.done ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)'}}>
-                                            {d.done ? '✅' : '⏳'} {d.text}
+                                            {d.done ? '\u2705' : '\u23F3'} {d.text}
                                         </div>
                                     );
                                 })}
@@ -84,10 +135,6 @@
                 </div>
             );
         }
-
-        /* ═══════════════════════════════════════════
-           KI-AKTE ANSICHT -- Zentrale Analyseergebnisse
-           ═══════════════════════════════════════════ */
         function KiAkteView({ kiAkte, kunde, onClose, onNeuAnalyse }) {
             const [activeTab, setActiveTab] = useState('positionen');
             if (!kiAkte || !kiAkte.meta) {
