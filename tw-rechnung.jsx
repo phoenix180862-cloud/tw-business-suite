@@ -1,11 +1,13 @@
         /* =====================================================================
-           RECHNUNGSMODUL -- 5 Untermodule, PDF-nahe Startseite
+           RECHNUNGSMODUL -- 6 Untermodule, PDF-nahe Startseite
            Skill: SKILL-rechnungsmodul-umbau.md + Thomas 5 Aenderungen
            Phase: typwahl -> startseite (PDF-Vorschau) -> posauswahl -> formular
+           Buttons: Alle 6 in einheitlichem Blau
+           6. Button: Aufmass (laedt Gesamtliste, druckt/versendet als PDF)
            ===================================================================== */
-        function RechnungsModul({ kunde, importResult, gesamtliste, aufmassGespeichert, onBack }) {
-            const [phase, setPhase] = useState('typwahl');
-            const [rechnungsTyp, setRechnungsTyp] = useState(null);
+        function RechnungsModul({ kunde, importResult, gesamtliste, aufmassGespeichert, vorwahlTyp, onVorwahlUsed, onBack }) {
+            const [phase, setPhase] = useState(vorwahlTyp ? 'startseite' : 'typwahl');
+            const [rechnungsTyp, setRechnungsTyp] = useState(vorwahlTyp || null);
             const [positionen, setPositionen] = useState([]);
             const [positionenGeladen, setPositionenGeladen] = useState(false);
             const [showDatenLaden, setShowDatenLaden] = useState(false);
@@ -24,6 +26,7 @@
             const [posAuswahl, setPosAuswahl] = useState({});
             const [nachtragsNr, setNachtragsNr] = useState('');
             const [angebotsNr, setAngebotsNr] = useState('');
+            const [aufmassNr, setAufmassNr] = useState('');
             const [gueltigBis, setGueltigBis] = useState('');
             const [kontozahlungen, setKontozahlungen] = useState([]);
             const [showKontoDialog, setShowKontoDialog] = useState(false);
@@ -70,6 +73,26 @@
                 setEmpfPlzOrt(plzOrt);
                 setBauvorhabenText(kunde.adresse || kunde.baumassnahme || kunde.name || '');
             }, [kunde]);
+            // --- Vorwahl: Wenn vom Aufmass-Modul direkt hierher navigiert ---
+            useEffect(function() {
+                if (vorwahlTyp === 'aufmass' && gesamtliste && gesamtliste.length > 0) {
+                    var amPos = [];
+                    var seen = {};
+                    gesamtliste.forEach(function(room) {
+                        (room.positionen || []).forEach(function(p) {
+                            var key = p.pos || p.posNr;
+                            if (!seen[key]) {
+                                seen[key] = { pos: key, bez: p.bez || '', einheit: p.einheit || 'm\u00B2', menge: 0, einzelpreis: 0 };
+                            }
+                            seen[key].menge += (parseFloat(p.ergebnis) || 0);
+                        });
+                    });
+                    Object.keys(seen).forEach(function(k) { amPos.push(seen[k]); });
+                    setPositionen(amPos);
+                    setPositionenGeladen(true);
+                    if (onVorwahlUsed) onVorwahlUsed();
+                }
+            }, [vorwahlTyp]);
             var lvPositionen = [];
             if (importResult && importResult.positionen && importResult.positionen.length > 0) { lvPositionen = importResult.positionen; }
             else if (kunde && kunde._lvPositionen && kunde._lvPositionen.length > 0) { lvPositionen = kunde._lvPositionen; }
@@ -78,9 +101,9 @@
             var aufmassMassen = {};
             if (gesamtliste && gesamtliste.length>0) { gesamtliste.forEach(function(room) { (room.positionen||[]).forEach(function(p) { var key=p.pos||p.posNr; if(key){if(!aufmassMassen[key])aufmassMassen[key]=0; aufmassMassen[key]+=parseFloat(p.ergebnis)||0;} }); }); }
             var hatAufmass = aufmassGespeichert && gesamtliste && gesamtliste.length>0;
-            useEffect(function() { if(!rechnungsTyp)return; var y=new Date().getFullYear(); var r=String(Math.floor(Math.random()*900)+100); if(rechnungsTyp==='nachtrag'){setNachtragsNr('NT-'+y+'-'+r);} else if(rechnungsTyp==='angebot'){setAngebotsNr('AG-'+y+'-'+r);} else{setRechnungsNr('RE-'+y+'-'+r);} }, [rechnungsTyp]);
+            useEffect(function() { if(!rechnungsTyp)return; var y=new Date().getFullYear(); var r=String(Math.floor(Math.random()*900)+100); if(rechnungsTyp==='nachtrag'){setNachtragsNr('NT-'+y+'-'+r);} else if(rechnungsTyp==='angebot'){setAngebotsNr('AG-'+y+'-'+r);} else if(rechnungsTyp==='aufmass'){setAufmassNr('AM-'+y+'-'+r);} else{setRechnungsNr('RE-'+y+'-'+r);} }, [rechnungsTyp]);
             var istRechnung = rechnungsTyp==='abschlag'||rechnungsTyp==='schluss'||rechnungsTyp==='einzel';
-            var getDokumentNr = function() { return rechnungsTyp==='nachtrag'?nachtragsNr:rechnungsTyp==='angebot'?angebotsNr:rechnungsNr; };
+            var getDokumentNr = function() { return rechnungsTyp==='nachtrag'?nachtragsNr:rechnungsTyp==='angebot'?angebotsNr:rechnungsTyp==='aufmass'?aufmassNr:rechnungsNr; };
             var typFarben = {abschlag:'#1E88E5',schluss:'#27ae60',einzel:'#00897b',nachtrag:'#e67e22',angebot:'#8e44ad'};
             var typColor = typFarben[rechnungsTyp]||'#1E88E5';
             var kName = kunde?(kunde.auftraggeber||kunde.name||''):'';
@@ -107,8 +130,8 @@
             var ladeKontozahlungen=function(){try{var d=JSON.parse(localStorage.getItem('tw_ausgangsbuch')||'[]');var kid=kunde._driveFolderId||kunde.id||kunde.name||'';var ab=d.filter(function(e){return e.kundeId===kid&&e.rechnungsTyp==='abschlag';});setKontozahlungen(ab.map(function(a){return{id:a.id,nr:a.rechnungsNr||a.dokumentNr,datum:a.datum,betrag:a.bruttoBetrag,aufgefuehrt:true};}));}catch(e){}};
             var kontoSumme=kontozahlungen.filter(function(k){return k.aufgefuehrt;}).reduce(function(s,k){return s+(parseFloat(k.betrag)||0);},0);
             var addNachtragsPositionen=function(){if(rechnungsTyp!=='nachtrag'||aktivePosn.length===0)return;var kid=kunde._driveFolderId||kunde.id||kunde.name;var key='lv_positionen_'+kid;var best=[];try{best=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}aktivePosn.forEach(function(np){best.push({pos:np.pos,posNr:np.pos,bez:'[NT] '+(np.bez||''),einheit:np.einheit,menge:np.menge,einzelpreis:np.einzelpreis,ep:np.einzelpreis,quelle:'nachtrag',nachtragsNr:nachtragsNr,erstelltAm:new Date().toISOString()});});localStorage.setItem(key,JSON.stringify(best));if(typeof LV_POSITIONEN!=='undefined')LV_POSITIONEN[kid]=best;};
-            var getDateiname=function(){var pf=rechnungsTyp==='abschlag'?'Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='einzel'?'Rechnung':rechnungsTyp==='nachtrag'?'Nachtrag':'Angebot';return pf+'_'+getDokumentNr()+'_'+(kunde.name||'Kunde').replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+rechnungsDatum.replace(/-/g,'')+'.pdf';};
-            var saveToGoogleDrive=async function(){var svc=window.GoogleDriveService;if(!svc||!svc.accessToken||!kunde._driveFolderId)return;var zo=istRechnung?'Rechnung-A.Kontozahlung':'Angebote-Nachtraege-Leistungsverzeichnis';try{var c=await svc.listFolderContents(kunde._driveFolderId);var tf=(c.folders||[]).find(function(f){return f.name===zo;});if(tf)console.log('PDF fuer Drive: '+zo+'/'+getDateiname());}catch(e){}};
+            var getDateiname=function(){var pf=rechnungsTyp==='abschlag'?'Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='einzel'?'Rechnung':rechnungsTyp==='nachtrag'?'Nachtrag':rechnungsTyp==='aufmass'?'Aufmass':'Angebot';return pf+'_'+getDokumentNr()+'_'+(kunde.name||'Kunde').replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+rechnungsDatum.replace(/-/g,'')+'.pdf';};
+            var saveToGoogleDrive=async function(){var svc=window.GoogleDriveService;if(!svc||!svc.accessToken||!kunde._driveFolderId)return;var zo=istRechnung?'Rechnung-A.Kontozahlung':rechnungsTyp==='aufmass'?'Aufmass':'Angebote-Nachtraege-Leistungsverzeichnis';try{var c=await svc.listFolderContents(kunde._driveFolderId);var tf=(c.folders||[]).find(function(f){return f.name===zo;});if(tf)console.log('PDF fuer Drive: '+zo+'/'+getDateiname());}catch(e){}};
             var noSpinnerCSS='<style>input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}input[type=number]{-moz-appearance:textfield;}</style>';
             var inputStyle={width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'13px',color:'var(--text-primary)',boxSizing:'border-box'};
             var smallInputStyle=Object.assign({},inputStyle,{padding:'6px 8px',fontSize:'12px',textAlign:'right'});
@@ -116,7 +139,7 @@
             var generatePDF=function(){
                 if(istRechnung){try{var abK='tw_ausgangsbuch';var abD=JSON.parse(localStorage.getItem(abK)||'[]');var isDup=abD.some(function(e){return(e.rechnungsNr===rechnungsNr||e.dokumentNr===rechnungsNr)&&e.datum===rechnungsDatum;});if(!isDup&&rechnungsNr){var tL=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':'Rechnung';var zD=new Date(rechnungsDatum);zD.setDate(zD.getDate()+zahlungszielTage);var sF=new Date(rechnungsDatum);sF.setDate(sF.getDate()+skontoTage);abD.push({id:'RE_'+Date.now(),lfdNr:abD.length+1,dokumentNr:rechnungsNr,rechnungsNr:rechnungsNr,dokumentTyp:rechnungsTyp,dokumentLabel:tL,typ:tL,rechnungsTyp:rechnungsTyp,datum:rechnungsDatum,leistungszeitraum:leistungszeitraum,kundeId:kunde._driveFolderId||kunde.id||kunde.name||'',kundeName:kName,kunde:kName,kundeAdresse:kAddr,kundeTyp:'b2b',bauvorhaben:bauvorhaben,auftragsnummer:auftragsnummer,kostenstelle:kostenstelle,nettoBetrag:nettoSumme,mwstSatz:mwstSatz,mwstBetrag:mwstBetrag,bruttoBetrag:bruttoSumme,sicherheitseinbehaltProzent:sicherheitseinbehalt,sicherheitseinbehaltBetrag:sicherheitBetrag,zahlungszielTage:zahlungszielTage,faelligkeitsDatum:zD.toISOString().split('T')[0],zahlungszielDatum:zD.toISOString().split('T')[0],skontoProzent:skontoProzent,skontoTage:skontoTage,skontoBetrag:skontoBetrag,skontoFrist:sF.toISOString().split('T')[0],forderungBrutto:zahlbetragOhneSkonto,forderungMitSkonto:zahlbetragMitSkonto,zahlbetrag:zahlbetragOhneSkonto,anzahlPositionen:aktivePosn.length,abschlagNr:rechnungsTyp==='abschlag'?abschlagNr:null,pdfDateiname:getDateiname(),driveOrdner:'Rechnung-A.Kontozahlung',status:'offen',zahlungen:[],zahlungsSumme:0,restbetrag:zahlbetragOhneSkonto,mahnStufe:0,mahnungen:[],notiz:'',erstelltAm:new Date().toISOString(),geaendertAm:new Date().toISOString()});localStorage.setItem(abK,JSON.stringify(abD));}}catch(e){}}
                 if(rechnungsTyp==='nachtrag')addNachtragsPositionen();
-                var typLabel2=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?('Nachtrag Nr. '+nachtragsNr):rechnungsTyp==='angebot'?('Angebot Nr. '+angebotsNr):'Rechnung';
+                var typLabel2=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?('Nachtrag Nr. '+nachtragsNr):rechnungsTyp==='angebot'?('Angebot Nr. '+angebotsNr):rechnungsTyp==='aufmass'?('Aufmass Nr. '+aufmassNr):'Rechnung';
                 var f2=function(n){return Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});};
                 var doc=new jspdf.jsPDF('p','mm','a4');
                 var PW=210,PH=297,ML=22,MR=18,MT=18,MB=25;
@@ -219,6 +242,7 @@
                 if(istRechnung&&rechnungsNr)mf.push(['Rechnungs-Nr.:',rechnungsNr]);
                 if(rechnungsTyp==='nachtrag')mf.push(['Nachtrags-Nr.:',nachtragsNr]);
                 if(rechnungsTyp==='angebot')mf.push(['Angebots-Nr.:',angebotsNr]);
+                if(rechnungsTyp==='aufmass')mf.push(['Aufmass-Nr.:',aufmassNr]);
                 if(auftragsnummer)mf.push(['Auftragsnummer:',auftragsnummer]);
                 if(kostenstelle)mf.push(['Kostenstelle:',kostenstelle]);
                 mf.push(['Steuernummer:','30/220/1234/5']);
@@ -230,6 +254,99 @@
                 });
                 y+=12;
                 // === POSITIONSTABELLE MIT AUTOTABLE ===
+                if(rechnungsTyp==='aufmass'){
+                // --- AUFMASS-TABELLE: 4 Spalten (Pos, Menge, Einh, Bezeichnung) ---
+                var amTableBody=aktivePosn.map(function(p){
+                    return[String(p.pos||''),f2(p.menge),String(p.einheit||''),String(p.bez||'')];
+                });
+                var pageRowMap={};
+                var footerDrawn={};
+                doc.autoTable({
+                    startY:y,
+                    margin:{left:ML,right:MR,top:MT+8,bottom:MB+12},
+                    head:[['Pos.','Menge','Einheit','Bezeichnung']],
+                    body:amTableBody,
+                    showHead:'everyPage',
+                    theme:'grid',
+                    tableLineColor:[224,224,224],
+                    tableLineWidth:0.2,
+                    styles:{
+                        fontSize:8.5,
+                        font:'helvetica',
+                        textColor:[34,34,34],
+                        cellPadding:{top:2.5,right:2,bottom:2.5,left:2},
+                        overflow:'linebreak',
+                        valign:'top',
+                        lineColor:[224,224,224],
+                        lineWidth:0.15
+                    },
+                    headStyles:{
+                        fillColor:[45,52,54],
+                        textColor:[255,255,255],
+                        fontStyle:'bold',
+                        fontSize:8,
+                        cellPadding:{top:2.5,right:2,bottom:2.5,left:2},
+                        lineWidth:0,
+                        halign:'center'
+                    },
+                    columnStyles:{
+                        0:{cellWidth:20,halign:'center',fontStyle:'bold'},
+                        1:{cellWidth:28,halign:'right',fontStyle:'bold'},
+                        2:{cellWidth:18,halign:'center'},
+                        3:{cellWidth:'auto',halign:'left'}
+                    },
+                    didDrawPage:function(data){
+                        var pn=doc.internal.getCurrentPageInfo().pageNumber;
+                        if(!footerDrawn[pn]){drawFooter(pn);footerDrawn[pn]=true;}
+                    },
+                    didDrawCell:function(data){
+                        if(data.section==='body'){
+                            var pn=doc.internal.getCurrentPageInfo().pageNumber;
+                            pageRowMap[pn]=data.row.index;
+                        }
+                    }
+                });
+                var lastPage=doc.internal.getCurrentPageInfo().pageNumber;
+                doc.setPage(lastPage);
+                y=doc.lastAutoTable.finalY+8;
+                var pn=lastPage;
+                // --- RAUMAUFSCHLUESSELUNG (wenn Gesamtliste vorhanden) ---
+                if(gesamtliste&&gesamtliste.length>0){
+                    if(y+15>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}
+                    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(17,17,17);
+                    doc.text('Raumaufschluesselung',ML,y);y+=6;
+                    doc.setDrawColor(196,30,30);doc.setLineWidth(0.4);doc.line(ML,y,ML+50,y);y+=5;
+                    gesamtliste.forEach(function(room){
+                        var roomPosn=(room.positionen||[]).filter(function(p){return(parseFloat(p.ergebnis)||0)>0;});
+                        if(roomPosn.length===0)return;
+                        if(y+12>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}
+                        doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(34,34,34);
+                        doc.text(room.raumName||'Raum',ML,y);y+=4;
+                        roomPosn.forEach(function(p){
+                            if(y+4>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}
+                            doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.setTextColor(85,85,85);
+                            doc.text('Pos. '+(p.pos||p.posNr||''),ML+4,y);
+                            doc.text(f2(p.ergebnis)+' '+(p.einheit||'m\u00B2'),ML+30,y);
+                            var bezTxt=p.bez||'';
+                            if(bezTxt.length>60)bezTxt=bezTxt.substring(0,57)+'...';
+                            doc.text(bezTxt,ML+55,y);
+                            y+=3.5;
+                        });
+                        y+=3;
+                    });
+                }
+                // --- Aufmass-Zusammenfassung ---
+                y+=4;
+                if(y+15>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}
+                doc.setDrawColor(34,34,34);doc.setLineWidth(0.5);doc.line(ML+CW-88,y,ML+CW,y);y+=5;
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(17,17,17);
+                doc.text('Positionen gesamt: '+aktivePosn.length,ML+CW-88,y);
+                if(gesamtliste&&gesamtliste.length>0){
+                    doc.text('Raeume: '+gesamtliste.length,ML+CW,y,{align:'right'});
+                }
+                y+=7;
+                } else {
+                // --- STANDARD-RECHNUNGSTABELLE: 6 Spalten ---
                 // Laufende Zwischensumme berechnen
                 var laufendeSummen=[];var ls=0;
                 aktivePosn.forEach(function(p){
@@ -336,6 +453,7 @@
                     doc.setTextColor(17,17,17);doc.text('Zahlbar '+zahlungszielTage+' Tage netto:',sx,y);doc.text(f2(zahlbetragOhneSkonto)+' \u20AC',sr,y,{align:'right'});y+=7;
                 }
                 if(rechnungsTyp==='angebot'&&gueltigBis){doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);doc.text('Gueltig bis:',sx,y);doc.text(new Date(gueltigBis).toLocaleDateString('de-DE'),sr,y,{align:'right'});y+=5;}
+                } // Ende else (Standard-Rechnungstabelle)
                 if(bemerkung){y+=3;doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(85,85,85);var bL=doc.splitTextToSize(bemerkung,CW);bL.forEach(function(l){if(y+4>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}doc.text(l,ML,y);y+=3.8;});}
                 if(!footerDrawn[pn]){drawFooter(pn);}
                 // PDF oeffnen
@@ -348,7 +466,7 @@
             var generateERechnungXML=function(profil){var isXR=profil==='xrechnung';var kS=kAddr,kO='',kP='';var am=kS.match(/^(.*?)[\s,]+(\d{5})\s+(.*)$/);if(am){kS=am[1].trim();kP=am[2];kO=am[3].trim();}var rD=rechnungsDatum.replace(/-/g,'');var xml='<?xml version="1.0" encoding="UTF-8"?>\n<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">\n<rsm:ExchangedDocumentContext>\n';if(isXR){xml+='<ram:BusinessProcessSpecifiedDocumentContextParameter><ram:ID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</ram:ID></ram:BusinessProcessSpecifiedDocumentContextParameter>\n<ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter>\n';}else{xml+='<ram:GuidelineSpecifiedDocumentContextParameter><ram:ID>urn:cen.eu:en16931:2017</ram:ID></ram:GuidelineSpecifiedDocumentContextParameter>\n';}xml+='</rsm:ExchangedDocumentContext>\n<rsm:ExchangedDocument><ram:ID>'+escXml(getDokumentNr())+'</ram:ID><ram:TypeCode>380</ram:TypeCode><ram:IssueDateTime><udt:DateTimeString format="102">'+rD+'</udt:DateTimeString></ram:IssueDateTime></rsm:ExchangedDocument>\n<rsm:SupplyChainTradeTransaction>\n';aktivePosn.forEach(function(p,idx){var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);xml+='<ram:IncludedSupplyChainTradeLineItem><ram:AssociatedDocumentLineDocument><ram:LineID>'+(idx+1)+'</ram:LineID></ram:AssociatedDocumentLineDocument><ram:SpecifiedTradeProduct><ram:Name>'+escXml(p.bez||'Pos '+p.pos)+'</ram:Name></ram:SpecifiedTradeProduct><ram:SpecifiedLineTradeAgreement><ram:NetPriceProductTradePrice><ram:ChargeAmount>'+fmtXml(p.einzelpreis)+'</ram:ChargeAmount></ram:NetPriceProductTradePrice></ram:SpecifiedLineTradeAgreement><ram:SpecifiedLineTradeDelivery><ram:BilledQuantity unitCode="'+mapEinheit(p.einheit)+'">'+fmtXml(p.menge)+'</ram:BilledQuantity></ram:SpecifiedLineTradeDelivery><ram:SpecifiedLineTradeSettlement><ram:ApplicableTradeTax><ram:TypeCode>VAT</ram:TypeCode><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>'+mwstSatz+'.00</ram:RateApplicablePercent></ram:ApplicableTradeTax><ram:SpecifiedTradeSettlementLineMonetarySummation><ram:LineTotalAmount>'+fmtXml(gp)+'</ram:LineTotalAmount></ram:SpecifiedTradeSettlementLineMonetarySummation></ram:SpecifiedLineTradeSettlement></ram:IncludedSupplyChainTradeLineItem>\n';});xml+='<ram:ApplicableHeaderTradeAgreement><ram:SellerTradeParty><ram:Name>Thomas Willwacher Fliesenlegermeister e.K.</ram:Name><ram:PostalTradeAddress><ram:LineOne>Flurweg 14a</ram:LineOne><ram:PostcodeCode>56472</ram:PostcodeCode><ram:CityName>Nisterau</ram:CityName><ram:CountryID>DE</ram:CountryID></ram:PostalTradeAddress><ram:SpecifiedTaxRegistration><ram:ID schemeID="FC">30/220/1234/5</ram:ID></ram:SpecifiedTaxRegistration></ram:SellerTradeParty><ram:BuyerTradeParty><ram:Name>'+escXml(kName)+'</ram:Name>';if(kS||kP||kO){xml+='<ram:PostalTradeAddress>';if(kS)xml+='<ram:LineOne>'+escXml(kS)+'</ram:LineOne>';if(kP)xml+='<ram:PostcodeCode>'+escXml(kP)+'</ram:PostcodeCode>';if(kO)xml+='<ram:CityName>'+escXml(kO)+'</ram:CityName>';xml+='<ram:CountryID>DE</ram:CountryID></ram:PostalTradeAddress>';}xml+='</ram:BuyerTradeParty>';if(auftragsnummer)xml+='<ram:BuyerOrderReferencedDocument><ram:IssuerAssignedID>'+escXml(auftragsnummer)+'</ram:IssuerAssignedID></ram:BuyerOrderReferencedDocument>';xml+='</ram:ApplicableHeaderTradeAgreement>\n<ram:ApplicableHeaderTradeDelivery><ram:ActualDeliverySupplyChainEvent><ram:OccurrenceDateTime><udt:DateTimeString format="102">'+rD+'</udt:DateTimeString></ram:OccurrenceDateTime></ram:ActualDeliverySupplyChainEvent></ram:ApplicableHeaderTradeDelivery>\n<ram:ApplicableHeaderTradeSettlement><ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode><ram:SpecifiedTradeSettlementPaymentMeans><ram:TypeCode>58</ram:TypeCode><ram:PayeePartyCreditorFinancialAccount><ram:IBANID>DE12573918000000000000</ram:IBANID></ram:PayeePartyCreditorFinancialAccount></ram:SpecifiedTradeSettlementPaymentMeans><ram:ApplicableTradeTax><ram:CalculatedAmount>'+fmtXml(mwstBetrag)+'</ram:CalculatedAmount><ram:TypeCode>VAT</ram:TypeCode><ram:BasisAmount>'+fmtXml(nettoSumme)+'</ram:BasisAmount><ram:CategoryCode>S</ram:CategoryCode><ram:RateApplicablePercent>'+mwstSatz+'.00</ram:RateApplicablePercent></ram:ApplicableTradeTax>';var fD=new Date(rechnungsDatum);fD.setDate(fD.getDate()+zahlungszielTage);xml+='<ram:SpecifiedTradePaymentTerms><ram:Description>Zahlbar innerhalb '+zahlungszielTage+' Tagen netto</ram:Description><ram:DueDateDateTime><udt:DateTimeString format="102">'+fD.toISOString().split('T')[0].replace(/-/g,'')+'</udt:DateTimeString></ram:DueDateDateTime></ram:SpecifiedTradePaymentTerms><ram:SpecifiedTradeSettlementHeaderMonetarySummation><ram:LineTotalAmount>'+fmtXml(nettoSumme)+'</ram:LineTotalAmount><ram:TaxBasisTotalAmount>'+fmtXml(nettoSumme)+'</ram:TaxBasisTotalAmount><ram:TaxTotalAmount currencyID="EUR">'+fmtXml(mwstBetrag)+'</ram:TaxTotalAmount><ram:GrandTotalAmount>'+fmtXml(bruttoSumme)+'</ram:GrandTotalAmount><ram:DuePayableAmount>'+fmtXml(zahlbetragOhneSkonto)+'</ram:DuePayableAmount></ram:SpecifiedTradeSettlementHeaderMonetarySummation></ram:ApplicableHeaderTradeSettlement>\n</rsm:SupplyChainTradeTransaction>\n</rsm:CrossIndustryInvoice>';return xml;};
             var downloadXRechnung=function(){var x=generateERechnungXML('xrechnung');var b=new Blob([x],{type:'application/xml;charset=utf-8'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=getDokumentNr()+'_XRechnung.xml';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);};
             var downloadZUGFeRD=function(){generatePDF();setTimeout(function(){var x=generateERechnungXML('zugferd');var b=new Blob([x],{type:'application/xml;charset=utf-8'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download=getDokumentNr()+'_factur-x.xml';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u);},1500);};
-            var sendPerEmail=async function(){var email=kunde.ag_email||kunde.bl_email||kunde.arch_email||'';var tL=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag':'Rechnung';var betr=tL+' Nr. '+getDokumentNr()+' \u2013 '+bauvorhaben;var body='Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere '+tL+' Nr. '+getDokumentNr()+'.\n\nBauvorhaben: '+bauvorhaben+'\n';if(istRechnung){body+='\nBruttobetrag: '+fmt(bruttoSumme)+' \u20AC\nZahlbar '+zahlungszielTage+' Tage netto: '+fmt(zahlbetragOhneSkonto)+' \u20AC\n\nBankverbindung:\nWesterwald Bank eG\nIBAN: DE12 5739 1800 0000 0000 00\nBIC: GENODE51WW1\n';}body+='\nMit freundlichen Gruessen\nThomas Willwacher\nFliesenlegermeister e.K.';generatePDF();var svc=window.GoogleDriveService;if(svc&&svc.accessToken&&email){try{var raw=['From: '+GMAIL_CONFIG.ABSENDER_EMAIL,'To: '+email,'Subject: =?UTF-8?B?'+btoa(unescape(encodeURIComponent(betr)))+'?=','MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','',body].join('\r\n');var enc=btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');var r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{'Authorization':'Bearer '+svc.accessToken,'Content-Type':'application/json'},body:JSON.stringify({raw:enc})});if(r.ok){alert('Gesendet an '+email);return;}}catch(e){}}setTimeout(function(){window.location.href='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(betr)+'&body='+encodeURIComponent(body);},1200);};
+            var sendPerEmail=async function(){var email=kunde.ag_email||kunde.bl_email||kunde.arch_email||'';var tL=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag':rechnungsTyp==='aufmass'?'Aufmass':'Rechnung';var betr=tL+' Nr. '+getDokumentNr()+' \u2013 '+bauvorhaben;var body='Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie '+(rechnungsTyp==='aufmass'?'unser '+tL:'unsere '+tL)+' Nr. '+getDokumentNr()+'.\n\nBauvorhaben: '+bauvorhaben+'\n';if(istRechnung){body+='\nBruttobetrag: '+fmt(bruttoSumme)+' \u20AC\nZahlbar '+zahlungszielTage+' Tage netto: '+fmt(zahlbetragOhneSkonto)+' \u20AC\n\nBankverbindung:\nWesterwald Bank eG\nIBAN: DE12 5739 1800 0000 0000 00\nBIC: GENODE51WW1\n';}body+='\nMit freundlichen Gruessen\nThomas Willwacher\nFliesenlegermeister e.K.';generatePDF();var svc=window.GoogleDriveService;if(svc&&svc.accessToken&&email){try{var raw=['From: '+GMAIL_CONFIG.ABSENDER_EMAIL,'To: '+email,'Subject: =?UTF-8?B?'+btoa(unescape(encodeURIComponent(betr)))+'?=','MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','',body].join('\r\n');var enc=btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');var r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{'Authorization':'Bearer '+svc.accessToken,'Content-Type':'application/json'},body:JSON.stringify({raw:enc})});if(r.ok){alert('Gesendet an '+email);return;}}catch(e){}}setTimeout(function(){window.location.href='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(betr)+'&body='+encodeURIComponent(body);},1200);};
             var openMailDialog=function(){setMailAdresse(kunde.ag_email||kunde.bl_email||'');setShowMailDialog(true);};
             var confirmAndSend=function(){var o=kunde.ag_email;if(mailAdresse)kunde.ag_email=mailAdresse;setShowMailDialog(false);sendPerEmail();if(!mailAdresse)kunde.ag_email=o;};
             // ===== PHASE 1: TYPWAHL (Design-System Modus-Karten) =====
@@ -387,11 +505,21 @@
                     React.createElement('path',{d:'M20 18L24 22L20 26',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1.5',strokeLinecap:'round',strokeLinejoin:'round'}),
                     React.createElement('path',{d:'M24 22H17',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1.5',strokeLinecap:'round'})
                 );
+                if (id === 'aufmass') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none'},s),
+                    React.createElement('rect',{x:'4',y:'8',width:'24',height:'16',rx:'2',stroke:'white',strokeWidth:'2'}),
+                    React.createElement('line',{x1:'8',y1:'8',x2:'8',y2:'16',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'12',y1:'8',x2:'12',y2:'14',stroke:'white',strokeWidth:'1'}),
+                    React.createElement('line',{x1:'16',y1:'8',x2:'16',y2:'16',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('line',{x1:'20',y1:'8',x2:'20',y2:'14',stroke:'white',strokeWidth:'1'}),
+                    React.createElement('line',{x1:'24',y1:'8',x2:'24',y2:'16',stroke:'white',strokeWidth:'1.5'}),
+                    React.createElement('path',{d:'M10 20h12',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1',strokeLinecap:'round'}),
+                    React.createElement('path',{d:'M10 19v2M22 19v2',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1',strokeLinecap:'round'})
+                );
                 return null;
             };
-            if(phase==='typwahl'){var typen=[{id:'abschlag',name:'Abschlagsrechnung',desc:'Teilrechnung mit kumulierter Aufstellung',gradient:'linear-gradient(135deg, #1E88E5, #1565C0)',shadow:'rgba(30,136,229,0.30)'},{id:'schluss',name:'Schlussrechnung',desc:'Endabrechnung mit Gesamtaufstellung',gradient:'linear-gradient(135deg, #27ae60, #1e8449)',shadow:'rgba(39,174,96,0.30)'},{id:'einzel',name:'Einzelrechnung',desc:'Einfache Rechnung ohne Abschlaege',gradient:'linear-gradient(135deg, #00897b, #00695c)',shadow:'rgba(0,137,123,0.30)'},{id:'nachtrag',name:'Nachtrag',desc:'Zusaetzliche / geaenderte Leistungen',gradient:'linear-gradient(135deg, #e67e22, #d35400)',shadow:'rgba(230,126,34,0.30)'},{id:'angebot',name:'Angebot',desc:'Kostenvoranschlag fuer den Auftraggeber',gradient:'linear-gradient(135deg, #8e44ad, #6c3483)',shadow:'rgba(142,68,173,0.30)'}];return(<div className="page-container" style={{padding:'20px 16px',minHeight:'100vh'}}><div dangerouslySetInnerHTML={{__html:noSpinnerCSS}} /><div style={{textAlign:'center',marginBottom:'24px'}}><FirmenLogo size="small" /><div style={{marginTop:'12px',fontSize:'17px',fontWeight:700,color:'var(--text-white)',fontFamily:'Oswald, sans-serif',letterSpacing:'0.5px'}}>{kunde?kunde.name:''}</div><div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'2px',textTransform:'uppercase',marginTop:'4px',fontFamily:'Oswald, sans-serif',fontWeight:'500'}}>Dokumenttyp waehlen</div></div><div style={{display:'flex',flexDirection:'column',gap:'10px'}}>{typen.map(function(t){return(<button key={t.id} onClick={function(){setRechnungsTyp(t.id);if(t.id==='schluss')ladeKontozahlungen();setPhase('startseite');}} style={{width:'100%',padding:'18px 16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:t.gradient,color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px '+t.shadow,transition:'all 0.25s ease',position:'relative',overflow:'hidden',touchAction:'manipulation'}}>{renderTypIcon(t.id)}<div style={{flex:1}}><div style={{fontSize:'16px',fontWeight:600,marginBottom:'3px',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>{t.name}</div><div style={{fontSize:'12px',opacity:0.85,lineHeight:'1.4',fontFamily:'Source Sans 3, sans-serif'}}>{t.desc}</div></div><span style={{fontSize:'20px',opacity:0.7}}>{'\u2192'}</span></button>);})}</div><button onClick={onBack} style={{width:'100%',marginTop:'16px',padding:'14px 32px',borderRadius:'var(--radius-md)',border:'none',background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:'0 4px 15px rgba(196,30,30,0.3)',transition:'all 0.25s ease',touchAction:'manipulation'}}>{'\u2190'} Zurueck zur Modulwahl</button></div>);}
+            if(phase==='typwahl'){var typen=[{id:'abschlag',name:'Abschlagsrechnung',desc:'Teilrechnung mit kumulierter Aufstellung',gradient:'linear-gradient(135deg, #1E88E5, #1565C0)',shadow:'rgba(30,136,229,0.30)'},{id:'schluss',name:'Schlussrechnung',desc:'Endabrechnung mit Gesamtaufstellung',gradient:'linear-gradient(135deg, #1976D2, #1256A0)',shadow:'rgba(25,118,210,0.30)'},{id:'einzel',name:'Einzelrechnung',desc:'Einfache Rechnung ohne Abschlaege',gradient:'linear-gradient(135deg, #2196F3, #1769C0)',shadow:'rgba(33,150,243,0.30)'},{id:'nachtrag',name:'Nachtrag',desc:'Zusaetzliche / geaenderte Leistungen',gradient:'linear-gradient(135deg, #1565C0, #0D47A1)',shadow:'rgba(21,101,192,0.30)'},{id:'angebot',name:'Angebot',desc:'Kostenvoranschlag fuer den Auftraggeber',gradient:'linear-gradient(135deg, #42A5F5, #1E88E5)',shadow:'rgba(66,165,245,0.30)'},{id:'aufmass',name:'Aufmass',desc:'Aufmass als Rechnungsanlage drucken / versenden',gradient:'linear-gradient(135deg, #0D47A1, #0A3575)',shadow:'rgba(13,71,161,0.30)'}];return(<div className="page-container" style={{padding:'20px 16px',minHeight:'100vh'}}><div dangerouslySetInnerHTML={{__html:noSpinnerCSS}} /><div style={{textAlign:'center',marginBottom:'24px'}}><FirmenLogo size="small" /><div style={{marginTop:'12px',fontSize:'17px',fontWeight:700,color:'var(--text-white)',fontFamily:'Oswald, sans-serif',letterSpacing:'0.5px'}}>{kunde?kunde.name:''}</div><div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'2px',textTransform:'uppercase',marginTop:'4px',fontFamily:'Oswald, sans-serif',fontWeight:'500'}}>Dokumenttyp waehlen</div></div><div style={{display:'flex',flexDirection:'column',gap:'10px'}}>{typen.map(function(t){return(<button key={t.id} onClick={function(){setRechnungsTyp(t.id);if(t.id==='schluss')ladeKontozahlungen();if(t.id==='aufmass'&&gesamtliste&&gesamtliste.length>0){var amPos=[];var seen={};gesamtliste.forEach(function(room){(room.positionen||[]).forEach(function(p){var key=p.pos||p.posNr;if(!seen[key]){seen[key]={pos:key,bez:p.bez||'',einheit:p.einheit||'m\u00B2',menge:0,einzelpreis:0};} seen[key].menge+=(parseFloat(p.ergebnis)||0);});});Object.keys(seen).forEach(function(k){amPos.push(seen[k]);});setPositionen(amPos);setPositionenGeladen(true);}setPhase('startseite');}} style={{width:'100%',padding:'18px 16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:t.gradient,color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px '+t.shadow,transition:'all 0.25s ease',position:'relative',overflow:'hidden',touchAction:'manipulation'}}>{renderTypIcon(t.id)}<div style={{flex:1}}><div style={{fontSize:'16px',fontWeight:600,marginBottom:'3px',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>{t.name}</div><div style={{fontSize:'12px',opacity:0.85,lineHeight:'1.4',fontFamily:'Source Sans 3, sans-serif'}}>{t.desc}</div></div><span style={{fontSize:'20px',opacity:0.7}}>{'\u2192'}</span></button>);})}</div><button onClick={onBack} style={{width:'100%',marginTop:'16px',padding:'14px 32px',borderRadius:'var(--radius-md)',border:'none',background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:'0 4px 15px rgba(196,30,30,0.3)',transition:'all 0.25s ease',touchAction:'manipulation'}}>{'\u2190'} Zurueck zur Modulwahl</button></div>);}
             // ===== PHASE 2: PDF-NAHE STARTSEITE (Alles IN der PDF-Seite editierbar) =====
-            if(phase==='startseite'){var tpLabel=rechnungsTyp==='abschlag'?abschlagNr+'. Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag Nr. '+nachtragsNr:rechnungsTyp==='angebot'?'Angebot Nr. '+angebotsNr:'Einzelrechnung';
+            if(phase==='startseite'){var tpLabel=rechnungsTyp==='abschlag'?abschlagNr+'. Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag Nr. '+nachtragsNr:rechnungsTyp==='angebot'?'Angebot Nr. '+angebotsNr:rechnungsTyp==='aufmass'?'Aufmass Nr. '+aufmassNr:'Einzelrechnung';
             // Editierbare Input-Styles fuer weissen Hintergrund
             var pdfInput={padding:'4px 6px',borderRadius:'4px',border:'1px solid #ccc',background:'#fafafa',fontSize:'10px',color:'#222',boxSizing:'border-box',width:'100%',fontFamily:'"Source Sans 3",sans-serif'};
             var pdfInputSm=Object.assign({},pdfInput,{fontSize:'9px',padding:'3px 5px'});
@@ -452,6 +580,10 @@
                     {rechnungsTyp==='angebot' && <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                         <span style={{display:'inline-block',width:'38mm',color:'#888',flexShrink:0}}>Angebots-Nr.:</span>
                         <input type="text" value={angebotsNr} onChange={function(e){setAngebotsNr(e.target.value);}} style={Object.assign({},pdfInputSm,{flex:1,fontWeight:600})} />
+                    </div>}
+                    {rechnungsTyp==='aufmass' && <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
+                        <span style={{display:'inline-block',width:'38mm',color:'#888',flexShrink:0}}>Aufmass-Nr.:</span>
+                        <input type="text" value={aufmassNr} onChange={function(e){setAufmassNr(e.target.value);}} style={Object.assign({},pdfInputSm,{flex:1,fontWeight:600})} />
                     </div>}
                     <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                         <span style={{display:'inline-block',width:'38mm',color:'#888',flexShrink:0}}>Auftragsnummer:</span>

@@ -12,6 +12,7 @@
             const [gesamtliste, setGesamtliste] = useState([]);
             const [showGesamtliste, setShowGesamtliste] = useState(false);
             const [aufmassGespeichert, setAufmassGespeichert] = useState(false);
+            const [rechnungsVorwahl, setRechnungsVorwahl] = useState(null);
             const [history, setHistory] = useState(['start']);
             const [historyIdx, setHistoryIdx] = useState(0);
             // ── Google Drive State ──
@@ -1393,7 +1394,10 @@
             };
 
             const handleAufmassBeenden = () => {
-                setShowGesamtliste(true);
+                setAufmassGespeichert(true);
+                setShowGesamtliste(false);
+                setRechnungsVorwahl('aufmass');
+                navigateTo('rechnung');
             };
 
             // ═══ Raum aus Gesamtliste wieder bearbeiten ═══
@@ -1699,7 +1703,7 @@
                     case 'raumblatt':
                         return <Raumblatt kunde={selectedKunde} raum={selectedRaum} onFinishRaum={handleFinishRaum} onBack={handleBackToRaumerkennung} selectedPositions={selectedPositions} lastRaumData={lastRaumData} gesamtliste={gesamtliste} onShowGesamtliste={() => setShowGesamtliste(true)} onAufmassBeenden={handleAufmassBeenden} />;
                     case 'rechnung':
-                        return <RechnungsModul kunde={selectedKunde} importResult={importResult} gesamtliste={gesamtliste} aufmassGespeichert={aufmassGespeichert} onBack={() => navigateTo('modulwahl')} />;
+                        return <RechnungsModul kunde={selectedKunde} importResult={importResult} gesamtliste={gesamtliste} aufmassGespeichert={aufmassGespeichert} vorwahlTyp={rechnungsVorwahl} onVorwahlUsed={function(){setRechnungsVorwahl(null);}} onBack={() => navigateTo('modulwahl')} />;
                     case 'ausgangsbuch':
                         return <RechnungsAusgangsbuch kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
                     case 'schriftverkehr':

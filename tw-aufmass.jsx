@@ -3278,14 +3278,14 @@
                         </button>
                     )}
 
-                    {/* SECONDARY: Direkt Aufmaß starten */}
+                    {/* SECONDARY: Direkt Aufmass starten */}
                     <button onClick={onStartAufmass} style={{
                         width:'100%', padding:'12px', borderRadius:'12px', border:'1px solid rgba(30,136,229,0.3)', cursor:'pointer',
                         background:'transparent',
                         color:'var(--accent-blue)', fontSize:'13px', fontWeight:'600',
                         display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
                     }}>
-                        📐 Direkt Aufmaß starten
+                        📐 Direkt Aufmass starten
                     </button>
                 </div>
             );
@@ -3686,7 +3686,7 @@
                     {erkannteRaeume.length > 0 && (
                         <div className="raumerkennung-info">
                             <span style={{fontSize:'18px'}}>🔍</span>
-                            <span><strong>{erkannteRaeume.length} Räume</strong> erkannt – Raum antippen → Positionen auswählen → Aufmaß starten</span>
+                            <span><strong>{erkannteRaeume.length} Räume</strong> erkannt – Raum antippen → Positionen auswählen → Aufmass starten</span>
                         </div>
                     )}
 
@@ -4358,11 +4358,11 @@
 
                             <div className="pos-modal-footer" style={{flexDirection:'column', gap:'8px'}}>
                                 {!lastRaumData ? (
-                                    /* ═══ ERSTER RAUM → "Beginn des Aufmaßes" ═══ */
+                                    /* ═══ ERSTER RAUM → "Beginn des Aufmasses" ═══ */
                                     <button className="modal-btn primary" style={{width:'100%', padding:'14px 20px', fontSize:'15px', opacity: selectedPositions.length === 0 ? 0.4 : 1}}
                                         disabled={selectedPositions.length === 0}
                                         onClick={handleWeiterZumRaumblatt}>
-                                        <span style={{display:'block', fontWeight:700}}>🏗️ Beginn des Aufmaßes</span>
+                                        <span style={{display:'block', fontWeight:700}}>🏗️ Beginn des Aufmasses</span>
                                         <span style={{display:'block', fontSize:'12px', opacity:0.85, marginTop:'3px'}}>
                                             {selectedPositions.length > 0
                                                 ? `${selectedPositions.length} Position${selectedPositions.length > 1 ? 'en' : ''} – Raumblatt öffnen`
@@ -4457,7 +4457,7 @@
                     if (el.tagName !== 'INPUT' && el.tagName !== 'SELECT') return;
                     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') return;
                     // Finde Container: Modal > Oeffnung > Masse-Section > Raumblatt
-                    const container = el.closest('.modal-overlay') || el.closest('.modal') || el.closest('.oeffnung-body') || el.closest('.rw-modal-body') || el.closest('.page-container');
+                    const container = el.closest('.modal-overlay') || el.closest('.modal') || el.closest('.oeffnung-body') || el.closest('.rw-modal-body') || el.closest('.masse-section') || el.closest('.raumblatt-content') || el.closest('.page-container');
                     if (!container) return;
                     const allInputs = [...container.querySelectorAll(inputSelector)].filter(inp => inp.offsetParent !== null || inp.offsetWidth > 0);
                     const idx = allInputs.indexOf(el);
@@ -5309,7 +5309,7 @@
                     }
 
                     // Nächstes Feld -- erst .masse-input im Container, dann beliebiges sichtbares Input
-                    const container = el.closest('.oeffnung-body') || el.closest('.page-container');
+                    const container = el.closest('.masse-section') || el.closest('.raumblatt-content') || el.closest('.page-container');
                     if (container) {
                         const masseInputs = [...container.querySelectorAll('.masse-input')];
                         const idx = masseInputs.indexOf(el);
@@ -8805,13 +8805,8 @@
                                                 onBlur={function() {
                                                     setWandMasse(function(prev) {
                                                         return prev.map(function(ww, i) {
-                                                            if (i === idx) {
-                                                                if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
-                                                                return ww;
-                                                            }
-                                                            if (masseKopieren && ((idx === 0 && i === 2) || (idx === 1 && i === 3))) {
-                                                                if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
-                                                            }
+                                                            if (i !== idx) return ww;
+                                                            if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
                                                             return ww;
                                                         });
                                                     });
@@ -10851,7 +10846,7 @@
                             <span className="btn-icon">✅</span>
                             <span className="btn-text">
                                 Raumblatt fertiggestellt
-                                <span className="btn-sub">Aufmasz vom Raumblatt erstellt und abgespeichert - Naechster Raum</span>
+                                <span className="btn-sub">Aufmass vom Raumblatt erstellt und abgespeichert - Naechster Raum</span>
                             </span>
                         </button>
 
@@ -10864,7 +10859,7 @@
                             </span>
                         </button>
 
-                        {/* Aufmasz fertigstellen (gesamt) */}
+                        {/* Aufmass fertigstellen (gesamt) */}
                         <button className="raum-action-btn complete" onClick={() => handleFinishRaumValidated(() => {
                             // Erst aktuellen Raum fertigstellen
                             const tuerenEntries = tueren.length > 0 ? tueren.map(t => ({...t})) : null;
@@ -10921,7 +10916,7 @@
                                 kiFotoErgebnisse: kiFotoErgebnisse
                             };
                             const raumName = (raum && raum.name) || (raum && raum.nr) || 'Raum';
-                            // Aktuellen Raum speichern UND dann Aufmaß beenden
+                            // Aktuellen Raum speichern UND dann Aufmass beenden
                             onFinishRaum((raum && raum.nr), {
                                 raumName,
                                 positionen: positionenMitErgebnis,
@@ -10933,13 +10928,13 @@
                                 fliesenDeckenhoch, abdichtungDeckenhoch,
                                 bodenPlusTuerlaibung
                             });
-                            // Aufmaß beenden wird nach dem State-Update ausgelöst
+                            // Aufmass beenden wird nach dem State-Update ausgelöst
                             setTimeout(() => onAufmassBeenden && onAufmassBeenden(), 100);
                         })}>
                             <span className="btn-icon">📦</span>
                             <span className="btn-text">
-                                Aufmasz fertigstellen
-                                <span className="btn-sub">Letztes Raumblatt speichern - Gesamtliste - Export nach Google Drive</span>
+                                Aufmass fertigstellen
+                                <span className="btn-sub">Letztes Raumblatt speichern - Weiter zum Rechnungsmodul</span>
                             </span>
                         </button>
 
@@ -11754,7 +11749,7 @@
                     {/* ═══ HEADER ═══ */}
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
                         <div>
-                            <h2 style={{margin:0, fontSize:'20px', color:'var(--text-white)'}}>📋 Gesamtliste – Aufmaß</h2>
+                            <h2 style={{margin:0, fontSize:'20px', color:'var(--text-white)'}}>📋 Gesamtliste – Aufmass</h2>
                             <div style={{fontSize:'13px', color:'var(--text-muted)', marginTop:'4px'}}>
                                 {gesamtliste.length} {gesamtliste.length === 1 ? 'Raum' : 'Räume'} aufgemessen
                                 {kunde && ` -- ${kunde.name || ''}`}
@@ -11934,7 +11929,7 @@
                         <button className="gl-export-btn" onClick={handleExport} disabled={exportInProgress}>
                             {exportInProgress
                                 ? (driveUploadStatus === 'uploading' ? '⏳ Upload auf Google Drive...' : '⏳ Export läuft...')
-                                : '📦 Aufmaß endgültig fertigstellen'}
+                                : '📦 Aufmass endgültig fertigstellen'}
                             <div style={{fontSize:'11px', fontWeight:400, marginTop:'4px', opacity:0.8}}>
                                 PDF + Excel erstellen · {gesamtliste.length} Raumblätter{isDriveMode ? ' · Upload auf Google Drive' : ''} · Gesamtmassen
                             </div>
@@ -11952,7 +11947,7 @@
                             <div style={{textAlign:'center', padding:'14px', marginTop:'8px', background:'rgba(39,174,96,0.08)', borderRadius:'10px', border:'1px solid rgba(39,174,96,0.25)'}}>
                                 <div style={{color:'#27ae60', fontWeight:700, fontSize:'14px'}}>☁️ Google Drive – Gespeichert!</div>
                                 <div style={{color:'var(--text-muted)', fontSize:'12px', marginTop:'4px'}}>
-                                    Dateien im Kundenordner unter "Aufmaß" abgelegt
+                                    Dateien im Kundenordner unter "Aufmass" abgelegt
                                 </div>
                                 {driveUploadResults.map(function(r, i) {
                                     return React.createElement('div', { key: i, style: {fontSize:'11px', color:'var(--text-light)', marginTop:'3px'} },
@@ -11972,7 +11967,7 @@
                         <button className="gl-back-btn" onClick={onClose}>
                             ◀ Zurück zur Bearbeitung
                             <div style={{fontSize:'11px', fontWeight:400, marginTop:'2px'}}>
-                                Aufmaß weiter bearbeiten · Räume hinzufügen · Werte ändern
+                                Aufmass weiter bearbeiten · Räume hinzufügen · Werte ändern
                             </div>
                         </button>
 
