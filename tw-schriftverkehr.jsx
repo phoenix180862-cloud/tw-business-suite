@@ -5,7 +5,14 @@
 
             // Formular-State
             const [empfaenger, setEmpfaenger] = useState(kunde ? (kunde.auftraggeber || kunde.name || '') : '');
-            const [empfAdresse, setEmpfAdresse] = useState(kunde ? (kunde.ag_adresse || kunde.adresse || '') : '');
+            const [empfAdresse, setEmpfAdresse] = useState(function() {
+                if (!kunde) return '';
+                // Separate Felder haben Vorrang
+                var str = kunde.auftraggeber_strasse || '';
+                var plz = kunde.auftraggeber_plzOrt || '';
+                if (str || plz) return (str + (str && plz ? ', ' : '') + plz).trim();
+                return kunde.ag_adresse || kunde.adresse || '';
+            });
             const [empfEmail, setEmpfEmail] = useState(kunde ? (kunde.ag_email || '') : '');
             const [bauvorhaben, setBauvorhaben] = useState(kunde ? (kunde.adresse || kunde.baumassnahme || kunde.name || '') : '');
             const [ihrZeichen, setIhrZeichen] = useState('');
@@ -84,7 +91,7 @@
                 if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});} }
 
                 var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + betreff + '</title>';
-                h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">';
+                h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=block" rel="stylesheet">';
                 h += '<style>';
                 h += '@page{size:A4;margin:0}';
                 h += '*{box-sizing:border-box;margin:0;padding:0}';
@@ -95,7 +102,7 @@
                 h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}';
                 h += '.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
                 h += '.lt{font-family:"Source Sans 3",serif;font-style:italic;font-weight:700;color:#c41e1e;font-size:13px;margin-bottom:-14px;padding-left:1px;position:relative;z-index:2}';
-                h += '.lw{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1}';
+                h += '.lw{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1;-webkit-text-stroke:0.4px #111}';
                 h += '.lw .w{font-size:52px}.lw .iw{position:relative;font-size:52px;display:inline-block}';
                 h += '.lw .iw .ic{font-size:52px;color:#111}.lw .iw .id{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:#c41e1e}';
                 h += '.lw .ll{font-size:68px;letter-spacing:1px;line-height:0.75}.lw .wa{font-size:52px}';
@@ -160,6 +167,7 @@
                 h += '<div>Flurweg 14a \u00b7 56472 Nisterau \u00b7 Tel. 02661-63101 \u00b7 Mobil 0170-2024161</div>';
                 h += '<div>Steuernummer: 30/220/1234/5 \u00b7 Westerwald Bank eG \u00b7 IBAN: DE12 5739 1800 0000 0000 00 \u00b7 BIC: GENODE51WW1</div></div>';
 
+                h += '<script>document.fonts.ready.then(function(){setTimeout(function(){window.focus();window.print();},400);});<\/script>';
                 h += '</div></body></html>';
                 return h;
             };
@@ -170,7 +178,6 @@
                 var pw = window.open('', '_blank', 'width=820,height=1160');
                 pw.document.write(h);
                 pw.document.close();
-                setTimeout(function() { pw.focus(); pw.print(); }, 800);
             };
 
             // ── Gmail-API Versand (direkt!) ──

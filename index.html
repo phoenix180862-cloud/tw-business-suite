@@ -2556,8 +2556,9 @@
 
 
     <div id="root"></div>
+
     <script type="text/babel">
-        /* ========== tw-shared-components.jsx ========== */
+
         const { useState, useEffect, useCallback, useRef } = React;
 
         /* ═══════════════════════════════════════════
@@ -3428,7 +3429,6 @@
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
 
-        /* ========== tw-aufmass.jsx ========== */
         function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl, onDriveStatusChange }) {
             // ── State ──
             const [geminiConnected, setGeminiConnected] = useState(false);
@@ -15417,102 +15417,48 @@
             );
         }
 
-        /* ========== tw-modulwahl.jsx ========== */
         function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta, onDatenBearbeiten, onOrdnerBrowser }) {
-            var module = [
-                { id: 'aufmass', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
-                { id: 'rechnung', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', gradient: 'linear-gradient(135deg, #27ae60, #1e8449)', shadow: 'rgba(39,174,96,0.30)', ready: true },
-                { id: 'ausgangsbuch', name: 'Rechnungs-Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', gradient: 'linear-gradient(135deg, #e67e22, #d35400)', shadow: 'rgba(230,126,34,0.30)', ready: true },
-                { id: 'schriftverkehr', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', gradient: 'linear-gradient(135deg, #8e44ad, #6c3483)', shadow: 'rgba(142,68,173,0.30)', ready: true },
-                { id: 'baustelle', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', gradient: 'linear-gradient(135deg, #e63535, #c41e1e)', shadow: 'rgba(196,30,30,0.30)', ready: true },
+            const module = [
+                { id: 'aufmass', icon: '\uD83D\uDCD0', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', color: 'var(--accent-blue)', ready: true },
+                { id: 'rechnung', icon: '\uD83D\uDCB6', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', color: 'var(--success)', ready: true },
+                { id: 'ausgangsbuch', icon: '\uD83D\uDCD2', name: 'Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', color: 'var(--accent-orange)', ready: true },
+                { id: 'schriftverkehr', icon: '\u2709\uFE0F', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', color: '#8e44ad', ready: true },
+                { id: 'baustelle', icon: '\uD83D\uDCF1', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', color: 'var(--accent-red-light)', ready: true },
             ];
-            var renderIcon = function(id) {
-                var s = {width:'32px',height:'32px',flexShrink:0};
-                if (id === 'aufmass') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
-                    React.createElement('rect',{x:'4',y:'4',width:'24',height:'24',rx:'3',stroke:'white',strokeWidth:'2',fill:'none'}),
-                    React.createElement('line',{x1:'4',y1:'16',x2:'28',y2:'16',stroke:'white',strokeWidth:'1.5',strokeDasharray:'3 2'}),
-                    React.createElement('line',{x1:'16',y1:'4',x2:'16',y2:'28',stroke:'white',strokeWidth:'1.5',strokeDasharray:'3 2'}),
-                    React.createElement('path',{d:'M6 26L26 6',stroke:'rgba(255,255,255,0.6)',strokeWidth:'1.5'}),
-                    React.createElement('circle',{cx:'8',cy:'8',r:'2',fill:'white'}),
-                    React.createElement('circle',{cx:'24',cy:'24',r:'2',fill:'white'})
-                );
-                if (id === 'rechnung') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
-                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2',fill:'none'}),
-                    React.createElement('line',{x1:'10',y1:'10',x2:'22',y2:'10',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'14',x2:'22',y2:'14',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'18',x2:'18',y2:'18',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('text',{x:'16',y:'26',fill:'white',fontSize:'9',fontWeight:'700',textAnchor:'middle',fontFamily:'Oswald, sans-serif'},'\u20AC')
-                );
-                if (id === 'ausgangsbuch') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
-                    React.createElement('rect',{x:'5',y:'4',width:'22',height:'24',rx:'2',stroke:'white',strokeWidth:'2',fill:'none'}),
-                    React.createElement('rect',{x:'3',y:'4',width:'4',height:'24',rx:'1',fill:'rgba(255,255,255,0.3)'}),
-                    React.createElement('line',{x1:'10',y1:'10',x2:'24',y2:'10',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'14',x2:'24',y2:'14',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'18',x2:'20',y2:'18',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'22',x2:'22',y2:'22',stroke:'white',strokeWidth:'1.5'})
-                );
-                if (id === 'schriftverkehr') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
-                    React.createElement('rect',{x:'3',y:'8',width:'26',height:'18',rx:'2',stroke:'white',strokeWidth:'2',fill:'none'}),
-                    React.createElement('path',{d:'M3 10L16 19L29 10',stroke:'white',strokeWidth:'2',fill:'none'}),
-                    React.createElement('line',{x1:'3',y1:'26',x2:'12',y2:'18',stroke:'rgba(255,255,255,0.4)',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'29',y1:'26',x2:'20',y2:'18',stroke:'rgba(255,255,255,0.4)',strokeWidth:'1.5'})
-                );
-                if (id === 'baustelle') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
-                    React.createElement('rect',{x:'8',y:'4',width:'16',height:'24',rx:'3',stroke:'white',strokeWidth:'2',fill:'none'}),
-                    React.createElement('line',{x1:'8',y1:'8',x2:'24',y2:'8',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'8',y1:'24',x2:'24',y2:'24',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('circle',{cx:'16',cy:'26',r:'1.5',fill:'white'}),
-                    React.createElement('rect',{x:'11',y:'12',width:'10',height:'8',rx:'1',stroke:'rgba(255,255,255,0.6)',strokeWidth:'1',fill:'none'}),
-                    React.createElement('line',{x1:'13',y1:'15',x2:'19',y2:'15',stroke:'rgba(255,255,255,0.5)',strokeWidth:'1'}),
-                    React.createElement('line',{x1:'13',y1:'17',x2:'17',y2:'17',stroke:'rgba(255,255,255,0.5)',strokeWidth:'1'})
-                );
-                return null;
-            };
             return (
                 <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
-                    <div style={{textAlign:'center', marginBottom:'24px'}}>
+                    <div style={{textAlign:'center', marginBottom:'20px'}}>
                         <FirmenLogo size="small" />
-                        <div style={{marginTop:'12px', fontSize:'17px', fontWeight:'700', color:'var(--text-white)', fontFamily:'Oswald, sans-serif', letterSpacing:'0.5px'}}>
+                        <div style={{marginTop:'12px', fontSize:'15px', fontWeight:'600', color:'var(--text-primary)', fontFamily:'Oswald, sans-serif'}}>
                             {kunde ? kunde.name : 'Kunde'}
                         </div>
-                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'2px', textTransform:'uppercase', fontFamily:'Oswald, sans-serif', fontWeight:'500'}}>
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'1.5px', textTransform:'uppercase', fontFamily:'Oswald, sans-serif', fontWeight:'500'}}>
                             Modul w\u00e4hlen
                         </div>
                     </div>
 
-                    <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                    {/* Modul-Kacheln */}
+                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'}}>
                         {module.map(function(m) {
                             return (
                                 <button key={m.id} onClick={function() { if (m.ready) onSelectModul(m.id); }}
                                     style={{
-                                        width:'100%',
-                                        padding:'18px 16px',
-                                        borderRadius:'var(--radius-lg)',
-                                        border:'1px solid transparent',
-                                        cursor: m.ready ? 'pointer' : 'not-allowed',
-                                        background: m.ready ? m.gradient : 'var(--bg-secondary)',
-                                        color: m.ready ? '#fff' : 'var(--text-muted)',
+                                        padding:'20px 14px', borderRadius:'var(--radius-lg)', border:'1px solid var(--border-color)', cursor: m.ready ? 'pointer' : 'default',
+                                        background: m.ready ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
                                         opacity: m.ready ? 1 : 0.4,
-                                        display:'flex',
-                                        alignItems:'center',
-                                        gap:'14px',
-                                        textAlign:'left',
-                                        boxShadow: m.ready ? ('0 6px 20px ' + m.shadow) : 'none',
+                                        display:'flex', flexDirection:'column', alignItems:'center', gap:'8px',
+                                        boxShadow: m.ready ? 'var(--shadow-md)' : 'none',
                                         transition:'all 0.25s ease',
-                                        position:'relative',
-                                        overflow:'hidden',
-                                        touchAction:'manipulation',
+                                        position:'relative'
                                     }}>
-                                    {renderIcon(m.id)}
-                                    <div style={{flex:1}}>
-                                        <div style={{fontSize:'16px', fontWeight:'600', marginBottom:'3px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                            {m.name}
-                                        </div>
-                                        <div style={{fontSize:'12px', opacity:0.85, lineHeight:'1.4', fontFamily:'Source Sans 3, sans-serif'}}>
-                                            {m.desc}
-                                        </div>
-                                    </div>
-                                    <span style={{fontSize:'20px', opacity:0.7}}>{'\u2192'}</span>
+                                    <span style={{fontSize:'32px'}}>{m.icon}</span>
+                                    <span style={{fontSize:'14px', fontWeight:'600', color: m.ready ? m.color : 'var(--text-muted)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>{m.name}</span>
+                                    <span style={{fontSize:'10px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.3', fontFamily:'Source Sans 3, sans-serif'}}>{m.desc}</span>
+                                    {!m.ready && (
+                                        <span style={{position:'absolute', top:'8px', right:'8px', fontSize:'9px', background:'rgba(196,30,30,0.12)', color:'var(--accent-red-light)', padding:'2px 6px', borderRadius:'var(--radius-sm)', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                            BALD
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}
@@ -15529,9 +15475,10 @@
             return (
                 <div className="modal-overlay" style={{zIndex:5000, background:'rgba(10,15,25,0.95)', display:'flex', alignItems:'center', justifyContent:'center'}}>
                     <div style={{width:'90%', maxWidth:'400px', textAlign:'center', color:'white'}}>
-                        <div style={{fontSize:'48px', marginBottom:'16px'}}>&#129302;</div>
+                        <div style={{fontSize:'48px', marginBottom:'16px'}}>🤖</div>
                         <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px'}}>KI-Analyse l\u00e4uft...</div>
 
+                        {/* Fortschrittsbalken */}
                         <div style={{width:'100%', height:'8px', background:'rgba(255,255,255,0.1)', borderRadius:'4px', overflow:'hidden', marginBottom:'12px'}}>
                             <div style={{width: pct + '%', height:'100%', background:'linear-gradient(90deg, var(--accent-blue), var(--accent-orange))', borderRadius:'4px', transition:'width 0.5s ease'}}></div>
                         </div>
@@ -15540,12 +15487,13 @@
                         </div>
                         <div style={{fontSize:'13px', fontWeight:'600', marginBottom:'12px'}}>{pct}%</div>
 
+                        {/* Detail-Liste */}
                         {details && details.length > 0 && (
                             <div style={{textAlign:'left', fontSize:'12px', lineHeight:'1.8'}}>
                                 {details.map(function(d, i) {
                                     return (
                                         <div key={i} style={{color: d.done ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.9)'}}>
-                                            {d.done ? '\u2705' : '\u23F3'} {d.text}
+                                            {d.done ? '✅' : '⏳'} {d.text}
                                         </div>
                                     );
                                 })}
@@ -15555,6 +15503,10 @@
                 </div>
             );
         }
+
+        /* ═══════════════════════════════════════════
+           KI-AKTE ANSICHT -- Zentrale Analyseergebnisse
+           ═══════════════════════════════════════════ */
         function KiAkteView({ kiAkte, kunde, onClose, onNeuAnalyse }) {
             const [activeTab, setActiveTab] = useState('positionen');
             if (!kiAkte || !kiAkte.meta) {
@@ -16140,244 +16092,6 @@
            §14 UStG konform · Abschlag/Schluss/Nachtrag/Stundenlohn/Einzelrechnung
            ═══════════════════════════════════════════ */
 
-        /* ========== tw-daten-uebersicht.jsx ========== */
-        /* DatenUebersicht v4 — kunde._importResult als Fallback */
-        function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen, onGoToOrdner }) {
-            var ir = importResult || (kunde && kunde._importResult) || {};
-            var kd = ir.kundendaten || {};
-            var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
-            var [activeTab, setActiveTab] = useState('stammdaten');
-            var [editMode, setEditMode] = useState(false);
-            var [savedMsg, setSavedMsg] = useState('');
-            var bauherr = stamm.bauherr || {};
-            var bauleiter = stamm.bauleiter || {};
-            var architekt = stamm.architekt || {};
-            var objekt = stamm.objektdaten || {};
-            var [stammFelder, setStammFelder] = useState({
-                projekt: stamm.projekt || kd.projekt || '',
-                bauherr_firma: bauherr.firma || kd.auftraggeber || '',
-                bauherr_strasse: bauherr.strasse || kd.auftraggeber_strasse || '',
-                bauherr_plzOrt: (bauherr.plzOrt || ((bauherr.plz || '') + ' ' + (bauherr.ort || '')).trim()) || '',
-                bauherr_ansprechpartner: bauherr.ansprechpartner || kd.auftraggeber_ansprechpartner || '',
-                bauherr_telefon: bauherr.telefon || kd.auftraggeber_telefon || '',
-                bauherr_email: bauherr.email || kd.auftraggeber_email || '',
-                bauleiter_firma: bauleiter.firma || bauleiter.name || kd.bauleitung || '',
-                bauleiter_telefon: bauleiter.telefon || kd.bauleitung_telefon || '',
-                bauleiter_email: bauleiter.email || kd.bauleitung_email || '',
-                architekt_buero: architekt.buero || kd.architekt || '',
-                architekt_bearbeiter: architekt.projektbearbeiter || kd.architekt_bearbeiter || '',
-                architekt_telefon: architekt.telefon || kd.architekt_telefon || '',
-                architekt_email: architekt.emailInhaber || architekt.emailBearbeiter || kd.architekt_email || '',
-                objekt_bauvorhaben: objekt.bauvorhaben || kd.baumassnahme || '',
-                objekt_baustelle: objekt.baustelleStrasse || kd.adresse || '',
-                objekt_plzOrt: objekt.baustellePlzOrt || kd.plzOrt || '',
-                objekt_gewerk: objekt.gewerk || kd.gewerk || 'Fliesenarbeiten',
-                objekt_auftragsdatum: objekt.auftragsdatum || kd.auftragsdatum || '',
-                objekt_netto: objekt.auftragssummeNetto || kd.auftragssummeNetto || '',
-                objekt_brutto: objekt.auftragssummeBrutto || kd.auftragssummeBrutto || '',
-            });
-            var allPos = (ir.positionen || (kunde && kunde._lvPositionen) || []);
-            var [positionen, setPositionen] = useState(allPos.map(function(p, idx) {
-                return { _idx: idx, pos: p.pos || '', bez: p.bez || '', einheit: p.einheit || 'm\u00b2', menge: p.menge || 0, einzelpreis: p.einzelpreis || 0, kategorie: p.kategorie || '', _istNachtrag: p._istNachtrag || false };
-            }));
-            var allRaeume = (ir.raeume || (kunde && kunde._raeume) || []);
-            var [raeume, setRaeume] = useState(allRaeume.map(function(r, idx) {
-                return { _idx: idx, nr: r.nr || '', bez: r.bez || '', geschoss: r.geschoss || '', flaeche: r.flaeche || 0, umfang: r.umfang || 0, bemerkung: r.bemerkung || '' };
-            }));
-            var tap = function(fn) { return { onTouchEnd: function(e){ e.preventDefault(); e.stopPropagation(); fn(); }, onClick: function(){ fn(); } }; };
-            var touchBase = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
-            var fmtZahl = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
-            var fmtEuro = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20ac'; };
-
-            // CRUD
-            var updateStammFeld = function(key, val) { setStammFelder(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
-            var updatePosition = function(idx, field, val) { setPositionen(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
-            var addPosition = function() { setPositionen(function(prev) { return prev.concat([{ _idx: prev.length, pos: '', bez: '', einheit: 'm\u00b2', menge: 0, einzelpreis: 0, kategorie: '', _istNachtrag: false }]); }); };
-            var removePosition = function(idx) { if (!confirm('Position ' + (positionen[idx].pos || idx+1) + ' loeschen?')) return; setPositionen(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
-            var updateRaum = function(idx, field, val) { setRaeume(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
-            var addRaum = function() { setRaeume(function(prev) { return prev.concat([{ _idx: prev.length, nr: '', bez: '', geschoss: 'EG', flaeche: 0, umfang: 0, bemerkung: '' }]); }); };
-            var removeRaum = function(idx) { if (!confirm('Raum ' + (raeume[idx].nr || idx+1) + ' loeschen?')) return; setRaeume(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
-
-            // Speichern OHNE Navigation
-            var handleSave = function() {
-                setEditMode(false);
-                if (onSave) { onSave({ stammFelder: stammFelder, positionen: positionen, raeume: raeume }); }
-                setSavedMsg('Daten gespeichert und in Module geladen!');
-                setTimeout(function() { setSavedMsg(''); setActiveTab('stammdaten'); }, 2000);
-            };
-
-            // ── Spracheingabe (globaler Service) ──
-            var activeMic = useSpeech();
-            var startSpeech = function(fieldKey, callback) {
-                TWSpeechService.start(fieldKey, callback);
-            };
-
-            // ── Zahl-Input: type=text, beim Focus leeren wenn 0, beim Blur formatieren ──
-            var zahlInput = function(value, onChange, extra) {
-                return React.createElement('input', Object.assign({
-                    type: 'text',
-                    inputMode: 'decimal',
-                    defaultValue: (parseFloat(value) || 0) === 0 ? '' : fmtZahl(value),
-                    onFocus: function(e) {
-                        var v = parseFloat(value) || 0;
-                        if (v === 0) { e.target.value = ''; }
-                        else { e.target.value = String(v).replace('.', ','); }
-                        setTimeout(function() { try { e.target.select(); } catch(x){} }, 50);
-                    },
-                    onBlur: function(e) {
-                        var parsed = parseFloat(e.target.value.replace(/\s/g, '').replace(',', '.')) || 0;
-                        e.target.value = parsed === 0 ? '' : fmtZahl(parsed);
-                        onChange(parsed);
-                    },
-                    style: Object.assign({ width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', textAlign:'right', color:'var(--text-primary)', boxSizing:'border-box' }, extra || {})
-                }));
-            };
-
-            var tabs = [
-                { id: 'stammdaten', label: 'Kundendaten', icon: '\uD83D\uDCCB', count: null },
-                { id: 'positionen', label: 'Positionen', icon: '\uD83D\uDCCE', count: positionen.length },
-                { id: 'raeume', label: 'Raeume', icon: '\uD83C\uDFE0', count: raeume.length }
-            ];
-            var inputStyle = function(extra) { return Object.assign({ width:'100%', padding:'8px 10px', borderRadius:'8px', fontSize:'13px', color:'var(--text-primary)', boxSizing:'border-box', background: editMode ? 'var(--bg-tertiary)' : 'var(--bg-secondary)', border: editMode ? '2px solid var(--accent-blue)' : '1px solid var(--border-color)', opacity: editMode ? 1 : 0.8 }, extra || {}); };
-
-            // ── Stammdaten-Sektion mit Sprache ──
-            var sectionCard = function(icon, title, fields) {
-                return (
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'12px', border:'1px solid var(--border-color)'}}>
-                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
-                            <span style={{fontSize:'18px'}}>{icon}</span> {title}
-                        </div>
-                        <div style={{display:'grid', gap:'8px'}}>
-                            {fields.map(function(f) { return (
-                                <div key={f[0]}>
-                                    <MicLabel fieldKey={'du_' + f[0]} label={f[1]} />
-                                    <div style={{display:'flex', gap:'4px'}}>
-                                        <MicInput fieldKey={'du_' + f[0]} value={stammFelder[f[0]] || ''} readOnly={!editMode} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={inputStyle({flex:1})} />
-                                        {editMode && (
-                                            <MicButton fieldKey={'du_' + f[0]} size="normal" onResult={function(text){ updateStammFeld(f[0], (stammFelder[f[0]] || '') + (stammFelder[f[0]] ? ' ' : '') + text); }} />
-                                        )}
-                                    </div>
-                                </div>
-                            ); })}
-                        </div>
-                    </div>
-                );
-            };
-            var cellEdit = function(val, onChange, extra) { return <input value={val} onChange={onChange} style={Object.assign({width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}, extra || {})} />; };
-
-            return (
-                <div style={{padding:'12px 16px', minHeight:'100vh', background:'var(--bg-primary)', paddingBottom:'180px'}}>
-                    <div style={{textAlign:'center', marginBottom:'16px'}}>
-                        <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>{stammFelder.bauherr_firma || (kunde && kunde.name) || 'Kundendaten'}</div>
-                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{stammFelder.objekt_bauvorhaben || 'Projekt'}</div>
-                    </div>
-                    {savedMsg && (<div style={{padding:'10px 16px', background:'rgba(30,136,229,0.12)', border:'1px solid rgba(30,136,229,0.3)', borderRadius:'10px', marginBottom:'12px', fontSize:'13px', color:'#1E88E5', fontWeight:'600', textAlign:'center'}}>{savedMsg}</div>)}
-                    <div style={{display:'flex', gap:'4px', marginBottom:'12px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
-                        {tabs.map(function(tab) { var isActive = activeTab === tab.id; return (
-                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border: isActive ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: isActive ? 'linear-gradient(135deg, #42a5f5, #1E88E5)' : 'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease', boxShadow: isActive ? '0 0 12px rgba(30,136,229,0.5), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', opacity: isActive ? 1 : 0.55, textShadow: isActive ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', transform: isActive ? 'scale(1.04)' : 'scale(1)' }, touchBase)}>
-                                <span style={{fontSize:'16px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
-                                {tab.label}{tab.count !== null && <span style={{marginLeft:'4px', fontSize:'10px', opacity:0.8}}>({tab.count})</span>}
-                            </button>
-                        ); })}
-                    </div>
-                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
-                        {!editMode ? (
-                            <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
-                        ) : (
-                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beenden & Daten in Module laden</button>
-                        )}
-                    </div>
-
-                    {activeTab === 'stammdaten' && (
-                        <div>
-                            {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [['bauherr_firma','Firma / Name'],['bauherr_strasse','Strasse'],['bauherr_plzOrt','PLZ / Ort'],['bauherr_ansprechpartner','Ansprechpartner'],['bauherr_telefon','Telefon'],['bauherr_email','E-Mail']])}
-                            {sectionCard('\uD83D\uDC77', 'Bauleitung', [['bauleiter_firma','Firma / Name'],['bauleiter_telefon','Telefon'],['bauleiter_email','E-Mail']])}
-                            {sectionCard('\uD83D\uDCD0', 'Architekt / Planer', [['architekt_buero','Buero / Firma'],['architekt_bearbeiter','Projektbearbeiter'],['architekt_telefon','Telefon'],['architekt_email','E-Mail']])}
-                            {sectionCard('\uD83C\uDFD7', 'Objektdaten', [['objekt_bauvorhaben','Bauvorhaben'],['objekt_baustelle','Baustellenadresse'],['objekt_plzOrt','PLZ / Ort'],['objekt_gewerk','Gewerk'],['objekt_auftragsdatum','Auftragsdatum'],['objekt_netto','Auftragssumme netto'],['objekt_brutto','Auftragssumme brutto']])}
-                        </div>
-                    )}
-
-                    {activeTab === 'positionen' && (
-                        <div style={{overflowX:'auto'}}>
-                            <div style={{minWidth:'580px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
-                                    <div>Pos-Nr.</div><div style={{textAlign:'right'}}>Menge</div><div style={{textAlign:'center'}}>Einh.</div><div>Leistungsbeschreibung</div><div style={{textAlign:'right'}}>EP netto</div><div style={{textAlign:'right'}}>GP netto</div>
-                                </div>
-                                {positionen.map(function(p, idx) {
-                                    var gp = Math.round((p.menge || 0) * (p.einzelpreis || 0) * 100) / 100;
-                                    return (
-                                        <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '58px 60px 42px 1fr 78px 88px 28px' : '58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: p._istNachtrag ? 'rgba(230,126,34,0.06)' : (idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent'), borderBottom:'1px solid var(--border-color)', borderLeft: p._istNachtrag ? '3px solid #e67e22' : '3px solid transparent'}}>
-                                            {editMode ? cellEdit(p.pos, function(e){updatePosition(idx,'pos',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px', color: p._istNachtrag ? '#e67e22' : 'var(--text-primary)'}}>{p.pos}</div>}
-                                            {editMode ? zahlInput(p.menge, function(v){updatePosition(idx,'menge',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(p.menge)}</div>}
-                                            {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
-                                            {editMode ? (
-                                                <div style={{display:'flex', gap:'2px'}}>
-                                                    <input value={p.bez} onChange={function(e){updatePosition(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
-                                                    <MicButton fieldKey={'pos_bez_' + idx} size="small" onResult={function(text){ updatePosition(idx, 'bez', (p.bez ? p.bez + ' ' : '') + text); }} />
-                                                </div>
-                                            ) : <div style={{fontSize:'11px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.bez}>{p.bez}</div>}
-                                            {editMode ? zahlInput(p.einzelpreis, function(v){updatePosition(idx,'einzelpreis',v);}) : <div style={{textAlign:'right', fontSize:'11px', fontFamily:'monospace'}}>{fmtEuro(p.einzelpreis)}</div>}
-                                            <div style={{textAlign:'right', fontSize:'11px', fontWeight:'600', fontFamily:'monospace'}}>{fmtEuro(gp)}</div>
-                                            {editMode && <button {...tap(function(){removePosition(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
-                                        </div>
-                                    );
-                                })}
-                                {positionen.length > 0 && (
-                                    <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
-                                        <div></div><div></div><div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>SUMME NETTO:</div><div></div>
-                                        <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'13px'}}>{fmtEuro(positionen.reduce(function(s,p){return s+Math.round((p.menge||0)*(p.einzelpreis||0)*100)/100;},0))}</div>
-                                    </div>
-                                )}
-                            </div>
-                            {editMode && <button {...tap(addPosition)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed var(--accent-red)',background:'rgba(196,30,30,0.05)',color:'var(--accent-red-light)',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neue Position</button>}
-                            {positionen.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83D\uDCCE'}</div><div>Keine Positionen</div></div>}
-                        </div>
-                    )}
-
-                    {activeTab === 'raeume' && (
-                        <div style={{overflowX:'auto'}}>
-                            <div style={{minWidth:'420px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'70px 1fr 50px 70px 70px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
-                                    <div>Raum-Nr.</div><div>Bezeichnung</div><div style={{textAlign:'center'}}>Gesch.</div><div style={{textAlign:'right'}}>Flaeche</div><div style={{textAlign:'right'}}>Umfang</div>
-                                </div>
-                                {raeume.map(function(r, idx) { return (
-                                    <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '70px 1fr 50px 70px 70px 28px' : '70px 1fr 50px 70px 70px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent', borderBottom:'1px solid var(--border-color)'}}>
-                                        {editMode ? cellEdit(r.nr, function(e){updateRaum(idx,'nr',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px'}}>{r.nr}</div>}
-                                        {editMode ? (
-                                            <div style={{display:'flex', gap:'2px'}}>
-                                                <input value={r.bez} onChange={function(e){updateRaum(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
-                                                <MicButton fieldKey={'raum_bez_' + idx} size="small" onResult={function(text){ updateRaum(idx, 'bez', (r.bez ? r.bez + ' ' : '') + text); }} />
-                                            </div>
-                                        ) : <div style={{fontSize:'11px'}}>{r.bez}</div>}
-                                        {editMode ? cellEdit(r.geschoss, function(e){updateRaum(idx,'geschoss',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{r.geschoss}</div>}
-                                        {editMode ? zahlInput(r.flaeche, function(v){updateRaum(idx,'flaeche',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(r.flaeche)} m\u00b2</div>}
-                                        {editMode ? zahlInput(r.umfang, function(v){updateRaum(idx,'umfang',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(r.umfang)} m</div>}
-                                        {editMode && <button {...tap(function(){removeRaum(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
-                                    </div>
-                                ); })}
-                                {raeume.length > 0 && (
-                                    <div style={{display:'grid', gridTemplateColumns:'70px 1fr 50px 70px 70px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
-                                        <div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>GESAMT:</div><div></div>
-                                        <div style={{textAlign:'right'}}>{fmtZahl(raeume.reduce(function(s,r){return s+(r.flaeche||0);},0))} m\u00b2</div>
-                                        <div style={{textAlign:'right'}}>{fmtZahl(raeume.reduce(function(s,r){return s+(r.umfang||0);},0))} m</div>
-                                    </div>
-                                )}
-                            </div>
-                            {editMode && <button {...tap(addRaum)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed var(--accent-red)',background:'rgba(196,30,30,0.05)',color:'var(--accent-red-light)',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neuer Raum</button>}
-                            {raeume.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83C\uDFE0'}</div><div>Keine Raeume</div></div>}
-                        </div>
-                    )}
-
-                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
-                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\u2190'} Zurueck</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        /* ========== tw-rechnung.jsx ========== */
         /* =====================================================================
            RECHNUNGSMODUL -- 5 Untermodule, PDF-nahe Startseite
            Skill: SKILL-rechnungsmodul-umbau.md + Thomas 5 Aenderungen
@@ -16409,8 +16123,6 @@
             const [showKontoDialog, setShowKontoDialog] = useState(false);
             const [showFormatWahl, setShowFormatWahl] = useState(false);
             const [showMailDialog, setShowMailDialog] = useState(false);
-            const [showBearbeitenPopup, setShowBearbeitenPopup] = useState(false);
-            const [editMode, setEditMode] = useState(false);
             const [mailAdresse, setMailAdresse] = useState('');
             // Editierbare Adress-States (werden aus Kundendaten initialisiert)
             const [empfName, setEmpfName] = useState('');
@@ -16424,16 +16136,30 @@
                 var n = kunde.auftraggeber || kunde.name || '';
                 if (n.indexOf('Datum') === 0 || n.indexOf('Unterschrift') !== -1) n = kunde.name || '';
                 setEmpfName(n);
-                var ad = kunde.ag_adresse || kunde.adresse || '';
-                if (ad.indexOf('Datum') !== -1) ad = kunde.adresse || '';
-                var lines = [];
-                if (ad) {
-                    var m = ad.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/);
-                    if (m) { lines.push(m[1].trim()); lines.push(m[2].trim()); }
-                    else { ad.split(',').forEach(function(s) { if (s.trim()) lines.push(s.trim()); }); }
+                // Datenquellen: importResult.kundendaten, importResult.stammdaten.bauherr, kunde._stammFelder, kunde direkt
+                var kd = (importResult && importResult.kundendaten) || {};
+                var bh = (importResult && importResult.stammdaten && importResult.stammdaten.bauherr) || {};
+                var sf = kunde._stammFelder || {};
+                // Ansprechpartner
+                var ap = kd.auftraggeber_ansprechpartner || bh.ansprechpartner || sf.bauherr_ansprechpartner || kunde.auftraggeber_ansprechpartner || '';
+                if (ap) setEmpfZusatz('z.Hd. ' + ap);
+                // Strasse: separate Felder haben Vorrang
+                var strasse = kd.auftraggeber_strasse || bh.strasse || sf.bauherr_strasse || kunde.auftraggeber_strasse || '';
+                // PLZ/Ort
+                var plzOrt = kd.auftraggeber_plzOrt || sf.bauherr_plzOrt || kunde.auftraggeber_plzOrt || '';
+                if (!plzOrt && bh.plz) plzOrt = (bh.plz + ' ' + (bh.ort || '')).trim();
+                // Fallback: kombinierte ag_adresse parsen
+                if (!strasse && !plzOrt) {
+                    var ad = kunde.ag_adresse || kunde.adresse || '';
+                    if (ad.indexOf('Datum') !== -1) ad = kunde.adresse || '';
+                    if (ad) {
+                        var m = ad.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/);
+                        if (m) { strasse = m[1].trim(); plzOrt = m[2].trim(); }
+                        else { var parts = []; ad.split(',').forEach(function(s) { if (s.trim()) parts.push(s.trim()); }); strasse = parts[0] || ''; plzOrt = parts[1] || ''; }
+                    }
                 }
-                setEmpfStrasse(lines[0] || '');
-                setEmpfPlzOrt(lines[1] || '');
+                setEmpfStrasse(strasse);
+                setEmpfPlzOrt(plzOrt);
                 setBauvorhabenText(kunde.adresse || kunde.baumassnahme || kunde.name || '');
             }, [kunde]);
             var lvPositionen = [];
@@ -16478,199 +16204,45 @@
             var noSpinnerCSS='<style>input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}input[type=number]{-moz-appearance:textfield;}</style>';
             var inputStyle={width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'13px',color:'var(--text-primary)',boxSizing:'border-box'};
             var smallInputStyle=Object.assign({},inputStyle,{padding:'6px 8px',fontSize:'12px',textAlign:'right'});
-            // ===== PDF-ERZEUGUNG (jspdf-autotable -- sauberer A4-Seitenumbruch) =====
+            // ===== PDF-ERZEUGUNG =====
             var generatePDF=function(){
                 if(istRechnung){try{var abK='tw_ausgangsbuch';var abD=JSON.parse(localStorage.getItem(abK)||'[]');var isDup=abD.some(function(e){return(e.rechnungsNr===rechnungsNr||e.dokumentNr===rechnungsNr)&&e.datum===rechnungsDatum;});if(!isDup&&rechnungsNr){var tL=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':'Rechnung';var zD=new Date(rechnungsDatum);zD.setDate(zD.getDate()+zahlungszielTage);var sF=new Date(rechnungsDatum);sF.setDate(sF.getDate()+skontoTage);abD.push({id:'RE_'+Date.now(),lfdNr:abD.length+1,dokumentNr:rechnungsNr,rechnungsNr:rechnungsNr,dokumentTyp:rechnungsTyp,dokumentLabel:tL,typ:tL,rechnungsTyp:rechnungsTyp,datum:rechnungsDatum,leistungszeitraum:leistungszeitraum,kundeId:kunde._driveFolderId||kunde.id||kunde.name||'',kundeName:kName,kunde:kName,kundeAdresse:kAddr,kundeTyp:'b2b',bauvorhaben:bauvorhaben,auftragsnummer:auftragsnummer,kostenstelle:kostenstelle,nettoBetrag:nettoSumme,mwstSatz:mwstSatz,mwstBetrag:mwstBetrag,bruttoBetrag:bruttoSumme,sicherheitseinbehaltProzent:sicherheitseinbehalt,sicherheitseinbehaltBetrag:sicherheitBetrag,zahlungszielTage:zahlungszielTage,faelligkeitsDatum:zD.toISOString().split('T')[0],zahlungszielDatum:zD.toISOString().split('T')[0],skontoProzent:skontoProzent,skontoTage:skontoTage,skontoBetrag:skontoBetrag,skontoFrist:sF.toISOString().split('T')[0],forderungBrutto:zahlbetragOhneSkonto,forderungMitSkonto:zahlbetragMitSkonto,zahlbetrag:zahlbetragOhneSkonto,anzahlPositionen:aktivePosn.length,abschlagNr:rechnungsTyp==='abschlag'?abschlagNr:null,pdfDateiname:getDateiname(),driveOrdner:'Rechnung-A.Kontozahlung',status:'offen',zahlungen:[],zahlungsSumme:0,restbetrag:zahlbetragOhneSkonto,mahnStufe:0,mahnungen:[],notiz:'',erstelltAm:new Date().toISOString(),geaendertAm:new Date().toISOString()});localStorage.setItem(abK,JSON.stringify(abD));}}catch(e){}}
                 if(rechnungsTyp==='nachtrag')addNachtragsPositionen();
-                var typLabel2=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?('Nachtrag Nr. '+nachtragsNr):rechnungsTyp==='angebot'?('Angebot Nr. '+angebotsNr):'Rechnung';
-                var f2=function(n){return Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});};
-                var doc=new jspdf.jsPDF('p','mm','a4');
-                var PW=210,PH=297,ML=22,MR=18,MT=18,MB=25;
-                var CW=PW-ML-MR;var rx=PW-MR;
-                // === FUSSZEILE (auf jeder Seite) ===
-                var drawFooter=function(pn){
-                    doc.setDrawColor(196,30,30);doc.setLineWidth(0.5);
-                    doc.line(ML,PH-MB+2,rx,PH-MB+2);
-                    doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(196,30,30);
-                    doc.text('Thomas Willwacher Fliesenlegermeister e.K.',ML,PH-MB+6);
-                    doc.setFont('helvetica','normal');doc.setTextColor(102,102,102);
-                    doc.text('Steuernummer: 30/220/1234/5',rx,PH-MB+6,{align:'right'});
-                    doc.text('Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1',ML,PH-MB+10);
-                    doc.text('Seite '+pn,rx,PH-MB+10,{align:'right'});
-                };
-                // === SEITE 1: BRIEFKOPF (mit genuegend Platz fuer alle Angaben) ===
-                var y=MT;
-                // --- LOGO ---
-                doc.setFont('times','italic');doc.setFontSize(10);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML,y+4);
-                doc.setFont('helvetica','bold');doc.setFontSize(32);doc.setTextColor(17,17,17);
-                doc.text('wiLLwacher',ML-0.5,y+16);
-                var logoW=doc.getTextWidth('wiLLwacher');
-                doc.setFont('times','normal');doc.setFontSize(10);doc.setTextColor(196,30,30);
-                doc.text('Fliesenlegermeister e.K.',ML+logoW,y+21,{align:'right'});
-                // Kontaktdaten rechts neben Logo
-                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
-                doc.text('Flurweg 14a',rx,y+5,{align:'right'});
-                doc.text('56472 Nisterau',rx,y+9,{align:'right'});
-                doc.text('Tel. 02661-63101',rx,y+13,{align:'right'});
-                doc.text('Mobil 0170-2024161',rx,y+17,{align:'right'});
-                y+=26;
-                // --- Rote Trennlinie ---
-                doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=4;
-                // --- Absenderzeile (klein, grau) ---
-                doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(170,170,170);
-                doc.text('Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau',ML,y);y+=6;
-                // --- EMPFAENGER-BLOCK (links) + DATUM (rechts, auf gleicher Hoehe) ---
-                var addrStartY=y;
-                doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,17,17);
-                doc.text(empfName||'',ML,y);y+=5;
-                doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(51,51,51);
-                if(empfZusatz){doc.text(empfZusatz,ML,y);y+=5;}
-                if(empfStrasse){doc.text(empfStrasse,ML,y);y+=5;}
-                if(empfPlzOrt){doc.text(empfPlzOrt,ML,y);y+=5;}
-                // Datum rechts, auf Hoehe vom Empfaenger-Start
-                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(136,136,136);
-                doc.text('Datum:',rx-30,addrStartY);
-                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);
-                doc.text(new Date(rechnungsDatum).toLocaleDateString('de-DE'),rx,addrStartY,{align:'right'});
-                // Sicherstellen dass y mindestens 20mm nach Adress-Start ist
-                y=Math.max(y, addrStartY+20);
-                y+=8;
-                // --- TITEL (gross) ---
-                doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
-                doc.text(typLabel2,ML,y);y+=8;
-                // --- BAUVORHABEN ---
-                doc.setFontSize(11);
-                doc.text('Bauvorhaben: '+(bauvorhabenText||''),ML,y);y+=8;
-                // --- META-FELDER links unter Bauvorhaben ---
-                doc.setFontSize(9);
-                var mf=[];
-                if(leistungszeitraum)mf.push(['Leistungszeitraum:',leistungszeitraum]);
-                if(istRechnung&&rechnungsNr)mf.push(['Rechnungs-Nr.:',rechnungsNr]);
-                if(rechnungsTyp==='nachtrag')mf.push(['Nachtrags-Nr.:',nachtragsNr]);
-                if(rechnungsTyp==='angebot')mf.push(['Angebots-Nr.:',angebotsNr]);
-                if(auftragsnummer)mf.push(['Auftragsnummer:',auftragsnummer]);
-                if(kostenstelle)mf.push(['Kostenstelle:',kostenstelle]);
-                mf.push(['Steuernummer:','30/220/1234/5']);
-                if(rechnungsTyp==='abschlag')mf.push(['Abschlags-Nr.:',String(abschlagNr)]);
-                mf.forEach(function(f){
-                    doc.setFont('helvetica','normal');doc.setTextColor(136,136,136);doc.text(f[0],ML,y);
-                    doc.setFont('helvetica','bold');doc.setTextColor(34,34,34);doc.text(f[1],ML+42,y);
-                    y+=5;
-                });
-                y+=6;
-                // === POSITIONSTABELLE MIT AUTOTABLE ===
-                // Laufende Zwischensumme berechnen
-                var laufendeSummen=[];var ls=0;
-                aktivePosn.forEach(function(p){
-                    ls+=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
-                    laufendeSummen.push(ls);
-                });
-                var tableBody=aktivePosn.map(function(p,idx){
-                    var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
-                    return[String(p.pos||''),f2(p.menge),String(p.einheit||''),String(p.bez||''),f2(p.einzelpreis),f2(gp)];
-                });
-                // Seiten-Tracking fuer Uebertraege
-                var pageRowMap={};
-                var footerDrawn={};
-                doc.autoTable({
-                    startY:y,
-                    margin:{left:ML,right:MR,top:MT+8,bottom:MB+12},
-                    head:[['Pos.','Menge','Einh.','Bezeichnung','EP (\u20AC)','GP (\u20AC)']],
-                    body:tableBody,
-                    showHead:'everyPage',
-                    theme:'grid',
-                    tableLineColor:[224,224,224],
-                    tableLineWidth:0.2,
-                    styles:{
-                        fontSize:8,
-                        font:'helvetica',
-                        textColor:[34,34,34],
-                        cellPadding:{top:2,right:2,bottom:2,left:2},
-                        overflow:'linebreak',
-                        valign:'top',
-                        lineColor:[224,224,224],
-                        lineWidth:0.15
-                    },
-                    headStyles:{
-                        fillColor:[45,52,54],
-                        textColor:[255,255,255],
-                        fontStyle:'bold',
-                        fontSize:7.5,
-                        cellPadding:{top:2.5,right:2,bottom:2.5,left:2},
-                        lineWidth:0,
-                        halign:'center'
-                    },
-                    columnStyles:{
-                        0:{cellWidth:18,halign:'center',fontStyle:'bold'},
-                        1:{cellWidth:20,halign:'right'},
-                        2:{cellWidth:14,halign:'center'},
-                        3:{cellWidth:'auto',halign:'left',fontSize:7.5},
-                        4:{cellWidth:22,halign:'right'},
-                        5:{cellWidth:24,halign:'right',fontStyle:'bold'}
-                    },
-                    didDrawPage:function(data){
-                        var pn=doc.internal.getCurrentPageInfo().pageNumber;
-                        if(!footerDrawn[pn]){drawFooter(pn);footerDrawn[pn]=true;}
-                        // Uebertrag am Seitenanfang (ab Seite 2)
-                        if(pn>1&&pageRowMap[pn-1]!==undefined){
-                            var prevSum=laufendeSummen[pageRowMap[pn-1]]||0;
-                            var uy=data.settings.margin.top-4;
-                            doc.setFont('helvetica','italic');doc.setFontSize(7.5);doc.setTextColor(85,85,85);
-                            doc.text('\u00DCbertrag von Seite '+(pn-1)+':',ML+CW-26,uy,{align:'right'});
-                            doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(34,34,34);
-                            doc.text(f2(prevSum)+' \u20AC',ML+CW,uy,{align:'right'});
-                        }
-                    },
-                    didDrawCell:function(data){
-                        if(data.section==='body'){
-                            var pn=doc.internal.getCurrentPageInfo().pageNumber;
-                            pageRowMap[pn]=data.row.index;
-                        }
-                    }
-                });
-                // Uebertrag am Ende jeder Seite (ausser der letzten)
-                var lastPage=doc.internal.getCurrentPageInfo().pageNumber;
-                for(var pg=1;pg<lastPage;pg++){
-                    if(pageRowMap[pg]!==undefined){
-                        var uSum=laufendeSummen[pageRowMap[pg]]||0;
-                        doc.setPage(pg);
-                        var uy2=PH-MB-2;
-                        doc.setDrawColor(34,34,34);doc.setLineWidth(0.3);
-                        doc.line(ML,uy2-4,ML+CW,uy2-4);
-                        doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(85,85,85);
-                        doc.text('\u00DCbertrag auf Seite '+(pg+1)+':',ML+CW-26,uy2,{align:'right'});
-                        doc.setTextColor(34,34,34);
-                        doc.text(f2(uSum)+' \u20AC',ML+CW,uy2,{align:'right'});
-                    }
-                }
-                // Zurueck auf letzte Seite
-                doc.setPage(lastPage);
-                // === SUMMENBLOCK ===
-                y=doc.lastAutoTable.finalY+8;
-                var pn=lastPage;
-                if(y+50>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}
-                var sx=ML+CW-88,sr=ML+CW;
-                doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(34,34,34);
-                doc.text('Nettobetrag:',sx,y);doc.setFont('helvetica','bold');doc.text(f2(nettoSumme)+' \u20AC',sr,y,{align:'right'});y+=5;
-                doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);
-                doc.text('zzgl. '+mwstSatz+'% MwSt.:',sx,y);doc.text(f2(mwstBetrag)+' \u20AC',sr,y,{align:'right'});y+=4;
-                doc.setDrawColor(34,34,34);doc.setLineWidth(0.7);doc.line(sx,y,sr,y);y+=0.8;doc.setLineWidth(0.2);doc.line(sx,y,sr,y);y+=5;
-                doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(17,17,17);
-                doc.text('Bruttobetrag:',sx,y);doc.text(f2(bruttoSumme)+' \u20AC',sr,y,{align:'right'});y+=7;
-                if(istRechnung){
-                    if(sicherheitseinbehalt>0){doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);doc.text('abzgl. Sicherheitseinbehalt '+sicherheitseinbehalt+'%:',sx,y);doc.text('\u2013 '+f2(sicherheitBetrag)+' \u20AC',sr,y,{align:'right'});y+=5;}
-                    if(rechnungsTyp==='schluss'&&kontoSumme>0){doc.text('abzgl. Kontozahlungen:',sx,y);doc.text('\u2013 '+f2(kontoSumme)+' \u20AC',sr,y,{align:'right'});y+=5;doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);doc.text('Restforderung:',sx,y);doc.text(f2(bruttoSumme-sicherheitBetrag-kontoSumme)+' \u20AC',sr,y,{align:'right'});y+=6;}
-                    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
-                    doc.text('Zahlbar '+skontoTage+' Tage ('+skontoProzent+'% Skonto):',sx,y);doc.text(f2(zahlbetragMitSkonto)+' \u20AC',sr,y,{align:'right'});y+=5;
-                    doc.setTextColor(17,17,17);doc.text('Zahlbar '+zahlungszielTage+' Tage netto:',sx,y);doc.text(f2(zahlbetragOhneSkonto)+' \u20AC',sr,y,{align:'right'});y+=7;
-                }
-                if(rechnungsTyp==='angebot'&&gueltigBis){doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);doc.text('Gueltig bis:',sx,y);doc.text(new Date(gueltigBis).toLocaleDateString('de-DE'),sr,y,{align:'right'});y+=5;}
-                if(bemerkung){y+=3;doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(85,85,85);var bL=doc.splitTextToSize(bemerkung,CW);bL.forEach(function(l){if(y+4>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}doc.text(l,ML,y);y+=3.8;});}
-                if(!footerDrawn[pn]){drawFooter(pn);}
-                // PDF oeffnen
-                var blob=doc.output('blob');var url=URL.createObjectURL(blob);window.open(url,'_blank');
-                saveToGoogleDrive();
+                var typLabel=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?('Nachtrag Nr. '+nachtragsNr):rechnungsTyp==='angebot'?('Angebot Nr. '+angebotsNr):'Rechnung';
+                var posR='';aktivePosn.forEach(function(p){var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);posR+='<tr><td style="text-align:center;font-weight:700;width:30px">'+(p.pos||'')+'</td><td style="text-align:right;width:55px">'+fmt(p.menge)+'</td><td style="text-align:center;width:35px">'+(p.einheit||'')+'</td><td style="padding:6px 8px">'+(p.bez||'').replace(/</g,'&lt;')+'</td><td style="text-align:right;width:65px">'+fmt(p.einzelpreis)+'</td><td style="text-align:right;width:75px;font-weight:700">'+fmt(gp)+'</td></tr>';});
+                var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+getDateiname()+'</title>';
+                h+='<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=block" rel="stylesheet">';
+                h+='<style>@page{size:A4;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:9.5pt;color:#222;line-height:1.4;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}.page:last-child{page-break-after:auto}table.p tr{page-break-inside:avoid}}';
+                h+='.page{width:210mm;min-height:297mm;padding:18mm 18mm 30mm 22mm;margin:0 auto;position:relative;background:#fff;overflow:hidden}';
+                h+='.logo-block{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4mm}.logo-inner{display:inline-flex;flex-direction:column;align-items:flex-start}.logo-thomas{font-family:"Source Sans 3",serif;font-style:italic;font-weight:700;color:#c41e1e;font-size:13px;margin-bottom:-14px;padding-left:1px;position:relative;z-index:2}.logo-word{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1;-webkit-text-stroke:0.4px #111}.logo-word .lw{font-size:52px}.logo-word .li-wrap{position:relative;font-size:52px;display:inline-block}.logo-word .li-char{font-size:52px;color:#111}.logo-word .li-dot{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:#c41e1e}.logo-word .lLL{font-size:68px;letter-spacing:1px;line-height:0.75}.logo-word .lwa{font-size:52px}.logo-sub{display:flex;justify-content:flex-end;width:100%;margin-top:2px}.logo-sub span{font-family:"Source Sans 3",sans-serif;font-weight:600;color:#c41e1e;font-size:13px;letter-spacing:2px}.logo-right{text-align:right;font-size:9.5pt;color:#333;line-height:1.7;padding-top:5mm}';
+                h+='.sep{border:none;border-top:2.5px solid #c41e1e;margin:3mm 0 2mm}.abs{font-size:7pt;color:#aaa;border-bottom:0.5px solid #ccc;display:inline-block;padding-bottom:1px;margin-bottom:5mm}';
+                h+='.addr-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6mm}.addr-name{font-weight:700;font-size:12pt;margin-bottom:1mm}.addr-street{font-size:10pt;color:#333;line-height:1.6}.doc-data{font-size:9pt;line-height:2;min-width:50mm;text-align:right}.doc-data .dd-l{display:inline-block;width:38mm;color:#888;text-align:left}.doc-data .dd-v{font-weight:600;color:#222}';
+                h+='.doc-title{font-size:17pt;font-weight:700;margin-bottom:2mm;color:#111}.bauvorhaben{font-size:13pt;font-weight:700;color:#111;margin-bottom:10mm}';
+                h+='table.p{width:100%;border-collapse:collapse;margin-bottom:6mm;font-size:8.5pt}table.p thead th{background:#2d3436;color:#fff;font-weight:700;padding:7px 6px;font-size:8pt;text-transform:uppercase;letter-spacing:0.3px}table.p tbody td{padding:6px;border-bottom:1px solid #e0e0e0;vertical-align:top;font-variant-numeric:tabular-nums}';
+                h+='.su{margin-left:auto;width:88mm;font-size:9.5pt;margin-bottom:6mm}.su .r{display:flex;justify-content:space-between;padding:2px 0}.su .r .v{font-variant-numeric:tabular-nums;text-align:right;min-width:34mm}.su .r.br{font-weight:700;font-size:12pt;padding:4px 0;border-top:2.5px double #222;margin-top:2px}.su .r.sk{color:#c41e1e;font-weight:700}.su .r.nz{font-weight:700}.su .r.kl{font-size:8.5pt;color:#777}.bm{font-size:8.5pt;color:#555;margin-bottom:8mm;line-height:1.5}';
+                h+='.ft{position:absolute;bottom:12mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7.5pt;color:#666;line-height:1.7}.ft-row{display:flex;justify-content:space-between;flex-wrap:wrap}.ft-firma{font-weight:700;color:#c41e1e}.ft-bank{color:#555;margin-top:1mm}</style></head><body>';
+                h+='<div class="page">';
+                h+='<div class="logo-block"><div class="logo-inner"><div class="logo-thomas">Thomas</div><div class="logo-word"><span class="lw">w</span><span class="li-wrap"><span class="li-char">\u0131</span><span class="li-dot"></span></span><span class="lLL">LL</span><span class="lwa">wacher</span></div><div class="logo-sub"><span>Fliesenlegermeister e.K.</span></div></div><div class="logo-right">Flurweg 14a<br>56472 Nisterau<br>Tel. 02661-63101<br>Mobil 0170-2024161</div></div>';
+                h+='<hr class="sep"><div class="abs">Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau</div>';
+                h+='<div class="addr-row"><div><div class="addr-name">'+empfName+'</div><div class="addr-street">'+(empfZusatz?empfZusatz+'<br>':'')+(empfStrasse?empfStrasse+'<br>':'')+empfPlzOrt+'</div></div><div class="doc-data">';
+                h+='<div><span class="dd-l">Datum:</span><span class="dd-v">'+new Date(rechnungsDatum).toLocaleDateString('de-DE')+'</span></div>';
+                if(leistungszeitraum)h+='<div><span class="dd-l">Leistungszeitraum:</span><span class="dd-v">'+leistungszeitraum+'</span></div>';
+                if(istRechnung)h+='<div><span class="dd-l">Rechnungs-Nr.:</span><span class="dd-v">'+rechnungsNr+'</span></div>';
+                if(rechnungsTyp==='nachtrag')h+='<div><span class="dd-l">Nachtrags-Nr.:</span><span class="dd-v">'+nachtragsNr+'</span></div>';
+                if(rechnungsTyp==='angebot')h+='<div><span class="dd-l">Angebots-Nr.:</span><span class="dd-v">'+angebotsNr+'</span></div>';
+                if(auftragsnummer)h+='<div><span class="dd-l">Auftragsnummer:</span><span class="dd-v">'+auftragsnummer+'</span></div>';
+                if(kostenstelle)h+='<div><span class="dd-l">Kostenstelle:</span><span class="dd-v">'+kostenstelle+'</span></div>';
+                h+='<div><span class="dd-l">Steuernummer:</span><span class="dd-v">30/220/1234/5</span></div></div></div>';
+                h+='<div class="doc-title">'+typLabel+'</div><div class="bauvorhaben">Bauvorhaben: '+bauvorhabenText+'</div>';
+                h+='<table class="p"><thead><tr><th style="text-align:center;width:30px">Pos.</th><th style="text-align:right;width:55px">Menge</th><th style="text-align:center;width:35px">Einh.</th><th style="text-align:left">Bezeichnung</th><th style="text-align:right;width:65px">EP (\u20AC)</th><th style="text-align:right;width:75px">GP (\u20AC)</th></tr></thead><tbody>'+posR+'</tbody></table>';
+                h+='<div class="su"><div class="r"><span>Nettobetrag:</span><span class="v">'+fmt(nettoSumme)+' \u20AC</span></div><div class="r kl"><span>zzgl. '+mwstSatz+'% MwSt.:</span><span class="v">'+fmt(mwstBetrag)+' \u20AC</span></div><div class="r br"><span>Bruttobetrag:</span><span class="v">'+fmt(bruttoSumme)+' \u20AC</span></div>';
+                if(istRechnung){if(sicherheitseinbehalt>0)h+='<div class="r kl"><span>abzgl. Sicherheitseinbehalt '+sicherheitseinbehalt+'%:</span><span class="v">\u2013 '+fmt(sicherheitBetrag)+' \u20AC</span></div>';if(rechnungsTyp==='schluss'&&kontoSumme>0){h+='<div class="r kl"><span>abzgl. Kontozahlungen:</span><span class="v">\u2013 '+fmt(kontoSumme)+' \u20AC</span></div>';h+='<div class="r nz"><span>Restforderung:</span><span class="v">'+fmt(bruttoSumme-sicherheitBetrag-kontoSumme)+' \u20AC</span></div>';}h+='<div class="r sk"><span>Zahlbar '+skontoTage+' Tage ('+skontoProzent+'% Skonto):</span><span class="v">'+fmt(zahlbetragMitSkonto)+' \u20AC</span></div><div class="r nz"><span>Zahlbar '+zahlungszielTage+' Tage netto:</span><span class="v">'+fmt(zahlbetragOhneSkonto)+' \u20AC</span></div>';}
+                if(rechnungsTyp==='angebot'&&gueltigBis)h+='<div class="r kl"><span>Gueltig bis:</span><span class="v">'+new Date(gueltigBis).toLocaleDateString('de-DE')+'</span></div>';
+                h+='</div>';if(bemerkung)h+='<div class="bm">'+bemerkung.replace(/\n/g,'<br>')+'</div>';
+                h+='<div class="ft"><div class="ft-row"><span class="ft-firma">Thomas Willwacher Fliesenlegermeister e.K.</span><span>Steuernummer: 30/220/1234/5</span></div><div class="ft-bank">Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1</div></div>';
+                h+='<script>document.fonts.ready.then(function(){setTimeout(function(){window.focus();window.print();},400);});<\/script>';
+                h+='</div></body></html>';
+                var pw=window.open('','_blank','width=820,height=1160');pw.document.write(h);pw.document.close();saveToGoogleDrive();
             };
             var escXml=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
             var fmtXml=function(v){return(parseFloat(v)||0).toFixed(2);};
@@ -16681,45 +16253,8 @@
             var sendPerEmail=async function(){var email=kunde.ag_email||kunde.bl_email||kunde.arch_email||'';var tL=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag':'Rechnung';var betr=tL+' Nr. '+getDokumentNr()+' \u2013 '+bauvorhaben;var body='Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere '+tL+' Nr. '+getDokumentNr()+'.\n\nBauvorhaben: '+bauvorhaben+'\n';if(istRechnung){body+='\nBruttobetrag: '+fmt(bruttoSumme)+' \u20AC\nZahlbar '+zahlungszielTage+' Tage netto: '+fmt(zahlbetragOhneSkonto)+' \u20AC\n\nBankverbindung:\nWesterwald Bank eG\nIBAN: DE12 5739 1800 0000 0000 00\nBIC: GENODE51WW1\n';}body+='\nMit freundlichen Gruessen\nThomas Willwacher\nFliesenlegermeister e.K.';generatePDF();var svc=window.GoogleDriveService;if(svc&&svc.accessToken&&email){try{var raw=['From: '+GMAIL_CONFIG.ABSENDER_EMAIL,'To: '+email,'Subject: =?UTF-8?B?'+btoa(unescape(encodeURIComponent(betr)))+'?=','MIME-Version: 1.0','Content-Type: text/plain; charset=UTF-8','',body].join('\r\n');var enc=btoa(unescape(encodeURIComponent(raw))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');var r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send',{method:'POST',headers:{'Authorization':'Bearer '+svc.accessToken,'Content-Type':'application/json'},body:JSON.stringify({raw:enc})});if(r.ok){alert('Gesendet an '+email);return;}}catch(e){}}setTimeout(function(){window.location.href='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(betr)+'&body='+encodeURIComponent(body);},1200);};
             var openMailDialog=function(){setMailAdresse(kunde.ag_email||kunde.bl_email||'');setShowMailDialog(true);};
             var confirmAndSend=function(){var o=kunde.ag_email;if(mailAdresse)kunde.ag_email=mailAdresse;setShowMailDialog(false);sendPerEmail();if(!mailAdresse)kunde.ag_email=o;};
-            // ===== PHASE 1: TYPWAHL (Design-System Modus-Karten) =====
-            var renderTypIcon = function(id) {
-                var s = {width:'28px',height:'28px',flexShrink:0};
-                if (id === 'abschlag') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none'},s),
-                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2'}),
-                    React.createElement('line',{x1:'10',y1:'11',x2:'22',y2:'11',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'15',x2:'22',y2:'15',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'19',x2:'18',y2:'19',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('path',{d:'M18 7h4v4',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1.5'})
-                );
-                if (id === 'schluss') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none'},s),
-                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2'}),
-                    React.createElement('line',{x1:'10',y1:'10',x2:'22',y2:'10',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'14',x2:'22',y2:'14',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'18',x2:'22',y2:'18',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('path',{d:'M12 23L15 26L22 20',stroke:'white',strokeWidth:'2',strokeLinecap:'round',strokeLinejoin:'round'})
-                );
-                if (id === 'einzel') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none'},s),
-                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2'}),
-                    React.createElement('line',{x1:'10',y1:'11',x2:'22',y2:'11',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'15',x2:'22',y2:'15',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'19',x2:'17',y2:'19',stroke:'white',strokeWidth:'1.5'})
-                );
-                if (id === 'nachtrag') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none'},s),
-                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2'}),
-                    React.createElement('line',{x1:'10',y1:'10',x2:'22',y2:'10',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'14',x2:'22',y2:'14',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('path',{d:'M16 20v6M13 23h6',stroke:'white',strokeWidth:'2',strokeLinecap:'round'})
-                );
-                if (id === 'angebot') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none'},s),
-                    React.createElement('rect',{x:'6',y:'3',width:'20',height:'26',rx:'2',stroke:'white',strokeWidth:'2'}),
-                    React.createElement('line',{x1:'10',y1:'10',x2:'22',y2:'10',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('line',{x1:'10',y1:'14',x2:'18',y2:'14',stroke:'white',strokeWidth:'1.5'}),
-                    React.createElement('path',{d:'M20 18L24 22L20 26',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1.5',strokeLinecap:'round',strokeLinejoin:'round'}),
-                    React.createElement('path',{d:'M24 22H17',stroke:'rgba(255,255,255,0.7)',strokeWidth:'1.5',strokeLinecap:'round'})
-                );
-                return null;
-            };
-            if(phase==='typwahl'){var typen=[{id:'abschlag',name:'Abschlagsrechnung',desc:'Teilrechnung mit kumulierter Aufstellung',gradient:'linear-gradient(135deg, #1E88E5, #1565C0)',shadow:'rgba(30,136,229,0.30)'},{id:'schluss',name:'Schlussrechnung',desc:'Endabrechnung mit Gesamtaufstellung',gradient:'linear-gradient(135deg, #27ae60, #1e8449)',shadow:'rgba(39,174,96,0.30)'},{id:'einzel',name:'Einzelrechnung',desc:'Einfache Rechnung ohne Abschlaege',gradient:'linear-gradient(135deg, #00897b, #00695c)',shadow:'rgba(0,137,123,0.30)'},{id:'nachtrag',name:'Nachtrag',desc:'Zusaetzliche / geaenderte Leistungen',gradient:'linear-gradient(135deg, #e67e22, #d35400)',shadow:'rgba(230,126,34,0.30)'},{id:'angebot',name:'Angebot',desc:'Kostenvoranschlag fuer den Auftraggeber',gradient:'linear-gradient(135deg, #8e44ad, #6c3483)',shadow:'rgba(142,68,173,0.30)'}];return(<div className="page-container" style={{padding:'20px 16px',minHeight:'100vh'}}><div dangerouslySetInnerHTML={{__html:noSpinnerCSS}} /><div style={{textAlign:'center',marginBottom:'24px'}}><FirmenLogo size="small" /><div style={{marginTop:'12px',fontSize:'17px',fontWeight:700,color:'var(--text-white)',fontFamily:'Oswald, sans-serif',letterSpacing:'0.5px'}}>{kunde?kunde.name:''}</div><div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'2px',textTransform:'uppercase',marginTop:'4px',fontFamily:'Oswald, sans-serif',fontWeight:'500'}}>Dokumenttyp waehlen</div></div><div style={{display:'flex',flexDirection:'column',gap:'10px'}}>{typen.map(function(t){return(<button key={t.id} onClick={function(){setRechnungsTyp(t.id);if(t.id==='schluss')ladeKontozahlungen();setPhase('startseite');}} style={{width:'100%',padding:'18px 16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:t.gradient,color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px '+t.shadow,transition:'all 0.25s ease',position:'relative',overflow:'hidden',touchAction:'manipulation'}}>{renderTypIcon(t.id)}<div style={{flex:1}}><div style={{fontSize:'16px',fontWeight:600,marginBottom:'3px',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>{t.name}</div><div style={{fontSize:'12px',opacity:0.85,lineHeight:'1.4',fontFamily:'Source Sans 3, sans-serif'}}>{t.desc}</div></div><span style={{fontSize:'20px',opacity:0.7}}>{'\u2192'}</span></button>);})}</div><button onClick={onBack} style={{width:'100%',marginTop:'16px',padding:'14px 32px',borderRadius:'var(--radius-md)',border:'none',background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:'0 4px 15px rgba(196,30,30,0.3)',transition:'all 0.25s ease',touchAction:'manipulation'}}>{'\u2190'} Zurueck zur Modulwahl</button></div>);}
+            // ===== PHASE 1: TYPWAHL =====
+            if(phase==='typwahl'){var typen=[{id:'abschlag',icon:'\uD83D\uDCCA',name:'Abschlagsrechnung',desc:'Teilrechnung mit kumulierter Aufstellung',color:'#1E88E5'},{id:'schluss',icon:'\uD83D\uDCCB',name:'Schlussrechnung',desc:'Endabrechnung mit Gesamtaufstellung',color:'#27ae60'},{id:'einzel',icon:'\uD83E\uDDFE',name:'Einzelrechnung',desc:'Einfache Rechnung ohne Abschlaege',color:'#00897b'},{id:'nachtrag',icon:'\uD83D\uDCD1',name:'Nachtrag',desc:'Zusaetzliche / geaenderte Leistungen',color:'#e67e22'},{id:'angebot',icon:'\uD83D\uDCDD',name:'Angebot',desc:'Kostenvoranschlag fuer den Auftraggeber',color:'#8e44ad'}];return(<div className="page-container" style={{padding:'16px',minHeight:'100vh'}}><div dangerouslySetInnerHTML={{__html:noSpinnerCSS}} /><div style={{textAlign:'center',marginBottom:'20px'}}><FirmenLogo size="small" /><div style={{marginTop:'12px',fontSize:'15px',fontWeight:700}}>{kunde?kunde.name:''}</div><div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginTop:'4px'}}>Dokumenttyp waehlen</div></div><div style={{display:'flex',flexDirection:'column',gap:'8px'}}>{typen.map(function(t){return(<button key={t.id} onClick={function(){setRechnungsTyp(t.id);if(t.id==='schluss')ladeKontozahlungen();setPhase('startseite');}} style={{padding:'14px 16px',borderRadius:'12px',border:'2px solid '+t.color+'22',background:'var(--bg-secondary)',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px',textAlign:'left',boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}><span style={{fontSize:'24px'}}>{t.icon}</span><div style={{flex:1}}><div style={{fontSize:'14px',fontWeight:700,color:t.color}}>{t.name}</div><div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'1px'}}>{t.desc}</div></div><span style={{color:'var(--text-muted)',fontSize:'16px'}}>{'\u203A'}</span></button>);})}</div><button onClick={onBack} style={{width:'100%',marginTop:'16px',padding:'12px',background:'var(--bg-tertiary)',color:'var(--text-muted)',border:'none',borderRadius:'10px',fontSize:'13px',cursor:'pointer'}}>{'\u2190'} Zurueck zur Modulwahl</button></div>);}
             // ===== PHASE 2: PDF-NAHE STARTSEITE (Alles IN der PDF-Seite editierbar) =====
             if(phase==='startseite'){var tpLabel=rechnungsTyp==='abschlag'?abschlagNr+'. Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag Nr. '+nachtragsNr:rechnungsTyp==='angebot'?'Angebot Nr. '+angebotsNr:'Einzelrechnung';
             // Editierbare Input-Styles fuer weissen Hintergrund
@@ -16729,17 +16264,17 @@
             {/* === EINE weisse A4-Seite === */}
             <div style={{margin:'8px',background:'#fff',borderRadius:'12px',padding:'22px 20px 16px',color:'#222',boxShadow:'0 4px 24px rgba(0,0,0,0.35)',minHeight:'85vh'}}>
 
-                {/* --- BRIEFKOPF: Logo links + Adresse rechts (40% groesser, Thomas=FLM Staerke) --- */}
+                {/* --- BRIEFKOPF: Logo links + Adresse rechts (SKILL-firmenlogo.md PDF-Groessen) --- */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'3mm'}}>
                     <div style={{display:'inline-flex',flexDirection:'column',alignItems:'flex-start'}}>
-                        <div style={{fontFamily:'"Source Sans 3",serif',fontStyle:'italic',fontWeight:600,color:'#c41e1e',fontSize:'14px',marginBottom:'-16px',paddingLeft:'0px',position:'relative',zIndex:2}}>Thomas</div>
-                        <div style={{display:'flex',alignItems:'baseline',fontFamily:'Oswald,sans-serif',fontWeight:700,color:'#111',lineHeight:1}}>
-                            <span style={{fontSize:'73px'}}>w</span>
-                            <span style={{position:'relative',fontSize:'73px',display:'inline-block'}}><span style={{fontSize:'73px',color:'#111'}}>{'\u0131'}</span><span style={{position:'absolute',top:'6px',left:'50%',transform:'translateX(-50%)',width:'11px',height:'11px',background:'#c41e1e'}}></span></span>
-                            <span style={{fontSize:'95px',letterSpacing:'1px',lineHeight:0.75}}>LL</span>
-                            <span style={{fontSize:'73px'}}>wacher</span>
+                        <div style={{fontFamily:'"Source Sans 3",serif',fontStyle:'italic',fontWeight:700,color:'#c41e1e',fontSize:'13px',marginBottom:'-14px',paddingLeft:'1px',position:'relative',zIndex:2}}>Thomas</div>
+                        <div style={{display:'flex',alignItems:'baseline',fontFamily:'Oswald,sans-serif',fontWeight:700,color:'#111',lineHeight:1,WebkitTextStroke:'0.4px #111'}}>
+                            <span style={{fontSize:'52px'}}>w</span>
+                            <span style={{position:'relative',fontSize:'52px',display:'inline-block'}}><span style={{fontSize:'52px',color:'#111'}}>{'\u0131'}</span><span style={{position:'absolute',top:'5px',left:'50%',transform:'translateX(-50%)',width:'8px',height:'8px',background:'#c41e1e'}}></span></span>
+                            <span style={{fontSize:'68px',letterSpacing:'1px',lineHeight:0.75}}>LL</span>
+                            <span style={{fontSize:'52px'}}>wacher</span>
                         </div>
-                        <div style={{display:'flex',justifyContent:'flex-end',width:'100%',marginTop:'2px'}}><span style={{fontFamily:'"Source Sans 3",sans-serif',fontWeight:600,color:'#c41e1e',fontSize:'18px',letterSpacing:'2.5px'}}>Fliesenlegermeister e.K.</span></div>
+                        <div style={{display:'flex',justifyContent:'flex-end',width:'100%',marginTop:'1px'}}><span style={{fontFamily:'"Source Sans 3",sans-serif',fontWeight:600,color:'#c41e1e',fontSize:'13px',letterSpacing:'2px'}}>Fliesenlegermeister e.K.</span></div>
                     </div>
                     <div style={{textAlign:'right',fontSize:'9.5pt',color:'#333',lineHeight:1.7,paddingTop:'5mm'}}>Flurweg 14a<br/>56472 Nisterau<br/>Tel. 02661-63101<br/>Mobil 0170-2024161</div>
                 </div>
@@ -16748,7 +16283,7 @@
                 <hr style={{border:'none',borderTop:'2.5px solid #c41e1e',margin:'3mm 0 2mm'}} />
                 <div style={{fontSize:'7pt',color:'#aaa',borderBottom:'0.5px solid #ccc',display:'inline-block',paddingBottom:'1px',marginBottom:'5mm'}}>Thomas Willwacher Fliesenlegermeister e.K. {'\u00B7'} Flurweg 14a {'\u00B7'} 56472 Nisterau</div>
 
-                {/* --- EMPFAENGER (komplett editierbar) + DATUM rechts --- */}
+                {/* --- EMPFAENGER (editierbar mit State) + DATUM rechts --- */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6mm'}}>
                     <div style={{flex:1,maxWidth:'55%'}}>
                         <input type="text" value={empfName} onChange={function(e){setEmpfName(e.target.value);}} placeholder="Firma / Name des Kunden" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'12px',marginBottom:'3px'})} />
@@ -16830,8 +16365,7 @@
                     // Grid-Spalten: breitere Spalten fuer bessere Lesbarkeit
                     var gridCols = '90px 100px 50px 1fr 90px 100px';
                     // Tabellenkopf-Komponente
-                    var tHead = React.createElement('div', {style:{display:'grid',gridTemplateColumns:editMode?('24px '+gridCols):gridCols,gap:'0',fontSize:'8pt',fontWeight:700,color:'#fff',background:'#2d3436',padding:'6px 6px',textTransform:'uppercase',letterSpacing:'0.3px'}},
-                        editMode && React.createElement('span',null,''),
+                    var tHead = React.createElement('div', {style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',fontSize:'8pt',fontWeight:700,color:'#fff',background:'#2d3436',padding:'6px 6px',textTransform:'uppercase',letterSpacing:'0.3px'}},
                         React.createElement('span',{style:{textAlign:'center'}},'Pos.'),
                         React.createElement('span',{style:{textAlign:'right',paddingRight:'6px'}},'Menge'),
                         React.createElement('span',{style:{textAlign:'center'}},'Einh.'),
@@ -16851,25 +16385,11 @@
                     var renderRow = function(p) {
                         var gp = (parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
                         zwischensumme += p.aktiv ? gp : 0;
-                        if (!editMode) {
-                            return React.createElement('div', {key:p.id, style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',padding:'5px 6px',borderBottom:'1px solid #e0e0e0',alignItems:'start',fontSize:'9pt'}},
-                                React.createElement('span',{style:{fontWeight:700,textAlign:'center',padding:'3px 4px'}},p.pos),
-                                React.createElement('span',{style:{textAlign:'right',padding:'3px 6px'}},fmt(p.menge)),
-                                React.createElement('span',{style:{textAlign:'center',padding:'3px 4px',fontSize:'8.5pt'}},p.einheit),
-                                React.createElement('div',{style:{padding:'3px 8px',fontSize:'8.5pt',lineHeight:'1.4',whiteSpace:'pre-wrap',wordBreak:'break-word'}},p.bez),
-                                React.createElement('span',{style:{textAlign:'right',padding:'3px 6px'}},fmt(p.einzelpreis)),
-                                React.createElement('span',{style:{fontWeight:700,textAlign:'right',padding:'3px 4px'}},fmt(gp)+' \u20AC')
-                            );
-                        }
-                        return React.createElement('div', {key:p.id, style:{display:'grid',gridTemplateColumns:'24px '+gridCols,gap:'0',padding:'5px 6px',borderBottom:'1px solid #e0e0e0',alignItems:'start',fontSize:'9pt',opacity:p.aktiv?1:0.3}},
-                            React.createElement('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',paddingTop:'2px'}},
-                                React.createElement('input',{type:'checkbox',checked:p.aktiv,onChange:function(){updatePos(p.id,'aktiv',!p.aktiv);},style:{cursor:'pointer'}}),
-                                React.createElement('button',{onClick:function(){removePosition(p.id);},style:{background:'none',border:'none',color:'#c41e1e',fontSize:'10px',cursor:'pointer',padding:0}},'\u2715')
-                            ),
+                        return React.createElement('div', {key:p.id, style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',padding:'5px 6px',borderBottom:'1px solid #e0e0e0',alignItems:'start',fontSize:'9pt',opacity:p.aktiv?1:0.3}},
                             React.createElement('input',{type:'text',value:p.pos,onChange:function(e){updatePos(p.id,'pos',e.target.value);},style:{padding:'3px 4px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'9pt',fontWeight:700,textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
                             React.createElement('input',{type:'text',inputMode:'decimal',value:p.menge===0?'0,00':(typeof p.menge==='number'?p.menge.toFixed(2).replace('.',','):p.menge),onChange:function(e){updatePos(p.id,'menge',e.target.value.replace(',','.'));},onBlur:function(e){var v=parseFloat(e.target.value.replace(',','.'));updatePos(p.id,'menge',isNaN(v)?0:Number(v.toFixed(2)));},style:{padding:'3px 6px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'9pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
                             React.createElement('input',{type:'text',value:p.einheit,onChange:function(e){updatePos(p.id,'einheit',e.target.value);},style:{padding:'3px 4px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',textAlign:'center',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
-                            React.createElement('textarea',{value:p.bez,onChange:function(e){updatePos(p.id,'bez',e.target.value);},rows:Math.max(2, Math.ceil(((p.bez||'').length + ((p.bez||'').split('\n').length - 1) * 45) / 45)),style:{padding:'3px 8px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',width:'100%',boxSizing:'border-box',background:'#fafafa',resize:'vertical',lineHeight:'1.4',fontFamily:'"Source Sans 3",sans-serif',minHeight:'36px'}}),
+                            React.createElement('textarea',{value:p.bez,onChange:function(e){updatePos(p.id,'bez',e.target.value);},rows:Math.max(1,Math.ceil((p.bez||'').length/60)),style:{padding:'3px 8px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'8.5pt',width:'100%',boxSizing:'border-box',background:'#fafafa',resize:'vertical',lineHeight:'1.4',fontFamily:'"Source Sans 3",sans-serif',minHeight:'24px'}}),
                             React.createElement('input',{type:'text',inputMode:'decimal',value:p.einzelpreis===0?'0,00':(typeof p.einzelpreis==='number'?p.einzelpreis.toFixed(2).replace('.',','):p.einzelpreis),onChange:function(e){updatePos(p.id,'einzelpreis',e.target.value.replace(',','.'));},onBlur:function(e){var v=parseFloat(e.target.value.replace(',','.'));updatePos(p.id,'einzelpreis',isNaN(v)?0:Number(v.toFixed(2)));},style:{padding:'3px 6px',border:'1px solid #ddd',borderRadius:'3px',fontSize:'9pt',textAlign:'right',width:'100%',boxSizing:'border-box',background:'#fafafa'}}),
                             React.createElement('div',{style:{fontWeight:700,textAlign:'right',padding:'4px 4px',fontSize:'9pt'}},fmt(gp)+' \u20AC')
                         );
@@ -16877,7 +16397,7 @@
                     return React.createElement('div', {style:{marginBottom:'12px'}},
                         React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
                             React.createElement('div',{style:{fontSize:'9px',fontWeight:700,color:'#555',textTransform:'uppercase',letterSpacing:'0.5px'}},'Positionen ('+positionen.length+')'),
-                            editMode && React.createElement('button',{onClick:addPosition,style:{padding:'4px 12px',fontSize:'9px',background:'#2d3436',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',fontWeight:600}},  '+ Position')
+                            React.createElement('button',{onClick:addPosition,style:{padding:'4px 12px',fontSize:'9px',background:'#2d3436',color:'white',border:'none',borderRadius:'4px',cursor:'pointer',fontWeight:600}},  '+ Position')
                         ),
                         // Alle Seiten rendern
                         pages.map(function(pagePositionen, pageIdx) {
@@ -16894,9 +16414,8 @@
                                 // Positionszeilen
                                 pagePositionen.map(renderRow),
                                 // Uebertrag am Seitenende (wenn nicht letzte Seite)
-                                !isLast && React.createElement('div',{style:{display:'grid',gridTemplateColumns:editMode?('24px '+gridCols):gridCols,gap:'0',padding:'6px 6px',borderTop:'1.5px solid #222',marginTop:'4px',fontSize:'9pt',fontWeight:700,color:'#555'}},
-                                    editMode && React.createElement('span',null,''),
-                                    React.createElement('span',{style:{gridColumn: editMode?'2 / 7':'1 / 6',textAlign:'right',paddingRight:'8px'}},'Uebertrag auf Seite '+(pageIdx+2)+':'),
+                                !isLast && React.createElement('div',{style:{display:'grid',gridTemplateColumns:gridCols,gap:'0',padding:'6px 6px',borderTop:'1.5px solid #222',marginTop:'4px',fontSize:'9pt',fontWeight:700,color:'#555'}},
+                                    React.createElement('span',{style:{gridColumn:'1 / 6',textAlign:'right',paddingRight:'8px'}},'Uebertrag auf Seite '+(pageIdx+2)+':'),
                                     React.createElement('span',{style:{textAlign:'right',paddingRight:'4px'}},fmt(zwischensumme)+' \u20AC')
                                 ),
                                 // Auf letzter Seite: Summenblock mit viel Platz
@@ -16935,19 +16454,15 @@
             {showDatenLaden&&(<div className="modal-overlay" onClick={function(){setShowDatenLaden(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'400px'}}><div className="modal-title">{'\uD83D\uDCE5'} Daten laden</div><div style={{display:'flex',flexDirection:'column',gap:'8px'}}>{hatAufmass&&(<button onClick={ladenAusAufmass} style={{padding:'14px',borderRadius:'10px',border:'2px solid #27ae60',background:'rgba(39,174,96,0.06)',cursor:'pointer',textAlign:'left'}}><div style={{fontWeight:700,fontSize:'13px',color:'var(--success)'}}>Aus Aufmass laden</div><div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>{Object.keys(aufmassMassen).filter(function(k){return aufmassMassen[k]>0;}).length} berechnete Positionen</div></button>)}{!hatAufmass&&(<div style={{padding:'10px',borderRadius:'10px',background:'rgba(230,126,34,0.08)',fontSize:'11px',color:'var(--accent-orange)',textAlign:'center'}}>Aufmass nicht verfuegbar</div>)}<button onClick={ladenAusKundenpositionen} style={{padding:'14px',borderRadius:'10px',border:'2px solid var(--accent-blue)',background:'rgba(30,136,229,0.06)',cursor:'pointer',textAlign:'left'}}><div style={{fontWeight:700,fontSize:'13px',color:'var(--accent-blue)'}}>Kundenpositionen</div><div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>{lvPositionen.length} LV-Positionen</div></button><button onClick={ladenAusDatei} style={{padding:'14px',borderRadius:'10px',border:'1px dashed var(--border-color)',background:'var(--bg-secondary)',cursor:'pointer',textAlign:'left'}}><div style={{fontWeight:700,fontSize:'13px',color:'var(--text-secondary)'}}>Datei hochladen</div><div style={{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}}>PDF, XLSX, CSV, JSON</div></button></div><button onClick={function(){setShowDatenLaden(false);}} style={{width:'100%',marginTop:'12px',padding:'10px',background:'var(--bg-tertiary)',color:'var(--text-muted)',border:'none',borderRadius:'10px',fontSize:'12px',cursor:'pointer'}}>Abbrechen</button></div></div>)}
             {showKontoDialog&&(<div className="modal-overlay" onClick={function(){setShowKontoDialog(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'420px',maxHeight:'80vh',overflow:'auto'}}><div className="modal-title">Kontozahlungen</div>{kontozahlungen.length===0?<div style={{padding:'16px',textAlign:'center',color:'var(--text-muted)',fontSize:'12px'}}>Keine Abschlagszahlungen gefunden.</div>:kontozahlungen.map(function(k,i){return<div key={k.id} style={{padding:'8px 12px',borderBottom:'1px solid var(--border-color)',display:'flex',alignItems:'center',gap:'8px'}}><input type="checkbox" checked={k.aufgefuehrt} onChange={function(){setKontozahlungen(function(prev){return prev.map(function(kk,ii){return ii===i?Object.assign({},kk,{aufgefuehrt:!kk.aufgefuehrt}):kk;});});}} /><div style={{flex:1,fontSize:'12px',fontWeight:600}}>{k.nr} vom {k.datum}</div><div style={{fontWeight:700,color:'var(--success)'}}>{fmt(k.betrag)} {'\u20AC'}</div></div>;})}<div style={{padding:'12px',borderTop:'2px solid var(--border-color)',fontWeight:700,display:'flex',justifyContent:'space-between'}}><span>Summe:</span><span style={{color:'var(--success)'}}>{fmt(kontoSumme)} {'\u20AC'}</span></div><button onClick={function(){setShowKontoDialog(false);}} style={{width:'100%',padding:'10px',marginTop:'8px',background:typColor,color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Uebernehmen</button></div></div>)}
             {/* Bottom-Bar */}
-            <div style={{position:'fixed',bottom:0,left:0,right:0,padding:'10px 16px',background:'var(--bg-primary)',borderTop:'1px solid var(--border-color)',zIndex:100,display:'flex',gap:'8px'}}><button onClick={function(){setPhase('typwahl');setPositionenGeladen(false);setPositionen([]);setEditMode(false);}} style={{padding:'12px 32px',borderRadius:'var(--radius-md)',border:'none',background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:'0 4px 15px rgba(196,30,30,0.3)',transition:'all 0.25s ease',touchAction:'manipulation'}}>{'\u2190'} Zurueck</button>{positionenGeladen&&<button onClick={function(){setShowBearbeitenPopup(true);}} style={{flex:2,padding:'12px',background:'linear-gradient(135deg, var(--accent-orange), var(--accent-orange-light))',color:'white',border:'none',borderRadius:'var(--radius-md)',fontSize:'16px',fontWeight:700,cursor:'pointer',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1.5px',boxShadow:'0 4px 15px rgba(230,126,34,0.3)',touchAction:'manipulation'}}>Bearbeiten {'\u2192'}</button>}</div>
-            {/* Bearbeiten-Popup mit 6 Optionen */}
-            {showBearbeitenPopup&&(<div className="modal-overlay" onClick={function(){setShowBearbeitenPopup(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'440px',padding:'24px'}}><div style={{textAlign:'center',marginBottom:'20px'}}><div style={{fontSize:'18px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',color:'var(--text-white)'}}>Dokument bearbeiten</div><div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'4px'}}>{kunde?kunde.name:''}</div></div><div style={{display:'flex',flexDirection:'column',gap:'8px'}}><button onClick={function(){setEditMode(true);setShowBearbeitenPopup(false);}} style={{width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:'linear-gradient(135deg, #1E88E5, #1565C0)',color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px rgba(30,136,229,0.30)',touchAction:'manipulation'}}><svg viewBox="0 0 28 28" fill="none" style={{width:'24px',height:'24px',flexShrink:0}}><path d="M20 4l4 4-14 14H6v-4L20 4z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><line x1="16" y1="8" x2="20" y2="12" stroke="white" strokeWidth="1.5"/></svg><div style={{flex:1}}><div style={{fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>Dokument bearbeiten</div><div style={{fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'}}>Positionen bearbeiten, hinzufuegen oder entfernen</div></div></button><button onClick={function(){generatePDF();setShowBearbeitenPopup(false);}} style={{width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:'linear-gradient(135deg, #27ae60, #1e8449)',color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px rgba(39,174,96,0.30)',touchAction:'manipulation'}}><svg viewBox="0 0 28 28" fill="none" style={{width:'24px',height:'24px',flexShrink:0}}><rect x="4" y="4" width="20" height="20" rx="2" stroke="white" strokeWidth="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="white" strokeWidth="1.5"/><line x1="8" y1="14" x2="20" y2="14" stroke="white" strokeWidth="1.5"/><line x1="8" y1="18" x2="16" y2="18" stroke="white" strokeWidth="1.5"/></svg><div style={{flex:1}}><div style={{fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>Ausdrucken</div><div style={{fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'}}>Dokument wird ausgedruckt</div></div></button><button onClick={function(){generatePDF();saveToGoogleDrive();setShowBearbeitenPopup(false);}} style={{width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:'linear-gradient(135deg, #00897b, #00695c)',color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px rgba(0,137,123,0.30)',touchAction:'manipulation'}}><svg viewBox="0 0 28 28" fill="none" style={{width:'24px',height:'24px',flexShrink:0}}><rect x="4" y="4" width="20" height="20" rx="2" stroke="white" strokeWidth="2"/><path d="M10 14l3 3 5-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg><div style={{flex:1}}><div style={{fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>Ausdrucken + PDF speichern</div><div style={{fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'}}>Dokument ausdrucken und als PDF ablegen</div></div></button><button onClick={function(){setShowBearbeitenPopup(false);openMailDialog();}} style={{width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:'linear-gradient(135deg, #e67e22, #d35400)',color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px rgba(230,126,34,0.30)',touchAction:'manipulation'}}><svg viewBox="0 0 28 28" fill="none" style={{width:'24px',height:'24px',flexShrink:0}}><rect x="2" y="6" width="24" height="16" rx="2" stroke="white" strokeWidth="2"/><path d="M2 8l12 8 12-8" stroke="white" strokeWidth="2"/></svg><div style={{flex:1}}><div style={{fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>Als Mail versenden</div><div style={{fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'}}>E-Mail-Adresse waehlen und Dokument senden</div></div></button>{istRechnung&&<React.Fragment><button onClick={function(){downloadXRechnung();setShowBearbeitenPopup(false);}} style={{width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:'linear-gradient(135deg, #4da6ff, #1E88E5)',color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px rgba(77,166,255,0.30)',touchAction:'manipulation'}}><svg viewBox="0 0 28 28" fill="none" style={{width:'24px',height:'24px',flexShrink:0}}><rect x="4" y="2" width="20" height="24" rx="2" stroke="white" strokeWidth="2"/><text x="14" y="17" fill="white" fontSize="8" fontWeight="700" textAnchor="middle" fontFamily="Oswald, sans-serif">XML</text></svg><div style={{flex:1}}><div style={{fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>XRechnung erstellen</div><div style={{fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'}}>XML-Format fuer Behoerden</div></div></button><button onClick={function(){downloadZUGFeRD();setShowBearbeitenPopup(false);}} style={{width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:'linear-gradient(135deg, #8e44ad, #6c3483)',color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:'0 6px 20px rgba(142,68,173,0.30)',touchAction:'manipulation'}}><svg viewBox="0 0 28 28" fill="none" style={{width:'24px',height:'24px',flexShrink:0}}><rect x="4" y="2" width="20" height="24" rx="2" stroke="white" strokeWidth="2"/><text x="14" y="17" fill="white" fontSize="7" fontWeight="700" textAnchor="middle" fontFamily="Oswald, sans-serif">ZUG</text></svg><div style={{flex:1}}><div style={{fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>ZUGFeRD / E-Rechnung</div><div style={{fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'}}>PDF + XML fuer B2B (EN 16931)</div></div></button></React.Fragment>}</div><button onClick={function(){setShowBearbeitenPopup(false);}} style={{width:'100%',marginTop:'12px',padding:'14px 32px',borderRadius:'var(--radius-md)',border:'none',background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:'0 4px 15px rgba(196,30,30,0.3)',touchAction:'manipulation'}}>Abbrechen</button></div></div>)}
+            <div style={{position:'fixed',bottom:0,left:0,right:0,padding:'10px 16px',background:'var(--bg-primary)',borderTop:'1px solid var(--border-color)',zIndex:100,display:'flex',gap:'8px'}}><button onClick={function(){setPhase('typwahl');setPositionenGeladen(false);setPositionen([]);}} style={{flex:1,padding:'12px',background:'var(--bg-tertiary)',color:'var(--text-muted)',border:'none',borderRadius:'10px',fontSize:'12px',cursor:'pointer'}}>{'\u2190'} Zurueck</button>{positionenGeladen&&<button onClick={function(){setPhase('formular');}} style={{flex:2,padding:'12px',background:typColor,color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>Bearbeiten {'\u2192'}</button>}</div>
             </div>);}
             // ===== PHASE 2b: POSITIONSAUSWAHL =====
             if(phase==='posauswahl'){var aP=lvPositionen.map(function(p,i){return{idx:i,pos:p.pos||p.posNr||String(i+1),bez:p.bez||p.titel||'',einheit:p.einheit||'m\u00B2',menge:p.menge||0,einzelpreis:p.einzelpreis||p.ep||0,aufmassMenge:aufmassMassen[p.pos||p.posNr]||0};});var aA=aP.length>0&&aP.every(function(p){return posAuswahl[p.idx]!==false;});var nA=aP.filter(function(p){return posAuswahl[p.idx]!==false;}).length;return(<div className="page-container" style={{padding:'16px',minHeight:'100vh',paddingBottom:'90px'}}><div style={{textAlign:'center',marginBottom:'16px'}}><div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'1.5px',textTransform:'uppercase'}}>Positionen auswaehlen</div><div style={{fontSize:'15px',fontWeight:700,marginTop:'4px'}}>{kunde?kunde.name:''}</div></div>{aP.length>0?(<div style={{background:'var(--bg-secondary)',borderRadius:'14px',overflow:'hidden',marginBottom:'12px'}}><div style={{padding:'10px 14px',borderBottom:'2px solid var(--border-color)',display:'flex',alignItems:'center',gap:'8px'}}><input type="checkbox" checked={aA} onChange={function(){var n={};aP.forEach(function(p){n[p.idx]=!aA;});setPosAuswahl(n);}} /><span style={{fontSize:'12px',fontWeight:700,color:typColor}}>Alle ({aP.length})</span><span style={{marginLeft:'auto',fontSize:'11px',color:'var(--text-muted)'}}>{nA} ausgewaehlt</span></div><div style={{maxHeight:'400px',overflow:'auto'}}>{aP.map(function(p){var chk=posAuswahl[p.idx]!==false;return(<div key={p.idx} style={{padding:'10px 14px',borderBottom:'1px solid var(--border-color)',display:'flex',alignItems:'flex-start',gap:'8px',opacity:chk?1:0.4}}><input type="checkbox" checked={chk} onChange={function(){setPosAuswahl(function(prev){var n=Object.assign({},prev);n[p.idx]=!chk;return n;});}} style={{marginTop:'2px'}} /><div style={{flex:1}}><div style={{display:'flex',gap:'6px',alignItems:'center'}}><span style={{fontWeight:700,fontSize:'11px',color:typColor,minWidth:'40px'}}>{p.pos}</span><span style={{fontSize:'12px'}}>{p.bez}</span></div><div style={{display:'flex',gap:'12px',marginTop:'3px',fontSize:'11px',color:'var(--text-muted)'}}><span>LV: {fmt(p.menge)} {p.einheit}</span>{p.einzelpreis>0&&<span>EP: {fmt(p.einzelpreis)} {'\u20AC'}</span>}{p.aufmassMenge>0&&<span style={{color:'var(--success)',fontWeight:600}}>Aufmass: {fmt(p.aufmassMenge)} {p.einheit}</span>}</div></div></div>);})}</div></div>):(<div style={{textAlign:'center',padding:'30px',color:'var(--text-muted)',fontSize:'13px',background:'var(--bg-secondary)',borderRadius:'14px',marginBottom:'12px'}}>Keine LV-Positionen.</div>)}<div style={{position:'fixed',bottom:0,left:0,right:0,padding:'10px 16px',background:'var(--bg-primary)',borderTop:'1px solid var(--border-color)',zIndex:100,display:'flex',gap:'8px'}}><button onClick={function(){setPhase('startseite');}} style={{flex:1,padding:'12px',background:'var(--bg-tertiary)',color:'var(--text-muted)',border:'none',borderRadius:'10px',fontSize:'12px',cursor:'pointer'}}>{'\u2190'} Zurueck</button><button onClick={function(){var sel=aP.filter(function(p){return posAuswahl[p.idx]!==false;});initPositionen(sel);setPhase('startseite');}} style={{flex:2,padding:'12px',background:nA>0?typColor:'var(--bg-tertiary)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>{nA>0?nA+' uebernehmen':'Weiter'}</button></div></div>);}
-            // ===== PHASE 3: FORMULAR (entfernt — Bearbeitung ist jetzt im PDF-Layout) =====
-            // Falls jemand noch auf phase 'formular' kommt, zurueck zur startseite
-            if(phase==='formular'){setPhase('startseite');setEditMode(true);}
-            return null;
+            // ===== PHASE 3: FORMULAR =====
+            var typLabel=rechnungsTyp==='abschlag'?abschlagNr+'. Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?'Nachtrag Nr. '+nachtragsNr:rechnungsTyp==='angebot'?'Angebot Nr. '+angebotsNr:'Einzelrechnung';
+            return(<div className="page-container" style={{padding:'16px',minHeight:'100vh',paddingBottom:'80px'}}><div dangerouslySetInnerHTML={{__html:noSpinnerCSS}} /><div style={{textAlign:'center',marginBottom:'14px'}}><FirmenLogo size="small" /><div style={{marginTop:'8px',fontSize:'15px',fontWeight:700,color:typColor}}>{typLabel}</div><div style={{fontSize:'11px',color:'var(--text-muted)'}}>{kunde?kunde.name:''}</div></div><div style={{background:'var(--bg-secondary)',borderRadius:'12px',padding:'12px',marginBottom:'10px'}}><div style={{fontSize:'11px',fontWeight:700,color:typColor,marginBottom:'8px'}}>Dokumentdaten</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'6px'}}><div><label style={{fontSize:'10px',color:'var(--text-muted)',display:'block'}}>Datum</label><input type="date" value={rechnungsDatum} onChange={function(e){setRechnungsDatum(e.target.value);}} style={inputStyle} /></div>{rechnungsTyp==='abschlag'&&<div><label style={{fontSize:'10px',color:'var(--text-muted)',display:'block'}}>Abschlags-Nr.</label><input type="text" inputMode="numeric" value={abschlagNr} onChange={function(e){setAbschlagNr(parseInt(e.target.value)||1);}} style={inputStyle} /></div>}<div style={{gridColumn:'span 2'}}><MicLabel fieldKey="re_lz" label="Leistungszeitraum" /><div style={{display:'flex',gap:'3px'}}><MicInput fieldKey="re_lz" value={leistungszeitraum} onChange={function(e){setLeistungszeitraum(e.target.value);}} placeholder="z.B. 01.01. - 31.03.2026" style={Object.assign({},inputStyle,{flex:1})} /><MicButton fieldKey="re_lz" size="small" onResult={function(t){setLeistungszeitraum((leistungszeitraum||'')+' '+t);}} /></div></div>{istRechnung&&<div><MicLabel fieldKey="re_nr" label="Rechnungs-Nr." /><div style={{display:'flex',gap:'3px'}}><MicInput fieldKey="re_nr" value={rechnungsNr} onChange={function(e){setRechnungsNr(e.target.value);}} style={Object.assign({},inputStyle,{flex:1})} /><MicButton fieldKey="re_nr" size="small" onResult={function(t){setRechnungsNr(rechnungsNr+t);}} /></div></div>}{rechnungsTyp==='nachtrag'&&<div><MicLabel fieldKey="re_nt" label="Nachtrags-Nr." /><div style={{display:'flex',gap:'3px'}}><MicInput fieldKey="re_nt" value={nachtragsNr} onChange={function(e){setNachtragsNr(e.target.value);}} style={Object.assign({},inputStyle,{flex:1})} /><MicButton fieldKey="re_nt" size="small" onResult={function(t){setNachtragsNr(nachtragsNr+t);}} /></div></div>}{rechnungsTyp==='angebot'&&<div><MicLabel fieldKey="re_ag" label="Angebots-Nr." /><div style={{display:'flex',gap:'3px'}}><MicInput fieldKey="re_ag" value={angebotsNr} onChange={function(e){setAngebotsNr(e.target.value);}} style={Object.assign({},inputStyle,{flex:1})} /><MicButton fieldKey="re_ag" size="small" onResult={function(t){setAngebotsNr(angebotsNr+t);}} /></div></div>}<div><MicLabel fieldKey="re_auftr" label="Auftragsnummer" /><div style={{display:'flex',gap:'3px'}}><MicInput fieldKey="re_auftr" value={auftragsnummer} onChange={function(e){setAuftragsnummer(e.target.value);}} placeholder="z.B. A-2026-001" style={Object.assign({},inputStyle,{flex:1})} /><MicButton fieldKey="re_auftr" size="small" onResult={function(t){setAuftragsnummer((auftragsnummer||'')+t);}} /></div></div><div><MicLabel fieldKey="re_kst" label="Kostenstelle" /><div style={{display:'flex',gap:'3px'}}><MicInput fieldKey="re_kst" value={kostenstelle} onChange={function(e){setKostenstelle(e.target.value);}} placeholder="optional" style={Object.assign({},inputStyle,{flex:1})} /><MicButton fieldKey="re_kst" size="small" onResult={function(t){setKostenstelle((kostenstelle||'')+t);}} /></div></div></div></div>{rechnungsTyp==='schluss'&&<button onClick={function(){setShowKontoDialog(true);ladeKontozahlungen();}} style={{width:'100%',padding:'10px',marginBottom:'10px',borderRadius:'10px',border:'2px solid #27ae60',background:'rgba(39,174,96,0.08)',color:'var(--success)',fontSize:'12px',fontWeight:700,cursor:'pointer'}}>Kontozahlungen ({kontozahlungen.length}) - Summe: {fmt(kontoSumme)} {'\u20AC'}</button>}{showKontoDialog&&<div className="modal-overlay" onClick={function(){setShowKontoDialog(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'420px',maxHeight:'80vh',overflow:'auto'}}><div className="modal-title">Kontozahlungen</div>{kontozahlungen.map(function(k,i){return<div key={k.id} style={{padding:'8px 12px',borderBottom:'1px solid var(--border-color)',display:'flex',alignItems:'center',gap:'8px'}}><input type="checkbox" checked={k.aufgefuehrt} onChange={function(){setKontozahlungen(function(prev){return prev.map(function(kk,ii){return ii===i?Object.assign({},kk,{aufgefuehrt:!kk.aufgefuehrt}):kk;});});}} /><div style={{flex:1,fontSize:'12px',fontWeight:600}}>{k.nr} vom {k.datum}</div><div style={{fontWeight:700,color:'var(--success)'}}>{fmt(k.betrag)} {'\u20AC'}</div></div>;})}<button onClick={function(){setShowKontoDialog(false);}} style={{width:'100%',padding:'10px',marginTop:'8px',background:typColor,color:'white',border:'none',borderRadius:'10px',fontWeight:700,cursor:'pointer'}}>OK</button></div></div>}<div style={{background:'var(--bg-secondary)',borderRadius:'12px',padding:'12px',marginBottom:'10px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}><div style={{fontSize:'11px',fontWeight:700,color:typColor}}>Positionen ({aktivePosn.length})</div><button onClick={addPosition} style={{padding:'3px 8px',fontSize:'10px',background:typColor,color:'white',border:'none',borderRadius:'6px',cursor:'pointer'}}>+ Neu</button></div><div style={{display:'grid',gridTemplateColumns:'28px 38px 52px 36px 1fr 62px 68px',gap:'2px',padding:'4px 2px',fontSize:'9px',fontWeight:700,color:'var(--text-muted)',textTransform:'uppercase',borderBottom:'2px solid var(--border-color)'}}><span></span><span>Pos.</span><span style={{textAlign:'right'}}>Menge</span><span style={{textAlign:'center'}}>Einh.</span><span>Bezeichnung</span><span style={{textAlign:'right'}}>EP</span><span style={{textAlign:'right'}}>GP</span></div>{positionen.length===0?<div style={{textAlign:'center',padding:'16px',color:'var(--text-muted)',fontSize:'12px'}}>Keine Positionen.</div>:<div>{positionen.map(function(p){var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);return(<div key={p.id} style={{display:'grid',gridTemplateColumns:'28px 38px 52px 36px 1fr 62px 68px',gap:'2px',padding:'6px 2px',borderBottom:'1px solid var(--border-color)',alignItems:'start',opacity:p.aktiv?1:0.3}}><div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'2px',paddingTop:'2px'}}><input type="checkbox" checked={p.aktiv} onChange={function(){updatePos(p.id,'aktiv',!p.aktiv);}} /><button onClick={function(){removePosition(p.id);}} style={{background:'none',border:'none',color:'var(--accent-red-light)',fontSize:'10px',cursor:'pointer',padding:0}}>{'\u2715'}</button></div><input value={p.pos} onChange={function(e){updatePos(p.id,'pos',e.target.value);}} style={{padding:'4px 3px',borderRadius:'4px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'11px',fontWeight:700,color:typColor,textAlign:'center',width:'100%',boxSizing:'border-box'}} /><input type="text" inputMode="decimal" value={p.menge||''} onChange={function(e){updatePos(p.id,'menge',e.target.value);}} onBlur={function(e){var v=parseFloat(e.target.value);updatePos(p.id,'menge',isNaN(v)?0:Number(v.toFixed(2)));}} style={{padding:'4px',borderRadius:'4px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'11px',textAlign:'right',width:'100%',boxSizing:'border-box'}} /><input value={p.einheit} onChange={function(e){updatePos(p.id,'einheit',e.target.value);}} style={{padding:'4px 2px',borderRadius:'4px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'10px',textAlign:'center',width:'100%',boxSizing:'border-box'}} /><div><div contentEditable={true} suppressContentEditableWarning={true} onBlur={function(e){updatePos(p.id,'bez',e.target.innerText);}} style={{padding:'4px 6px',borderRadius:'4px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'11px',lineHeight:'1.4',minHeight:'28px',wordBreak:'break-word',outline:'none'}}>{p.bez}</div></div><input type="text" inputMode="decimal" value={p.einzelpreis||''} onChange={function(e){updatePos(p.id,'einzelpreis',e.target.value);}} onBlur={function(e){var v=parseFloat(e.target.value);updatePos(p.id,'einzelpreis',isNaN(v)?0:Number(v.toFixed(2)));}} style={{padding:'4px',borderRadius:'4px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'11px',textAlign:'right',width:'100%',boxSizing:'border-box'}} /><div style={{fontSize:'12px',fontWeight:700,textAlign:'right',padding:'4px 2px',color:typColor}}>{fmt(gp)} {'\u20AC'}</div></div>);})}</div>}</div>{istRechnung&&<div style={{background:'var(--bg-secondary)',borderRadius:'12px',padding:'12px',marginBottom:'10px'}}><div style={{fontSize:'11px',fontWeight:700,color:'var(--text-secondary)',marginBottom:'8px'}}>Konditionen</div><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:'6px'}}><div><label style={{fontSize:'9px',color:'var(--text-muted)',display:'block'}}>Skonto %</label><input type="text" inputMode="decimal" value={skontoProzent} onChange={function(e){setSkontoProzent(parseFloat(e.target.value)||0);}} style={smallInputStyle} /></div><div><label style={{fontSize:'9px',color:'var(--text-muted)',display:'block'}}>Skonto Tage</label><input type="text" inputMode="numeric" value={skontoTage} onChange={function(e){setSkontoTage(parseInt(e.target.value)||0);}} style={smallInputStyle} /></div><div><label style={{fontSize:'9px',color:'var(--text-muted)',display:'block'}}>Zahlungsziel</label><input type="text" inputMode="numeric" value={zahlungszielTage} onChange={function(e){setZahlungszielTage(parseInt(e.target.value)||0);}} style={smallInputStyle} /></div><div><label style={{fontSize:'9px',color:'var(--text-muted)',display:'block'}}>Einbehalt %</label><input type="text" inputMode="decimal" value={sicherheitseinbehalt} onChange={function(e){setSicherheitseinbehalt(parseFloat(e.target.value)||0);}} style={smallInputStyle} /></div></div></div>}<div style={{background:'var(--bg-secondary)',borderRadius:'12px',padding:'12px',marginBottom:'10px'}}><MicLabel fieldKey="re_bem" label="Bemerkung" /><div style={{display:'flex',gap:'4px',alignItems:'flex-start'}}><MicInput fieldKey="re_bem" multiline={true} value={bemerkung} onChange={function(e){setBemerkung(e.target.value);}} rows={2} placeholder="Optionaler Zusatztext..." style={{flex:1,padding:'8px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'12px',color:'var(--text-primary)',resize:'vertical',boxSizing:'border-box'}} /><MicButton fieldKey="re_bem" size="normal" onResult={function(t){setBemerkung((bemerkung||'')+(bemerkung?' ':'')+t);}} /></div></div><div style={{background:'var(--bg-secondary)',borderRadius:'12px',padding:'14px',marginBottom:'10px',boxShadow:'0 2px 8px rgba(0,0,0,0.12)'}}><div style={{fontSize:'11px',fontWeight:700,color:'var(--text-secondary)',marginBottom:'8px'}}>Berechnung</div><div style={{fontSize:'13px',lineHeight:2}}><div style={{display:'flex',justifyContent:'space-between'}}><span>Nettobetrag:</span><span style={{fontWeight:600}}>{fmt(nettoSumme)} {'\u20AC'}</span></div><div style={{display:'flex',justifyContent:'space-between',color:'var(--text-muted)',fontSize:'12px'}}><span>zzgl. MwSt. {mwstSatz}%:</span><span>{fmt(mwstBetrag)} {'\u20AC'}</span></div><div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:'16px',borderTop:'2px solid var(--border-color)',paddingTop:'4px',marginTop:'2px'}}><span>Bruttobetrag:</span><span>{fmt(bruttoSumme)} {'\u20AC'}</span></div>{istRechnung&&sicherheitseinbehalt>0&&<div style={{display:'flex',justifyContent:'space-between',color:'var(--text-muted)',fontSize:'11px'}}><span>abzgl. Einbehalt {sicherheitseinbehalt}%:</span><span>{'\u2013'} {fmt(sicherheitBetrag)} {'\u20AC'}</span></div>}{rechnungsTyp==='schluss'&&kontoSumme>0&&<div style={{display:'flex',justifyContent:'space-between',color:'var(--success)',fontWeight:600}}><span>abzgl. Kontozahlungen:</span><span>{'\u2013'} {fmt(kontoSumme)} {'\u20AC'}</span></div>}{istRechnung&&<React.Fragment><div style={{display:'flex',justifyContent:'space-between',color:typColor,fontWeight:700,marginTop:'2px',fontSize:'13px'}}><span>Skonto ({skontoProzent}%, {skontoTage}T):</span><span>{fmt(zahlbetragMitSkonto)} {'\u20AC'}</span></div><div style={{display:'flex',justifyContent:'space-between',fontWeight:600,fontSize:'13px'}}><span>Netto ({zahlungszielTage}T):</span><span>{fmt(zahlbetragOhneSkonto)} {'\u20AC'}</span></div></React.Fragment>}</div></div>{showMailDialog&&<div className="modal-overlay" onClick={function(){setShowMailDialog(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'380px'}}><div className="modal-title">Per E-Mail senden</div><div style={{marginBottom:'12px'}}><label style={{fontSize:'11px',color:'var(--text-muted)',display:'block',marginBottom:'4px'}}>Empfaenger</label><input type="email" value={mailAdresse} onChange={function(e){setMailAdresse(e.target.value);}} placeholder="empfaenger@firma.de" style={{width:'100%',padding:'10px 12px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'14px',color:'var(--text-primary)',boxSizing:'border-box'}} autoFocus />{kunde.ag_email&&kunde.ag_email!==mailAdresse&&<button onClick={function(){setMailAdresse(kunde.ag_email);}} style={{marginTop:'6px',padding:'4px 8px',fontSize:'10px',background:'rgba(30,136,229,0.1)',color:'var(--accent-blue)',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'6px',cursor:'pointer'}}>AG: {kunde.ag_email}</button>}</div><div style={{display:'flex',gap:'8px'}}><button onClick={function(){setShowMailDialog(false);}} style={{flex:1,padding:'10px',background:'var(--bg-tertiary)',color:'var(--text-muted)',border:'none',borderRadius:'10px',fontSize:'13px',cursor:'pointer'}}>Abbrechen</button><button onClick={confirmAndSend} style={{flex:2,padding:'10px',background:'linear-gradient(135deg, #e67e22, #d35400)',color:'white',border:'none',borderRadius:'10px',fontSize:'13px',fontWeight:700,cursor:'pointer'}}>PDF + Mail</button></div></div></div>}<div style={{position:'fixed',bottom:0,left:0,right:0,padding:'10px 16px',background:'var(--bg-primary)',borderTop:'1px solid var(--border-color)',zIndex:100}}><div style={{display:'flex',gap:'8px',marginBottom:showFormatWahl?'8px':'0'}}><button onClick={function(){setPhase('startseite');}} style={{padding:'12px 10px',background:'var(--bg-tertiary)',color:'var(--text-muted)',border:'none',borderRadius:'10px',fontSize:'12px',cursor:'pointer',minWidth:'44px',minHeight:'44px'}}>{'\u2190'}</button><button onClick={function(){setShowFormatWahl(!showFormatWahl);}} style={{flex:1,padding:'12px',background:'linear-gradient(135deg, '+typColor+', '+typColor+'cc)',color:'white',border:'none',borderRadius:'10px',fontSize:'14px',fontWeight:700,cursor:'pointer',minHeight:'48px'}}>{istRechnung?'Rechnung erstellen':rechnungsTyp==='nachtrag'?'Nachtrag erstellen':'Angebot erstellen'} {showFormatWahl?'\u25BC':'\u25B2'}</button><button onClick={openMailDialog} style={{padding:'12px 16px',background:'linear-gradient(135deg, #e67e22, #d35400)',color:'white',border:'none',borderRadius:'10px',fontWeight:700,cursor:'pointer',minHeight:'48px'}}>{'\u2709'}</button></div>{showFormatWahl&&<div style={{display:'flex',flexDirection:'column',gap:'6px',padding:'8px 0 4px'}}><button onClick={function(){generatePDF();setShowFormatWahl(false);}} style={{width:'100%',padding:'14px 16px',borderRadius:'12px',border:'1px solid var(--border-color)',background:'var(--bg-secondary)',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px',textAlign:'left',minHeight:'56px'}}><span style={{fontSize:'24px'}}>&#128196;</span><div style={{flex:1}}><div style={{fontSize:'14px',fontWeight:700}}>PDF-Dokument</div><div style={{fontSize:'11px',color:'var(--text-muted)'}}>Standard-PDF</div></div></button>{istRechnung&&<React.Fragment><button onClick={function(){downloadZUGFeRD();setShowFormatWahl(false);}} style={{width:'100%',padding:'14px 16px',borderRadius:'12px',border:'1px solid rgba(39,174,96,0.3)',background:'rgba(39,174,96,0.05)',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px',textAlign:'left',minHeight:'56px'}}><span style={{fontSize:'24px'}}>&#128203;</span><div style={{flex:1}}><div style={{fontSize:'14px',fontWeight:700,color:'var(--success)'}}>ZUGFeRD</div><div style={{fontSize:'11px',color:'var(--text-muted)'}}>PDF + XML fuer B2B</div></div></button><button onClick={function(){downloadXRechnung();setShowFormatWahl(false);}} style={{width:'100%',padding:'14px 16px',borderRadius:'12px',border:'1px solid rgba(30,136,229,0.3)',background:'rgba(30,136,229,0.05)',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px',textAlign:'left',minHeight:'56px'}}><span style={{fontSize:'24px'}}>&#127963;</span><div style={{flex:1}}><div style={{fontSize:'14px',fontWeight:700,color:'var(--accent-blue)'}}>XRechnung</div><div style={{fontSize:'11px',color:'var(--text-muted)'}}>XML fuer Behoerden</div></div></button></React.Fragment>}</div>}</div></div>);
         }
 
-        /* ========== tw-schriftverkehr.jsx ========== */
         function SchriftverkehrModul({ kunde, onBack }) {
             // ── Phasen: 'kanalwahl' → 'formular' ──
             const [phase, setPhase] = useState('kanalwahl');
@@ -16955,7 +16470,14 @@
 
             // Formular-State
             const [empfaenger, setEmpfaenger] = useState(kunde ? (kunde.auftraggeber || kunde.name || '') : '');
-            const [empfAdresse, setEmpfAdresse] = useState(kunde ? (kunde.ag_adresse || kunde.adresse || '') : '');
+            const [empfAdresse, setEmpfAdresse] = useState(function() {
+                if (!kunde) return '';
+                // Separate Felder haben Vorrang
+                var str = kunde.auftraggeber_strasse || '';
+                var plz = kunde.auftraggeber_plzOrt || '';
+                if (str || plz) return (str + (str && plz ? ', ' : '') + plz).trim();
+                return kunde.ag_adresse || kunde.adresse || '';
+            });
             const [empfEmail, setEmpfEmail] = useState(kunde ? (kunde.ag_email || '') : '');
             const [bauvorhaben, setBauvorhaben] = useState(kunde ? (kunde.adresse || kunde.baumassnahme || kunde.name || '') : '');
             const [ihrZeichen, setIhrZeichen] = useState('');
@@ -17034,7 +16556,7 @@
                 if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});} }
 
                 var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + betreff + '</title>';
-                h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">';
+                h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=block" rel="stylesheet">';
                 h += '<style>';
                 h += '@page{size:A4;margin:0}';
                 h += '*{box-sizing:border-box;margin:0;padding:0}';
@@ -17045,7 +16567,7 @@
                 h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}';
                 h += '.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
                 h += '.lt{font-family:"Source Sans 3",serif;font-style:italic;font-weight:700;color:#c41e1e;font-size:13px;margin-bottom:-14px;padding-left:1px;position:relative;z-index:2}';
-                h += '.lw{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1}';
+                h += '.lw{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1;-webkit-text-stroke:0.4px #111}';
                 h += '.lw .w{font-size:52px}.lw .iw{position:relative;font-size:52px;display:inline-block}';
                 h += '.lw .iw .ic{font-size:52px;color:#111}.lw .iw .id{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:#c41e1e}';
                 h += '.lw .ll{font-size:68px;letter-spacing:1px;line-height:0.75}.lw .wa{font-size:52px}';
@@ -17110,6 +16632,7 @@
                 h += '<div>Flurweg 14a \u00b7 56472 Nisterau \u00b7 Tel. 02661-63101 \u00b7 Mobil 0170-2024161</div>';
                 h += '<div>Steuernummer: 30/220/1234/5 \u00b7 Westerwald Bank eG \u00b7 IBAN: DE12 5739 1800 0000 0000 00 \u00b7 BIC: GENODE51WW1</div></div>';
 
+                h += '<script>document.fonts.ready.then(function(){setTimeout(function(){window.focus();window.print();},400);});<\/script>';
                 h += '</div></body></html>';
                 return h;
             };
@@ -17120,7 +16643,6 @@
                 var pw = window.open('', '_blank', 'width=820,height=1160');
                 pw.document.write(h);
                 pw.document.close();
-                setTimeout(function() { pw.focus(); pw.print(); }, 800);
             };
 
             // ── Gmail-API Versand (direkt!) ──
@@ -17437,7 +16959,6 @@
            Auto-Save · Alarm bei Zahlungsziel · Umsatzanalyse · Editierbar
            ═══════════════════════════════════════════ */
 
-        /* ========== tw-ausgangsbuch.jsx ========== */
         function RechnungsAusgangsbuch({ kunde, onBack }) {
             const AB_KEY = 'tw_ausgangsbuch';
             const SETTINGS_KEY = 'tw_ausgangsbuch_settings';
@@ -17858,7 +17379,6 @@
            Kunden an Baustellen-App pushen, Mitarbeiter freigeben
            ═══════════════════════════════════════════ */
 
-        /* ========== tw-baustelle.jsx ========== */
         function BaustellenAppAdmin({ kunde, onBack }) {
             const [tab, setTab] = useState('kunde');
             const [fbOk, setFbOk] = useState(false);
@@ -18237,7 +17757,242 @@
         }
 
 
-        /* ========== tw-app.jsx ========== */
+        /* DatenUebersicht v4 — kunde._importResult als Fallback */
+        function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen, onGoToOrdner }) {
+            var ir = importResult || (kunde && kunde._importResult) || {};
+            var kd = ir.kundendaten || {};
+            var stamm = (ir.stammdaten || (kunde && kunde._stammdaten) || {});
+            var [activeTab, setActiveTab] = useState('stammdaten');
+            var [editMode, setEditMode] = useState(false);
+            var [savedMsg, setSavedMsg] = useState('');
+            var bauherr = stamm.bauherr || {};
+            var bauleiter = stamm.bauleiter || {};
+            var architekt = stamm.architekt || {};
+            var objekt = stamm.objektdaten || {};
+            var [stammFelder, setStammFelder] = useState({
+                projekt: stamm.projekt || kd.projekt || '',
+                bauherr_firma: bauherr.firma || kd.auftraggeber || '',
+                bauherr_strasse: bauherr.strasse || kd.auftraggeber_strasse || '',
+                bauherr_plzOrt: (bauherr.plzOrt || ((bauherr.plz || '') + ' ' + (bauherr.ort || '')).trim()) || '',
+                bauherr_ansprechpartner: bauherr.ansprechpartner || kd.auftraggeber_ansprechpartner || '',
+                bauherr_telefon: bauherr.telefon || kd.auftraggeber_telefon || '',
+                bauherr_email: bauherr.email || kd.auftraggeber_email || '',
+                bauleiter_firma: bauleiter.firma || bauleiter.name || kd.bauleitung || '',
+                bauleiter_telefon: bauleiter.telefon || kd.bauleitung_telefon || '',
+                bauleiter_email: bauleiter.email || kd.bauleitung_email || '',
+                architekt_buero: architekt.buero || kd.architekt || '',
+                architekt_bearbeiter: architekt.projektbearbeiter || kd.architekt_bearbeiter || '',
+                architekt_telefon: architekt.telefon || kd.architekt_telefon || '',
+                architekt_email: architekt.emailInhaber || architekt.emailBearbeiter || kd.architekt_email || '',
+                objekt_bauvorhaben: objekt.bauvorhaben || kd.baumassnahme || '',
+                objekt_baustelle: objekt.baustelleStrasse || kd.adresse || '',
+                objekt_plzOrt: objekt.baustellePlzOrt || kd.plzOrt || '',
+                objekt_gewerk: objekt.gewerk || kd.gewerk || 'Fliesenarbeiten',
+                objekt_auftragsdatum: objekt.auftragsdatum || kd.auftragsdatum || '',
+                objekt_netto: objekt.auftragssummeNetto || kd.auftragssummeNetto || '',
+                objekt_brutto: objekt.auftragssummeBrutto || kd.auftragssummeBrutto || '',
+            });
+            var allPos = (ir.positionen || (kunde && kunde._lvPositionen) || []);
+            var [positionen, setPositionen] = useState(allPos.map(function(p, idx) {
+                return { _idx: idx, pos: p.pos || '', bez: p.bez || '', einheit: p.einheit || 'm\u00b2', menge: p.menge || 0, einzelpreis: p.einzelpreis || 0, kategorie: p.kategorie || '', _istNachtrag: p._istNachtrag || false };
+            }));
+            var allRaeume = (ir.raeume || (kunde && kunde._raeume) || []);
+            var [raeume, setRaeume] = useState(allRaeume.map(function(r, idx) {
+                return { _idx: idx, nr: r.nr || '', bez: r.bez || '', geschoss: r.geschoss || '', flaeche: r.flaeche || 0, umfang: r.umfang || 0, bemerkung: r.bemerkung || '' };
+            }));
+            var tap = function(fn) { return { onTouchEnd: function(e){ e.preventDefault(); e.stopPropagation(); fn(); }, onClick: function(){ fn(); } }; };
+            var touchBase = { WebkitTapHighlightColor:'rgba(30,136,229,0.2)', touchAction:'manipulation', userSelect:'none', WebkitUserSelect:'none' };
+            var fmtZahl = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+            var fmtEuro = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20ac'; };
+
+            // CRUD
+            var updateStammFeld = function(key, val) { setStammFelder(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
+            var updatePosition = function(idx, field, val) { setPositionen(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
+            var addPosition = function() { setPositionen(function(prev) { return prev.concat([{ _idx: prev.length, pos: '', bez: '', einheit: 'm\u00b2', menge: 0, einzelpreis: 0, kategorie: '', _istNachtrag: false }]); }); };
+            var removePosition = function(idx) { if (!confirm('Position ' + (positionen[idx].pos || idx+1) + ' loeschen?')) return; setPositionen(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
+            var updateRaum = function(idx, field, val) { setRaeume(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
+            var addRaum = function() { setRaeume(function(prev) { return prev.concat([{ _idx: prev.length, nr: '', bez: '', geschoss: 'EG', flaeche: 0, umfang: 0, bemerkung: '' }]); }); };
+            var removeRaum = function(idx) { if (!confirm('Raum ' + (raeume[idx].nr || idx+1) + ' loeschen?')) return; setRaeume(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
+
+            // Speichern OHNE Navigation
+            var handleSave = function() {
+                setEditMode(false);
+                if (onSave) { onSave({ stammFelder: stammFelder, positionen: positionen, raeume: raeume }); }
+                setSavedMsg('Daten gespeichert und in Module geladen!');
+                setTimeout(function() { setSavedMsg(''); setActiveTab('stammdaten'); }, 2000);
+            };
+
+            // ── Spracheingabe (globaler Service) ──
+            var activeMic = useSpeech();
+            var startSpeech = function(fieldKey, callback) {
+                TWSpeechService.start(fieldKey, callback);
+            };
+
+            // ── Zahl-Input: type=text, beim Focus leeren wenn 0, beim Blur formatieren ──
+            var zahlInput = function(value, onChange, extra) {
+                return React.createElement('input', Object.assign({
+                    type: 'text',
+                    inputMode: 'decimal',
+                    defaultValue: (parseFloat(value) || 0) === 0 ? '' : fmtZahl(value),
+                    onFocus: function(e) {
+                        var v = parseFloat(value) || 0;
+                        if (v === 0) { e.target.value = ''; }
+                        else { e.target.value = String(v).replace('.', ','); }
+                        setTimeout(function() { try { e.target.select(); } catch(x){} }, 50);
+                    },
+                    onBlur: function(e) {
+                        var parsed = parseFloat(e.target.value.replace(/\s/g, '').replace(',', '.')) || 0;
+                        e.target.value = parsed === 0 ? '' : fmtZahl(parsed);
+                        onChange(parsed);
+                    },
+                    style: Object.assign({ width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', textAlign:'right', color:'var(--text-primary)', boxSizing:'border-box' }, extra || {})
+                }));
+            };
+
+            var tabs = [
+                { id: 'stammdaten', label: 'Kundendaten', icon: '\uD83D\uDCCB', count: null },
+                { id: 'positionen', label: 'Positionen', icon: '\uD83D\uDCCE', count: positionen.length },
+                { id: 'raeume', label: 'Raeume', icon: '\uD83C\uDFE0', count: raeume.length }
+            ];
+            var inputStyle = function(extra) { return Object.assign({ width:'100%', padding:'8px 10px', borderRadius:'8px', fontSize:'13px', color:'var(--text-primary)', boxSizing:'border-box', background: editMode ? 'var(--bg-tertiary)' : 'var(--bg-secondary)', border: editMode ? '2px solid var(--accent-blue)' : '1px solid var(--border-color)', opacity: editMode ? 1 : 0.8 }, extra || {}); };
+
+            // ── Stammdaten-Sektion mit Sprache ──
+            var sectionCard = function(icon, title, fields) {
+                return (
+                    <div style={{background:'var(--bg-secondary)', borderRadius:'14px', padding:'16px', marginBottom:'12px', border:'1px solid var(--border-color)'}}>
+                        <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}>
+                            <span style={{fontSize:'18px'}}>{icon}</span> {title}
+                        </div>
+                        <div style={{display:'grid', gap:'8px'}}>
+                            {fields.map(function(f) { return (
+                                <div key={f[0]}>
+                                    <MicLabel fieldKey={'du_' + f[0]} label={f[1]} />
+                                    <div style={{display:'flex', gap:'4px'}}>
+                                        <MicInput fieldKey={'du_' + f[0]} value={stammFelder[f[0]] || ''} readOnly={!editMode} onChange={function(e){ updateStammFeld(f[0], e.target.value); }} style={inputStyle({flex:1})} />
+                                        {editMode && (
+                                            <MicButton fieldKey={'du_' + f[0]} size="normal" onResult={function(text){ updateStammFeld(f[0], (stammFelder[f[0]] || '') + (stammFelder[f[0]] ? ' ' : '') + text); }} />
+                                        )}
+                                    </div>
+                                </div>
+                            ); })}
+                        </div>
+                    </div>
+                );
+            };
+            var cellEdit = function(val, onChange, extra) { return <input value={val} onChange={onChange} style={Object.assign({width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}, extra || {})} />; };
+
+            return (
+                <div style={{padding:'12px 16px', minHeight:'100vh', background:'var(--bg-primary)', paddingBottom:'180px'}}>
+                    <div style={{textAlign:'center', marginBottom:'16px'}}>
+                        <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>{stammFelder.bauherr_firma || (kunde && kunde.name) || 'Kundendaten'}</div>
+                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{stammFelder.objekt_bauvorhaben || 'Projekt'}</div>
+                    </div>
+                    {savedMsg && (<div style={{padding:'10px 16px', background:'rgba(30,136,229,0.12)', border:'1px solid rgba(30,136,229,0.3)', borderRadius:'10px', marginBottom:'12px', fontSize:'13px', color:'#1E88E5', fontWeight:'600', textAlign:'center'}}>{savedMsg}</div>)}
+                    <div style={{display:'flex', gap:'4px', marginBottom:'12px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
+                        {tabs.map(function(tab) { var isActive = activeTab === tab.id; return (
+                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border: isActive ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: isActive ? 'linear-gradient(135deg, #42a5f5, #1E88E5)' : 'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease', boxShadow: isActive ? '0 0 12px rgba(30,136,229,0.5), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', opacity: isActive ? 1 : 0.55, textShadow: isActive ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', transform: isActive ? 'scale(1.04)' : 'scale(1)' }, touchBase)}>
+                                <span style={{fontSize:'16px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
+                                {tab.label}{tab.count !== null && <span style={{marginLeft:'4px', fontSize:'10px', opacity:0.8}}>({tab.count})</span>}
+                            </button>
+                        ); })}
+                    </div>
+                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                        {!editMode ? (
+                            <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
+                        ) : (
+                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beenden & Daten in Module laden</button>
+                        )}
+                    </div>
+
+                    {activeTab === 'stammdaten' && (
+                        <div>
+                            {sectionCard('\uD83C\uDFE2', 'Bauherr / Auftraggeber', [['bauherr_firma','Firma / Name'],['bauherr_strasse','Strasse'],['bauherr_plzOrt','PLZ / Ort'],['bauherr_ansprechpartner','Ansprechpartner'],['bauherr_telefon','Telefon'],['bauherr_email','E-Mail']])}
+                            {sectionCard('\uD83D\uDC77', 'Bauleitung', [['bauleiter_firma','Firma / Name'],['bauleiter_telefon','Telefon'],['bauleiter_email','E-Mail']])}
+                            {sectionCard('\uD83D\uDCD0', 'Architekt / Planer', [['architekt_buero','Buero / Firma'],['architekt_bearbeiter','Projektbearbeiter'],['architekt_telefon','Telefon'],['architekt_email','E-Mail']])}
+                            {sectionCard('\uD83C\uDFD7', 'Objektdaten', [['objekt_bauvorhaben','Bauvorhaben'],['objekt_baustelle','Baustellenadresse'],['objekt_plzOrt','PLZ / Ort'],['objekt_gewerk','Gewerk'],['objekt_auftragsdatum','Auftragsdatum'],['objekt_netto','Auftragssumme netto'],['objekt_brutto','Auftragssumme brutto']])}
+                        </div>
+                    )}
+
+                    {activeTab === 'positionen' && (
+                        <div style={{overflowX:'auto'}}>
+                            <div style={{minWidth:'580px'}}>
+                                <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
+                                    <div>Pos-Nr.</div><div style={{textAlign:'right'}}>Menge</div><div style={{textAlign:'center'}}>Einh.</div><div>Leistungsbeschreibung</div><div style={{textAlign:'right'}}>EP netto</div><div style={{textAlign:'right'}}>GP netto</div>
+                                </div>
+                                {positionen.map(function(p, idx) {
+                                    var gp = Math.round((p.menge || 0) * (p.einzelpreis || 0) * 100) / 100;
+                                    return (
+                                        <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '58px 60px 42px 1fr 78px 88px 28px' : '58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: p._istNachtrag ? 'rgba(230,126,34,0.06)' : (idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent'), borderBottom:'1px solid var(--border-color)', borderLeft: p._istNachtrag ? '3px solid #e67e22' : '3px solid transparent'}}>
+                                            {editMode ? cellEdit(p.pos, function(e){updatePosition(idx,'pos',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px', color: p._istNachtrag ? '#e67e22' : 'var(--text-primary)'}}>{p.pos}</div>}
+                                            {editMode ? zahlInput(p.menge, function(v){updatePosition(idx,'menge',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(p.menge)}</div>}
+                                            {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
+                                            {editMode ? (
+                                                <div style={{display:'flex', gap:'2px'}}>
+                                                    <input value={p.bez} onChange={function(e){updatePosition(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
+                                                    <MicButton fieldKey={'pos_bez_' + idx} size="small" onResult={function(text){ updatePosition(idx, 'bez', (p.bez ? p.bez + ' ' : '') + text); }} />
+                                                </div>
+                                            ) : <div style={{fontSize:'11px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.bez}>{p.bez}</div>}
+                                            {editMode ? zahlInput(p.einzelpreis, function(v){updatePosition(idx,'einzelpreis',v);}) : <div style={{textAlign:'right', fontSize:'11px', fontFamily:'monospace'}}>{fmtEuro(p.einzelpreis)}</div>}
+                                            <div style={{textAlign:'right', fontSize:'11px', fontWeight:'600', fontFamily:'monospace'}}>{fmtEuro(gp)}</div>
+                                            {editMode && <button {...tap(function(){removePosition(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
+                                        </div>
+                                    );
+                                })}
+                                {positionen.length > 0 && (
+                                    <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
+                                        <div></div><div></div><div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>SUMME NETTO:</div><div></div>
+                                        <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'13px'}}>{fmtEuro(positionen.reduce(function(s,p){return s+Math.round((p.menge||0)*(p.einzelpreis||0)*100)/100;},0))}</div>
+                                    </div>
+                                )}
+                            </div>
+                            {editMode && <button {...tap(addPosition)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed var(--accent-red)',background:'rgba(196,30,30,0.05)',color:'var(--accent-red-light)',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neue Position</button>}
+                            {positionen.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83D\uDCCE'}</div><div>Keine Positionen</div></div>}
+                        </div>
+                    )}
+
+                    {activeTab === 'raeume' && (
+                        <div style={{overflowX:'auto'}}>
+                            <div style={{minWidth:'420px'}}>
+                                <div style={{display:'grid', gridTemplateColumns:'70px 1fr 50px 70px 70px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
+                                    <div>Raum-Nr.</div><div>Bezeichnung</div><div style={{textAlign:'center'}}>Gesch.</div><div style={{textAlign:'right'}}>Flaeche</div><div style={{textAlign:'right'}}>Umfang</div>
+                                </div>
+                                {raeume.map(function(r, idx) { return (
+                                    <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '70px 1fr 50px 70px 70px 28px' : '70px 1fr 50px 70px 70px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent', borderBottom:'1px solid var(--border-color)'}}>
+                                        {editMode ? cellEdit(r.nr, function(e){updateRaum(idx,'nr',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px'}}>{r.nr}</div>}
+                                        {editMode ? (
+                                            <div style={{display:'flex', gap:'2px'}}>
+                                                <input value={r.bez} onChange={function(e){updateRaum(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
+                                                <MicButton fieldKey={'raum_bez_' + idx} size="small" onResult={function(text){ updateRaum(idx, 'bez', (r.bez ? r.bez + ' ' : '') + text); }} />
+                                            </div>
+                                        ) : <div style={{fontSize:'11px'}}>{r.bez}</div>}
+                                        {editMode ? cellEdit(r.geschoss, function(e){updateRaum(idx,'geschoss',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{r.geschoss}</div>}
+                                        {editMode ? zahlInput(r.flaeche, function(v){updateRaum(idx,'flaeche',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(r.flaeche)} m\u00b2</div>}
+                                        {editMode ? zahlInput(r.umfang, function(v){updateRaum(idx,'umfang',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(r.umfang)} m</div>}
+                                        {editMode && <button {...tap(function(){removeRaum(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
+                                    </div>
+                                ); })}
+                                {raeume.length > 0 && (
+                                    <div style={{display:'grid', gridTemplateColumns:'70px 1fr 50px 70px 70px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
+                                        <div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>GESAMT:</div><div></div>
+                                        <div style={{textAlign:'right'}}>{fmtZahl(raeume.reduce(function(s,r){return s+(r.flaeche||0);},0))} m\u00b2</div>
+                                        <div style={{textAlign:'right'}}>{fmtZahl(raeume.reduce(function(s,r){return s+(r.umfang||0);},0))} m</div>
+                                    </div>
+                                )}
+                            </div>
+                            {editMode && <button {...tap(addRaum)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed var(--accent-red)',background:'rgba(196,30,30,0.05)',color:'var(--accent-red-light)',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neuer Raum</button>}
+                            {raeume.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83C\uDFE0'}</div><div>Keine Raeume</div></div>}
+                        </div>
+                    )}
+
+                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
+                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
+                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\u2190'} Zurueck</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
         function App() {
             // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser'
             const [page, setPage] = useState('start');
@@ -18619,6 +18374,11 @@
                     kunde.auftraggeber = sf.bauherr_firma || kunde.auftraggeber;
                     kunde.adresse = sf.objekt_baustelle || kunde.adresse;
                     kunde.baumassnahme = sf.objekt_bauvorhaben || kunde.baumassnahme;
+                    kunde.auftraggeber_strasse = sf.bauherr_strasse || kunde.auftraggeber_strasse || '';
+                    kunde.auftraggeber_plzOrt = sf.bauherr_plzOrt || kunde.auftraggeber_plzOrt || '';
+                    kunde.auftraggeber_ansprechpartner = sf.bauherr_ansprechpartner || kunde.auftraggeber_ansprechpartner || '';
+                    kunde.ag_email = sf.bauherr_email || kunde.ag_email || '';
+                    kunde.ag_telefon = sf.bauherr_telefon || kunde.ag_telefon || '';
                     updatedKd = {
                         auftraggeber: sf.bauherr_firma || '',
                         auftraggeber_strasse: sf.bauherr_strasse || '',
@@ -18735,8 +18495,10 @@
                         architekt_telefon: data.arch_telefon || '',
                         architekt_email: data.arch_email || '',
                         auftraggeber_strasse: stammF.bauherr_strasse || '',
-                        auftraggeber_telefon: data.ag_telefon || '',
-                        auftraggeber_email: data.ag_email || ''
+                        auftraggeber_plzOrt: stammF.bauherr_plzOrt || '',
+                        auftraggeber_ansprechpartner: stammF.bauherr_ansprechpartner || '',
+                        auftraggeber_telefon: data.ag_telefon || stammF.bauherr_telefon || '',
+                        auftraggeber_email: data.ag_email || stammF.bauherr_email || ''
                     },
                     stammdaten: {
                         projekt: stammF.objekt_projektnr || '',
@@ -18964,8 +18726,11 @@
                             arch_telefon: kd.arch_telefon || prev.arch_telefon || '',
                             arch_email: kd.arch_email || prev.arch_email || '',
                             ag_adresse: kd.ag_adresse || prev.ag_adresse || '',
-                            ag_telefon: kd.ag_telefon || prev.ag_telefon || '',
-                            ag_email: kd.ag_email || prev.ag_email || '',
+                            ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || prev.ag_telefon || '',
+                            ag_email: kd.ag_email || kd.auftraggeber_email || prev.ag_email || '',
+                            auftraggeber_strasse: kd.auftraggeber_strasse || prev.auftraggeber_strasse || '',
+                            auftraggeber_plzOrt: kd.auftraggeber_plzOrt || prev.auftraggeber_plzOrt || '',
+                            auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || prev.auftraggeber_ansprechpartner || '',
                             vertrag: vt.auftraggeber ? vt : (prev.vertrag || {}),
                             raeume: result.raeume && result.raeume.length > 0 ? result.raeume.map(function(r, idx) {
                                 return Object.assign({ id: 'oa_' + idx }, r, { nr: r.nr || String(idx + 1) });
@@ -19419,9 +19184,12 @@
                         arch_fax: kd.arch_fax || '',
                         arch_email: kd.arch_email || '',
                         ag_adresse: kd.ag_adresse || kd.adresse || '',
-                        ag_telefon: kd.ag_telefon || '',
+                        ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || '',
                         ag_fax: kd.ag_fax || '',
-                        ag_email: kd.ag_email || '',
+                        ag_email: kd.ag_email || kd.auftraggeber_email || '',
+                        auftraggeber_strasse: kd.auftraggeber_strasse || '',
+                        auftraggeber_plzOrt: kd.auftraggeber_plzOrt || '',
+                        auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || '',
                         vertrag: vt,
                         raeume: (result.raeume || []).map(function(r, idx) {
                             if (typeof r === 'string') {
@@ -19513,7 +19281,10 @@
                             bl_telefon: kd.bl_telefon || '', bl_email: kd.bl_email || '',
                             architekt: kd.architekt || selectedKunde.architekt || '',
                             arch_telefon: kd.arch_telefon || '', arch_email: kd.arch_email || '',
-                            ag_adresse: kd.ag_adresse || '', ag_telefon: kd.ag_telefon || '', ag_email: kd.ag_email || '',
+                            ag_adresse: kd.ag_adresse || '', ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || '', ag_email: kd.ag_email || kd.auftraggeber_email || '',
+                            auftraggeber_strasse: kd.auftraggeber_strasse || selectedKunde.auftraggeber_strasse || '',
+                            auftraggeber_plzOrt: kd.auftraggeber_plzOrt || selectedKunde.auftraggeber_plzOrt || '',
+                            auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || selectedKunde.auftraggeber_ansprechpartner || '',
                             raeume: (result.raeume || []).map(function(r, idx) {
                                 if (typeof r === 'string') return { id: 'import_' + idx, nr: String(idx+1), bez: r, geschoss: '', fliesenhoehe: 0, raumhoehe: 0, waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}] };
                                 return Object.assign({ id: 'import_' + idx }, r, { nr: r.nr || String(idx+1) });
@@ -20179,4 +19950,6 @@
 
         const root = ReactDOM.createRoot(document.getElementById("root"));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
-    </script></body></html>
+    </script>
+</body>
+</html>

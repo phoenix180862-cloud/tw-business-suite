@@ -379,6 +379,11 @@
                     kunde.auftraggeber = sf.bauherr_firma || kunde.auftraggeber;
                     kunde.adresse = sf.objekt_baustelle || kunde.adresse;
                     kunde.baumassnahme = sf.objekt_bauvorhaben || kunde.baumassnahme;
+                    kunde.auftraggeber_strasse = sf.bauherr_strasse || kunde.auftraggeber_strasse || '';
+                    kunde.auftraggeber_plzOrt = sf.bauherr_plzOrt || kunde.auftraggeber_plzOrt || '';
+                    kunde.auftraggeber_ansprechpartner = sf.bauherr_ansprechpartner || kunde.auftraggeber_ansprechpartner || '';
+                    kunde.ag_email = sf.bauherr_email || kunde.ag_email || '';
+                    kunde.ag_telefon = sf.bauherr_telefon || kunde.ag_telefon || '';
                     updatedKd = {
                         auftraggeber: sf.bauherr_firma || '',
                         auftraggeber_strasse: sf.bauherr_strasse || '',
@@ -495,8 +500,10 @@
                         architekt_telefon: data.arch_telefon || '',
                         architekt_email: data.arch_email || '',
                         auftraggeber_strasse: stammF.bauherr_strasse || '',
-                        auftraggeber_telefon: data.ag_telefon || '',
-                        auftraggeber_email: data.ag_email || ''
+                        auftraggeber_plzOrt: stammF.bauherr_plzOrt || '',
+                        auftraggeber_ansprechpartner: stammF.bauherr_ansprechpartner || '',
+                        auftraggeber_telefon: data.ag_telefon || stammF.bauherr_telefon || '',
+                        auftraggeber_email: data.ag_email || stammF.bauherr_email || ''
                     },
                     stammdaten: {
                         projekt: stammF.objekt_projektnr || '',
@@ -724,8 +731,11 @@
                             arch_telefon: kd.arch_telefon || prev.arch_telefon || '',
                             arch_email: kd.arch_email || prev.arch_email || '',
                             ag_adresse: kd.ag_adresse || prev.ag_adresse || '',
-                            ag_telefon: kd.ag_telefon || prev.ag_telefon || '',
-                            ag_email: kd.ag_email || prev.ag_email || '',
+                            ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || prev.ag_telefon || '',
+                            ag_email: kd.ag_email || kd.auftraggeber_email || prev.ag_email || '',
+                            auftraggeber_strasse: kd.auftraggeber_strasse || prev.auftraggeber_strasse || '',
+                            auftraggeber_plzOrt: kd.auftraggeber_plzOrt || prev.auftraggeber_plzOrt || '',
+                            auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || prev.auftraggeber_ansprechpartner || '',
                             vertrag: vt.auftraggeber ? vt : (prev.vertrag || {}),
                             raeume: result.raeume && result.raeume.length > 0 ? result.raeume.map(function(r, idx) {
                                 return Object.assign({ id: 'oa_' + idx }, r, { nr: r.nr || String(idx + 1) });
@@ -1179,9 +1189,12 @@
                         arch_fax: kd.arch_fax || '',
                         arch_email: kd.arch_email || '',
                         ag_adresse: kd.ag_adresse || kd.adresse || '',
-                        ag_telefon: kd.ag_telefon || '',
+                        ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || '',
                         ag_fax: kd.ag_fax || '',
-                        ag_email: kd.ag_email || '',
+                        ag_email: kd.ag_email || kd.auftraggeber_email || '',
+                        auftraggeber_strasse: kd.auftraggeber_strasse || '',
+                        auftraggeber_plzOrt: kd.auftraggeber_plzOrt || '',
+                        auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || '',
                         vertrag: vt,
                         raeume: (result.raeume || []).map(function(r, idx) {
                             if (typeof r === 'string') {
@@ -1273,7 +1286,10 @@
                             bl_telefon: kd.bl_telefon || '', bl_email: kd.bl_email || '',
                             architekt: kd.architekt || selectedKunde.architekt || '',
                             arch_telefon: kd.arch_telefon || '', arch_email: kd.arch_email || '',
-                            ag_adresse: kd.ag_adresse || '', ag_telefon: kd.ag_telefon || '', ag_email: kd.ag_email || '',
+                            ag_adresse: kd.ag_adresse || '', ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || '', ag_email: kd.ag_email || kd.auftraggeber_email || '',
+                            auftraggeber_strasse: kd.auftraggeber_strasse || selectedKunde.auftraggeber_strasse || '',
+                            auftraggeber_plzOrt: kd.auftraggeber_plzOrt || selectedKunde.auftraggeber_plzOrt || '',
+                            auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || selectedKunde.auftraggeber_ansprechpartner || '',
                             raeume: (result.raeume || []).map(function(r, idx) {
                                 if (typeof r === 'string') return { id: 'import_' + idx, nr: String(idx+1), bez: r, geschoss: '', fliesenhoehe: 0, raumhoehe: 0, waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}] };
                                 return Object.assign({ id: 'import_' + idx }, r, { nr: r.nr || String(idx+1) });
