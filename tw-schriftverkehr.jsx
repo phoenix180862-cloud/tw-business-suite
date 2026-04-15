@@ -7,7 +7,6 @@
             const [empfaenger, setEmpfaenger] = useState(kunde ? (kunde.auftraggeber || kunde.name || '') : '');
             const [empfAdresse, setEmpfAdresse] = useState(function() {
                 if (!kunde) return '';
-                // Separate Felder haben Vorrang
                 var str = kunde.auftraggeber_strasse || '';
                 var plz = kunde.auftraggeber_plzOrt || '';
                 if (str || plz) return (str + (str && plz ? ', ' : '') + plz).trim();

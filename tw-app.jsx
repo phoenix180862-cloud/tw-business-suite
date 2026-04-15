@@ -602,9 +602,12 @@
                         arch_fax: kd.arch_fax || enriched.arch_fax || '',
                         arch_email: kd.arch_email || enriched.arch_email || '',
                         ag_adresse: kd.ag_adresse || kd.adresse || enriched.ag_adresse || '',
-                        ag_telefon: kd.ag_telefon || enriched.ag_telefon || '',
+                        ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || enriched.ag_telefon || '',
                         ag_fax: kd.ag_fax || enriched.ag_fax || '',
-                        ag_email: kd.ag_email || enriched.ag_email || '',
+                        ag_email: kd.ag_email || kd.auftraggeber_email || enriched.ag_email || '',
+                        auftraggeber_strasse: kd.auftraggeber_strasse || enriched.auftraggeber_strasse || '',
+                        auftraggeber_plzOrt: kd.auftraggeber_plzOrt || enriched.auftraggeber_plzOrt || '',
+                        auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || enriched.auftraggeber_ansprechpartner || '',
                         vertrag: vt,
                         raeume: (result.raeume || []).map(function(r, idx) {
                             if (typeof r === 'string') {
@@ -1189,12 +1192,9 @@
                         arch_fax: kd.arch_fax || '',
                         arch_email: kd.arch_email || '',
                         ag_adresse: kd.ag_adresse || kd.adresse || '',
-                        ag_telefon: kd.ag_telefon || kd.auftraggeber_telefon || '',
+                        ag_telefon: kd.ag_telefon || '',
                         ag_fax: kd.ag_fax || '',
-                        ag_email: kd.ag_email || kd.auftraggeber_email || '',
-                        auftraggeber_strasse: kd.auftraggeber_strasse || '',
-                        auftraggeber_plzOrt: kd.auftraggeber_plzOrt || '',
-                        auftraggeber_ansprechpartner: kd.auftraggeber_ansprechpartner || '',
+                        ag_email: kd.ag_email || '',
                         vertrag: vt,
                         raeume: (result.raeume || []).map(function(r, idx) {
                             if (typeof r === 'string') {
