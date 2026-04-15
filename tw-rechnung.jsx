@@ -5,9 +5,9 @@
            Buttons: Alle 6 in einheitlichem Blau
            6. Button: Aufmass (laedt Gesamtliste, druckt/versendet als PDF)
            ===================================================================== */
-        function RechnungsModul({ kunde, importResult, gesamtliste, aufmassGespeichert, vorwahlTyp, onVorwahlUsed, onBack }) {
-            const [phase, setPhase] = useState(vorwahlTyp ? 'startseite' : 'typwahl');
-            const [rechnungsTyp, setRechnungsTyp] = useState(vorwahlTyp || null);
+        function RechnungsModul({ kunde, importResult, gesamtliste, aufmassGespeichert, onBack }) {
+            const [phase, setPhase] = useState('typwahl');
+            const [rechnungsTyp, setRechnungsTyp] = useState(null);
             const [positionen, setPositionen] = useState([]);
             const [positionenGeladen, setPositionenGeladen] = useState(false);
             const [showDatenLaden, setShowDatenLaden] = useState(false);
@@ -73,26 +73,6 @@
                 setEmpfPlzOrt(plzOrt);
                 setBauvorhabenText(kunde.adresse || kunde.baumassnahme || kunde.name || '');
             }, [kunde]);
-            // --- Vorwahl: Wenn vom Aufmass-Modul direkt hierher navigiert ---
-            useEffect(function() {
-                if (vorwahlTyp === 'aufmass' && gesamtliste && gesamtliste.length > 0) {
-                    var amPos = [];
-                    var seen = {};
-                    gesamtliste.forEach(function(room) {
-                        (room.positionen || []).forEach(function(p) {
-                            var key = p.pos || p.posNr;
-                            if (!seen[key]) {
-                                seen[key] = { pos: key, bez: p.bez || '', einheit: p.einheit || 'm\u00B2', menge: 0, einzelpreis: 0 };
-                            }
-                            seen[key].menge += (parseFloat(p.ergebnis) || 0);
-                        });
-                    });
-                    Object.keys(seen).forEach(function(k) { amPos.push(seen[k]); });
-                    setPositionen(amPos);
-                    setPositionenGeladen(true);
-                    if (onVorwahlUsed) onVorwahlUsed();
-                }
-            }, [vorwahlTyp]);
             var lvPositionen = [];
             if (importResult && importResult.positionen && importResult.positionen.length > 0) { lvPositionen = importResult.positionen; }
             else if (kunde && kunde._lvPositionen && kunde._lvPositionen.length > 0) { lvPositionen = kunde._lvPositionen; }
