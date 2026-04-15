@@ -135,20 +135,35 @@
                 // === SEITE 1: BRIEFKOPF (mit genuegend Platz fuer alle Angaben) ===
                 var y=MT;
                 // --- LOGO: Einzelteile separat gezeichnet ---
-                // "Thomas" (helvetica italic, gleiche Schriftfamilie wie Fliesenlegermeister)
-                doc.setFont('helvetica','bolditalic');doc.setFontSize(11);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML+0.5,y+6);
-                // "w" + "i"
+                // "w"
                 doc.setFont('helvetica','bold');doc.setFontSize(38);doc.setTextColor(17,17,17);
                 var xPos=ML-0.3;
                 doc.text('w',xPos,y+20);doc.text('w',xPos+0.15,y+20);doc.text('w',xPos+0.3,y+20);
                 xPos+=doc.getTextWidth('w');
+                // "i" als Strich ohne Punkt: normales i zeichnen, dann Punkt mit weissem Rechteck ueberdecken
                 doc.text('i',xPos,y+20);doc.text('i',xPos+0.15,y+20);doc.text('i',xPos+0.3,y+20);
                 var iCenterX=xPos+doc.getTextWidth('i')/2;
-                xPos+=doc.getTextWidth('i');
-                // Roter Punkt ueber dem i (unter dem Thomas-Schriftzug)
+                // Schwarzen i-Punkt mit weissem Rechteck ueberdecken
+                doc.setFillColor(255,255,255);
+                doc.rect(iCenterX-2,y+6.5,4,4,'F');
+                // Roter Quadrat-Punkt knapp ueber dem i-Strich
                 doc.setFillColor(196,30,30);
-                doc.rect(iCenterX-1.2,y+9,2.4,2.4,'F');
+                doc.rect(iCenterX-1.3,y+10.5,2.6,2.6,'F');
+                xPos+=doc.getTextWidth('i');
+                // "Thomas" (positioniert ueber w und i, nicht ueber LL)
+                doc.setFont('helvetica','bolditalic');doc.setFontSize(11);doc.setTextColor(196,30,30);
+                doc.text('Thomas',ML+0.5,y+7);
+                // "LL" (groesser, 48pt)
+                doc.setFont('helvetica','bold');doc.setFontSize(48);doc.setTextColor(17,17,17);
+                doc.text('LL',xPos,y+20);doc.text('LL',xPos+0.15,y+20);doc.text('LL',xPos+0.3,y+20);
+                xPos+=doc.getTextWidth('LL');
+                // "wacher"
+                doc.setFontSize(38);
+                doc.text('wacher',xPos,y+20);doc.text('wacher',xPos+0.15,y+20);doc.text('wacher',xPos+0.3,y+20);
+                var logoEnd=xPos+doc.getTextWidth('wacher');
+                // "Fliesenlegermeister e.K." (gleiche Schrift wie Thomas)
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
                 // "LL" (groesser, 48pt)
                 doc.setFontSize(48);doc.setTextColor(17,17,17);
                 doc.text('LL',xPos,y+20);doc.text('LL',xPos+0.15,y+20);doc.text('LL',xPos+0.3,y+20);
@@ -191,11 +206,18 @@
                 // --- TITEL (gross) ---
                 doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
                 doc.text(typLabel2,ML,y);y+=8;
-                // --- BAUVORHABEN (mit Textumbruch bei langen Texten) ---
+                // --- BAUVORHABEN (Label links, Text rechts mit Umbruch auf gleicher Einrueckung) ---
                 doc.setFontSize(11);
-                var bvText='Bauvorhaben: '+(bauvorhabenText||'');
-                var bvLines=doc.splitTextToSize(bvText,CW);
-                bvLines.forEach(function(line){doc.text(line,ML,y);y+=5;});
+                var bvLabel='Bauvorhaben: ';
+                var bvLabelW=doc.getTextWidth(bvLabel);
+                doc.setFont('helvetica','bold');
+                doc.text(bvLabel,ML,y);
+                var bvTextWidth=CW-bvLabelW;
+                var bvLines=doc.splitTextToSize(bauvorhabenText||'',bvTextWidth);
+                bvLines.forEach(function(line,idx){
+                    doc.text(line,ML+bvLabelW,y);
+                    y+=5;
+                });
                 y+=3;
                 // --- META-FELDER links unter Bauvorhaben ---
                 doc.setFontSize(9);
