@@ -1,10 +1,10 @@
         function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta, onDatenBearbeiten, onOrdnerBrowser }) {
             var module = [
-                { id: 'aufmass', name: 'Aufma\u00df', desc: 'VOB-konforme Aufma\u00df-Erfassung', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
-                { id: 'rechnung', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', gradient: 'linear-gradient(135deg, #27ae60, #1e8449)', shadow: 'rgba(39,174,96,0.30)', ready: true },
-                { id: 'ausgangsbuch', name: 'Rechnungs-Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', gradient: 'linear-gradient(135deg, #e67e22, #d35400)', shadow: 'rgba(230,126,34,0.30)', ready: true },
-                { id: 'schriftverkehr', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', gradient: 'linear-gradient(135deg, #8e44ad, #6c3483)', shadow: 'rgba(142,68,173,0.30)', ready: true },
-                { id: 'baustelle', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', gradient: 'linear-gradient(135deg, #e63535, #c41e1e)', shadow: 'rgba(196,30,30,0.30)', ready: true },
+                { id: 'aufmass', name: 'Aufmass', desc: 'VOB-konforme Aufmass-Erfassung', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
+                { id: 'rechnung', name: 'Rechnungen', desc: 'Abschlags- & Schlussrechnungen', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
+                { id: 'ausgangsbuch', name: 'Rechnungs-Ausgangsbuch', desc: 'Rechnungsausgangsbuch & Analysen', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
+                { id: 'schriftverkehr', name: 'Schriftverkehr', desc: 'Briefe, E-Mails, Korrespondenz', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
+                { id: 'baustelle', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
             ];
             var renderIcon = function(id) {
                 var s = {width:'32px',height:'32px',flexShrink:0};
