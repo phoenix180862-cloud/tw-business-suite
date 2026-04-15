@@ -134,22 +134,38 @@
                 };
                 // === SEITE 1: BRIEFKOPF (mit genuegend Platz fuer alle Angaben) ===
                 var y=MT;
-                // --- LOGO (kraeftig, doppelt gezeichnet fuer staerkere Schrift) ---
-                doc.setFont('times','italic');doc.setFontSize(12);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML,y+4);
+                // --- LOGO: Einzelteile separat gezeichnet ---
+                // "Thomas" (helvetica italic, gleiche Schriftfamilie wie Fliesenlegermeister)
+                doc.setFont('helvetica','bolditalic');doc.setFontSize(11);doc.setTextColor(196,30,30);
+                doc.text('Thomas',ML+0.5,y+8);
+                // "w" + "i"
                 doc.setFont('helvetica','bold');doc.setFontSize(38);doc.setTextColor(17,17,17);
-                doc.text('wiLLwacher',ML-0.5,y+17);
-                doc.text('wiLLwacher',ML-0.2,y+17);
-                var logoW=doc.getTextWidth('wiLLwacher');
-                doc.setFont('times','normal');doc.setFontSize(10);doc.setTextColor(196,30,30);
-                doc.text('Fliesenlegermeister e.K.',ML+logoW,y+23,{align:'right'});
+                var xPos=ML-0.3;
+                doc.text('w',xPos,y+20);doc.text('w',xPos+0.15,y+20);doc.text('w',xPos+0.3,y+20);
+                xPos+=doc.getTextWidth('w');
+                doc.text('i',xPos,y+20);doc.text('i',xPos+0.15,y+20);doc.text('i',xPos+0.3,y+20);
+                xPos+=doc.getTextWidth('i');
+                // Roter Punkt ueber dem i
+                doc.setFillColor(196,30,30);
+                doc.rect(xPos-doc.getTextWidth('i')+doc.getTextWidth('i')/2-1.2,y+5.5,2.4,2.4,'F');
+                // "LL" (groesser, 48pt)
+                doc.setFontSize(48);doc.setTextColor(17,17,17);
+                doc.text('LL',xPos,y+20);doc.text('LL',xPos+0.15,y+20);doc.text('LL',xPos+0.3,y+20);
+                xPos+=doc.getTextWidth('LL');
+                // "wacher"
+                doc.setFontSize(38);
+                doc.text('wacher',xPos,y+20);doc.text('wacher',xPos+0.15,y+20);doc.text('wacher',xPos+0.3,y+20);
+                var logoEnd=xPos+doc.getTextWidth('wacher');
+                // "Fliesenlegermeister e.K." (gleiche Schrift wie Thomas)
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
                 // Kontaktdaten rechts neben Logo
                 doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
-                doc.text('Flurweg 14a',rx,y+5,{align:'right'});
-                doc.text('56472 Nisterau',rx,y+9,{align:'right'});
-                doc.text('Tel. 02661-63101',rx,y+13,{align:'right'});
-                doc.text('Mobil 0170-2024161',rx,y+17,{align:'right'});
-                y+=28;
+                doc.text('Flurweg 14a',rx,y+8,{align:'right'});
+                doc.text('56472 Nisterau',rx,y+12,{align:'right'});
+                doc.text('Tel. 02661-63101',rx,y+16,{align:'right'});
+                doc.text('Mobil 0170-2024161',rx,y+20,{align:'right'});
+                y+=30;
                 // --- Rote Trennlinie ---
                 doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=4;
                 // --- Absenderzeile (klein, grau) ---
@@ -174,9 +190,12 @@
                 // --- TITEL (gross) ---
                 doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
                 doc.text(typLabel2,ML,y);y+=8;
-                // --- BAUVORHABEN ---
+                // --- BAUVORHABEN (mit Textumbruch bei langen Texten) ---
                 doc.setFontSize(11);
-                doc.text('Bauvorhaben: '+(bauvorhabenText||''),ML,y);y+=8;
+                var bvText='Bauvorhaben: '+(bauvorhabenText||'');
+                var bvLines=doc.splitTextToSize(bvText,CW);
+                bvLines.forEach(function(line){doc.text(line,ML,y);y+=5;});
+                y+=3;
                 // --- META-FELDER links unter Bauvorhaben ---
                 doc.setFontSize(9);
                 var mf=[];
