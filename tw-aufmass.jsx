@@ -4457,7 +4457,7 @@
                     if (el.tagName !== 'INPUT' && el.tagName !== 'SELECT') return;
                     if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') return;
                     // Finde Container: Modal > Oeffnung > Masse-Section > Raumblatt
-                    const container = el.closest('.modal-overlay') || el.closest('.modal') || el.closest('.oeffnung-body') || el.closest('.rw-modal-body') || el.closest('.masse-section') || el.closest('.raumblatt-content') || el.closest('.page-container');
+                    const container = el.closest('.modal-overlay') || el.closest('.modal') || el.closest('.oeffnung-body') || el.closest('.rw-modal-body') || el.closest('.page-container');
                     if (!container) return;
                     const allInputs = [...container.querySelectorAll(inputSelector)].filter(inp => inp.offsetParent !== null || inp.offsetWidth > 0);
                     const idx = allInputs.indexOf(el);
@@ -5309,7 +5309,7 @@
                     }
 
                     // Nächstes Feld -- erst .masse-input im Container, dann beliebiges sichtbares Input
-                    const container = el.closest('.masse-section') || el.closest('.raumblatt-content') || el.closest('.page-container');
+                    const container = el.closest('.oeffnung-body') || el.closest('.page-container');
                     if (container) {
                         const masseInputs = [...container.querySelectorAll('.masse-input')];
                         const idx = masseInputs.indexOf(el);
@@ -8805,8 +8805,13 @@
                                                 onBlur={function() {
                                                     setWandMasse(function(prev) {
                                                         return prev.map(function(ww, i) {
-                                                            if (i !== idx) return ww;
-                                                            if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
+                                                            if (i === idx) {
+                                                                if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
+                                                                return ww;
+                                                            }
+                                                            if (masseKopieren && ((idx === 0 && i === 2) || (idx === 1 && i === 3))) {
+                                                                if (ww.l && !isNaN(parseMass(ww.l))) return {...ww, l: formatMass(ww.l)};
+                                                            }
                                                             return ww;
                                                         });
                                                     });
