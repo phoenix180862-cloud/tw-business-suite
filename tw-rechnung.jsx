@@ -149,7 +149,9 @@
                 doc.text('i',lx,y+20);doc.text('i',lx+0.2,y+20);
                 var iMid=lx+iW/2;
                 doc.setFillColor(255,255,255);doc.rect(iMid-2.5,y+6,5,4.5,'F');
-                doc.setFillColor(196,30,30);doc.rect(iMid-1.3,y+10.5,2.6,2.6,'F');
+                // Roter Punkt: kleiner (2.2x2.2) und hoeher (y+9)
+                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+9,2.2,2.2,'F');
+                var dotRight=iMid+1.1;
                 lx+=iW;
                 // "LL" (48pt, doppelt)
                 doc.setFont('helvetica','bold');doc.setFontSize(48);doc.setTextColor(17,17,17);
@@ -159,9 +161,15 @@
                 doc.setFontSize(38);
                 doc.text('wacher',lx,y+20);doc.text('wacher',lx+0.2,y+20);
                 var logoEnd=lx+wacherW;
-                // "Thomas" (ueber wi-Bereich, wie auf Startseite Bild 1)
-                doc.setFont('helvetica','bolditalic');doc.setFontSize(11);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML+0.5,y+7);
+                // "Thomas": Oberkante = Oberkante roter Punkt, von w-Kante bis Punkt-Kante
+                var thomasWidth=dotRight-ML;
+                doc.setFont('helvetica','bolditalic');doc.setTextColor(196,30,30);
+                // Fontsize so anpassen dass Thomas genau passt
+                var tFs=11;doc.setFontSize(tFs);var tW=doc.getTextWidth('Thomas');
+                while(tW>thomasWidth+0.3&&tFs>7){tFs-=0.5;doc.setFontSize(tFs);tW=doc.getTextWidth('Thomas');}
+                // Baseline so dass Oberkante bei y+9 liegt (cap-height ca. 70% der Fontsize in pt -> mm)
+                var capH=tFs*0.35*0.7;
+                doc.text('Thomas',ML,y+9+capH);
                 // "Fliesenlegermeister e.K."
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
