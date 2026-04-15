@@ -16292,7 +16292,7 @@
                 // Schwarzen i-Punkt KOMPLETT weiss ueberdecken (grosses Rechteck)
                 doc.setFillColor(255,255,255);doc.rect(lx-1,y+4,iW+2,7,'F');
                 // Roter Punkt bei y+9.7
-                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+9.8,2.2,2.2,'F');
+                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+10,2.2,2.2,'F');
                 lx+=iW;
                 // "LL" (53pt = 10% groesser, doppelt)
                 doc.setFont('helvetica','bold');doc.setFontSize(53);doc.setTextColor(17,17,17);
@@ -16305,7 +16305,7 @@
                 // "Thomas": gerade (bold), kleiner, von w-Kante, Unterkante knapp ueber Punkt
                 var dotRight=iMid+1.1;
                 doc.setFont('helvetica','bold');doc.setFontSize(10.1);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML,y+8.8);
+                doc.text('Thomas',ML,y+9);
                 // "Fliesenlegermeister e.K."
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
@@ -16336,7 +16336,7 @@
                 doc.text(new Date(rechnungsDatum).toLocaleDateString('de-DE'),rx,addrStartY,{align:'right'});
                 // Sicherstellen dass y mindestens 20mm nach Adress-Start ist
                 y=Math.max(y, addrStartY+20);
-                y+=8;
+                y+=20;
                 // --- TITEL (gross) ---
                 doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
                 doc.text(typLabel2,ML,y);y+=8;
