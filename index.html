@@ -16478,44 +16478,192 @@
             var noSpinnerCSS='<style>input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}input[type=number]{-moz-appearance:textfield;}</style>';
             var inputStyle={width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'13px',color:'var(--text-primary)',boxSizing:'border-box'};
             var smallInputStyle=Object.assign({},inputStyle,{padding:'6px 8px',fontSize:'12px',textAlign:'right'});
-            // ===== PDF-ERZEUGUNG =====
+            // ===== PDF-ERZEUGUNG (jspdf-autotable -- sauberer A4-Seitenumbruch) =====
             var generatePDF=function(){
                 if(istRechnung){try{var abK='tw_ausgangsbuch';var abD=JSON.parse(localStorage.getItem(abK)||'[]');var isDup=abD.some(function(e){return(e.rechnungsNr===rechnungsNr||e.dokumentNr===rechnungsNr)&&e.datum===rechnungsDatum;});if(!isDup&&rechnungsNr){var tL=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':'Rechnung';var zD=new Date(rechnungsDatum);zD.setDate(zD.getDate()+zahlungszielTage);var sF=new Date(rechnungsDatum);sF.setDate(sF.getDate()+skontoTage);abD.push({id:'RE_'+Date.now(),lfdNr:abD.length+1,dokumentNr:rechnungsNr,rechnungsNr:rechnungsNr,dokumentTyp:rechnungsTyp,dokumentLabel:tL,typ:tL,rechnungsTyp:rechnungsTyp,datum:rechnungsDatum,leistungszeitraum:leistungszeitraum,kundeId:kunde._driveFolderId||kunde.id||kunde.name||'',kundeName:kName,kunde:kName,kundeAdresse:kAddr,kundeTyp:'b2b',bauvorhaben:bauvorhaben,auftragsnummer:auftragsnummer,kostenstelle:kostenstelle,nettoBetrag:nettoSumme,mwstSatz:mwstSatz,mwstBetrag:mwstBetrag,bruttoBetrag:bruttoSumme,sicherheitseinbehaltProzent:sicherheitseinbehalt,sicherheitseinbehaltBetrag:sicherheitBetrag,zahlungszielTage:zahlungszielTage,faelligkeitsDatum:zD.toISOString().split('T')[0],zahlungszielDatum:zD.toISOString().split('T')[0],skontoProzent:skontoProzent,skontoTage:skontoTage,skontoBetrag:skontoBetrag,skontoFrist:sF.toISOString().split('T')[0],forderungBrutto:zahlbetragOhneSkonto,forderungMitSkonto:zahlbetragMitSkonto,zahlbetrag:zahlbetragOhneSkonto,anzahlPositionen:aktivePosn.length,abschlagNr:rechnungsTyp==='abschlag'?abschlagNr:null,pdfDateiname:getDateiname(),driveOrdner:'Rechnung-A.Kontozahlung',status:'offen',zahlungen:[],zahlungsSumme:0,restbetrag:zahlbetragOhneSkonto,mahnStufe:0,mahnungen:[],notiz:'',erstelltAm:new Date().toISOString(),geaendertAm:new Date().toISOString()});localStorage.setItem(abK,JSON.stringify(abD));}}catch(e){}}
                 if(rechnungsTyp==='nachtrag')addNachtragsPositionen();
-                var typLabel=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?('Nachtrag Nr. '+nachtragsNr):rechnungsTyp==='angebot'?('Angebot Nr. '+angebotsNr):'Rechnung';
-                var posR='';aktivePosn.forEach(function(p){var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);posR+='<tr><td style="text-align:center;font-weight:700;width:30px">'+(p.pos||'')+'</td><td style="text-align:right;width:55px">'+fmt(p.menge)+'</td><td style="text-align:center;width:35px">'+(p.einheit||'')+'</td><td style="padding:6px 8px;word-break:break-word;white-space:pre-wrap;line-height:1.4">'+(p.bez||'').replace(/</g,'&lt;')+'</td><td style="text-align:right;width:65px">'+fmt(p.einzelpreis)+'</td><td style="text-align:right;width:75px;font-weight:700">'+fmt(gp)+'</td></tr>';});
-                var h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+getDateiname()+'</title>';
-                h+='<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">';
-                h+='<style>@page{size:A4;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:9.5pt;color:#222;line-height:1.4;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.page{page-break-after:always}.page:last-child{page-break-after:auto}table.p tr{page-break-inside:avoid}}';
-                h+='.page{width:210mm;min-height:297mm;padding:18mm 18mm 30mm 22mm;margin:0 auto;position:relative;background:#fff;overflow:hidden}';
-                h+='.logo-block{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4mm}.logo-inner{display:inline-flex;flex-direction:column;align-items:flex-start}.logo-thomas{font-family:"Source Sans 3",serif;font-style:italic;font-weight:600;color:#c41e1e;font-size:16px;margin-bottom:-18px;padding-left:0;position:relative;z-index:2}.logo-word{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1}.logo-word .lw{font-size:81px}.logo-word .li-wrap{position:relative;font-size:81px;display:inline-block}.logo-word .li-char{font-size:81px;color:#111}.logo-word .li-dot{position:absolute;top:7px;left:50%;transform:translateX(-50%);width:13px;height:13px;background:#c41e1e}.logo-word .lLL{font-size:106px;letter-spacing:1px;line-height:0.75}.logo-word .lwa{font-size:81px}.logo-sub{display:flex;justify-content:flex-end;width:100%;margin-top:2px}.logo-sub span{font-family:"Source Sans 3",sans-serif;font-weight:600;color:#c41e1e;font-size:20px;letter-spacing:2.5px}.logo-right{text-align:right;font-size:9.5pt;color:#333;line-height:1.7;padding-top:5mm}';
-                h+='.sep{border:none;border-top:2.5px solid #c41e1e;margin:3mm 0 2mm}.abs{font-size:7pt;color:#aaa;border-bottom:0.5px solid #ccc;display:inline-block;padding-bottom:1px;margin-bottom:5mm}';
-                h+='.addr-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6mm}.addr-name{font-weight:700;font-size:12pt;margin-bottom:1mm}.addr-street{font-size:10pt;color:#333;line-height:1.6}.doc-data{font-size:9pt;line-height:2;min-width:50mm;text-align:right}.doc-data .dd-l{display:inline-block;width:38mm;color:#888;text-align:left}.doc-data .dd-v{font-weight:600;color:#222}';
-                h+='.doc-title{font-size:17pt;font-weight:700;margin-bottom:2mm;color:#111}.bauvorhaben{font-size:13pt;font-weight:700;color:#111;margin-bottom:5mm}';
-                h+='table.p{width:100%;border-collapse:collapse;margin-bottom:6mm;font-size:8.5pt}table.p thead th{background:#2d3436;color:#fff;font-weight:700;padding:7px 6px;font-size:8pt;text-transform:uppercase;letter-spacing:0.3px}table.p tbody td{padding:6px;border-bottom:1px solid #e0e0e0;vertical-align:top;font-variant-numeric:tabular-nums}';
-                h+='.su{margin-left:auto;width:88mm;font-size:9.5pt;margin-bottom:6mm}.su .r{display:flex;justify-content:space-between;padding:2px 0}.su .r .v{font-variant-numeric:tabular-nums;text-align:right;min-width:34mm}.su .r.br{font-weight:700;font-size:12pt;padding:4px 0;border-top:2.5px double #222;margin-top:2px}.su .r.sk{color:#c41e1e;font-weight:700}.su .r.nz{font-weight:700}.su .r.kl{font-size:8.5pt;color:#777}.bm{font-size:8.5pt;color:#555;margin-bottom:8mm;line-height:1.5}';
-                h+='.ft{position:absolute;bottom:12mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7.5pt;color:#666;line-height:1.7}.ft-row{display:flex;justify-content:space-between;flex-wrap:wrap}.ft-firma{font-weight:700;color:#c41e1e}.ft-bank{color:#555;margin-top:1mm}</style></head><body>';
-                h+='<div class="page">';
-                h+='<div class="logo-block"><div class="logo-inner"><div class="logo-thomas">Thomas</div><div class="logo-word"><span class="lw">w</span><span class="li-wrap"><span class="li-char">\u0131</span><span class="li-dot"></span></span><span class="lLL">LL</span><span class="lwa">wacher</span></div><div class="logo-sub"><span>Fliesenlegermeister e.K.</span></div></div><div class="logo-right">Flurweg 14a<br>56472 Nisterau<br>Tel. 02661-63101<br>Mobil 0170-2024161</div></div>';
-                h+='<hr class="sep"><div class="abs">Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau</div>';
-                h+='<div class="addr-row"><div><div class="addr-name">'+empfName+'</div><div class="addr-street">'+(empfZusatz?empfZusatz+'<br>':'')+(empfStrasse?empfStrasse+'<br>':'')+empfPlzOrt+'</div></div><div class="doc-data">';
-                h+='<div><span class="dd-l">Datum:</span><span class="dd-v">'+new Date(rechnungsDatum).toLocaleDateString('de-DE')+'</span></div>';
-                if(leistungszeitraum)h+='<div><span class="dd-l">Leistungszeitraum:</span><span class="dd-v">'+leistungszeitraum+'</span></div>';
-                if(istRechnung)h+='<div><span class="dd-l">Rechnungs-Nr.:</span><span class="dd-v">'+rechnungsNr+'</span></div>';
-                if(rechnungsTyp==='nachtrag')h+='<div><span class="dd-l">Nachtrags-Nr.:</span><span class="dd-v">'+nachtragsNr+'</span></div>';
-                if(rechnungsTyp==='angebot')h+='<div><span class="dd-l">Angebots-Nr.:</span><span class="dd-v">'+angebotsNr+'</span></div>';
-                if(auftragsnummer)h+='<div><span class="dd-l">Auftragsnummer:</span><span class="dd-v">'+auftragsnummer+'</span></div>';
-                if(kostenstelle)h+='<div><span class="dd-l">Kostenstelle:</span><span class="dd-v">'+kostenstelle+'</span></div>';
-                h+='<div><span class="dd-l">Steuernummer:</span><span class="dd-v">30/220/1234/5</span></div></div></div>';
-                h+='<div class="doc-title">'+typLabel+'</div><div class="bauvorhaben">Bauvorhaben: '+bauvorhabenText+'</div>';
-                h+='<table class="p"><thead><tr><th style="text-align:center;width:30px">Pos.</th><th style="text-align:right;width:55px">Menge</th><th style="text-align:center;width:35px">Einh.</th><th style="text-align:left">Bezeichnung</th><th style="text-align:right;width:65px">EP (\u20AC)</th><th style="text-align:right;width:75px">GP (\u20AC)</th></tr></thead><tbody>'+posR+'</tbody></table>';
-                h+='<div class="su"><div class="r"><span>Nettobetrag:</span><span class="v">'+fmt(nettoSumme)+' \u20AC</span></div><div class="r kl"><span>zzgl. '+mwstSatz+'% MwSt.:</span><span class="v">'+fmt(mwstBetrag)+' \u20AC</span></div><div class="r br"><span>Bruttobetrag:</span><span class="v">'+fmt(bruttoSumme)+' \u20AC</span></div>';
-                if(istRechnung){if(sicherheitseinbehalt>0)h+='<div class="r kl"><span>abzgl. Sicherheitseinbehalt '+sicherheitseinbehalt+'%:</span><span class="v">\u2013 '+fmt(sicherheitBetrag)+' \u20AC</span></div>';if(rechnungsTyp==='schluss'&&kontoSumme>0){h+='<div class="r kl"><span>abzgl. Kontozahlungen:</span><span class="v">\u2013 '+fmt(kontoSumme)+' \u20AC</span></div>';h+='<div class="r nz"><span>Restforderung:</span><span class="v">'+fmt(bruttoSumme-sicherheitBetrag-kontoSumme)+' \u20AC</span></div>';}h+='<div class="r sk"><span>Zahlbar '+skontoTage+' Tage ('+skontoProzent+'% Skonto):</span><span class="v">'+fmt(zahlbetragMitSkonto)+' \u20AC</span></div><div class="r nz"><span>Zahlbar '+zahlungszielTage+' Tage netto:</span><span class="v">'+fmt(zahlbetragOhneSkonto)+' \u20AC</span></div>';}
-                if(rechnungsTyp==='angebot'&&gueltigBis)h+='<div class="r kl"><span>Gueltig bis:</span><span class="v">'+new Date(gueltigBis).toLocaleDateString('de-DE')+'</span></div>';
-                h+='</div>';if(bemerkung)h+='<div class="bm">'+bemerkung.replace(/\n/g,'<br>')+'</div>';
-                h+='<div class="ft"><div class="ft-row"><span class="ft-firma">Thomas Willwacher Fliesenlegermeister e.K.</span><span>Steuernummer: 30/220/1234/5</span></div><div class="ft-bank">Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1</div></div>';
-                h+='</div></body></html>';
-                var pw=window.open('','_blank','width=820,height=1160');pw.document.write(h);pw.document.close();setTimeout(function(){pw.focus();pw.print();},800);saveToGoogleDrive();
+                var typLabel2=rechnungsTyp==='abschlag'?(abschlagNr+'. Abschlagsrechnung'):rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='nachtrag'?('Nachtrag Nr. '+nachtragsNr):rechnungsTyp==='angebot'?('Angebot Nr. '+angebotsNr):'Rechnung';
+                var f2=function(n){return Number(n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});};
+                var doc=new jspdf.jsPDF('p','mm','a4');
+                var PW=210,PH=297,ML=22,MR=18,MT=18,MB=25;
+                var CW=PW-ML-MR;var rx=PW-MR;
+                // === FUSSZEILE (auf jeder Seite) ===
+                var drawFooter=function(pn){
+                    doc.setDrawColor(196,30,30);doc.setLineWidth(0.5);
+                    doc.line(ML,PH-MB+2,rx,PH-MB+2);
+                    doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(196,30,30);
+                    doc.text('Thomas Willwacher Fliesenlegermeister e.K.',ML,PH-MB+6);
+                    doc.setFont('helvetica','normal');doc.setTextColor(102,102,102);
+                    doc.text('Steuernummer: 30/220/1234/5',rx,PH-MB+6,{align:'right'});
+                    doc.text('Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1',ML,PH-MB+10);
+                    doc.text('Seite '+pn,rx,PH-MB+10,{align:'right'});
+                };
+                // === SEITE 1: BRIEFKOPF ===
+                var y=MT;
+                doc.setFont('times','italic');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                doc.text('Thomas',ML,y+4);
+                doc.setFont('helvetica','bold');doc.setFontSize(32);doc.setTextColor(17,17,17);
+                doc.text('wiLLwacher',ML-0.5,y+16);
+                var logoW=doc.getTextWidth('wiLLwacher');
+                doc.setFont('times','normal');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                doc.text('Fliesenlegermeister e.K.',ML+logoW,y+21,{align:'right'});
+                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
+                doc.text('Flurweg 14a',rx,y+5,{align:'right'});
+                doc.text('56472 Nisterau',rx,y+9,{align:'right'});
+                doc.text('Tel. 02661-63101',rx,y+13,{align:'right'});
+                doc.text('Mobil 0170-2024161',rx,y+17,{align:'right'});
+                y+=25;
+                doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=3;
+                doc.setFontSize(6);doc.setTextColor(170,170,170);
+                doc.text('Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau',ML,y);y+=7;
+                // Empfaenger LINKS
+                doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(17,17,17);
+                doc.text(empfName||'',ML,y);y+=5;
+                doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(51,51,51);
+                if(empfZusatz){doc.text(empfZusatz,ML,y);y+=4.5;}
+                if(empfStrasse){doc.text(empfStrasse,ML,y);y+=4.5;}
+                if(empfPlzOrt){doc.text(empfPlzOrt,ML,y);y+=4.5;}
+                // Datum NUR rechts
+                doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(136,136,136);
+                doc.text('Datum:',rx-28,MT+32);
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);
+                doc.text(new Date(rechnungsDatum).toLocaleDateString('de-DE'),rx,MT+32,{align:'right'});
+                y+=6;
+                // TITEL
+                doc.setFont('helvetica','bold');doc.setFontSize(15);doc.setTextColor(17,17,17);
+                doc.text(typLabel2,ML,y);y+=7;
+                // BAUVORHABEN
+                doc.setFontSize(11);
+                doc.text('Bauvorhaben: '+(bauvorhabenText||''),ML,y);y+=6;
+                // META-FELDER links unter Bauvorhaben
+                doc.setFontSize(9);
+                var mf=[];
+                if(leistungszeitraum)mf.push(['Leistungszeitraum:',leistungszeitraum]);
+                if(istRechnung&&rechnungsNr)mf.push(['Rechnungs-Nr.:',rechnungsNr]);
+                if(rechnungsTyp==='nachtrag')mf.push(['Nachtrags-Nr.:',nachtragsNr]);
+                if(rechnungsTyp==='angebot')mf.push(['Angebots-Nr.:',angebotsNr]);
+                if(auftragsnummer)mf.push(['Auftragsnummer:',auftragsnummer]);
+                if(kostenstelle)mf.push(['Kostenstelle:',kostenstelle]);
+                mf.push(['Steuernummer:','30/220/1234/5']);
+                if(rechnungsTyp==='abschlag')mf.push(['Abschlags-Nr.:',String(abschlagNr)]);
+                mf.forEach(function(f){
+                    doc.setFont('helvetica','normal');doc.setTextColor(136,136,136);doc.text(f[0],ML,y);
+                    doc.setFont('helvetica','bold');doc.setTextColor(34,34,34);doc.text(f[1],ML+40,y);
+                    y+=4.5;
+                });
+                y+=4;
+                // === POSITIONSTABELLE MIT AUTOTABLE ===
+                // Laufende Zwischensumme berechnen
+                var laufendeSummen=[];var ls=0;
+                aktivePosn.forEach(function(p){
+                    ls+=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
+                    laufendeSummen.push(ls);
+                });
+                var tableBody=aktivePosn.map(function(p,idx){
+                    var gp=(parseFloat(p.menge)||0)*(parseFloat(p.einzelpreis)||0);
+                    return[String(p.pos||''),f2(p.menge),String(p.einheit||''),String(p.bez||''),f2(p.einzelpreis),f2(gp)];
+                });
+                // Seiten-Tracking fuer Uebertraege
+                var pageRowMap={};
+                var footerDrawn={};
+                doc.autoTable({
+                    startY:y,
+                    margin:{left:ML,right:MR,top:MT+8,bottom:MB+12},
+                    head:[['Pos.','Menge','Einh.','Bezeichnung','EP (\u20AC)','GP (\u20AC)']],
+                    body:tableBody,
+                    showHead:'everyPage',
+                    theme:'grid',
+                    tableLineColor:[224,224,224],
+                    tableLineWidth:0.2,
+                    styles:{
+                        fontSize:8,
+                        font:'helvetica',
+                        textColor:[34,34,34],
+                        cellPadding:{top:2,right:2,bottom:2,left:2},
+                        overflow:'linebreak',
+                        valign:'top',
+                        lineColor:[224,224,224],
+                        lineWidth:0.15
+                    },
+                    headStyles:{
+                        fillColor:[45,52,54],
+                        textColor:[255,255,255],
+                        fontStyle:'bold',
+                        fontSize:7.5,
+                        cellPadding:{top:2.5,right:2,bottom:2.5,left:2},
+                        lineWidth:0,
+                        halign:'center'
+                    },
+                    columnStyles:{
+                        0:{cellWidth:18,halign:'center',fontStyle:'bold'},
+                        1:{cellWidth:20,halign:'right'},
+                        2:{cellWidth:14,halign:'center'},
+                        3:{cellWidth:'auto',halign:'left',fontSize:7.5},
+                        4:{cellWidth:22,halign:'right'},
+                        5:{cellWidth:24,halign:'right',fontStyle:'bold'}
+                    },
+                    didDrawPage:function(data){
+                        var pn=doc.internal.getCurrentPageInfo().pageNumber;
+                        if(!footerDrawn[pn]){drawFooter(pn);footerDrawn[pn]=true;}
+                        // Uebertrag am Seitenanfang (ab Seite 2)
+                        if(pn>1&&pageRowMap[pn-1]!==undefined){
+                            var prevSum=laufendeSummen[pageRowMap[pn-1]]||0;
+                            var uy=data.settings.margin.top-4;
+                            doc.setFont('helvetica','italic');doc.setFontSize(7.5);doc.setTextColor(85,85,85);
+                            doc.text('\u00DCbertrag von Seite '+(pn-1)+':',ML+CW-26,uy,{align:'right'});
+                            doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(34,34,34);
+                            doc.text(f2(prevSum)+' \u20AC',ML+CW,uy,{align:'right'});
+                        }
+                    },
+                    didDrawCell:function(data){
+                        if(data.section==='body'){
+                            var pn=doc.internal.getCurrentPageInfo().pageNumber;
+                            pageRowMap[pn]=data.row.index;
+                        }
+                    }
+                });
+                // Uebertrag am Ende jeder Seite (ausser der letzten)
+                var lastPage=doc.internal.getCurrentPageInfo().pageNumber;
+                for(var pg=1;pg<lastPage;pg++){
+                    if(pageRowMap[pg]!==undefined){
+                        var uSum=laufendeSummen[pageRowMap[pg]]||0;
+                        doc.setPage(pg);
+                        var uy2=PH-MB-2;
+                        doc.setDrawColor(34,34,34);doc.setLineWidth(0.3);
+                        doc.line(ML,uy2-4,ML+CW,uy2-4);
+                        doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(85,85,85);
+                        doc.text('\u00DCbertrag auf Seite '+(pg+1)+':',ML+CW-26,uy2,{align:'right'});
+                        doc.setTextColor(34,34,34);
+                        doc.text(f2(uSum)+' \u20AC',ML+CW,uy2,{align:'right'});
+                    }
+                }
+                // Zurueck auf letzte Seite
+                doc.setPage(lastPage);
+                // === SUMMENBLOCK ===
+                y=doc.lastAutoTable.finalY+8;
+                var pn=lastPage;
+                if(y+50>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}
+                var sx=ML+CW-88,sr=ML+CW;
+                doc.setFont('helvetica','normal');doc.setFontSize(9.5);doc.setTextColor(34,34,34);
+                doc.text('Nettobetrag:',sx,y);doc.setFont('helvetica','bold');doc.text(f2(nettoSumme)+' \u20AC',sr,y,{align:'right'});y+=5;
+                doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);
+                doc.text('zzgl. '+mwstSatz+'% MwSt.:',sx,y);doc.text(f2(mwstBetrag)+' \u20AC',sr,y,{align:'right'});y+=4;
+                doc.setDrawColor(34,34,34);doc.setLineWidth(0.7);doc.line(sx,y,sr,y);y+=0.8;doc.setLineWidth(0.2);doc.line(sx,y,sr,y);y+=5;
+                doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(17,17,17);
+                doc.text('Bruttobetrag:',sx,y);doc.text(f2(bruttoSumme)+' \u20AC',sr,y,{align:'right'});y+=7;
+                if(istRechnung){
+                    if(sicherheitseinbehalt>0){doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);doc.text('abzgl. Sicherheitseinbehalt '+sicherheitseinbehalt+'%:',sx,y);doc.text('\u2013 '+f2(sicherheitBetrag)+' \u20AC',sr,y,{align:'right'});y+=5;}
+                    if(rechnungsTyp==='schluss'&&kontoSumme>0){doc.text('abzgl. Kontozahlungen:',sx,y);doc.text('\u2013 '+f2(kontoSumme)+' \u20AC',sr,y,{align:'right'});y+=5;doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);doc.text('Restforderung:',sx,y);doc.text(f2(bruttoSumme-sicherheitBetrag-kontoSumme)+' \u20AC',sr,y,{align:'right'});y+=6;}
+                    doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                    doc.text('Zahlbar '+skontoTage+' Tage ('+skontoProzent+'% Skonto):',sx,y);doc.text(f2(zahlbetragMitSkonto)+' \u20AC',sr,y,{align:'right'});y+=5;
+                    doc.setTextColor(17,17,17);doc.text('Zahlbar '+zahlungszielTage+' Tage netto:',sx,y);doc.text(f2(zahlbetragOhneSkonto)+' \u20AC',sr,y,{align:'right'});y+=7;
+                }
+                if(rechnungsTyp==='angebot'&&gueltigBis){doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(119,119,119);doc.text('Gueltig bis:',sx,y);doc.text(new Date(gueltigBis).toLocaleDateString('de-DE'),sr,y,{align:'right'});y+=5;}
+                if(bemerkung){y+=3;doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(85,85,85);var bL=doc.splitTextToSize(bemerkung,CW);bL.forEach(function(l){if(y+4>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}doc.text(l,ML,y);y+=3.8;});}
+                if(!footerDrawn[pn]){drawFooter(pn);}
+                // PDF oeffnen
+                var blob=doc.output('blob');var url=URL.createObjectURL(blob);window.open(url,'_blank');
+                saveToGoogleDrive();
             };
             var escXml=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
             var fmtXml=function(v){return(parseFloat(v)||0).toFixed(2);};
