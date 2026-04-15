@@ -137,17 +137,18 @@
                 // --- LOGO: Einzelteile separat gezeichnet ---
                 // "Thomas" (helvetica italic, gleiche Schriftfamilie wie Fliesenlegermeister)
                 doc.setFont('helvetica','bolditalic');doc.setFontSize(11);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML+0.5,y+8);
+                doc.text('Thomas',ML+0.5,y+6);
                 // "w" + "i"
                 doc.setFont('helvetica','bold');doc.setFontSize(38);doc.setTextColor(17,17,17);
                 var xPos=ML-0.3;
                 doc.text('w',xPos,y+20);doc.text('w',xPos+0.15,y+20);doc.text('w',xPos+0.3,y+20);
                 xPos+=doc.getTextWidth('w');
                 doc.text('i',xPos,y+20);doc.text('i',xPos+0.15,y+20);doc.text('i',xPos+0.3,y+20);
+                var iCenterX=xPos+doc.getTextWidth('i')/2;
                 xPos+=doc.getTextWidth('i');
-                // Roter Punkt ueber dem i
+                // Roter Punkt ueber dem i (unter dem Thomas-Schriftzug)
                 doc.setFillColor(196,30,30);
-                doc.rect(xPos-doc.getTextWidth('i')+doc.getTextWidth('i')/2-1.2,y+5.5,2.4,2.4,'F');
+                doc.rect(iCenterX-1.2,y+9,2.4,2.4,'F');
                 // "LL" (groesser, 48pt)
                 doc.setFontSize(48);doc.setTextColor(17,17,17);
                 doc.text('LL',xPos,y+20);doc.text('LL',xPos+0.15,y+20);doc.text('LL',xPos+0.3,y+20);
