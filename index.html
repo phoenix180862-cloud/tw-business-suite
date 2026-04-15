@@ -16306,17 +16306,6 @@
                 // "Fliesenlegermeister e.K."
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
-                // "LL" (groesser, 48pt)
-                doc.setFontSize(48);doc.setTextColor(17,17,17);
-                doc.text('LL',xPos,y+20);doc.text('LL',xPos+0.15,y+20);doc.text('LL',xPos+0.3,y+20);
-                xPos+=doc.getTextWidth('LL');
-                // "wacher"
-                doc.setFontSize(38);
-                doc.text('wacher',xPos,y+20);doc.text('wacher',xPos+0.15,y+20);doc.text('wacher',xPos+0.3,y+20);
-                var logoEnd=xPos+doc.getTextWidth('wacher');
-                // "Fliesenlegermeister e.K." (gleiche Schrift wie Thomas)
-                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
-                doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
                 // Kontaktdaten rechts neben Logo
                 doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
                 doc.text('Flurweg 14a',rx,y+8,{align:'right'});
