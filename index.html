@@ -16275,34 +16275,35 @@
                 };
                 // === SEITE 1: BRIEFKOPF (mit genuegend Platz fuer alle Angaben) ===
                 var y=MT;
-                // --- LOGO: Einzelteile separat gezeichnet ---
-                // "w"
-                doc.setFont('helvetica','bold');doc.setFontSize(38);doc.setTextColor(17,17,17);
-                var xPos=ML-0.3;
-                doc.text('w',xPos,y+20);doc.text('w',xPos+0.15,y+20);doc.text('w',xPos+0.3,y+20);
-                xPos+=doc.getTextWidth('w');
-                // "i" als Strich ohne Punkt: normales i zeichnen, dann Punkt mit weissem Rechteck ueberdecken
-                doc.text('i',xPos,y+20);doc.text('i',xPos+0.15,y+20);doc.text('i',xPos+0.3,y+20);
-                var iCenterX=xPos+doc.getTextWidth('i')/2;
-                // Schwarzen i-Punkt mit weissem Rechteck ueberdecken
-                doc.setFillColor(255,255,255);
-                doc.rect(iCenterX-2,y+6.5,4,4,'F');
-                // Roter Quadrat-Punkt knapp ueber dem i-Strich
-                doc.setFillColor(196,30,30);
-                doc.rect(iCenterX-1.3,y+10.5,2.6,2.6,'F');
-                xPos+=doc.getTextWidth('i');
-                // "Thomas" (positioniert ueber w und i, nicht ueber LL)
+                // --- LOGO: Breiten vorberechnen, dann zeichnen ---
+                // Alle Breiten bei korrekter Fontsize messen
+                doc.setFont('helvetica','bold');
+                doc.setFontSize(38);var wW=doc.getTextWidth('w');var iW=doc.getTextWidth('i');var wacherW=doc.getTextWidth('wacher');
+                doc.setFontSize(48);var llW=doc.getTextWidth('LL');
+                // Zeichnen
+                var lx=ML;
+                // "w" (38pt, doppelt fuer Fettung)
+                doc.setFontSize(38);doc.setTextColor(17,17,17);
+                doc.text('w',lx,y+20);doc.text('w',lx+0.2,y+20);
+                lx+=wW;
+                // "i" ohne Punkt: zeichnen, schwarzen Punkt weiss ueberdecken, roten Punkt setzen
+                doc.text('i',lx,y+20);doc.text('i',lx+0.2,y+20);
+                var iMid=lx+iW/2;
+                doc.setFillColor(255,255,255);doc.rect(iMid-2.5,y+6,5,4.5,'F');
+                doc.setFillColor(196,30,30);doc.rect(iMid-1.3,y+10.5,2.6,2.6,'F');
+                lx+=iW;
+                // "LL" (48pt, doppelt)
+                doc.setFont('helvetica','bold');doc.setFontSize(48);doc.setTextColor(17,17,17);
+                doc.text('LL',lx,y+20);doc.text('LL',lx+0.2,y+20);
+                lx+=llW;
+                // "wacher" (38pt, doppelt)
+                doc.setFontSize(38);
+                doc.text('wacher',lx,y+20);doc.text('wacher',lx+0.2,y+20);
+                var logoEnd=lx+wacherW;
+                // "Thomas" (ueber wi-Bereich, wie auf Startseite Bild 1)
                 doc.setFont('helvetica','bolditalic');doc.setFontSize(11);doc.setTextColor(196,30,30);
                 doc.text('Thomas',ML+0.5,y+7);
-                // "LL" (groesser, 48pt)
-                doc.setFont('helvetica','bold');doc.setFontSize(48);doc.setTextColor(17,17,17);
-                doc.text('LL',xPos,y+20);doc.text('LL',xPos+0.15,y+20);doc.text('LL',xPos+0.3,y+20);
-                xPos+=doc.getTextWidth('LL');
-                // "wacher"
-                doc.setFontSize(38);
-                doc.text('wacher',xPos,y+20);doc.text('wacher',xPos+0.15,y+20);doc.text('wacher',xPos+0.3,y+20);
-                var logoEnd=xPos+doc.getTextWidth('wacher');
-                // "Fliesenlegermeister e.K." (gleiche Schrift wie Thomas)
+                // "Fliesenlegermeister e.K."
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
                 // "LL" (groesser, 48pt)
