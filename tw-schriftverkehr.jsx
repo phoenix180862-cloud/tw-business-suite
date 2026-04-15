@@ -1,15 +1,14 @@
         /* =====================================================================
            SCHRIFTVERKEHR-MODUL -- Mail & Brief Korrespondenz
-           Skill: SKILL-schriftverkehr-briefkopf.md
+           Skill: SKILL-schriftverkehr-briefkopf.md + SKILL-jspdf-briefkopf.md
            Phase: kanalwahl -> startseite (PDF-Vorschau) -> bearbeiten-popup
-           Alle Aktions-Buttons: BLAU | Alle Nav-Buttons: ROT
+           PDF: Identisch zum Rechnungsmodul (jsPDF Briefkopf)
            ===================================================================== */
         function SchriftverkehrModul({ kunde, onBack }) {
             var BLAU = 'linear-gradient(135deg, #1E88E5, #1565C0)';
             var BLAU_SHADOW = '0 6px 20px rgba(30,136,229,0.30)';
             var ROT = 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))';
             var ROT_SHADOW = '0 4px 15px rgba(196,30,30,0.3)';
-            var noSpinCSS = '<style>input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}</style>';
 
             const [phase, setPhase] = useState('kanalwahl');
             const [versandKanal, setVersandKanal] = useState(null);
@@ -33,7 +32,7 @@
             const [anrede, setAnrede] = useState('Sehr geehrte Damen und Herren,');
             const [textBody, setTextBody] = useState('');
             const [grussformel, setGrussformel] = useState('Mit freundlichen Gr\u00FC\u00DFen');
-            const [briefDatum, setBriefDatum] = useState(new Date().toLocaleDateString('de-DE'));
+            const [briefDatum, setBriefDatum] = useState(new Date().toISOString().split('T')[0]);
             const [bilder, setBilder] = useState([]);
             const [vorlage, setVorlage] = useState('');
             const [sendStatus, setSendStatus] = useState(null);
@@ -55,39 +54,167 @@
             var handleBild = function(e) { var file = e.target.files && e.target.files[0]; if (!file) return; var img = new Image(); var canvas = document.createElement('canvas'); img.onload = function() { var w = img.width, h = img.height; var maxW = 1200, maxH = 900; if (w > maxW) { h = h * maxW / w; w = maxW; } if (h > maxH) { w = w * maxH / h; h = maxH; } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); setBilder(function(prev) { return prev.concat([{ name: file.name, dataUrl: canvas.toDataURL('image/jpeg', 0.85) }]); }); }; img.src = URL.createObjectURL(file); e.target.value = ''; };
             var removeBild = function(idx) { setBilder(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
 
-            // -- Briefkopf-HTML (SKILL-schriftverkehr-briefkopf.md) --
-            var buildBriefHTML = function() {
-                var kName = empfaenger || ''; var af = empfAdresse || ''; var aLines = [];
-                if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});} }
-                var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + betreff + '</title>';
-                h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=block" rel="stylesheet">';
-                h += '<style>@page{size:A4;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:10.5pt;color:#222;line-height:1.6;background:#fff}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-                h += '.page{width:210mm;min-height:297mm;padding:20mm 18mm 25mm 22mm;margin:0 auto;position:relative;background:#fff}';
-                h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
-                h += '.lt{font-family:"Source Sans 3",sans-serif;font-style:normal;font-weight:700;color:#c41e1e;font-size:13px;letter-spacing:3px;margin-bottom:-14px;padding-left:1px;position:relative;z-index:2}';
-                h += '.lw{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1}.lw .w{font-size:52px}.lw .iw{position:relative;font-size:52px;display:inline-block}.lw .iw .ic{font-size:52px;color:#111}.lw .iw .id{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:#c41e1e}.lw .ll{font-size:68px;letter-spacing:1px;line-height:0.75}.lw .wa{font-size:52px}';
-                h += '.ls{display:flex;justify-content:flex-end;width:100%;margin-top:1px}.ls span{font-family:"Source Sans 3",sans-serif;font-weight:600;color:#c41e1e;font-size:13px;letter-spacing:2px}';
-                h += '.lr{text-align:right;font-size:8pt;color:#555;line-height:1.5}.sep{border:none;border-top:2px solid #c41e1e;margin:3mm 0 2mm}';
-                h += '.abs{font-size:7pt;color:#aaa;border-bottom:0.5px solid #ccc;display:inline-block;padding-bottom:1px;margin-bottom:5mm}';
-                h += '.eb{display:flex;justify-content:space-between;margin-bottom:6mm}.en{font-weight:700;font-size:11pt}.ea{font-size:10pt;color:#333;line-height:1.5}.db{text-align:right}.dl{font-size:7.5pt;color:#999}.dv{font-size:10.5pt}';
-                h += '.bz{font-size:9pt;color:#555;margin-bottom:6mm}.bz .l{display:inline-block;width:38mm;color:#888}.bz .v{font-weight:600;color:#222}';
-                h += '.bt{font-size:13pt;font-weight:700;margin-bottom:4mm}.tx{font-size:10.5pt;line-height:1.7;margin-bottom:6mm;white-space:pre-wrap}.tx img{max-width:100%;height:auto;margin:4mm 0;border-radius:2px}.gr{font-size:10.5pt;margin-top:8mm}';
-                h += '.ft{position:absolute;bottom:18mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7pt;color:#c41e1e;font-weight:600}</style></head><body><div class="page">';
-                h += '<div class="lh"><div class="lc"><div class="lt">Thomas</div><div class="lw"><span class="w">w</span><span class="iw"><span class="ic">\u0131</span><span class="id"></span></span><span class="ll">LL</span><span class="wa">wacher</span></div><div class="ls"><span>Fliesenlegermeister e.K.</span></div></div><div class="lr">Flurweg 14a<br>56472 Nisterau<br>Tel. 02661-63101<br>Mobil 0170-2024161</div></div>';
-                h += '<hr class="sep"><div class="abs">Thomas Willwacher Fliesenlegermeister e.K. \u00b7 Flurweg 14a \u00b7 56472 Nisterau</div>';
-                h += '<div class="eb"><div><div class="en">' + kName + '</div><div class="ea">' + aLines.join('<br>') + '</div></div><div class="db"><div class="dl">Datum</div><div class="dv" style="font-weight:600">Nisterau, ' + briefDatum + '</div></div></div>';
-                h += '<div class="bz"><div><span class="l">Bauvorhaben:</span> <span class="v">' + bauvorhaben + '</span></div><div><span class="l">Unser Zeichen:</span> <span class="v">' + unserZeichen + '</span></div></div>';
-                if (betreff) h += '<div class="bt">' + betreff + '</div>';
-                h += '<div class="tx">' + anrede + '\n\n' + textBody.replace(/</g, '&lt;').replace(/\n/g, '<br>');
-                bilder.forEach(function(b) { h += '<br><img src="' + b.dataUrl + '" alt="' + b.name + '">'; });
-                h += '</div><div class="gr">' + grussformel + '<br><br><br>Thomas Willwacher<br>Fliesenlegermeister e.K.</div>';
-                h += '<div class="ft">Thomas Willwacher Fliesenlegermeister e.K.</div>';
-                h += '<script>document.fonts.ready.then(function(){setTimeout(function(){window.focus();window.print();},400);});<\/script></div></body></html>';
-                return h;
+            // -- Adresse aufsplitten --
+            var splitAdresse = function() {
+                var af = empfAdresse || '';
+                var str = ''; var plzOrt = '';
+                if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){str=m[1].trim();plzOrt=m[2].trim();}else{var parts=af.split(',');str=(parts[0]||'').trim();plzOrt=(parts[1]||'').trim();} }
+                return { strasse: str, plzOrt: plzOrt };
             };
 
-            var handleDrucken = function() { var h = buildBriefHTML(); var pw = window.open('', '_blank', 'width=820,height=1160'); pw.document.write(h); pw.document.close(); };
+            // ===== jsPDF PDF-ERZEUGUNG (IDENTISCH zum Rechnungsmodul) =====
+            var generatePDF = function() {
+                var doc = new jspdf.jsPDF('p','mm','a4');
+                var PW=210,PH=297,ML=22,MR=18,MT=18,MB=25;
+                var CW=PW-ML-MR; var rx=PW-MR;
 
+                var adr = splitAdresse();
+                var empfName = empfaenger || '';
+                var empfStrasse = adr.strasse;
+                var empfPlzOrt = adr.plzOrt;
+                var datumFormatiert = new Date(briefDatum).toLocaleDateString('de-DE');
+
+                // === FUSSZEILE (auf jeder Seite) ===
+                var drawFooter = function(pn) {
+                    doc.setDrawColor(196,30,30);doc.setLineWidth(0.5);
+                    doc.line(ML,PH-MB+2,rx,PH-MB+2);
+                    doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(196,30,30);
+                    doc.text('Thomas Willwacher Fliesenlegermeister e.K.',ML,PH-MB+6);
+                    doc.setFont('helvetica','normal');doc.setTextColor(102,102,102);
+                    doc.text('Steuernummer: 30/220/1234/5',rx,PH-MB+6,{align:'right'});
+                    doc.text('Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1',ML,PH-MB+10);
+                    doc.text('Seite '+pn,rx,PH-MB+10,{align:'right'});
+                };
+
+                var y = MT;
+
+                // === LOGO: exakt wie Rechnungsmodul (SKILL-jspdf-briefkopf.md) ===
+                doc.setFont('helvetica','bold');
+                doc.setFontSize(38);var wW=doc.getTextWidth('w');var iW=doc.getTextWidth('i');var wacherW=doc.getTextWidth('wacher');
+                doc.setFontSize(53);var llW=doc.getTextWidth('LL');
+                var lx=ML;
+                doc.setFontSize(38);doc.setTextColor(17,17,17);
+                doc.text('w',lx,y+20);doc.text('w',lx+0.2,y+20);lx+=wW;
+                doc.text('i',lx,y+20);doc.text('i',lx+0.2,y+20);
+                var iMid=lx+iW/2;
+                doc.setFillColor(255,255,255);doc.rect(lx-1,y+4,iW+2,7,'F');
+                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+10,2.2,2.2,'F');
+                lx+=iW;
+                doc.setFont('helvetica','bold');doc.setFontSize(53);doc.setTextColor(17,17,17);
+                doc.text('LL',lx,y+20);doc.text('LL',lx+0.2,y+20);lx+=llW;
+                doc.setFontSize(38);doc.text('wacher',lx,y+20);doc.text('wacher',lx+0.2,y+20);
+                var logoEnd=lx+wacherW;
+                doc.setFont('helvetica','bold');doc.setFontSize(10.1);doc.setTextColor(196,30,30);
+                doc.text('Thomas',ML,y+9);
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
+                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
+                doc.text('Flurweg 14a',rx,y+8,{align:'right'});
+                doc.text('56472 Nisterau',rx,y+12,{align:'right'});
+                doc.text('Tel. 02661-63101',rx,y+16,{align:'right'});
+                doc.text('Mobil 0170-2024161',rx,y+20,{align:'right'});
+                y+=30;
+
+                // --- Rote Trennlinie ---
+                doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=4;
+                // --- Absenderzeile ---
+                doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(170,170,170);
+                doc.text('Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau',ML,y);y+=6;
+
+                // --- EMPFAENGER links + DATUM rechts ---
+                var addrStartY=y;
+                doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,17,17);
+                doc.text(empfName,ML,y);y+=5;
+                doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(51,51,51);
+                if(empfStrasse){doc.text(empfStrasse,ML,y);y+=5;}
+                if(empfPlzOrt){doc.text(empfPlzOrt,ML,y);y+=5;}
+                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(136,136,136);
+                doc.text('Datum:',rx-30,addrStartY);
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);
+                doc.text(datumFormatiert,rx,addrStartY,{align:'right'});
+                y=Math.max(y,addrStartY+20);
+                y+=20;
+
+                // --- BETREFF (gross) ---
+                if (betreff) {
+                    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
+                    doc.text(betreff,ML,y);y+=8;
+                }
+
+                // --- BAUVORHABEN ---
+                doc.setFontSize(11);
+                var bvLabel='Bauvorhaben: ';
+                var bvLabelW=doc.getTextWidth(bvLabel);
+                doc.setFont('helvetica','bold');doc.text(bvLabel,ML,y);
+                var bvTextWidth=CW-bvLabelW;
+                var bvLines=doc.splitTextToSize(bauvorhaben||'',bvTextWidth);
+                bvLines.forEach(function(line){doc.text(line,ML+bvLabelW,y);y+=5;});
+                y+=2;
+
+                // --- UNSER ZEICHEN ---
+                doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(136,136,136);
+                doc.text('Unser Zeichen:',ML,y);
+                doc.setFont('helvetica','bold');doc.setTextColor(34,34,34);
+                doc.text(unserZeichen,ML+42,y);y+=8;
+
+                // --- BRIEFTEXT (Anrede + Text + Gruss) ---
+                var maxTextY = PH - MB - 5;
+                var pageNum = 1;
+                drawFooter(pageNum);
+
+                doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(34,34,34);
+
+                // Anrede
+                if (anrede) {
+                    var anredeLines = doc.splitTextToSize(anrede, CW);
+                    anredeLines.forEach(function(line) {
+                        if (y > maxTextY) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                        doc.text(line, ML, y); y += 5;
+                    });
+                    y += 3;
+                }
+
+                // Textkoerper
+                if (textBody) {
+                    var textLines = doc.splitTextToSize(textBody, CW);
+                    textLines.forEach(function(line) {
+                        if (y > maxTextY) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                        doc.text(line, ML, y); y += 5;
+                    });
+                    y += 5;
+                }
+
+                // Bilder einfuegen
+                bilder.forEach(function(b) {
+                    try {
+                        var imgW = 80; var imgH = 60;
+                        if (y + imgH > maxTextY) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                        doc.addImage(b.dataUrl, 'JPEG', ML, y, imgW, imgH);
+                        y += imgH + 5;
+                    } catch(e) { console.warn('Bild konnte nicht eingefuegt werden:', e); }
+                });
+
+                // Grussformel
+                y += 5;
+                if (y > maxTextY - 25) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(34,34,34);
+                var grussLines = doc.splitTextToSize(grussformel, CW);
+                grussLines.forEach(function(line) { doc.text(line, ML, y); y += 5; });
+                y += 15;
+                doc.text('Thomas Willwacher', ML, y); y += 5;
+                doc.text('Fliesenlegermeister e.K.', ML, y);
+
+                // PDF oeffnen
+                var pdfBlob = doc.output('blob');
+                var pdfUrl = URL.createObjectURL(pdfBlob);
+                window.open(pdfUrl, '_blank');
+                return pdfBlob;
+            };
+
+            // -- Drucken = PDF erzeugen --
+            var handleDrucken = function() { generatePDF(); };
+
+            // -- Gmail-API Versand (mit HTML-Mail fuer bessere Darstellung) --
             var handleSenden = async function() {
                 if (!empfEmail && !mailAdresse) { alert('Bitte eine E-Mail-Adresse eingeben!'); return; }
                 var zielEmail = mailAdresse || empfEmail;
@@ -101,14 +228,14 @@
                     var rawParts = ['From: ' + GMAIL_CONFIG.ABSENDER_EMAIL, 'To: ' + zielEmail, 'Subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(vollBetreff))) + '?=', 'MIME-Version: 1.0', 'Content-Type: multipart/alternative; boundary="' + boundary + '"', '', '--' + boundary, 'Content-Type: text/plain; charset=UTF-8', '', anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.', '', '--' + boundary, 'Content-Type: text/html; charset=UTF-8', '', htmlMail, '', '--' + boundary + '--'];
                     var encoded = btoa(unescape(encodeURIComponent(rawParts.join('\r\n')))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
                     var resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method: 'POST', headers: { 'Authorization': 'Bearer ' + service.accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: encoded }) });
-                    if (resp.ok) { setSendStatus('sent'); try { if (service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var mOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); await service.uploadFile(mOId, (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.html', 'text/html', new Blob([buildBriefHTML()],{type:'text/html'})); } } catch(aE){console.warn('Archivierung:',aE);} }
+                    if (resp.ok) { setSendStatus('sent'); try { if (service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var mOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var pdfBlob = generatePDF(); await service.uploadFile(mOId, (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf', 'application/pdf', pdfBlob); } } catch(aE){console.warn('Archivierung:',aE);} }
                     else { window.location.href = 'mailto:' + encodeURIComponent(zielEmail) + '?subject=' + encodeURIComponent(vollBetreff) + '&body=' + encodeURIComponent(anrede+'\n\n'+textBody+'\n\n'+grussformel); setSendStatus('sent'); }
                 } catch(err) { console.error('Sende-Fehler:', err); window.location.href = 'mailto:' + encodeURIComponent(mailAdresse||empfEmail) + '?subject=' + encodeURIComponent(betreff||'Schreiben') + '&body=' + encodeURIComponent(anrede+'\n\n'+textBody+'\n\n'+grussformel); setSendStatus('sent'); }
                 setTimeout(function() { setSendStatus(null); }, 4000);
             };
 
             var handleDriveSpeichern = async function() {
-                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var uOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.html'; await service.uploadFile(uOId, fN, 'text/html', new Blob([buildBriefHTML()],{type:'text/html'})); alert('\u2705 Gespeichert in Schriftverkehr/' + (versandKanal==='mail'?'Mail':'Briefe') + '/'); } else { var blob = new Blob([buildBriefHTML()], {type:'text/html'}); var url = URL.createObjectURL(blob); var a = document.createElement('a'); a.href = url; a.download = (versandKanal==='mail'?'Mail':'Brief') + '_' + new Date().toISOString().slice(0,10) + '.html'; a.click(); URL.revokeObjectURL(url); } } catch(err) { console.error('Speichern-Fehler:', err); alert('Fehler: ' + err.message); }
+                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var uOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; var pdfBlob = generatePDF(); await service.uploadFile(uOId, fN, 'application/pdf', pdfBlob); alert('\u2705 PDF gespeichert in Schriftverkehr/' + (versandKanal==='mail'?'Mail':'Briefe') + '/'); } else { var pdfBlob2 = generatePDF(); var a = document.createElement('a'); a.href = URL.createObjectURL(pdfBlob2); a.download = (versandKanal==='mail'?'Mail':'Brief') + '_' + new Date().toISOString().slice(0,10) + '.pdf'; a.click(); } } catch(err) { console.error('Speichern-Fehler:', err); alert('Fehler: ' + err.message); }
             };
 
             var openMailDialog = function() { setMailAdresse(kunde?(kunde.ag_email||kunde.bl_email||''):''); setShowMailDialog(true); };
@@ -138,7 +265,7 @@
 
                 return (<div className="page-container" style={{padding:'0',minHeight:'100vh',paddingBottom:'80px'}}>
                 <div style={{margin:'8px',background:'#fff',borderRadius:'12px',padding:'22px 20px 16px',color:'#222',boxShadow:'0 4px 24px rgba(0,0,0,0.35)',minHeight:'85vh'}}>
-                    {/* BRIEFKOPF: Logo links + Adresse rechts */}
+                    {/* BRIEFKOPF: Logo links + Adresse rechts -- identisch Rechnungsmodul */}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'3mm'}}>
                         <div style={{display:'inline-flex',flexDirection:'column',alignItems:'flex-start'}}>
                             <div style={{fontFamily:'"Source Sans 3",sans-serif',fontStyle:'normal',fontWeight:700,color:'#c41e1e',fontSize:'14.5px',letterSpacing:'3px',marginBottom:'-18px',paddingLeft:'1px',position:'relative',zIndex:2}}>Thomas</div>
@@ -164,8 +291,14 @@
                             {versandKanal==='mail'&&!editMode&&empfEmail&&<div style={{fontSize:'9pt',color:'#1E88E5',marginTop:'2px'}}>{empfEmail}</div>}
                             {versandKanal==='mail'&&editMode&&kunde&&(kunde.ag_email||kunde.bl_email||kunde.arch_email)&&(<div style={{display:'flex',gap:'4px',marginTop:'4px',flexWrap:'wrap'}}>{kunde.ag_email&&<button onClick={function(){setEmpfEmail(kunde.ag_email);}} style={{padding:'3px 7px',fontSize:'9px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'5px',cursor:'pointer'}}>AG: {kunde.ag_email}</button>}{kunde.bl_email&&<button onClick={function(){setEmpfEmail(kunde.bl_email);}} style={{padding:'3px 7px',fontSize:'9px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'5px',cursor:'pointer'}}>BL: {kunde.bl_email}</button>}{kunde.arch_email&&<button onClick={function(){setEmpfEmail(kunde.arch_email);}} style={{padding:'3px 7px',fontSize:'9px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'5px',cursor:'pointer'}}>Arch: {kunde.arch_email}</button>}</div>)}
                         </div>
-                        <div style={{textAlign:'right'}}><div style={{fontSize:'7.5pt',color:'#999'}}>Datum</div>{editMode?<input value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={Object.assign({},pdfInput,{fontWeight:600,textAlign:'right'})} />:<div style={{fontSize:'10.5pt',fontWeight:600}}>Nisterau, {briefDatum}</div>}</div>
+                        <div style={{textAlign:'right'}}><div style={{fontSize:'7.5pt',color:'#999'}}>Datum</div>{editMode?<input type="text" value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={Object.assign({},pdfInput,{fontWeight:600,textAlign:'right'})} />:<div style={{fontSize:'10.5pt',fontWeight:600}}>Nisterau, {new Date(briefDatum).toLocaleDateString('de-DE')}</div>}</div>
                     </div>
+
+                    {/* 5cm Abstand -- wie im Rechnungsmodul (y+=20 nach Adresse) */}
+                    <div style={{height:'20mm'}}></div>
+
+                    {/* BETREFF */}
+                    {editMode?<input value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'13pt',marginBottom:'4mm'})} />:(betreff&&<div style={{fontSize:'13pt',fontWeight:700,marginBottom:'4mm'}}>{betreff}</div>)}
 
                     {/* Bauvorhaben + Unser Zeichen LINKS */}
                     <div style={{fontSize:'9pt',color:'#555',marginBottom:'6mm'}}>
@@ -175,9 +308,6 @@
 
                     {/* Vorlagen (nur Edit-Modus) */}
                     {editMode&&(<div style={{marginBottom:'6mm'}}><select value={vorlage} onChange={function(e){applyVorlage(e.target.value);}} style={{width:'100%',padding:'6px 8px',borderRadius:'6px',border:'1px solid #ccc',background:'#f5f5f5',fontSize:'10px',color:'#222'}}><option value="">-- Freitext (keine Vorlage) --</option>{vorlagen.map(function(v){return <option key={v.id} value={v.id}>{v.name}</option>;})}</select></div>)}
-
-                    {/* BETREFF */}
-                    {editMode?<input value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'13pt',marginBottom:'4mm'})} />:(betreff&&<div style={{fontSize:'13pt',fontWeight:700,marginBottom:'4mm'}}>{betreff}</div>)}
 
                     {/* ANREDE + TEXT */}
                     {editMode?(<div style={{marginBottom:'4mm'}}><input value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({},pdfInput,{marginBottom:'4px'})} /><textarea value={textBody} onChange={function(e){setTextBody(e.target.value);}} rows={10} placeholder="Brieftext hier eingeben..." style={{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #ccc',background:'#fafafa',fontSize:'10.5pt',color:'#222',lineHeight:1.7,resize:'vertical',boxSizing:'border-box',fontFamily:'"Source Sans 3",sans-serif',minHeight:'180px'}} /></div>):(<div style={{fontSize:'10.5pt',lineHeight:1.7,whiteSpace:'pre-wrap',marginBottom:'6mm',color:'#333',minHeight:'120px'}}>{anrede&&<div>{anrede}</div>}{textBody?<div style={{marginTop:'8px'}}>{textBody}</div>:<div style={{color:'#bbb',fontStyle:'italic',marginTop:'8px'}}>Text wird hier angezeigt...</div>}</div>)}
@@ -189,7 +319,7 @@
                     {/* Grussformel */}
                     {editMode?<input value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={Object.assign({},pdfInput,{marginTop:'8mm'})} />:<div style={{fontSize:'10.5pt',color:'#333',marginTop:'8mm'}}>{grussformel}<br/><br/><br/>Thomas Willwacher<br/>Fliesenlegermeister e.K.</div>}
 
-                    {/* FUSSZEILE: NUR Firmenname in Rot */}
+                    {/* FUSSZEILE */}
                     <div style={{borderTop:'1.5px solid #c41e1e',paddingTop:'8px',fontSize:'7.5pt',color:'#c41e1e',fontWeight:600,marginTop:'30px'}}>Thomas Willwacher Fliesenlegermeister e.K.</div>
                 </div>
 
@@ -197,13 +327,13 @@
                 {sendStatus==='sending'&&(<div style={{position:'fixed',top:'60px',left:'50%',transform:'translateX(-50%)',padding:'12px 24px',background:BLAU,color:'white',borderRadius:'12px',fontSize:'13px',fontWeight:'700',zIndex:200,boxShadow:'0 4px 16px rgba(0,0,0,0.3)'}}>Wird gesendet...</div>)}
                 {sendStatus==='sent'&&(<div style={{position:'fixed',top:'60px',left:'50%',transform:'translateX(-50%)',padding:'12px 24px',background:'linear-gradient(135deg,#27ae60,#1e8449)',color:'white',borderRadius:'12px',fontSize:'13px',fontWeight:'700',zIndex:200,boxShadow:'0 4px 16px rgba(0,0,0,0.3)'}}>Erfolgreich gesendet!</div>)}
 
-                {/* Bottom-Bar: Zurueck ROT + Bearbeiten BLAU */}
+                {/* Bottom-Bar */}
                 <div style={{position:'fixed',bottom:0,left:0,right:0,padding:'10px 16px',background:'var(--bg-primary)',borderTop:'1px solid var(--border-color)',zIndex:100,display:'flex',gap:'8px'}}>
                     <button onClick={function(){if(editMode){setEditMode(false);}else{setPhase('kanalwahl');}}} style={{padding:'12px 32px',borderRadius:'var(--radius-md)',border:'none',background:ROT,color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:ROT_SHADOW,touchAction:'manipulation'}}>{'\u2190'} Zurueck</button>
                     <button onClick={function(){setShowBearbeitenPopup(true);}} style={{flex:2,padding:'12px',background:BLAU,color:'white',border:'none',borderRadius:'var(--radius-md)',fontSize:'16px',fontWeight:700,cursor:'pointer',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1.5px',boxShadow:BLAU_SHADOW,touchAction:'manipulation'}}>Bearbeiten {'\u2192'}</button>
                 </div>
 
-                {/* BEARBEITEN-POPUP: Alle Buttons BLAU, Abbrechen ROT */}
+                {/* BEARBEITEN-POPUP */}
                 {showBearbeitenPopup&&(<div className="modal-overlay" onClick={function(){setShowBearbeitenPopup(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'440px',padding:'24px'}}>
                     <div style={{textAlign:'center',marginBottom:'20px'}}><div style={{fontSize:'18px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',color:'var(--text-white)'}}>Dokument bearbeiten</div><div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'4px'}}>{kunde?kunde.name:''} {'\u2014'} {kanalLabel}</div></div>
                     <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
