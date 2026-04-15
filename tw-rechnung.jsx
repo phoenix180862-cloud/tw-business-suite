@@ -150,8 +150,8 @@
                 var iMid=lx+iW/2;
                 // Schwarzen i-Punkt KOMPLETT weiss ueberdecken (grosses Rechteck)
                 doc.setFillColor(255,255,255);doc.rect(lx-1,y+4,iW+2,7,'F');
-                // Roter Punkt bei y+9.5
-                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+9.5,2.2,2.2,'F');
+                // Roter Punkt bei y+9.7
+                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+9.7,2.2,2.2,'F');
                 lx+=iW;
                 // "LL" (53pt = 10% groesser, doppelt)
                 doc.setFont('helvetica','bold');doc.setFontSize(53);doc.setTextColor(17,17,17);
@@ -164,7 +164,7 @@
                 // "Thomas": gerade (bold), kleiner, von w-Kante, Unterkante knapp ueber Punkt
                 var dotRight=iMid+1.1;
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
-                doc.text('Thomas',ML,y+8.5);
+                doc.text('Thomas',ML,y+8.7);
                 // "Fliesenlegermeister e.K."
                 doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
                 doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
