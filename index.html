@@ -9989,6 +9989,185 @@
                 callback();
             };
 
+            // ── Helper: Alle Raum-Daten einsammeln (fuer Finish und Aufmass-Beenden) ──
+            const buildRaumFinishPayload = () => {
+                const tuerenEntries = tueren.length > 0 ? tueren.map(t => ({...t})) : null;
+                const tuerDefaults = tueren.length > 0 ? {
+                    breite: tueren[0].breite || "", hoehe: tueren[0].hoehe || "", tiefe: tueren[0].tiefe || "",
+                    hatLaibung: tueren[0].hatLaibung || false,
+                    dauerelastisch: tueren[0].dauerelastisch,
+                    leibungWandGefliest: tueren[0].leibungWandGefliest,
+                    leibungBodenGefliest: tueren[0].leibungBodenGefliest,
+                    sturzGefliest: tueren[0].sturzGefliest,
+                    leibungWandAbgedichtet: tueren[0].leibungWandAbgedichtet,
+                    leibungBodenAbgedichtet: tueren[0].leibungBodenAbgedichtet,
+                    sturzAbgedichtet: tueren[0].sturzAbgedichtet,
+                } : null;
+                const fensterDefaults = (fensterUebernehmen && fenster.length > 0) ? {
+                    breite: fenster[0].breite || "", hoehe: fenster[0].hoehe || "", tiefe: fenster[0].tiefe || "",
+                    bruestung: fenster[0].bruestung || "", hatLaibung: fenster[0].hatLaibung || false, bodengleich: fenster[0].bodengleich || false,
+                    leibungWandGefliest: fenster[0].leibungWandGefliest,
+                    fensterbankGefliest: fenster[0].fensterbankGefliest,
+                    sturzGefliest: fenster[0].sturzGefliest,
+                    leibungWandAbgedichtet: fenster[0].leibungWandAbgedichtet,
+                    fensterbankAbgedichtet: fenster[0].fensterbankAbgedichtet,
+                    sturzAbgedichtet: fenster[0].sturzAbgedichtet,
+                } : null;
+                const fensterEntries = (fensterUebernehmen && fenster.length > 0) ? fenster.map(f => ({...f})) : null;
+                const sonstigeDefaults = (sonstigeUebernehmen && abzuege.length > 0) ? abzuege.map(a => ({...a})) : null;
+                const positionenMitErgebnis = posCards.map(pos => {
+                    const rawSteps = buildRechenweg(pos);
+                    const rwSteps = enrichRechenweg(rawSteps);
+                    const editSteps = posRechenwegEdits[pos.pos] || null;
+                    return {
+                        pos: pos.pos, bez: pos.bez, einheit: pos.einheit,
+                        kategorie: pos.kategorie,
+                        ergebnis: calcPositionResult(pos),
+                        rechenwegSteps: rwSteps,
+                        hasManualRW: pos.hasManualRW || false,
+                        manualRechenweg: pos.manualRechenweg || [],
+                        manualErgebnis: pos.manualErgebnis || 0,
+                        manualMenge: pos.manualMenge || '',
+                        posRechenwegEdit: editSteps,
+                        tags: pos.tags || []
+                    };
+                });
+                const raumState = {
+                    masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})),
+                    tueren: tueren.map(t => ({...t})), fenster: fenster.map(f => ({...f})),
+                    abzuege: abzuege.map(a => ({...a})), posCards: posCards.map(p => ({...p})),
+                    posRechenwegEdits: {...posRechenwegEdits},
+                    fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
+                    bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
+                    raumhoehe: masse.raumhoehe,
+                    phasenFotos: phasenFotos, objektFotos: objektFotos,
+                    kiErgebnisse: kiErgebnisse,
+                    kiFotoErgebnisse: kiFotoErgebnisse
+                };
+                const raumName = (raum && raum.name) || (raum && raum.nr) || 'Raum';
+                return {
+                    raumName,
+                    positionen: positionenMitErgebnis,
+                    raumState,
+                    masse: { ...masse },
+                    tuerDefaults, fensterDefaults, sonstigeDefaults,
+                    tuerenEntries, fensterEntries,
+                    fliesenUmlaufend, abdichtungUmlaufend,
+                    fliesenDeckenhoch, abdichtungDeckenhoch,
+                    bodenPlusTuerlaibung
+                };
+            };
+
+            // ── Raumblatt fertigstellen (aktuellen Raum speichern, Rueckkehr zur Raumerkennung) ──
+            const doRaumblattFertigstellen = () => {
+                handleFinishRaumValidated(() => {
+                    const payload = buildRaumFinishPayload();
+                    onFinishRaum((raum && raum.nr), payload);
+                });
+            };
+
+            // ── Aufmass komplett fertigstellen (Raum speichern + Aufmass beenden + Weiter zum Rechnungsmodul) ──
+            const doAufmassFertigstellen = () => {
+                handleFinishRaumValidated(() => {
+                    const payload = buildRaumFinishPayload();
+                    onFinishRaum((raum && raum.nr), payload);
+                    // Aufmass beenden nach State-Update -- navigiert automatisch zum Rechnungsmodul
+                    setTimeout(() => onAufmassBeenden && onAufmassBeenden(), 100);
+                });
+            };
+
+            // ── Zurueck mit Confirm-Dialog bei ungespeicherten Aenderungen ──
+            const doZurueckZurRaumerkennung = () => {
+                if (hasUnsavedChanges) {
+                    if (!confirm('Es gibt ungespeicherte Aenderungen im Raumblatt.\n\nWirklich zurueck zur Raumerkennung?')) return;
+                }
+                onBack();
+            };
+
+            // ── WIP-Speicherung: Aktuellen Bildschirm-Stand einsammeln ──
+            // Ref wird bei jedem Render aktualisiert, Listener selbst nur einmal registriert
+            const wipCollectorRef = React.useRef(null);
+            wipCollectorRef.current = function() {
+                return {
+                    moduleState: {
+                        // Metadaten des aktiven Raums
+                        activeRaum: raum,
+                        activeSelectedPositions: initPositions || [],
+                        activeRaumName: raumName,
+                        activeTab: rbTab,
+                        // Komplette Raumdaten
+                        masse: masse,
+                        wandMasse: wandMasse,
+                        tueren: tueren,
+                        fenster: fenster,
+                        abzuege: abzuege,
+                        posCards: posCards,
+                        posRechenwegEdits: posRechenwegEdits,
+                        fliesenUmlaufend: fliesenUmlaufend,
+                        abdichtungUmlaufend: abdichtungUmlaufend,
+                        fliesenDeckenhoch: fliesenDeckenhoch,
+                        abdichtungDeckenhoch: abdichtungDeckenhoch,
+                        bodenPlusTuerlaibung: bodenPlusTuerlaibung,
+                        fensterUebernehmen: fensterUebernehmen,
+                        sonstigeUebernehmen: sonstigeUebernehmen,
+                        phasenFotos: phasenFotos,
+                        objektFotos: objektFotos,
+                        kiErgebnisse: kiErgebnisse,
+                        kiFotoErgebnisse: kiFotoErgebnisse,
+                        // App-weite Daten (werden vom Fallback-Handler ueberschrieben)
+                        gesamtliste: gesamtliste || []
+                    },
+                    meta: {
+                        beschreibung: 'Raumblatt: ' + (raumName || (raum && raum.bez) || (raum && raum.nr) || 'Raum'),
+                        icon: '\uD83D\uDCD0',
+                        raumNr: raum && raum.nr,
+                        raumBez: raum && raum.bez
+                    }
+                };
+            };
+
+            // ── Listener einmal registrieren, nutzt Ref fuer immer aktuellen State ──
+            React.useEffect(function() {
+                if (!window.TW || !window.TW.on) return;
+                var unsubCollect = window.TW.on('wip:collectState', function(data) {
+                    if (!data || data.modulName !== 'aufmass') return;
+                    if (wipCollectorRef.current && typeof data.callback === 'function') {
+                        try { data.callback(wipCollectorRef.current()); }
+                        catch(e) { console.error('[Raumblatt] wip:collectState Fehler:', e); }
+                    }
+                });
+                var unsubRestore = window.TW.on('wip:restoreState', function(data) {
+                    if (!data || data.modulName !== 'aufmass' || !data.moduleState) return;
+                    var s = data.moduleState;
+                    try {
+                        if (s.activeRaumName !== undefined) setRaumName(s.activeRaumName);
+                        if (typeof s.activeTab === 'number') setRbTab(s.activeTab);
+                        if (s.masse) setMasse(s.masse);
+                        if (s.wandMasse) setWandMasse(s.wandMasse);
+                        if (s.tueren) setTueren(s.tueren);
+                        if (s.fenster) setFenster(s.fenster);
+                        if (s.abzuege) setAbzuege(s.abzuege);
+                        if (s.posCards) setPosCards(s.posCards);
+                        if (s.posRechenwegEdits) setPosRechenwegEdits(s.posRechenwegEdits);
+                        if (typeof s.fliesenUmlaufend === 'boolean') setFliesenUmlaufend(s.fliesenUmlaufend);
+                        if (typeof s.abdichtungUmlaufend === 'boolean') setAbdichtungUmlaufend(s.abdichtungUmlaufend);
+                        if (typeof s.fliesenDeckenhoch === 'boolean') setFliesenDeckenhoch(s.fliesenDeckenhoch);
+                        if (typeof s.abdichtungDeckenhoch === 'boolean') setAbdichtungDeckenhoch(s.abdichtungDeckenhoch);
+                        if (typeof s.bodenPlusTuerlaibung === 'boolean') setBodenPlusTuerlaibung(s.bodenPlusTuerlaibung);
+                        if (typeof s.fensterUebernehmen === 'boolean') setFensterUebernehmen(s.fensterUebernehmen);
+                        if (typeof s.sonstigeUebernehmen === 'boolean') setSonstigeUebernehmen(s.sonstigeUebernehmen);
+                        if (s.phasenFotos) setPhasenFotos(s.phasenFotos);
+                        if (s.objektFotos) setObjektFotos(s.objektFotos);
+                        if (s.kiErgebnisse) setKiErgebnisse(s.kiErgebnisse);
+                        if (s.kiFotoErgebnisse) setKiFotoErgebnisse(s.kiFotoErgebnisse);
+                    } catch(e) { console.error('[Raumblatt] wip:restoreState Fehler:', e); }
+                });
+                return function() {
+                    if (typeof unsubCollect === 'function') unsubCollect();
+                    if (typeof unsubRestore === 'function') unsubRestore();
+                };
+            }, []);
+
             // ── Schnellzugriff Handler ──
             const handleOpenKundendaten = () => {
                 if (window.TW && window.TW.EventBus) {
@@ -11325,21 +11504,21 @@
                     {/* ═══ STICKY WRAPPER fuer beide Leisten ═══ */}
                     <div style={{position:'sticky', top:'95px', zIndex:98, background:'var(--bg-primary)', paddingBottom:'4px', borderBottom:'1px solid var(--border-subtle)'}}>
 
-                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raum fertig, Aufmass beenden) ═══ */}
+                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raumblatt fertig stellen, Aufmass fertigstellen) ═══ */}
                     <div className="rb-nav-red" style={{
                         display:'flex', gap:'3px', padding:'4px 0', marginBottom:'2px'
                     }}>
                         {onBack && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={onBack}>Zurueck</button>
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doZurueckZurRaumerkennung}>Zurueck</button>
                         )}
                         {onShowGesamtliste && (
                             <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { onShowGesamtliste(); }}>Gesamtliste</button>
                         )}
                         {onFinishRaum && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { handleTabChange(3); }}>Raum fertig</button>
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doRaumblattFertigstellen}>Raumblatt fertig stellen</button>
                         )}
                         {onAufmassBeenden && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={onAufmassBeenden}>Aufmass beenden</button>
+                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doAufmassFertigstellen}>Aufmass fertigstellen</button>
                         )}
                     </div>
 
@@ -14235,186 +14414,6 @@
                         </div>
                     )}
 
-                    {/* Action Buttons */}
-                    {/* ═══ ACTION BUTTONS ═══ */}
-                    <div className="raum-action-grid">
-                        {/* Raumblatt fertigstellen */}
-                        <button className="raum-action-btn finish" onClick={() => handleFinishRaumValidated(() => {
-                            // Alle Einstellungen sammeln
-                            const tuerenEntries = tueren.length > 0 ? tueren.map(t => ({...t})) : null;
-                            const tuerDefaults = tueren.length > 0 ? {
-                                breite: tueren[0].breite || "", hoehe: tueren[0].hoehe || "", tiefe: tueren[0].tiefe || "",
-                                hatLaibung: tueren[0].hatLaibung || false,
-                                dauerelastisch: tueren[0].dauerelastisch,
-                                leibungWandGefliest: tueren[0].leibungWandGefliest,
-                                leibungBodenGefliest: tueren[0].leibungBodenGefliest,
-                                sturzGefliest: tueren[0].sturzGefliest,
-                                leibungWandAbgedichtet: tueren[0].leibungWandAbgedichtet,
-                                leibungBodenAbgedichtet: tueren[0].leibungBodenAbgedichtet,
-                                sturzAbgedichtet: tueren[0].sturzAbgedichtet,
-                            } : null;
-                            const fensterDefaults = (fensterUebernehmen && fenster.length > 0) ? {
-                                breite: fenster[0].breite || "", hoehe: fenster[0].hoehe || "", tiefe: fenster[0].tiefe || "",
-                                bruestung: fenster[0].bruestung || "", hatLaibung: fenster[0].hatLaibung || false, bodengleich: fenster[0].bodengleich || false,
-                                leibungWandGefliest: fenster[0].leibungWandGefliest,
-                                fensterbankGefliest: fenster[0].fensterbankGefliest,
-                                sturzGefliest: fenster[0].sturzGefliest,
-                                leibungWandAbgedichtet: fenster[0].leibungWandAbgedichtet,
-                                fensterbankAbgedichtet: fenster[0].fensterbankAbgedichtet,
-                                sturzAbgedichtet: fenster[0].sturzAbgedichtet,
-                            } : null;
-                            const fensterEntries = (fensterUebernehmen && fenster.length > 0) ? fenster.map(f => ({...f})) : null;
-                            const sonstigeDefaults = (sonstigeUebernehmen && abzuege.length > 0) ? abzuege.map(a => ({...a})) : null;
-                            // Alle Positionen mit Ergebnissen sammeln
-                            const positionenMitErgebnis = posCards.map(pos => {
-                                const rawSteps = buildRechenweg(pos);
-                                const rwSteps = enrichRechenweg(rawSteps);
-                                const editSteps = posRechenwegEdits[pos.pos] || null;
-                                return {
-                                    pos: pos.pos, bez: pos.bez, einheit: pos.einheit,
-                                    kategorie: pos.kategorie,
-                                    ergebnis: calcPositionResult(pos),
-                                    rechenwegSteps: rwSteps,
-                                    hasManualRW: pos.hasManualRW || false,
-                                    manualRechenweg: pos.manualRechenweg || [],
-                                    manualErgebnis: pos.manualErgebnis || 0,
-                                    manualMenge: pos.manualMenge || '',
-                                    posRechenwegEdit: editSteps,
-                                    tags: pos.tags || []
-                                };
-                            });
-                            // Kompletten Raumzustand für spätere Bearbeitung speichern
-                            const raumState = {
-                                masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})),
-                                tueren: tueren.map(t => ({...t})), fenster: fenster.map(f => ({...f})),
-                                abzuege: abzuege.map(a => ({...a})), posCards: posCards.map(p => ({...p})),
-                                posRechenwegEdits: {...posRechenwegEdits},
-                                fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
-                                bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
-                                raumhoehe: masse.raumhoehe,
-                                phasenFotos: phasenFotos, objektFotos: objektFotos,
-                                kiErgebnisse: kiErgebnisse,
-                                kiFotoErgebnisse: kiFotoErgebnisse
-                            };
-                            const raumName = (raum && raum.name) || (raum && raum.nr) || 'Raum';
-                            onFinishRaum((raum && raum.nr), {
-                                raumName,
-                                positionen: positionenMitErgebnis,
-                                raumState,
-                                masse: { ...masse },
-                                tuerDefaults, fensterDefaults, sonstigeDefaults,
-                                tuerenEntries, fensterEntries,
-                                fliesenUmlaufend, abdichtungUmlaufend,
-                                fliesenDeckenhoch, abdichtungDeckenhoch,
-                                bodenPlusTuerlaibung
-                            });
-                        })}>
-                            <span className="btn-icon">✅</span>
-                            <span className="btn-text">
-                                Raumblatt fertiggestellt
-                                <span className="btn-sub">Aufmass vom Raumblatt erstellt und abgespeichert - Naechster Raum</span>
-                            </span>
-                        </button>
-
-                        {/* Gesamtliste anzeigen */}
-                        <button className="raum-action-btn" onClick={onShowGesamtliste}>
-                            <span className="btn-icon">📋</span>
-                            <span className="btn-text">
-                                Übersicht der Gesamtliste
-                                <span className="btn-sub">{(gesamtliste || []).length} {(gesamtliste || []).length === 1 ? 'Raum' : 'Räume'} fertiggestellt</span>
-                            </span>
-                        </button>
-
-                        {/* Aufmass fertigstellen (gesamt) */}
-                        <button className="raum-action-btn complete" onClick={() => handleFinishRaumValidated(() => {
-                            // Erst aktuellen Raum fertigstellen
-                            const tuerenEntries = tueren.length > 0 ? tueren.map(t => ({...t})) : null;
-                            const tuerDefaults = tueren.length > 0 ? {
-                                breite: tueren[0].breite || "", hoehe: tueren[0].hoehe || "", tiefe: tueren[0].tiefe || "",
-                                hatLaibung: tueren[0].hatLaibung || false,
-                                dauerelastisch: tueren[0].dauerelastisch,
-                                leibungWandGefliest: tueren[0].leibungWandGefliest,
-                                leibungBodenGefliest: tueren[0].leibungBodenGefliest,
-                                sturzGefliest: tueren[0].sturzGefliest,
-                                leibungWandAbgedichtet: tueren[0].leibungWandAbgedichtet,
-                                leibungBodenAbgedichtet: tueren[0].leibungBodenAbgedichtet,
-                                sturzAbgedichtet: tueren[0].sturzAbgedichtet,
-                            } : null;
-                            const fensterDefaults = (fensterUebernehmen && fenster.length > 0) ? {
-                                breite: fenster[0].breite || "", hoehe: fenster[0].hoehe || "", tiefe: fenster[0].tiefe || "",
-                                bruestung: fenster[0].bruestung || "", hatLaibung: fenster[0].hatLaibung || false, bodengleich: fenster[0].bodengleich || false,
-                                leibungWandGefliest: fenster[0].leibungWandGefliest,
-                                fensterbankGefliest: fenster[0].fensterbankGefliest,
-                                sturzGefliest: fenster[0].sturzGefliest,
-                                leibungWandAbgedichtet: fenster[0].leibungWandAbgedichtet,
-                                fensterbankAbgedichtet: fenster[0].fensterbankAbgedichtet,
-                                sturzAbgedichtet: fenster[0].sturzAbgedichtet,
-                            } : null;
-                            const fensterEntries = (fensterUebernehmen && fenster.length > 0) ? fenster.map(f => ({...f})) : null;
-                            const sonstigeDefaults = (sonstigeUebernehmen && abzuege.length > 0) ? abzuege.map(a => ({...a})) : null;
-                            const positionenMitErgebnis = posCards.map(pos => {
-                                const rawSteps = buildRechenweg(pos);
-                                const rwSteps = enrichRechenweg(rawSteps);
-                                const editSteps = posRechenwegEdits[pos.pos] || null;
-                                return {
-                                    pos: pos.pos, bez: pos.bez, einheit: pos.einheit,
-                                    kategorie: pos.kategorie,
-                                    ergebnis: calcPositionResult(pos),
-                                    rechenwegSteps: rwSteps,
-                                    hasManualRW: pos.hasManualRW || false,
-                                    manualRechenweg: pos.manualRechenweg || [],
-                                    manualErgebnis: pos.manualErgebnis || 0,
-                                    manualMenge: pos.manualMenge || '',
-                                    posRechenwegEdit: editSteps,
-                                    tags: pos.tags || []
-                                };
-                            });
-                            const raumState = {
-                                masse: { ...masse }, wandMasse: wandMasse.map(w => ({...w})),
-                                tueren: tueren.map(t => ({...t})), fenster: fenster.map(f => ({...f})),
-                                abzuege: abzuege.map(a => ({...a})), posCards: posCards.map(p => ({...p})),
-                                posRechenwegEdits: {...posRechenwegEdits},
-                                fliesenUmlaufend, abdichtungUmlaufend, fliesenDeckenhoch, abdichtungDeckenhoch,
-                                bodenPlusTuerlaibung, fensterUebernehmen, sonstigeUebernehmen,
-                                raumhoehe: masse.raumhoehe,
-                                phasenFotos: phasenFotos, objektFotos: objektFotos,
-                                kiErgebnisse: kiErgebnisse,
-                                kiFotoErgebnisse: kiFotoErgebnisse
-                            };
-                            const raumName = (raum && raum.name) || (raum && raum.nr) || 'Raum';
-                            // Aktuellen Raum speichern UND dann Aufmass beenden
-                            onFinishRaum((raum && raum.nr), {
-                                raumName,
-                                positionen: positionenMitErgebnis,
-                                raumState,
-                                masse: { ...masse },
-                                tuerDefaults, fensterDefaults, sonstigeDefaults,
-                                tuerenEntries, fensterEntries,
-                                fliesenUmlaufend, abdichtungUmlaufend,
-                                fliesenDeckenhoch, abdichtungDeckenhoch,
-                                bodenPlusTuerlaibung
-                            });
-                            // Aufmass beenden wird nach dem State-Update ausgelöst
-                            setTimeout(() => onAufmassBeenden && onAufmassBeenden(), 100);
-                        })}>
-                            <span className="btn-icon">📦</span>
-                            <span className="btn-text">
-                                Aufmass fertigstellen
-                                <span className="btn-sub">Letztes Raumblatt speichern - Weiter zum Rechnungsmodul</span>
-                            </span>
-                        </button>
-
-                        {/* Zurueck */}
-                        <button className="raum-action-btn" onClick={() => {
-                            if (hasUnsavedChanges) {
-                                if (!confirm('Es gibt ungespeicherte Aenderungen im Raumblatt.\n\nWirklich zurueck zur Raumerkennung?')) return;
-                            }
-                            onBack();
-                        }} style={{color:'var(--text-muted)'}}>
-                            <span className="btn-icon">◀</span>
-                            <span className="btn-text">Zurueck zur Raumerkennung</span>
-                        </button>
-                    </div>
 
                     </React.Fragment>)}
 
