@@ -6990,18 +6990,31 @@
                 if (!file || !fotoContext) return;
                 const reader = new FileReader();
                 reader.onload = (ev) => {
+                    const dataUrl = ev.target.result;
                     setAktFotos(prev => {
                         const updated = { ...prev };
                         updated[fotoContext.phase] = {
                             ...updated[fotoContext.phase],
                             [fotoContext.wandId]: {
-                                image: ev.target.result, croppedImage: null,
+                                image: dataUrl, croppedImage: null,
                                 zeit: new Date().toLocaleTimeString('de-DE'),
                                 aiAnalysis: null, marked: false
                             }
                         };
                         return updated;
                     });
+                    // PHASE 2: Paralleles Sicherheitsnetz — Foto als Blob in den Foto-Store
+                    // schreiben. Geschieht im Hintergrund, blockiert die UI nicht.
+                    try {
+                        if (window.TWStorage && window.TWStorage.saveFoto && kunde) {
+                            var kundeId = kunde._driveFolderId || kunde.id || kunde.name;
+                            var raumKey = (raum && (raum.bez || raum.nr)) || raumName || 'raum';
+                            window.TWStorage.saveFoto(
+                                kundeId, 'phase', raumKey, fotoContext.phase + '__' + fotoContext.wandId,
+                                dataUrl, { phase: fotoContext.phase, wandId: fotoContext.wandId, aufgenommen: new Date().toISOString() }
+                            ).catch(function(e) { console.warn('[Foto-Persist] Phase:', e.message); });
+                        }
+                    } catch(e) { /* still */ }
                     setFotoContext(null);
                 };
                 reader.readAsDataURL(file);
@@ -7333,6 +7346,17 @@
                             aiAnalysis: null
                         }]);
                     }
+                    // PHASE 2: Paralleles Sicherheitsnetz — Foto als Blob in den Foto-Store
+                    try {
+                        if (window.TWStorage && window.TWStorage.saveFoto && kunde) {
+                            var kundeId = kunde._driveFolderId || kunde.id || kunde.name;
+                            var raumKey = (raum && (raum.bez || raum.nr)) || raumName || 'raum';
+                            window.TWStorage.saveFoto(
+                                kundeId, 'wand', raumKey, wandId,
+                                base64, { wandId: wandId, aufgenommen: new Date().toISOString() }
+                            ).catch(function(e) { console.warn('[Foto-Persist] Wand:', e.message); });
+                        }
+                    } catch(e) { /* still */ }
                 };
                 reader.readAsDataURL(file);
             };
@@ -9931,16 +9955,27 @@
                                     if (!file || nr === null) return;
                                     var reader = new FileReader();
                                     reader.onload = function(ev) {
+                                        var dataUrl = ev.target.result;
                                         setObjektFotos(function(prev) {
                                             return prev.map(function(slot) {
                                                 if (slot.nr === nr) return Object.assign({}, slot, {
-                                                    image: ev.target.result, croppedImage: null,
+                                                    image: dataUrl, croppedImage: null,
                                                     zeit: new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit', second:'2-digit'}),
                                                     marked: false
                                                 });
                                                 return slot;
                                             });
                                         });
+                                        // PHASE 2: Paralleles Sicherheitsnetz — Foto als Blob im Foto-Store
+                                        try {
+                                            if (window.TWStorage && window.TWStorage.saveFoto && kunde) {
+                                                var kId = kunde._driveFolderId || kunde.id || kunde.name;
+                                                window.TWStorage.saveFoto(
+                                                    kId, 'objekt', 'objekt-gesamt', 'slot_' + nr,
+                                                    dataUrl, { slotNr: nr, aufgenommen: new Date().toISOString() }
+                                                ).catch(function(e) { console.warn('[Foto-Persist] Objekt:', e.message); });
+                                            }
+                                        } catch(e) { /* still */ }
                                         objektFotoTarget.current = null;
                                     };
                                     reader.readAsDataURL(file);
