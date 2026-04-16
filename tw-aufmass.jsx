@@ -3486,33 +3486,58 @@
             const handleCopyToRecognized = (raum) => {
                 if (!lastRaumData) return raum;
                 const updated = { ...raum };
-                
-                // ── Wände: IMMER vom neuen Raum (aus Zeichnung) behalten! ──
-                // raum.waende wird NICHT überschrieben!
-                
-                // ── Höhen: Zeichnung hat Vorrang, sonst vom Vorraum ──
+
+                // ── Waende: Wenn der neue Raum KEINE oder nur leere Laengen hat und der Vorraum
+                //    gleich viele Waende, uebernehmen wir die Laengen vom Vorraum.
+                //    Wenn der neue Raum bereits Laengen aus der Zeichnung hat, behalten wir diese. ──
+                const vorraumWaende = (lastRaumData.waende || (lastRaumData._masse && lastRaumData._masse.wandMasse) || []);
+                const neueWaende = raum.waende || [];
+                const keineNeueLaengen = neueWaende.length === 0 || neueWaende.every(function(w){
+                    return !w || w.l === '' || w.l === 0 || w.l === null || w.l === undefined;
+                });
+                if (keineNeueLaengen && vorraumWaende.length > 0) {
+                    // Fall A: neuer Raum hat ueberhaupt keine Waende -> komplette Vorraum-Waende uebernehmen
+                    if (neueWaende.length === 0) {
+                        updated.waende = vorraumWaende.map(function(w){ return { id: w.id, l: w.l }; });
+                    }
+                    // Fall B: neuer Raum hat Wand-Struktur (A/B/C/D) aber keine Laengen
+                    //        -> Laengen vom Vorraum mergen, wenn die IDs passen
+                    else {
+                        updated.waende = neueWaende.map(function(w, i){
+                            const vorWand = vorraumWaende.find(function(vw){ return vw.id === w.id; }) || vorraumWaende[i];
+                            return { id: w.id, l: (vorWand && vorWand.l) ? vorWand.l : (w.l || '') };
+                        });
+                    }
+                }
+
+                // ── Hoehen: Zeichnung hat Vorrang, sonst vom Vorraum ──
                 if (!raum.fliesenhoehe && lastRaumData.hoehe) updated.fliesenhoehe = lastRaumData.hoehe;
+                if (!raum.hoehe && lastRaumData.hoehe) updated.hoehe = lastRaumData.hoehe;
                 if (!raum.raumhoehe && lastRaumData.raumhoehe) updated.raumhoehe = lastRaumData.raumhoehe;
-                
+
                 // ── Abdichtung + Sockel: NIE in Zeichnung → IMMER vom Vorraum ──
                 if (lastRaumData.abdichtungshoehe) updated.abdichtungshoehe = lastRaumData.abdichtungshoehe;
                 if (lastRaumData.sockelhoehe) updated.sockelhoehe = lastRaumData.sockelhoehe;
-                
+
                 // ── Alle Schalter: IMMER vom Vorraum ──
                 if (lastRaumData.fliesenUmlaufend !== undefined) updated.fliesenUmlaufend = lastRaumData.fliesenUmlaufend;
                 if (lastRaumData.abdichtungUmlaufend !== undefined) updated.abdichtungUmlaufend = lastRaumData.abdichtungUmlaufend;
                 if (lastRaumData.fliesenDeckenhoch !== undefined) updated.fliesenDeckenhoch = lastRaumData.fliesenDeckenhoch;
                 if (lastRaumData.abdichtungDeckenhoch !== undefined) updated.abdichtungDeckenhoch = lastRaumData.abdichtungDeckenhoch;
                 if (lastRaumData.bodenPlusTuerlaibung !== undefined) updated.bodenPlusTuerlaibung = lastRaumData.bodenPlusTuerlaibung;
-                
-                // ── Tür/Fenster/Sonstige-Defaults: IMMER vom Vorraum ──
+
+                // ── Tuer/Fenster/Sonstige-Defaults: IMMER vom Vorraum ──
                 if (lastRaumData.tuerDefaults) updated.tuerDefaults = lastRaumData.tuerDefaults;
                 if (lastRaumData.fensterDefaults) updated.fensterDefaults = lastRaumData.fensterDefaults;
                 if (lastRaumData.sonstigeDefaults) updated.sonstigeDefaults = lastRaumData.sonstigeDefaults;
-                // ── Komplette Einträge für Vorladung ──
+                // ── Komplette Eintraege fuer Vorladung ──
                 if (lastRaumData.tuerenEntries) updated.tuerenEntries = lastRaumData.tuerenEntries;
                 if (lastRaumData.fensterEntries) updated.fensterEntries = lastRaumData.fensterEntries;
-                
+                // ── Abzuege vom Vorraum mit neuen IDs uebernehmen ──
+                if (lastRaumData.abzuege && lastRaumData.abzuege.length > 0 && (!raum.abzuege || raum.abzuege.length === 0)) {
+                    updated.abzuege = lastRaumData.abzuege.map(function(a){ return Object.assign({}, a, { id: Date.now() + Math.random() }); });
+                }
+
                 return updated;
             };
 
@@ -3683,6 +3708,36 @@
                     <div className="page-title">Raumerkennung</div>
                     <div className="page-subtitle">Räume aus Zeichnungen, LV und Raumbuch ermittelt</div>
 
+                    {/* ═══ ROTE AKTIONS-NAVIGATION (Raum manuell / Baugleich / Gesamtliste) ═══ */}
+                    <div className="rb-nav-red" style={{
+                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'8px'
+                    }}>
+                        <button className="rb-nav-btn rb-nav-red-btn"
+                            onClick={() => setShowManual(true)}>
+                            Raum manuell eingeben
+                        </button>
+                        <button className="rb-nav-btn rb-nav-red-btn"
+                            disabled={!lastRaumData}
+                            style={{opacity: !lastRaumData ? 0.4 : 1, cursor: !lastRaumData ? 'not-allowed' : 'pointer'}}
+                            title={!lastRaumData ? 'Erst muss ein Raum fertiggestellt werden' : ''}
+                            onClick={() => {
+                                if (!lastRaumData) return;
+                                setBgNr(''); setBgBez('');
+                                setBgGeschoss(lastRaumData.geschoss || '');
+                                setBgSonstiges('');
+                                setShowBaugleich(true);
+                            }}>
+                            Baugleicher Raum anlegen
+                        </button>
+                        <button className="rb-nav-btn rb-nav-red-btn"
+                            disabled={!gesamtliste || gesamtliste.length === 0}
+                            style={{opacity: (!gesamtliste || gesamtliste.length === 0) ? 0.4 : 1, cursor: (!gesamtliste || gesamtliste.length === 0) ? 'not-allowed' : 'pointer'}}
+                            title={(!gesamtliste || gesamtliste.length === 0) ? 'Noch kein Raum fertiggestellt' : ''}
+                            onClick={onShowGesamtliste}>
+                            Gesamtliste{gesamtliste && gesamtliste.length > 0 ? ' (' + gesamtliste.length + ')' : ''}
+                        </button>
+                    </div>
+
                     {erkannteRaeume.length > 0 && (
                         <div className="raumerkennung-info">
                             <span style={{fontSize:'18px'}}>🔍</span>
@@ -3748,17 +3803,11 @@
                         </React.Fragment>
                     ))}
 
-                    {/* Manueller Raum */}
-                    <div style={{marginTop:'20px'}}>
-                        <div className="raum-list-header">✏️ Raum manuell eingeben</div>
-                        <div className={`manual-raum-card ${showManual ? 'expanded' : ''}`}
-                             onClick={() => !showManual && setShowManual(true)}>
-                            {!showManual ? (
-                                <div className="manual-raum-collapsed">
-                                    <span style={{fontSize:'22px'}}>＋</span>
-                                    Raum nicht erkannt? Hier manuell eingeben
-                                </div>
-                            ) : (
+                    {/* Manueller Raum - Formular oeffnet sich ueber roten Button oben */}
+                    {showManual && (
+                        <div style={{marginTop:'20px'}}>
+                            <div className="raum-list-header">✏️ Neuen Raum manuell anlegen</div>
+                            <div className="manual-raum-card expanded">
                                 <React.Fragment>
                                     <div className="manual-raum-collapsed" style={{justifyContent:'flex-start', marginBottom:'4px'}}>
                                         <span style={{fontSize:'18px'}}>✏️</span> Neuen Raum anlegen
@@ -3915,69 +3964,6 @@
                                         </div>
                                     </div>
                                 </React.Fragment>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ═══ MAßE VOM VORRAUM ÜBERNEHMEN ═══ */}
-                    {lastRaumData && (
-                        <div style={{marginTop:'16px'}}>
-                            <div className="raum-list-header">🔄 Maße vom Vorraum übernehmen</div>
-                            <div style={{
-                                background:'var(--bg-card)', border:'2px solid var(--success)',
-                                borderRadius:'var(--radius-md)', padding:'16px', cursor:'pointer',
-                                transition:'all 0.3s'
-                            }}
-                            onClick={() => {
-                                setBgNr('');
-                                setBgBez('');
-                                setBgGeschoss(lastRaumData.geschoss || '');
-                                setBgSonstiges('');
-                                setShowBaugleich(true);
-                            }}>
-                                <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'10px'}}>
-                                    <span style={{fontSize:'28px'}}>📋</span>
-                                    <div>
-                                        <div style={{fontFamily:'Oswald', fontSize:'16px', fontWeight:600, color:'var(--success)', letterSpacing:'0.5px'}}>
-                                            Baugleichen Raum anlegen
-                                        </div>
-                                        <div style={{fontSize:'13px', color:'var(--text-light)', marginTop:'2px', lineHeight:'1.4'}}>
-                                            Alle Maße vom zuletzt bearbeiteten Raum werden automatisch übernommen.
-                                            Ideal für Serienbäder, gleiche Stationszimmer etc.
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{
-                                    display:'flex', flexWrap:'wrap', gap:'6px', padding:'10px 12px',
-                                    background:'rgba(39,174,96,0.06)', borderRadius:'var(--radius-sm)',
-                                    border:'1px solid rgba(39,174,96,0.15)'
-                                }}>
-                                    <span style={{fontSize:'12px', color:'var(--text-muted)', width:'100%', marginBottom:'4px'}}>Vorraum-Daten:</span>
-                                    {lastRaumData.waende && lastRaumData.waende.map(w => (
-                                        <span key={w.id} style={{
-                                            fontSize:'12px', padding:'3px 8px', borderRadius:'4px',
-                                            background:'rgba(230,126,34,0.1)', color:'var(--accent-orange)', fontWeight:600
-                                        }}>
-                                            {w.id}: {fmtDe(w.l)} m
-                                        </span>
-                                    ))}
-                                    {lastRaumData.hoehe > 0 && (
-                                        <span style={{
-                                            fontSize:'12px', padding:'3px 8px', borderRadius:'4px',
-                                            background:'rgba(39,174,96,0.1)', color:'var(--success)', fontWeight:600
-                                        }}>
-                                            Höhe: {fmtDe(lastRaumData.hoehe)} m
-                                        </span>
-                                    )}
-                                    {lastRaumData.geschoss && (
-                                        <span style={{
-                                            fontSize:'12px', padding:'3px 8px', borderRadius:'4px',
-                                            background:'rgba(255,255,255,0.06)', color:'var(--text-light)'
-                                        }}>
-                                            {lastRaumData.geschoss}
-                                        </span>
-                                    )}
-                                </div>
                             </div>
                         </div>
                     )}
@@ -4470,18 +4456,8 @@
                         </div>
                     )}
 
-                    {/* Gesamtliste-Button (wenn Räume fertiggestellt) */}
-                    {gesamtliste && gesamtliste.length > 0 && (
-                        <div style={{padding:'16px'}}>
-                            <button className="raum-action-btn" style={{width:'100%'}} onClick={onShowGesamtliste}>
-                                <span className="btn-icon">📋</span>
-                                <span className="btn-text">
-                                    Übersicht der Gesamtliste
-                                    <span className="btn-sub">{gesamtliste.length} {gesamtliste.length === 1 ? 'Raum' : 'Räume'} fertiggestellt</span>
-                                </span>
-                            </button>
-                        </div>
-                    )}
+                    {/* Gesamtliste-Funktion ist oben in der roten Navigationsleiste verfuegbar --
+                        der untere Redundanz-Button wurde entfernt. */}
                 </div>
             );
         }
