@@ -4386,6 +4386,44 @@
                                     </button>
                                 )}
 
+                                {/* ═══ NEU: AUFMASS DIREKT STARTEN ═══
+                                     Gleiche Funktion wie auf der Raumerkennung-Seite.
+                                     Springt OHNE Raumauswahl und OHNE Positionsauswahl direkt ins Raumblatt. */}
+                                <button
+                                    onClick={function() {
+                                        var direktRaum = {
+                                            nr: '',
+                                            geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
+                                            bez: '',
+                                            quelle: 'Direkt',
+                                            waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                            hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                            fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                            raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
+                                            abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
+                                            sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
+                                            fliesenUmlaufend: true,
+                                            abdichtungUmlaufend: true,
+                                            manuell: true,
+                                        };
+                                        setShowPosModal(false);
+                                        setActiveRaum(null);
+                                        onSelectRaum(direktRaum, []);
+                                    }}
+                                    style={{
+                                        width:'100%', padding:'16px 20px', borderRadius:'14px', border:'none', cursor:'pointer',
+                                        background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                        color:'white', fontSize:'15px', fontWeight:'700',
+                                        boxShadow:'0 4px 16px rgba(30,136,229,0.35)',
+                                        display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+                                        fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    }}>
+                                    {'\uD83D\uDCD0'} Aufmass direkt starten
+                                </button>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'-2px'}}>
+                                    Ohne Raumauswahl und Positionsauswahl
+                                </div>
+
                                 <button className="modal-btn secondary" style={{width:'100%'}} onClick={() => { setShowPosModal(false); setActiveRaum(null); }}>
                                     Abbrechen
                                 </button>

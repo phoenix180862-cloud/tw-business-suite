@@ -2555,10 +2555,7 @@
     <div id="root"></div>
 
 
-    <div id="root"></div>
-
     <script type="text/babel">
-
         const { useState, useEffect, useCallback, useRef } = React;
 
         /* ═══════════════════════════════════════════
@@ -7816,6 +7813,44 @@
                                         </span>
                                     </button>
                                 )}
+
+                                {/* ═══ NEU: AUFMASS DIREKT STARTEN ═══
+                                     Gleiche Funktion wie auf der Raumerkennung-Seite.
+                                     Springt OHNE Raumauswahl und OHNE Positionsauswahl direkt ins Raumblatt. */}
+                                <button
+                                    onClick={function() {
+                                        var direktRaum = {
+                                            nr: '',
+                                            geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
+                                            bez: '',
+                                            quelle: 'Direkt',
+                                            waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                            hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                            fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                            raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
+                                            abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
+                                            sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
+                                            fliesenUmlaufend: true,
+                                            abdichtungUmlaufend: true,
+                                            manuell: true,
+                                        };
+                                        setShowPosModal(false);
+                                        setActiveRaum(null);
+                                        onSelectRaum(direktRaum, []);
+                                    }}
+                                    style={{
+                                        width:'100%', padding:'16px 20px', borderRadius:'14px', border:'none', cursor:'pointer',
+                                        background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                        color:'white', fontSize:'15px', fontWeight:'700',
+                                        boxShadow:'0 4px 16px rgba(30,136,229,0.35)',
+                                        display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
+                                        fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    }}>
+                                    {'\uD83D\uDCD0'} Aufmass direkt starten
+                                </button>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'-2px'}}>
+                                    Ohne Raumauswahl und Positionsauswahl
+                                </div>
 
                                 <button className="modal-btn secondary" style={{width:'100%'}} onClick={() => { setShowPosModal(false); setActiveRaum(null); }}>
                                     Abbrechen
@@ -16890,12 +16925,25 @@
             return null;
         }
 
+        /* =====================================================================
+           SCHRIFTVERKEHR-MODUL -- Mail & Brief Korrespondenz
+           Skill: SKILL-schriftverkehr-briefkopf.md + SKILL-jspdf-briefkopf.md
+           Phase: kanalwahl -> startseite (PDF-Vorschau) -> bearbeiten-popup
+           PDF: Identisch zum Rechnungsmodul (jsPDF Briefkopf)
+           ===================================================================== */
         function SchriftverkehrModul({ kunde, onBack }) {
-            // ── Phasen: 'kanalwahl' → 'formular' ──
-            const [phase, setPhase] = useState('kanalwahl');
-            const [versandKanal, setVersandKanal] = useState(null); // 'mail' | 'post'
+            var BLAU = 'linear-gradient(135deg, #1E88E5, #1565C0)';
+            var BLAU_SHADOW = '0 6px 20px rgba(30,136,229,0.30)';
+            var ROT = 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))';
+            var ROT_SHADOW = '0 4px 15px rgba(196,30,30,0.3)';
 
-            // Formular-State
+            const [phase, setPhase] = useState('kanalwahl');
+            const [versandKanal, setVersandKanal] = useState(null);
+            const [showBearbeitenPopup, setShowBearbeitenPopup] = useState(false);
+            const [editMode, setEditMode] = useState(false);
+            const [showMailDialog, setShowMailDialog] = useState(false);
+            const [mailAdresse, setMailAdresse] = useState('');
+
             const [empfaenger, setEmpfaenger] = useState(kunde ? (kunde.auftraggeber || kunde.name || '') : '');
             const [empfAdresse, setEmpfAdresse] = useState(function() {
                 if (!kunde) return '';
@@ -16906,895 +16954,1019 @@
             });
             const [empfEmail, setEmpfEmail] = useState(kunde ? (kunde.ag_email || '') : '');
             const [bauvorhaben, setBauvorhaben] = useState(kunde ? (kunde.adresse || kunde.baumassnahme || kunde.name || '') : '');
-            const [ihrZeichen, setIhrZeichen] = useState('');
             const [unserZeichen, setUnserZeichen] = useState('TW/' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*900)+100));
             const [betreff, setBetreff] = useState('');
             const [anrede, setAnrede] = useState('Sehr geehrte Damen und Herren,');
             const [textBody, setTextBody] = useState('');
-            const [grussformel, setGrussformel] = useState('Mit freundlichen Grüßen');
-            const [briefDatum, setBriefDatum] = useState(new Date().toLocaleDateString('de-DE'));
+            const [grussformel, setGrussformel] = useState('Mit freundlichen Gr\u00FC\u00DFen');
+            const [briefDatum, setBriefDatum] = useState(new Date().toISOString().split('T')[0]);
             const [bilder, setBilder] = useState([]);
             const [vorlage, setVorlage] = useState('');
-            const [sendStatus, setSendStatus] = useState(null); // null | 'sending' | 'sent' | 'error'
-            const [showEmpfWahl, setShowEmpfWahl] = useState(false);
+            const [sendStatus, setSendStatus] = useState(null);
 
-            // ── Vorlagen ──
             var vorlagen = [
-                { id: 'aufmass', name: 'Aufmaßankündigung', betreff: 'Aufmaß-Termin -- ' + bauvorhaben,
-                  text: 'bezugnehmend auf den oben genannten Bauvertrag möchte ich Ihnen mitteilen, dass ich beabsichtige, ein Aufmaß der bisher erbrachten Leistungen durchzuführen.\n\nIch bitte Sie, einen Vertreter zu diesem Termin zu entsenden, um das Aufmaß gemeinsam vorzunehmen.\n\nSollte der vorgeschlagene Termin nicht passen, bitte ich um kurzfristige Rückmeldung, damit wir einen Alternativtermin vereinbaren können.' },
-                { id: 'bedenken', name: 'Bedenkenanmeldung (VOB/B §4)', betreff: 'Bedenkenanmeldung gemäß VOB/B §4 Abs. 3 -- ' + bauvorhaben,
-                  text: 'hiermit melde ich gemäß VOB/B §4 Abs. 3 Bedenken an gegen:\n\n☐ die vorgesehene Art der Ausführung\n☐ die Güte der vom Auftraggeber gelieferten Stoffe oder Bauteile\n☐ die Leistung anderer Unternehmer\n\nBegründung:\n[Hier die konkreten Bedenken beschreiben]\n\nIch weise darauf hin, dass ich bei Ausführung der Arbeiten trotz der angemeldeten Bedenken keine Gewähr für die betroffenen Leistungsteile übernehmen kann, sofern die Bedenken nicht ausgeräumt werden.\n\nIch bitte um schriftliche Stellungnahme bis zum [Datum].' },
-                { id: 'behinderung', name: 'Behinderungsanzeige (VOB/B §6)', betreff: 'Behinderungsanzeige gemäß VOB/B §6 Abs. 1 -- ' + bauvorhaben,
-                  text: 'hiermit zeige ich Ihnen gemäß VOB/B §6 Abs. 1 an, dass ich in der Ausführung meiner vertraglichen Leistungen behindert bin.\n\nArt der Behinderung:\n[Hier die Behinderung beschreiben]\n\nBeginn der Behinderung: [Datum]\n\nIch bitte um unverzügliche Beseitigung der Behinderung. Gleichzeitig weise ich darauf hin, dass sich die Ausführungsfristen gemäß VOB/B §6 Abs. 2 um die Dauer der Behinderung verlängern.\n\nEtwaige Mehrkosten, die durch die Behinderung entstehen, werde ich gesondert geltend machen.' },
-                { id: 'rechnung', name: 'Rechnung übersenden', betreff: 'Rechnung -- ' + bauvorhaben,
-                  text: 'anbei übersende ich Ihnen meine Rechnung für die erbrachten Leistungen im oben genannten Bauvorhaben.\n\nIch bitte um Überweisung des Betrages innerhalb der angegebenen Zahlungsfrist auf das in der Rechnung angegebene Konto.\n\nBei Rückfragen stehe ich Ihnen gerne zur Verfügung.' },
-                { id: 'nachtrag', name: 'Nachtragsangebot (VOB/B §2)', betreff: 'Nachtragsangebot -- ' + bauvorhaben,
-                  text: 'bei der Ausführung der Arbeiten im oben genannten Bauvorhaben haben sich zusätzliche/geänderte Leistungen ergeben, die nicht im ursprünglichen Leistungsverzeichnis enthalten sind.\n\nGemäß VOB/B §2 Abs. 5/6 unterbreite ich Ihnen hiermit folgendes Nachtragsangebot:\n\n[Beschreibung der Zusatzleistungen]\n\nIch bitte um schriftliche Beauftragung vor Ausführung der Arbeiten.' },
-                { id: 'maengelruege', name: 'Mängelrüge', betreff: 'Mängelrüge -- ' + bauvorhaben,
-                  text: 'bei der Ausführung meiner Arbeiten habe ich festgestellt, dass die Vorleistungen Mängel aufweisen, die eine ordnungsgemäße Ausführung meiner Arbeiten beeinträchtigen.\n\nFestgestellte Mängel:\n[Hier die Mängel beschreiben]\n\nIch fordere Sie auf, die genannten Mängel bis zum [Datum] zu beseitigen. Bis zur Beseitigung der Mängel sehe ich mich nicht in der Lage, meine Arbeiten fortzuführen.' },
-                { id: 'abnahme', name: 'Abnahme anfordern (VOB/B §12)', betreff: 'Fertigstellungsanzeige und Abnahmeverlangen -- ' + bauvorhaben,
-                  text: 'hiermit zeige ich Ihnen an, dass ich meine vertraglichen Leistungen im oben genannten Bauvorhaben fertiggestellt habe.\n\nGemäß VOB/B §12 Abs. 1 fordere ich Sie auf, innerhalb von 12 Werktagen nach Zugang dieses Schreibens die Abnahme durchzuführen.\n\nIch schlage folgenden Termin für die Abnahme vor: [Datum]\n\nSollte dieser Termin nicht passen, bitte ich um zeitnahe Mitteilung eines Alternativtermins.' },
+                { id: 'aufmass', name: 'Aufma\u00DFank\u00FCndigung', betreff: 'Aufma\u00DF-Termin -- ' + bauvorhaben, text: 'bezugnehmend auf den oben genannten Bauvertrag m\u00F6chte ich Ihnen mitteilen, dass ich beabsichtige, ein Aufma\u00DF der bisher erbrachten Leistungen durchzuf\u00FChren.\n\nIch bitte Sie, einen Vertreter zu diesem Termin zu entsenden, um das Aufma\u00DF gemeinsam vorzunehmen.\n\nSollte der vorgeschlagene Termin nicht passen, bitte ich um kurzfristige R\u00FCckmeldung, damit wir einen Alternativtermin vereinbaren k\u00F6nnen.' },
+                { id: 'bedenken', name: 'Bedenkenanmeldung (VOB/B \u00A74)', betreff: 'Bedenkenanmeldung gem. VOB/B \u00A74 Abs. 3 -- ' + bauvorhaben, text: 'hiermit melde ich gem\u00E4\u00DF VOB/B \u00A74 Abs. 3 Bedenken an gegen:\n\n\u2610 die vorgesehene Art der Ausf\u00FChrung\n\u2610 die G\u00FCte der vom Auftraggeber gelieferten Stoffe oder Bauteile\n\u2610 die Leistung anderer Unternehmer\n\nBegr\u00FCndung:\n[Hier die konkreten Bedenken beschreiben]\n\nIch bitte um schriftliche Stellungnahme bis zum [Datum].' },
+                { id: 'behinderung', name: 'Behinderungsanzeige (VOB/B \u00A76)', betreff: 'Behinderungsanzeige gem. VOB/B \u00A76 Abs. 1 -- ' + bauvorhaben, text: 'hiermit zeige ich Ihnen gem\u00E4\u00DF VOB/B \u00A76 Abs. 1 an, dass ich in der Ausf\u00FChrung meiner vertraglichen Leistungen behindert bin.\n\nArt der Behinderung:\n[Hier die Behinderung beschreiben]\n\nBeginn der Behinderung: [Datum]\n\nIch bitte um unverz\u00FCgliche Beseitigung der Behinderung.' },
+                { id: 'rechnung', name: 'Rechnung \u00FCbersenden', betreff: 'Rechnung -- ' + bauvorhaben, text: 'anbei \u00FCbersende ich Ihnen meine Rechnung f\u00FCr die erbrachten Leistungen im oben genannten Bauvorhaben.\n\nIch bitte um \u00DCberweisung des Betrages innerhalb der angegebenen Zahlungsfrist auf das in der Rechnung angegebene Konto.' },
+                { id: 'nachtrag', name: 'Nachtragsangebot (VOB/B \u00A72)', betreff: 'Nachtragsangebot -- ' + bauvorhaben, text: 'bei der Ausf\u00FChrung der Arbeiten haben sich zus\u00E4tzliche Leistungen ergeben.\n\nGem\u00E4\u00DF VOB/B \u00A72 Abs. 5/6 unterbreite ich Ihnen hiermit folgendes Nachtragsangebot:\n\n[Beschreibung der Zusatzleistungen]\n\nIch bitte um schriftliche Beauftragung vor Ausf\u00FChrung der Arbeiten.' },
+                { id: 'maengelruege', name: 'M\u00E4ngelr\u00FCge', betreff: 'M\u00E4ngelr\u00FCge -- ' + bauvorhaben, text: 'bei der Ausf\u00FChrung meiner Arbeiten habe ich festgestellt, dass die Vorleistungen M\u00E4ngel aufweisen.\n\nFestgestellte M\u00E4ngel:\n[Hier die M\u00E4ngel beschreiben]\n\nIch fordere Sie auf, die genannten M\u00E4ngel bis zum [Datum] zu beseitigen.' },
+                { id: 'abnahme', name: 'Abnahme anfordern (VOB/B \u00A712)', betreff: 'Fertigstellungsanzeige -- ' + bauvorhaben, text: 'hiermit zeige ich Ihnen an, dass ich meine vertraglichen Leistungen fertiggestellt habe.\n\nGem\u00E4\u00DF VOB/B \u00A712 Abs. 1 fordere ich Sie auf, innerhalb von 12 Werktagen die Abnahme durchzuf\u00FChren.\n\nIch schlage folgenden Termin vor: [Datum]' },
             ];
 
-            var applyVorlage = function(id) {
-                setVorlage(id);
-                if (!id) return;
-                var v = vorlagen.find(function(t) { return t.id === id; });
-                if (v) {
-                    setBetreff(v.betreff);
-                    setTextBody(v.text);
-                }
-            };
+            var applyVorlage = function(id) { setVorlage(id); if (!id) return; var v = vorlagen.find(function(t){ return t.id === id; }); if (v) { setBetreff(v.betreff); setTextBody(v.text); } };
 
-            // ── Bild-Handling ──
             var bildInputRef = React.useRef(null);
             var kameraInputRef = React.useRef(null);
+            var handleBild = function(e) { var file = e.target.files && e.target.files[0]; if (!file) return; var img = new Image(); var canvas = document.createElement('canvas'); img.onload = function() { var w = img.width, h = img.height; var maxW = 1200, maxH = 900; if (w > maxW) { h = h * maxW / w; w = maxW; } if (h > maxH) { w = w * maxH / h; h = maxH; } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); setBilder(function(prev) { return prev.concat([{ name: file.name, dataUrl: canvas.toDataURL('image/jpeg', 0.85) }]); }); }; img.src = URL.createObjectURL(file); e.target.value = ''; };
+            var removeBild = function(idx) { setBilder(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
 
-            var handleBild = function(e) {
-                var file = e.target.files && e.target.files[0];
-                if (!file) return;
-                // Komprimieren
-                var img = new Image();
-                var canvas = document.createElement('canvas');
-                img.onload = function() {
-                    var w = img.width, h = img.height;
-                    var maxW = 1200, maxH = 900;
-                    if (w > maxW) { h = h * maxW / w; w = maxW; }
-                    if (h > maxH) { w = w * maxH / h; h = maxH; }
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                    setBilder(function(prev) { return prev.concat([{ name: file.name, dataUrl: dataUrl }]); });
-                };
-                img.src = URL.createObjectURL(file);
-                e.target.value = '';
-            };
-
-            var removeBild = function(idx) {
-                setBilder(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); });
-            };
-
-            // ── Briefkopf-HTML (identisch zum Rechnungsmodul) ──
-            var buildBriefHTML = function() {
-                var kName = empfaenger || '';
+            // -- Adresse aufsplitten --
+            var splitAdresse = function() {
                 var af = empfAdresse || '';
-                var aLines = [];
-                if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){aLines.push(m[1].trim());aLines.push(m[2].trim());}else{af.split(',').forEach(function(s){if(s.trim())aLines.push(s.trim());});} }
-
-                var h = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + betreff + '</title>';
-                h += '<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=block" rel="stylesheet">';
-                h += '<style>';
-                h += '@page{size:A4;margin:0}';
-                h += '*{box-sizing:border-box;margin:0;padding:0}';
-                h += 'body{font-family:"Source Sans 3","Segoe UI",sans-serif;font-size:10.5pt;color:#222;line-height:1.6;background:#fff}';
-                h += '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-                h += '.page{width:210mm;min-height:297mm;padding:20mm 18mm 25mm 22mm;margin:0 auto;position:relative;background:#fff}';
-                // Logo-Styles identisch zum Rechnungsmodul
-                h += '.lh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:3mm}';
-                h += '.lc{display:inline-flex;flex-direction:column;align-items:flex-start}';
-                h += '.lt{font-family:"Source Sans 3",serif;font-style:italic;font-weight:700;color:#c41e1e;font-size:13px;margin-bottom:-14px;padding-left:1px;position:relative;z-index:2}';
-                h += '.lw{display:flex;align-items:baseline;font-family:"Oswald",sans-serif;font-weight:700;color:#111;line-height:1;-webkit-text-stroke:0.4px #111}';
-                h += '.lw .w{font-size:52px}.lw .iw{position:relative;font-size:52px;display:inline-block}';
-                h += '.lw .iw .ic{font-size:52px;color:#111}.lw .iw .id{position:absolute;top:5px;left:50%;transform:translateX(-50%);width:8px;height:8px;background:#c41e1e}';
-                h += '.lw .ll{font-size:68px;letter-spacing:1px;line-height:0.75}.lw .wa{font-size:52px}';
-                h += '.ls{display:flex;justify-content:flex-end;width:100%;margin-top:1px}';
-                h += '.ls span{font-family:"Source Sans 3",sans-serif;font-weight:600;color:#c41e1e;font-size:13px;letter-spacing:2px}';
-                h += '.lr{text-align:right;font-size:9pt;color:#555;line-height:1.6;padding-top:3mm}';
-                h += '.sep{border:none;border-top:2px solid #c41e1e;margin:3mm 0 2mm}';
-                h += '.abs{font-size:7pt;color:#aaa;border-bottom:0.5px solid #ccc;display:inline-block;padding-bottom:1px;margin-bottom:5mm}';
-                h += '.eb{display:flex;justify-content:space-between;margin-bottom:6mm}';
-                h += '.en{font-weight:700;font-size:11pt}.ea{font-size:10pt;color:#333;line-height:1.5}';
-                h += '.db{text-align:right}.dl{font-size:7.5pt;color:#999}.dv{font-size:10.5pt}';
-                h += '.bz{font-size:9pt;color:#555;margin-bottom:6mm}';
-                h += '.bz .l{display:inline-block;width:38mm;color:#888}.bz .v{font-weight:600;color:#222}';
-                h += '.bt{font-size:13pt;font-weight:700;margin-bottom:4mm}';
-                h += '.tx{font-size:10.5pt;line-height:1.7;margin-bottom:6mm;white-space:pre-wrap}';
-                h += '.tx img{max-width:100%;height:auto;margin:4mm 0;border-radius:2px}';
-                h += '.gr{font-size:10.5pt;margin-top:8mm}';
-                h += '.ft{position:absolute;bottom:18mm;left:22mm;right:18mm;border-top:1.5px solid #c41e1e;padding-top:2mm;font-size:7pt;color:#999;line-height:1.6}';
-                h += '.ft .ti{font-style:italic;color:#c41e1e;font-weight:700}.ft .tn{color:#333;font-weight:700}.ft .tf{color:#c41e1e}';
-                h += '</style></head><body>';
-
-                h += '<div class="page">';
-                // Logo -- identisch zum Rechnungsmodul
-                h += '<div class="lh"><div class="lc">';
-                h += '<div class="lt">Thomas</div>';
-                h += '<div class="lw"><span class="w">w</span><span class="iw"><span class="ic">\u0131</span><span class="id"></span></span><span class="ll">LL</span><span class="wa">wacher</span></div>';
-                h += '<div class="ls"><span>Fliesenlegermeister e.K.</span></div>';
-                h += '</div><div class="lr">Flurweg 14a<br>56472 Nisterau<br>Tel. 02661-63101<br>Mobil 0170-2024161</div></div>';
-
-                h += '<hr class="sep">';
-                h += '<div class="abs">Thomas Willwacher Fliesenlegermeister e.K. \u00b7 Flurweg 14a \u00b7 56472 Nisterau</div>';
-
-                // Empfänger + Datum
-                h += '<div class="eb"><div><div class="en">' + kName + '</div>';
-                h += '<div class="ea">' + aLines.join('<br>') + '</div></div>';
-                h += '<div class="db"><div class="dl">Datum</div><div class="dv">Nisterau, ' + briefDatum + '</div></div></div>';
-
-                // Bezugszeile
-                h += '<div class="bz">';
-                h += '<div><span class="l">Bauvorhaben:</span> <span class="v">' + bauvorhaben + '</span></div>';
-                if (ihrZeichen) h += '<div><span class="l">Ihr Zeichen:</span> <span class="v">' + ihrZeichen + '</span></div>';
-                h += '<div><span class="l">Unser Zeichen:</span> <span class="v">' + unserZeichen + '</span></div>';
-                h += '</div>';
-
-                // Betreff
-                if (betreff) h += '<div class="bt">' + betreff + '</div>';
-
-                // Anrede + Text
-                h += '<div class="tx">' + anrede + '\n\n' + textBody.replace(/</g, '&lt;').replace(/\n/g, '<br>');
-
-                // Bilder einfügen
-                bilder.forEach(function(b) {
-                    h += '<br><img src="' + b.dataUrl + '" alt="' + b.name + '">';
-                });
-                h += '</div>';
-
-                // Grußformel
-                h += '<div class="gr">' + grussformel + '<br><br><br>Thomas Willwacher<br>Fliesenlegermeister e.K.</div>';
-
-                // Fußzeile
-                h += '<div class="ft"><div><span class="ti">Thomas </span><span class="tn">wiLLwacher</span> <span class="tf">Fliesenlegermeister e.K.</span></div>';
-                h += '<div>Flurweg 14a \u00b7 56472 Nisterau \u00b7 Tel. 02661-63101 \u00b7 Mobil 0170-2024161</div>';
-                h += '<div>Steuernummer: 30/220/1234/5 \u00b7 Westerwald Bank eG \u00b7 IBAN: DE12 5739 1800 0000 0000 00 \u00b7 BIC: GENODE51WW1</div></div>';
-
-                h += '<script>document.fonts.ready.then(function(){setTimeout(function(){window.focus();window.print();},400);});<\/script>';
-                h += '</div></body></html>';
-                return h;
+                var str = ''; var plzOrt = '';
+                if (af) { var m = af.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(m){str=m[1].trim();plzOrt=m[2].trim();}else{var parts=af.split(',');str=(parts[0]||'').trim();plzOrt=(parts[1]||'').trim();} }
+                return { strasse: str, plzOrt: plzOrt };
             };
 
-            // ── PDF / Drucken ──
-            var handleDrucken = function() {
-                var h = buildBriefHTML();
-                var pw = window.open('', '_blank', 'width=820,height=1160');
-                pw.document.write(h);
-                pw.document.close();
-            };
+            // ===== jsPDF PDF-ERZEUGUNG (IDENTISCH zum Rechnungsmodul) =====
+            var generatePDF = function() {
+                var doc = new jspdf.jsPDF('p','mm','a4');
+                var PW=210,PH=297,ML=22,MR=18,MT=18,MB=25;
+                var CW=PW-ML-MR; var rx=PW-MR;
 
-            // ── Gmail-API Versand (direkt!) ──
-            var handleSenden = async function() {
-                if (!empfEmail) {
-                    alert('Bitte eine Empfänger-E-Mail-Adresse eingeben!');
-                    return;
+                var adr = splitAdresse();
+                var empfName = empfaenger || '';
+                var empfStrasse = adr.strasse;
+                var empfPlzOrt = adr.plzOrt;
+                var datumFormatiert = new Date(briefDatum).toLocaleDateString('de-DE');
+
+                // === FUSSZEILE (auf jeder Seite) ===
+                var drawFooter = function(pn) {
+                    doc.setDrawColor(196,30,30);doc.setLineWidth(0.5);
+                    doc.line(ML,PH-MB+2,rx,PH-MB+2);
+                    doc.setFontSize(7);doc.setFont('helvetica','bold');doc.setTextColor(196,30,30);
+                    doc.text('Thomas Willwacher Fliesenlegermeister e.K.',ML,PH-MB+6);
+                    doc.setFont('helvetica','normal');doc.setTextColor(102,102,102);
+                    doc.text('Steuernummer: 30/220/1234/5',rx,PH-MB+6,{align:'right'});
+                    doc.text('Westerwald Bank eG \u00B7 IBAN: DE12 5739 1800 0000 0000 00 \u00B7 BIC: GENODE51WW1',ML,PH-MB+10);
+                    doc.text('Seite '+pn,rx,PH-MB+10,{align:'right'});
+                };
+
+                var y = MT;
+
+                // === LOGO: exakt wie Rechnungsmodul (SKILL-jspdf-briefkopf.md) ===
+                doc.setFont('helvetica','bold');
+                doc.setFontSize(38);var wW=doc.getTextWidth('w');var iW=doc.getTextWidth('i');var wacherW=doc.getTextWidth('wacher');
+                doc.setFontSize(53);var llW=doc.getTextWidth('LL');
+                var lx=ML;
+                doc.setFontSize(38);doc.setTextColor(17,17,17);
+                doc.text('w',lx,y+20);doc.text('w',lx+0.2,y+20);lx+=wW;
+                doc.text('i',lx,y+20);doc.text('i',lx+0.2,y+20);
+                var iMid=lx+iW/2;
+                doc.setFillColor(255,255,255);doc.rect(lx-1,y+4,iW+2,7,'F');
+                doc.setFillColor(196,30,30);doc.rect(iMid-1.1,y+10,2.2,2.2,'F');
+                lx+=iW;
+                doc.setFont('helvetica','bold');doc.setFontSize(53);doc.setTextColor(17,17,17);
+                doc.text('LL',lx,y+20);doc.text('LL',lx+0.2,y+20);lx+=llW;
+                doc.setFontSize(38);doc.text('wacher',lx,y+20);doc.text('wacher',lx+0.2,y+20);
+                var logoEnd=lx+wacherW;
+                doc.setFont('helvetica','bold');doc.setFontSize(10.1);doc.setTextColor(196,30,30);
+                doc.text('Thomas',ML,y+9);
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(196,30,30);
+                doc.text('Fliesenlegermeister e.K.',logoEnd,y+25,{align:'right'});
+                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(51,51,51);
+                doc.text('Flurweg 14a',rx,y+8,{align:'right'});
+                doc.text('56472 Nisterau',rx,y+12,{align:'right'});
+                doc.text('Tel. 02661-63101',rx,y+16,{align:'right'});
+                doc.text('Mobil 0170-2024161',rx,y+20,{align:'right'});
+                y+=30;
+
+                // --- Rote Trennlinie ---
+                doc.setDrawColor(196,30,30);doc.setLineWidth(0.8);doc.line(ML,y,rx,y);y+=4;
+                // --- Absenderzeile ---
+                doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(170,170,170);
+                doc.text('Thomas Willwacher Fliesenlegermeister e.K. \u00B7 Flurweg 14a \u00B7 56472 Nisterau',ML,y);y+=6;
+
+                // --- EMPFAENGER links + DATUM rechts ---
+                var addrStartY=y;
+                doc.setFont('helvetica','bold');doc.setFontSize(11);doc.setTextColor(17,17,17);
+                doc.text(empfName,ML,y);y+=5;
+                doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(51,51,51);
+                if(empfStrasse){doc.text(empfStrasse,ML,y);y+=5;}
+                if(empfPlzOrt){doc.text(empfPlzOrt,ML,y);y+=5;}
+                doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(136,136,136);
+                doc.text('Datum:',rx-30,addrStartY);
+                doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(34,34,34);
+                doc.text(datumFormatiert,rx,addrStartY,{align:'right'});
+                y=Math.max(y,addrStartY+20);
+                y+=20;
+
+                // --- BETREFF (gross) ---
+                if (betreff) {
+                    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.setTextColor(17,17,17);
+                    doc.text(betreff,ML,y);y+=8;
                 }
+
+                // --- BAUVORHABEN ---
+                doc.setFontSize(11);
+                var bvLabel='Bauvorhaben: ';
+                var bvLabelW=doc.getTextWidth(bvLabel);
+                doc.setFont('helvetica','bold');doc.text(bvLabel,ML,y);
+                var bvTextWidth=CW-bvLabelW;
+                var bvLines=doc.splitTextToSize(bauvorhaben||'',bvTextWidth);
+                bvLines.forEach(function(line){doc.text(line,ML+bvLabelW,y);y+=5;});
+                y+=2;
+
+                // --- UNSER ZEICHEN ---
+                doc.setFontSize(9);doc.setFont('helvetica','normal');doc.setTextColor(136,136,136);
+                doc.text('Unser Zeichen:',ML,y);
+                doc.setFont('helvetica','bold');doc.setTextColor(34,34,34);
+                doc.text(unserZeichen,ML+42,y);y+=8;
+
+                // --- BRIEFTEXT (Anrede + Text + Gruss) ---
+                var maxTextY = PH - MB - 5;
+                var pageNum = 1;
+                drawFooter(pageNum);
+
+                doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(34,34,34);
+
+                // Anrede
+                if (anrede) {
+                    var anredeLines = doc.splitTextToSize(anrede, CW);
+                    anredeLines.forEach(function(line) {
+                        if (y > maxTextY) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                        doc.text(line, ML, y); y += 5;
+                    });
+                    y += 3;
+                }
+
+                // Textkoerper
+                if (textBody) {
+                    var textLines = doc.splitTextToSize(textBody, CW);
+                    textLines.forEach(function(line) {
+                        if (y > maxTextY) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                        doc.text(line, ML, y); y += 5;
+                    });
+                    y += 5;
+                }
+
+                // Bilder einfuegen
+                bilder.forEach(function(b) {
+                    try {
+                        var imgW = 80; var imgH = 60;
+                        if (y + imgH > maxTextY) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                        doc.addImage(b.dataUrl, 'JPEG', ML, y, imgW, imgH);
+                        y += imgH + 5;
+                    } catch(e) { console.warn('Bild konnte nicht eingefuegt werden:', e); }
+                });
+
+                // Grussformel
+                y += 5;
+                if (y > maxTextY - 25) { doc.addPage(); pageNum++; y = MT; drawFooter(pageNum); }
+                doc.setFont('helvetica','normal');doc.setFontSize(10.5);doc.setTextColor(34,34,34);
+                var grussLines = doc.splitTextToSize(grussformel, CW);
+                grussLines.forEach(function(line) { doc.text(line, ML, y); y += 5; });
+                y += 15;
+                doc.text('Thomas Willwacher', ML, y); y += 5;
+                doc.text('Fliesenlegermeister e.K.', ML, y);
+
+                // PDF oeffnen
+                var pdfBlob = doc.output('blob');
+                var pdfUrl = URL.createObjectURL(pdfBlob);
+                window.open(pdfUrl, '_blank');
+                return pdfBlob;
+            };
+
+            // -- Drucken = PDF erzeugen --
+            var handleDrucken = function() { generatePDF(); };
+
+            // -- Gmail-API Versand (mit HTML-Mail fuer bessere Darstellung) --
+            var handleSenden = async function() {
+                if (!empfEmail && !mailAdresse) { alert('Bitte eine E-Mail-Adresse eingeben!'); return; }
+                var zielEmail = mailAdresse || empfEmail;
                 setSendStatus('sending');
                 try {
                     var service = window.GoogleDriveService;
-                    if (!service.accessToken) {
-                        // Noch nicht verbunden → Auth anfordern
-                        await service.init();
-                        await service.requestAuth();
-                    }
-
-                    // HTML-Mail bauen
+                    if (!service || !service.accessToken) { if(service){await service.init(); await service.requestAuth();} }
                     var vollBetreff = betreff || ('Schreiben -- ' + bauvorhaben);
-                    var htmlMail = '<html><body style="font-family:\'Segoe UI\',Arial,sans-serif;font-size:10.5pt;color:#222;line-height:1.6;">';
-                    htmlMail += '<p>' + anrede + '</p>';
-                    htmlMail += '<p>' + textBody.replace(/\n/g, '<br>') + '</p>';
-                    bilder.forEach(function(b) {
-                        htmlMail += '<p><img src="' + b.dataUrl + '" style="max-width:600px;height:auto;border-radius:4px;" alt="' + b.name + '"></p>';
-                    });
-                    htmlMail += '<p>' + grussformel + '</p>';
-                    htmlMail += '<p><strong>Thomas Willwacher</strong><br>Fliesenlegermeister e.K.<br>Flurweg 14a \u00b7 56472 Nisterau<br>Tel. 02661-63101 \u00b7 Mobil 0170-2024161</p>';
-                    htmlMail += '</body></html>';
-
-                    // MIME-Mail aufbauen
+                    var htmlMail = '<html><body style="font-family:Segoe UI,Arial,sans-serif;font-size:10.5pt;color:#222;line-height:1.6;"><p>' + anrede + '</p><p>' + textBody.replace(/\n/g, '<br>') + '</p><p>' + grussformel + '</p><p><strong>Thomas Willwacher</strong><br>Fliesenlegermeister e.K.<br>Flurweg 14a \u00b7 56472 Nisterau<br>Tel. 02661-63101 \u00b7 Mobil 0170-2024161</p></body></html>';
                     var boundary = 'boundary_' + Date.now();
-                    var rawParts = [
-                        'From: ' + GMAIL_CONFIG.ABSENDER_EMAIL,
-                        'To: ' + empfEmail,
-                        'Subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(vollBetreff))) + '?=',
-                        'MIME-Version: 1.0',
-                        'Content-Type: multipart/alternative; boundary="' + boundary + '"',
-                        '',
-                        '--' + boundary,
-                        'Content-Type: text/plain; charset=UTF-8',
-                        '',
-                        anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.',
-                        '',
-                        '--' + boundary,
-                        'Content-Type: text/html; charset=UTF-8',
-                        '',
-                        htmlMail,
-                        '',
-                        '--' + boundary + '--'
-                    ];
-
-                    var rawMail = rawParts.join('\r\n');
-                    var encoded = btoa(unescape(encodeURIComponent(rawMail))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-                    var resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': 'Bearer ' + service.accessToken,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ raw: encoded })
-                    });
-
-                    if (resp.ok) {
-                        setSendStatus('sent');
-                        // Archivierung in Google Drive
-                        try {
-                            if (service.isConnected() && kunde && kunde._driveFolderId) {
-                                var schriftOrdnerId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan');
-                                var mailOrdnerId = await service.findOrCreateFolder(schriftOrdnerId, versandKanal === 'mail' ? 'Mail' : 'Briefe');
-                                var datumFile = new Date().toISOString().slice(0,10).replace(/-/g,'');
-                                var betreffKurz = (betreff || 'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9äöüÄÖÜß\- ]/g, '').replace(/ /g, '_');
-                                var prefix = versandKanal === 'mail' ? 'Mail' : 'Brief';
-                                var fileName = prefix + '_' + datumFile + '_' + betreffKurz + '.html';
-                                var briefHTML = buildBriefHTML();
-                                await service.uploadFile(mailOrdnerId, fileName, 'text/html', new Blob([briefHTML], {type:'text/html'}));
-                            }
-                        } catch(archErr) { console.warn('Archivierung:', archErr); }
-
-                        setTimeout(function() { setSendStatus(null); }, 4000);
-                    } else {
-                        var errData = await resp.json().catch(function(){ return {}; });
-                        console.error('Gmail Fehler:', errData);
-                        // Fallback: mailto
-                        var mailtoLink = 'mailto:' + encodeURIComponent(empfEmail)
-                            + '?subject=' + encodeURIComponent(vollBetreff)
-                            + '&body=' + encodeURIComponent(anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.');
-                        window.location.href = mailtoLink;
-                        setSendStatus('sent');
-                        setTimeout(function() { setSendStatus(null); }, 3000);
-                    }
-                } catch(err) {
-                    console.error('Sende-Fehler:', err);
-                    // Fallback: mailto
-                    var vollBetreff2 = betreff || ('Schreiben -- ' + bauvorhaben);
-                    var mailtoLink2 = 'mailto:' + encodeURIComponent(empfEmail)
-                        + '?subject=' + encodeURIComponent(vollBetreff2)
-                        + '&body=' + encodeURIComponent(anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.');
-                    window.location.href = mailtoLink2;
-                    setSendStatus('sent');
-                    setTimeout(function() { setSendStatus(null); }, 3000);
-                }
+                    var rawParts = ['From: ' + GMAIL_CONFIG.ABSENDER_EMAIL, 'To: ' + zielEmail, 'Subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(vollBetreff))) + '?=', 'MIME-Version: 1.0', 'Content-Type: multipart/alternative; boundary="' + boundary + '"', '', '--' + boundary, 'Content-Type: text/plain; charset=UTF-8', '', anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.', '', '--' + boundary, 'Content-Type: text/html; charset=UTF-8', '', htmlMail, '', '--' + boundary + '--'];
+                    var encoded = btoa(unescape(encodeURIComponent(rawParts.join('\r\n')))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+                    var resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method: 'POST', headers: { 'Authorization': 'Bearer ' + service.accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: encoded }) });
+                    if (resp.ok) { setSendStatus('sent'); try { if (service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var mOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var pdfBlob = generatePDF(); await service.uploadFile(mOId, (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf', 'application/pdf', pdfBlob); } } catch(aE){console.warn('Archivierung:',aE);} }
+                    else { window.location.href = 'mailto:' + encodeURIComponent(zielEmail) + '?subject=' + encodeURIComponent(vollBetreff) + '&body=' + encodeURIComponent(anrede+'\n\n'+textBody+'\n\n'+grussformel); setSendStatus('sent'); }
+                } catch(err) { console.error('Sende-Fehler:', err); window.location.href = 'mailto:' + encodeURIComponent(mailAdresse||empfEmail) + '?subject=' + encodeURIComponent(betreff||'Schreiben') + '&body=' + encodeURIComponent(anrede+'\n\n'+textBody+'\n\n'+grussformel); setSendStatus('sent'); }
+                setTimeout(function() { setSendStatus(null); }, 4000);
             };
 
-            // ── Speichern in Drive ──
-            var handleSpeichern = async function() {
-                try {
-                    var service = window.GoogleDriveService;
-                    if (service.isConnected() && kunde && kunde._driveFolderId) {
-                        var schriftOrdnerId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan');
-                        var unterOrdnerId = await service.findOrCreateFolder(schriftOrdnerId, versandKanal === 'mail' ? 'Mail' : 'Briefe');
-                        var datumFile = new Date().toISOString().slice(0,10).replace(/-/g,'');
-                        var betreffKurz = (betreff || 'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9äöüÄÖÜß\- ]/g, '').replace(/ /g, '_');
-                        var prefix = versandKanal === 'mail' ? 'Mail' : 'Brief';
-                        var fileName = prefix + '_' + datumFile + '_' + betreffKurz + '.html';
-                        await service.uploadFile(unterOrdnerId, fileName, 'text/html', new Blob([buildBriefHTML()], {type:'text/html'}));
-                        alert('\u2705 ' + prefix + ' gespeichert in Schriftverkehr/' + (versandKanal === 'mail' ? 'Mail' : 'Briefe') + '/');
-                    } else {
-                        // Fallback: Lokaler Download
-                        var blob = new Blob([buildBriefHTML()], { type: 'text/html' });
-                        var url = URL.createObjectURL(blob);
-                        var a = document.createElement('a');
-                        a.href = url;
-                        a.download = (versandKanal === 'mail' ? 'Mail' : 'Brief') + '_' + new Date().toISOString().slice(0,10) + '.html';
-                        a.click();
-                        URL.revokeObjectURL(url);
-                    }
-                } catch(err) {
-                    console.error('Speichern-Fehler:', err);
-                    alert('Fehler beim Speichern: ' + err.message);
-                }
+            var handleDriveSpeichern = async function() {
+                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var uOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; var pdfBlob = generatePDF(); await service.uploadFile(uOId, fN, 'application/pdf', pdfBlob); alert('\u2705 PDF gespeichert in Schriftverkehr/' + (versandKanal==='mail'?'Mail':'Briefe') + '/'); } else { var pdfBlob2 = generatePDF(); var a = document.createElement('a'); a.href = URL.createObjectURL(pdfBlob2); a.download = (versandKanal==='mail'?'Mail':'Brief') + '_' + new Date().toISOString().slice(0,10) + '.pdf'; a.click(); } } catch(err) { console.error('Speichern-Fehler:', err); alert('Fehler: ' + err.message); }
             };
 
-            var inputStyle = {width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', boxSizing:'border-box'};
-            var lila = '#8e44ad';
+            var openMailDialog = function() { setMailAdresse(kunde?(kunde.ag_email||kunde.bl_email||''):''); setShowMailDialog(true); };
+            var confirmAndSend = function() { setShowMailDialog(false); setTimeout(handleSenden, 100); };
 
-            // ═══ PHASE 1: Kanal-Auswahl ═══
+            var pdfInput = {padding:'4px 6px',borderRadius:'4px',border:'1px solid #ccc',background:'#fafafa',fontSize:'10px',color:'#222',boxSizing:'border-box',width:'100%',fontFamily:'"Source Sans 3",sans-serif'};
+            var popBtn = {width:'100%',padding:'16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:BLAU,color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:BLAU_SHADOW,touchAction:'manipulation'};
+            var popLbl = {fontSize:'15px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'};
+            var popSub = {fontSize:'11px',opacity:0.85,marginTop:'2px',fontFamily:'Source Sans 3, sans-serif'};
+            var icoS = {width:'24px',height:'24px',flexShrink:0};
+
+            // ===== PHASE 1: KANALWAHL =====
             if (phase === 'kanalwahl') {
-                return (
-                    <div className="page-container" style={{padding:'20px 16px', minHeight:'100vh'}}>
-                        <div style={{textAlign:'center', marginBottom:'28px'}}>
-                            <FirmenLogo size="small" />
-                            <div style={{marginTop:'12px', fontSize:'17px', fontWeight:'700', color: lila}}>Schriftverkehr</div>
-                            <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{kunde ? kunde.name : ''}</div>
-                            <div style={{fontSize:'11px', color:'var(--text-muted)', letterSpacing:'1.5px', textTransform:'uppercase', marginTop:'8px'}}>Wie möchten Sie korrespondieren?</div>
-                        </div>
-
-                        <div style={{display:'flex', gap:'12px', marginBottom:'16px'}}>
-                            <button onClick={function(){ setVersandKanal('mail'); setPhase('formular'); }}
-                                style={{flex:1, padding:'28px 16px', borderRadius:'16px', border:'2px solid rgba(142,68,173,0.2)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-                                <span style={{fontSize:'40px'}}>✉️</span>
-                                <span style={{fontSize:'16px', fontWeight:'700', color: lila}}>E-MAIL</span>
-                                <span style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.4'}}>E-Mail direkt<br/>via Gmail senden</span>
-                            </button>
-                            <button onClick={function(){ setVersandKanal('post'); setPhase('formular'); }}
-                                style={{flex:1, padding:'28px 16px', borderRadius:'16px', border:'2px solid rgba(142,68,173,0.2)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:'10px', boxShadow:'0 2px 8px rgba(0,0,0,0.1)'}}>
-                                <span style={{fontSize:'40px'}}>📄</span>
-                                <span style={{fontSize:'16px', fontWeight:'700', color: lila}}>POST</span>
-                                <span style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', lineHeight:'1.4'}}>Geschäftsbrief<br/>drucken & senden</span>
-                            </button>
-                        </div>
-
-                        <button onClick={onBack} style={{width:'100%', marginTop:'8px', padding:'12px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'13px', cursor:'pointer'}}>← Zurück zur Modulwahl</button>
-                    </div>
-                );
+                return (<div className="page-container" style={{padding:'20px 16px',minHeight:'100vh'}}><div style={{textAlign:'center',marginBottom:'24px'}}><FirmenLogo size="small" /><div style={{marginTop:'12px',fontSize:'17px',fontWeight:700,color:'var(--accent-blue)',fontFamily:'Oswald, sans-serif',letterSpacing:'0.5px'}}>Schriftverkehr</div><div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'4px'}}>{kunde?kunde.name:''}</div><div style={{fontSize:'11px',color:'var(--text-muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginTop:'8px',fontFamily:'Oswald, sans-serif',fontWeight:'500'}}>Kanal waehlen</div></div>
+                <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
+                    <button onClick={function(){setVersandKanal('mail');setPhase('startseite');}} style={{width:'100%',padding:'18px 16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:BLAU,color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:BLAU_SHADOW,transition:'all 0.25s ease',touchAction:'manipulation'}}><svg viewBox="0 0 32 32" fill="none" style={{width:'28px',height:'28px',flexShrink:0}}><rect x="2" y="7" width="28" height="18" rx="3" stroke="white" strokeWidth="2"/><path d="M2 10l14 9 14-9" stroke="white" strokeWidth="2"/></svg><div style={{flex:1}}><div style={{fontSize:'16px',fontWeight:600,marginBottom:'3px',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>E-Mail</div><div style={{fontSize:'12px',opacity:0.85,lineHeight:'1.4',fontFamily:'Source Sans 3, sans-serif'}}>Professionelle E-Mail mit Anhaengen versenden</div></div><span style={{fontSize:'20px',opacity:0.7}}>{'\u2192'}</span></button>
+                    <button onClick={function(){setVersandKanal('post');setPhase('startseite');}} style={{width:'100%',padding:'18px 16px',borderRadius:'var(--radius-lg)',border:'1px solid transparent',cursor:'pointer',background:BLAU,color:'#fff',display:'flex',alignItems:'center',gap:'14px',textAlign:'left',boxShadow:BLAU_SHADOW,transition:'all 0.25s ease',touchAction:'manipulation'}}><svg viewBox="0 0 32 32" fill="none" style={{width:'28px',height:'28px',flexShrink:0}}><rect x="4" y="3" width="24" height="26" rx="2" stroke="white" strokeWidth="2"/><line x1="9" y1="10" x2="23" y2="10" stroke="white" strokeWidth="1.5"/><line x1="9" y1="14" x2="23" y2="14" stroke="white" strokeWidth="1.5"/><line x1="9" y1="18" x2="19" y2="18" stroke="white" strokeWidth="1.5"/><line x1="9" y1="22" x2="16" y2="22" stroke="white" strokeWidth="1.5"/></svg><div style={{flex:1}}><div style={{fontSize:'16px',fontWeight:600,marginBottom:'3px',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}}>Brief / Post</div><div style={{fontSize:'12px',opacity:0.85,lineHeight:'1.4',fontFamily:'Source Sans 3, sans-serif'}}>DIN-5008-konformer Geschaeftsbrief erstellen</div></div><span style={{fontSize:'20px',opacity:0.7}}>{'\u2192'}</span></button>
+                </div>
+                <button onClick={onBack} style={{width:'100%',marginTop:'16px',padding:'14px 32px',borderRadius:'var(--radius-md)',border:'none',background:ROT,color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:ROT_SHADOW,touchAction:'manipulation'}}>{'\u2190'} Zurueck zur Modulwahl</button></div>);
             }
 
-            // ═══ PHASE 2: Formular ═══
-            var kanalColor = versandKanal === 'mail' ? '#8e44ad' : '#2c3e50';
-            var kanalLabel = versandKanal === 'mail' ? '✉️ E-Mail' : '📄 Geschäftsbrief';
+            // ===== PHASE 2: PDF-NAHE STARTSEITE =====
+            if (phase === 'startseite') {
+                var kanalLabel = versandKanal === 'mail' ? 'E-Mail' : 'Geschaeftsbrief';
+                var adressZeilen = [];
+                if (empfAdresse) { var mA = empfAdresse.match(/^(.*?)[\s,]+(\d{5}\s+.*)$/); if(mA){adressZeilen.push(mA[1].trim());adressZeilen.push(mA[2].trim());}else{empfAdresse.split(',').forEach(function(s){if(s.trim())adressZeilen.push(s.trim());});} }
 
-            return (
-                <div className="page-container" style={{padding:'16px', minHeight:'100vh', paddingBottom:'80px'}}>
-
-                    {/* Header */}
-                    <div style={{textAlign:'center', marginBottom:'14px'}}>
-                        <FirmenLogo size="small" />
-                        <div style={{marginTop:'8px', fontSize:'15px', fontWeight:'700', color: kanalColor}}>{kanalLabel}</div>
-                        <div style={{fontSize:'11px', color:'var(--text-muted)'}}>{kunde ? kunde.name : 'Freies Schreiben'}</div>
-                    </div>
-
-                    {/* Empfänger + Bauvorhaben */}
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'8px'}}>📬 Empfänger</div>
-                        <div style={{display:'grid', gap:'6px'}}>
-                            <div><MicLabel fieldKey="sv_empf" label="Empfänger (Firma/Person)" />
-                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_empf" value={empfaenger} onChange={function(e){setEmpfaenger(e.target.value);}} placeholder="Firma oder Name" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_empf" size="small" onResult={function(t){setEmpfaenger((empfaenger||'')+' '+t);}} /></div></div>
-                            <div><MicLabel fieldKey="sv_adr" label="Adresse" />
-                                <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_adr" value={empfAdresse} onChange={function(e){setEmpfAdresse(e.target.value);}} placeholder="Straße Nr, PLZ Ort" style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_adr" size="small" onResult={function(t){setEmpfAdresse((empfAdresse||'')+' '+t);}} /></div></div>
-                            {versandKanal === 'mail' && (
-                                <div>
-                                    <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>E-Mail-Adresse</label>
-                                    <input type="email" value={empfEmail} onChange={function(e){setEmpfEmail(e.target.value);}} placeholder="empfaenger@firma.de" style={inputStyle} />
-                                    {/* Schnell-Buttons für bekannte E-Mails */}
-                                    {kunde && (kunde.ag_email || kunde.bl_email || kunde.arch_email) && (
-                                        <div style={{display:'flex', gap:'4px', marginTop:'4px', flexWrap:'wrap'}}>
-                                            {kunde.ag_email && <button onClick={function(){setEmpfEmail(kunde.ag_email);}} style={{padding:'3px 7px', fontSize:'9px', background:'rgba(30,136,229,0.1)', color:'var(--accent-blue)', border:'1px solid rgba(30,136,229,0.2)', borderRadius:'5px', cursor:'pointer'}}>AG: {kunde.ag_email}</button>}
-                                            {kunde.bl_email && <button onClick={function(){setEmpfEmail(kunde.bl_email);}} style={{padding:'3px 7px', fontSize:'9px', background:'rgba(39,174,96,0.1)', color:'var(--success)', border:'1px solid rgba(39,174,96,0.2)', borderRadius:'5px', cursor:'pointer'}}>BL: {kunde.bl_email}</button>}
-                                            {kunde.arch_email && <button onClick={function(){setEmpfEmail(kunde.arch_email);}} style={{padding:'3px 7px', fontSize:'9px', background:'rgba(230,126,34,0.1)', color:'var(--accent-orange)', border:'1px solid rgba(230,126,34,0.2)', borderRadius:'5px', cursor:'pointer'}}>Arch: {kunde.arch_email}</button>}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px'}}>
-                                <div><MicLabel fieldKey="sv_bv" label="Bauvorhaben" />
-                                    <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_bv" value={bauvorhaben} onChange={function(e){setBauvorhaben(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_bv" size="small" onResult={function(t){setBauvorhaben((bauvorhaben||'')+' '+t);}} /></div></div>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Datum</label>
-                                    <input value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={inputStyle} /></div>
+                return (<div className="page-container" style={{padding:'0',minHeight:'100vh',paddingBottom:'80px'}}>
+                <div style={{margin:'8px',background:'#fff',borderRadius:'12px',padding:'22px 20px 16px',color:'#222',boxShadow:'0 4px 24px rgba(0,0,0,0.35)',minHeight:'85vh'}}>
+                    {/* BRIEFKOPF: Logo links + Adresse rechts -- identisch Rechnungsmodul */}
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'3mm'}}>
+                        <div style={{display:'inline-flex',flexDirection:'column',alignItems:'flex-start'}}>
+                            <div style={{fontFamily:'"Source Sans 3",sans-serif',fontStyle:'normal',fontWeight:700,color:'#c41e1e',fontSize:'14.5px',letterSpacing:'3px',marginBottom:'-18px',paddingLeft:'1px',position:'relative',zIndex:2}}>Thomas</div>
+                            <div style={{display:'flex',alignItems:'baseline',fontFamily:'Oswald,sans-serif',fontWeight:700,color:'#111',lineHeight:1,WebkitTextStroke:'0.4px #111'}}>
+                                <span style={{fontSize:'73px'}}>w</span>
+                                <span style={{position:'relative',fontSize:'73px',display:'inline-block'}}><span style={{fontSize:'73px',color:'#111'}}>{'\u0131'}</span><span style={{position:'absolute',top:'10px',left:'50%',transform:'translateX(-50%)',width:'11px',height:'11px',background:'#c41e1e'}}></span></span>
+                                <span style={{fontSize:'95px',letterSpacing:'1px',lineHeight:0.75}}>LL</span>
+                                <span style={{fontSize:'73px'}}>wacher</span>
                             </div>
-                            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px'}}>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Ihr Zeichen</label>
-                                    <input value={ihrZeichen} onChange={function(e){setIhrZeichen(e.target.value);}} placeholder="optional" style={inputStyle} /></div>
-                                <div><label style={{fontSize:'10px', color:'var(--text-muted)', display:'block'}}>Unser Zeichen</label>
-                                    <input value={unserZeichen} onChange={function(e){setUnserZeichen(e.target.value);}} style={inputStyle} /></div>
-                            </div>
+                            <div style={{display:'flex',justifyContent:'flex-end',width:'100%',marginTop:'2px'}}><span style={{fontFamily:'"Source Sans 3",sans-serif',fontWeight:600,color:'#c41e1e',fontSize:'14.5px',letterSpacing:'2.5px'}}>Fliesenlegermeister e.K.</span></div>
                         </div>
+                        <div style={{textAlign:'right',fontSize:'8pt',color:'#555',lineHeight:1.5,paddingTop:'5mm'}}>Flurweg 14a<br/>56472 Nisterau<br/>Tel. 02661-63101<br/>Mobil 0170-2024161</div>
+                    </div>
+                    <hr style={{border:'none',borderTop:'2.5px solid #c41e1e',margin:'3mm 0 2mm'}} />
+                    <div style={{fontSize:'7pt',color:'#aaa',borderBottom:'0.5px solid #ccc',display:'inline-block',paddingBottom:'1px',marginBottom:'5mm'}}>Thomas Willwacher Fliesenlegermeister e.K. {'\u00B7'} Flurweg 14a {'\u00B7'} 56472 Nisterau</div>
+
+                    {/* EMPFAENGER links + NUR DATUM rechts */}
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:'6mm'}}>
+                        <div>
+                            {editMode?<input value={empfaenger} onChange={function(e){setEmpfaenger(e.target.value);}} style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'11pt'})} />:<div style={{fontWeight:700,fontSize:'11pt'}}>{empfaenger}</div>}
+                            {editMode?<input value={empfAdresse} onChange={function(e){setEmpfAdresse(e.target.value);}} style={Object.assign({},pdfInput,{marginTop:'4px'})} />:<div style={{fontSize:'10pt',color:'#333',lineHeight:1.5}}>{adressZeilen.map(function(z,i){return <div key={i}>{z}</div>;})}</div>}
+                            {versandKanal==='mail'&&editMode&&<input value={empfEmail} onChange={function(e){setEmpfEmail(e.target.value);}} placeholder="empfaenger@firma.de" style={Object.assign({},pdfInput,{marginTop:'4px',color:'#1E88E5'})} />}
+                            {versandKanal==='mail'&&!editMode&&empfEmail&&<div style={{fontSize:'9pt',color:'#1E88E5',marginTop:'2px'}}>{empfEmail}</div>}
+                            {versandKanal==='mail'&&editMode&&kunde&&(kunde.ag_email||kunde.bl_email||kunde.arch_email)&&(<div style={{display:'flex',gap:'4px',marginTop:'4px',flexWrap:'wrap'}}>{kunde.ag_email&&<button onClick={function(){setEmpfEmail(kunde.ag_email);}} style={{padding:'3px 7px',fontSize:'9px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'5px',cursor:'pointer'}}>AG: {kunde.ag_email}</button>}{kunde.bl_email&&<button onClick={function(){setEmpfEmail(kunde.bl_email);}} style={{padding:'3px 7px',fontSize:'9px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'5px',cursor:'pointer'}}>BL: {kunde.bl_email}</button>}{kunde.arch_email&&<button onClick={function(){setEmpfEmail(kunde.arch_email);}} style={{padding:'3px 7px',fontSize:'9px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'5px',cursor:'pointer'}}>Arch: {kunde.arch_email}</button>}</div>)}
+                        </div>
+                        <div style={{textAlign:'right'}}><div style={{fontSize:'7.5pt',color:'#999'}}>Datum</div>{editMode?<input type="text" value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={Object.assign({},pdfInput,{fontWeight:600,textAlign:'right'})} />:<div style={{fontSize:'10.5pt',fontWeight:600}}>Nisterau, {new Date(briefDatum).toLocaleDateString('de-DE')}</div>}</div>
                     </div>
 
-                    {/* Vorlagen-Auswahl */}
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'6px'}}>📋 Vorlage (optional)</div>
-                        <select value={vorlage} onChange={function(e){ applyVorlage(e.target.value); }}
-                            style={{width:'100%', padding:'8px 10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'12px', color:'var(--text-primary)', boxSizing:'border-box'}}>
-                            <option value="">-- Freitext (keine Vorlage) --</option>
-                            {vorlagen.map(function(v) { return <option key={v.id} value={v.id}>{v.name}</option>; })}
-                        </select>
+                    {/* 5cm Abstand -- wie im Rechnungsmodul (y+=20 nach Adresse) */}
+                    <div style={{height:'20mm'}}></div>
+
+                    {/* BETREFF */}
+                    {editMode?<input value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'13pt',marginBottom:'4mm'})} />:(betreff&&<div style={{fontSize:'13pt',fontWeight:700,marginBottom:'4mm'}}>{betreff}</div>)}
+
+                    {/* Bauvorhaben + Unser Zeichen LINKS */}
+                    <div style={{fontSize:'9pt',color:'#555',marginBottom:'6mm'}}>
+                        <div><span style={{display:'inline-block',width:'38mm',color:'#888'}}>Bauvorhaben:</span> {editMode?<input value={bauvorhaben} onChange={function(e){setBauvorhaben(e.target.value);}} style={Object.assign({},pdfInput,{width:'60%',fontWeight:600})} />:<span style={{fontWeight:600,color:'#222'}}>{bauvorhaben}</span>}</div>
+                        <div><span style={{display:'inline-block',width:'38mm',color:'#888'}}>Unser Zeichen:</span> {editMode?<input value={unserZeichen} onChange={function(e){setUnserZeichen(e.target.value);}} style={Object.assign({},pdfInput,{width:'40%',fontWeight:600})} />:<span style={{fontWeight:600,color:'#222'}}>{unserZeichen}</span>}</div>
                     </div>
 
-                    {/* Textbereich */}
-                    <div style={{background:'var(--bg-secondary)', borderRadius:'12px', padding:'12px', marginBottom:'10px', boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
-                        <div style={{fontSize:'11px', fontWeight:'700', color: kanalColor, marginBottom:'8px'}}>✏️ Schreiben</div>
+                    {/* Vorlagen (nur Edit-Modus) */}
+                    {editMode&&(<div style={{marginBottom:'6mm'}}><select value={vorlage} onChange={function(e){applyVorlage(e.target.value);}} style={{width:'100%',padding:'6px 8px',borderRadius:'6px',border:'1px solid #ccc',background:'#f5f5f5',fontSize:'10px',color:'#222'}}><option value="">-- Freitext (keine Vorlage) --</option>{vorlagen.map(function(v){return <option key={v.id} value={v.id}>{v.name}</option>;})}</select></div>)}
 
-                        <div><MicLabel fieldKey="sv_betr" label="Betreff" />
-                            <div style={{display:'flex', gap:'3px', marginBottom:'6px'}}><MicInput fieldKey="sv_betr" value={betreff} onChange={function(e){setBetreff(e.target.value);}} placeholder="Betreff des Schreibens" style={Object.assign({}, inputStyle, {flex:1, fontWeight:'700'})} /><MicButton fieldKey="sv_betr" size="small" onResult={function(t){setBetreff((betreff||'')+' '+t);}} /></div></div>
+                    {/* ANREDE + TEXT */}
+                    {editMode?(<div style={{marginBottom:'4mm'}}><input value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({},pdfInput,{marginBottom:'4px'})} /><textarea value={textBody} onChange={function(e){setTextBody(e.target.value);}} rows={10} placeholder="Brieftext hier eingeben..." style={{width:'100%',padding:'8px',borderRadius:'4px',border:'1px solid #ccc',background:'#fafafa',fontSize:'10.5pt',color:'#222',lineHeight:1.7,resize:'vertical',boxSizing:'border-box',fontFamily:'"Source Sans 3",sans-serif',minHeight:'180px'}} /></div>):(<div style={{fontSize:'10.5pt',lineHeight:1.7,whiteSpace:'pre-wrap',marginBottom:'6mm',color:'#333',minHeight:'120px'}}>{anrede&&<div>{anrede}</div>}{textBody?<div style={{marginTop:'8px'}}>{textBody}</div>:<div style={{color:'#bbb',fontStyle:'italic',marginTop:'8px'}}>Text wird hier angezeigt...</div>}</div>)}
 
-                        <div><MicLabel fieldKey="sv_anr" label="Anrede" />
-                            <div style={{display:'flex', gap:'3px', marginBottom:'6px'}}><MicInput fieldKey="sv_anr" value={anrede} onChange={function(e){setAnrede(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_anr" size="small" onResult={function(t){setAnrede((anrede||'')+' '+t);}} /></div></div>
+                    {/* Bilder (Edit-Modus) */}
+                    {editMode&&bilder.length>0&&(<div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'8px'}}>{bilder.map(function(b,idx){return(<div key={idx} style={{position:'relative',width:'80px',height:'80px',borderRadius:'8px',overflow:'hidden',border:'1px solid #ccc'}}><img src={b.dataUrl} alt={b.name} style={{width:'100%',height:'100%',objectFit:'cover'}} /><button onClick={function(){removeBild(idx);}} style={{position:'absolute',top:'2px',right:'2px',background:'rgba(196,30,30,0.9)',color:'white',border:'none',borderRadius:'50%',width:'20px',height:'20px',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>{'\u2715'}</button></div>);})}</div>)}
+                    {editMode&&(<div style={{display:'flex',gap:'6px',marginBottom:'8px'}}><button onClick={function(){kameraInputRef.current&&kameraInputRef.current.click();}} style={{flex:1,padding:'8px',background:'rgba(30,136,229,0.08)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'8px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>Foto</button><input ref={kameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleBild} style={{display:'none'}} /><button onClick={function(){bildInputRef.current&&bildInputRef.current.click();}} style={{flex:1,padding:'8px',background:'rgba(30,136,229,0.08)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'8px',fontSize:'12px',fontWeight:'600',cursor:'pointer'}}>Galerie/Dateien</button><input ref={bildInputRef} type="file" accept="image/*" onChange={handleBild} style={{display:'none'}} /></div>)}
 
-                        <div><MicLabel fieldKey="sv_text" label="Textinhalt" />
-                            <div style={{display:'flex', gap:'4px', alignItems:'flex-start'}}>
-                                <MicInput fieldKey="sv_text" multiline={true} value={textBody} onChange={function(e){setTextBody(e.target.value);}} rows={8} placeholder="Hier den Brieftext eingeben..."
-                                    style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', resize:'vertical', boxSizing:'border-box', lineHeight:'1.6', minHeight:'160px'}} />
-                                <MicButton fieldKey="sv_text" size="normal" onResult={function(t){setTextBody((textBody||'')+(textBody?' ':'')+t);}} />
-                            </div></div>
+                    {/* Grussformel */}
+                    {editMode?<input value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={Object.assign({},pdfInput,{marginTop:'8mm'})} />:<div style={{fontSize:'10.5pt',color:'#333',marginTop:'8mm'}}>{grussformel}<br/><br/><br/>Thomas Willwacher<br/>Fliesenlegermeister e.K.</div>}
 
-                        {/* Bilder */}
-                        {bilder.length > 0 && (
-                            <div style={{marginTop:'8px', display:'flex', gap:'8px', flexWrap:'wrap'}}>
-                                {bilder.map(function(b, idx) {
-                                    return (
-                                        <div key={idx} style={{position:'relative', width:'80px', height:'80px', borderRadius:'8px', overflow:'hidden', border:'1px solid var(--border-color)'}}>
-                                            <img src={b.dataUrl} alt={b.name} style={{width:'100%', height:'100%', objectFit:'cover'}} />
-                                            <button onClick={function(){ removeBild(idx); }}
-                                                style={{position:'absolute', top:'2px', right:'2px', background:'rgba(196,30,30,0.9)', color:'white', border:'none', borderRadius:'50%', width:'20px', height:'20px', fontSize:'11px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center'}}>✕</button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* Bild-Buttons */}
-                        <div style={{display:'flex', gap:'6px', marginTop:'8px'}}>
-                            <button onClick={function(){ kameraInputRef.current && kameraInputRef.current.click(); }}
-                                style={{flex:1, padding:'8px', background:'rgba(142,68,173,0.08)', color: lila, border:'1px solid rgba(142,68,173,0.2)', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer'}}>
-                                📷 Foto
-                            </button>
-                            <input ref={kameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleBild} style={{display:'none'}} />
-                            <button onClick={function(){ bildInputRef.current && bildInputRef.current.click(); }}
-                                style={{flex:1, padding:'8px', background:'rgba(142,68,173,0.08)', color: lila, border:'1px solid rgba(142,68,173,0.2)', borderRadius:'8px', fontSize:'12px', fontWeight:'600', cursor:'pointer'}}>
-                                🖼 Galerie/Dateien
-                            </button>
-                            <input ref={bildInputRef} type="file" accept="image/*" onChange={handleBild} style={{display:'none'}} />
-                        </div>
-
-                        <div style={{marginTop:'8px'}}><MicLabel fieldKey="sv_gruss" label="Grußformel" />
-                            <div style={{display:'flex', gap:'3px'}}><MicInput fieldKey="sv_gruss" value={grussformel} onChange={function(e){setGrussformel(e.target.value);}} style={Object.assign({}, inputStyle, {flex:1})} /><MicButton fieldKey="sv_gruss" size="small" onResult={function(t){setGrussformel((grussformel||'')+' '+t);}} /></div></div>
-                    </div>
-
-                    {/* Versand-Status Toast */}
-                    {sendStatus === 'sending' && (
-                        <div style={{position:'fixed', top:'60px', left:'50%', transform:'translateX(-50%)', padding:'12px 24px', background:'linear-gradient(135deg, #8e44ad, #6c3483)', color:'white', borderRadius:'12px', fontSize:'13px', fontWeight:'700', zIndex:200, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'8px'}}>
-                            <span style={{animation:'spin 1s linear infinite', display:'inline-block'}}>⏳</span> Wird gesendet...
-                        </div>
-                    )}
-                    {sendStatus === 'sent' && (
-                        <div style={{position:'fixed', top:'60px', left:'50%', transform:'translateX(-50%)', padding:'12px 24px', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', borderRadius:'12px', fontSize:'13px', fontWeight:'700', zIndex:200, boxShadow:'0 4px 16px rgba(0,0,0,0.3)'}}>
-                            ✅ Erfolgreich gesendet!
-                        </div>
-                    )}
-
-                    {/* Fixed Bottom Bar */}
-                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'10px 16px', background:'var(--bg-primary)', borderTop:'1px solid var(--border-color)', zIndex:100, display:'flex', gap:'6px'}}>
-                        <button onClick={function(){ setPhase('kanalwahl'); }}
-                            style={{padding:'12px 10px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'10px', fontSize:'12px', cursor:'pointer'}}>←</button>
-                        <button onClick={handleSenden}
-                            style={{flex:1, padding:'12px', background:'linear-gradient(135deg, #8e44ad, #6c3483)', color:'white', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', opacity: sendStatus === 'sending' ? 0.6 : 1}}>
-                            ✉️ Senden
-                        </button>
-                        <button onClick={handleDrucken}
-                            style={{flex:1, padding:'12px', background:'linear-gradient(135deg, #2c3e50, #1a252f)', color:'white', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
-                            🖨 Drucken
-                        </button>
-                        <button onClick={handleSpeichern}
-                            style={{padding:'12px 10px', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'3px'}}>
-                            💾
-                        </button>
-                    </div>
+                    {/* FUSSZEILE */}
+                    <div style={{borderTop:'1.5px solid #c41e1e',paddingTop:'8px',fontSize:'7.5pt',color:'#c41e1e',fontWeight:600,marginTop:'30px'}}>Thomas Willwacher Fliesenlegermeister e.K.</div>
                 </div>
-            );
+
+                {/* Versand-Status */}
+                {sendStatus==='sending'&&(<div style={{position:'fixed',top:'60px',left:'50%',transform:'translateX(-50%)',padding:'12px 24px',background:BLAU,color:'white',borderRadius:'12px',fontSize:'13px',fontWeight:'700',zIndex:200,boxShadow:'0 4px 16px rgba(0,0,0,0.3)'}}>Wird gesendet...</div>)}
+                {sendStatus==='sent'&&(<div style={{position:'fixed',top:'60px',left:'50%',transform:'translateX(-50%)',padding:'12px 24px',background:'linear-gradient(135deg,#27ae60,#1e8449)',color:'white',borderRadius:'12px',fontSize:'13px',fontWeight:'700',zIndex:200,boxShadow:'0 4px 16px rgba(0,0,0,0.3)'}}>Erfolgreich gesendet!</div>)}
+
+                {/* Bottom-Bar */}
+                <div style={{position:'fixed',bottom:0,left:0,right:0,padding:'10px 16px',background:'var(--bg-primary)',borderTop:'1px solid var(--border-color)',zIndex:100,display:'flex',gap:'8px'}}>
+                    <button onClick={function(){if(editMode){setEditMode(false);}else{setPhase('kanalwahl');}}} style={{padding:'12px 32px',borderRadius:'var(--radius-md)',border:'none',background:ROT,color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:ROT_SHADOW,touchAction:'manipulation'}}>{'\u2190'} Zurueck</button>
+                    <button onClick={function(){setShowBearbeitenPopup(true);}} style={{flex:2,padding:'12px',background:BLAU,color:'white',border:'none',borderRadius:'var(--radius-md)',fontSize:'16px',fontWeight:700,cursor:'pointer',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1.5px',boxShadow:BLAU_SHADOW,touchAction:'manipulation'}}>Bearbeiten {'\u2192'}</button>
+                </div>
+
+                {/* BEARBEITEN-POPUP */}
+                {showBearbeitenPopup&&(<div className="modal-overlay" onClick={function(){setShowBearbeitenPopup(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'440px',padding:'24px'}}>
+                    <div style={{textAlign:'center',marginBottom:'20px'}}><div style={{fontSize:'18px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',color:'var(--text-white)'}}>Dokument bearbeiten</div><div style={{fontSize:'12px',color:'var(--text-muted)',marginTop:'4px'}}>{kunde?kunde.name:''} {'\u2014'} {kanalLabel}</div></div>
+                    <div style={{display:'flex',flexDirection:'column',gap:'8px'}}>
+                        <button onClick={function(){setEditMode(true);setShowBearbeitenPopup(false);}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><path d="M20 4l4 4-14 14H6v-4L20 4z" stroke="white" strokeWidth="2" strokeLinejoin="round"/><line x1="16" y1="8" x2="20" y2="12" stroke="white" strokeWidth="1.5"/></svg><div style={{flex:1}}><div style={popLbl}>Dokument bearbeiten</div><div style={popSub}>Text, Empfaenger und Anhaenge bearbeiten</div></div></button>
+                        <button onClick={function(){handleDrucken();setShowBearbeitenPopup(false);}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><rect x="4" y="4" width="20" height="20" rx="2" stroke="white" strokeWidth="2"/><line x1="8" y1="10" x2="20" y2="10" stroke="white" strokeWidth="1.5"/><line x1="8" y1="14" x2="20" y2="14" stroke="white" strokeWidth="1.5"/><line x1="8" y1="18" x2="16" y2="18" stroke="white" strokeWidth="1.5"/></svg><div style={{flex:1}}><div style={popLbl}>Ausdrucken</div><div style={popSub}>Dokument als Briefkopf-PDF drucken</div></div></button>
+                        <button onClick={function(){handleDrucken();handleDriveSpeichern();setShowBearbeitenPopup(false);}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><rect x="4" y="4" width="20" height="20" rx="2" stroke="white" strokeWidth="2"/><path d="M10 14l3 3 5-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg><div style={{flex:1}}><div style={popLbl}>Ausdrucken + PDF speichern</div><div style={popSub}>Drucken und in Google Drive ablegen</div></div></button>
+                        <button onClick={function(){setShowBearbeitenPopup(false);openMailDialog();}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><rect x="2" y="6" width="24" height="16" rx="2" stroke="white" strokeWidth="2"/><path d="M2 8l12 8 12-8" stroke="white" strokeWidth="2"/></svg><div style={{flex:1}}><div style={popLbl}>Als Mail versenden</div><div style={popSub}>E-Mail-Adresse waehlen und senden</div></div></button>
+                        <button onClick={function(){handleDriveSpeichern();setShowBearbeitenPopup(false);}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><path d="M4 18l8-14h8l8 14" stroke="white" strokeWidth="2" strokeLinejoin="round"/><path d="M4 18l4 7h12l4-7" stroke="white" strokeWidth="2" strokeLinejoin="round"/><line x1="12" y1="18" x2="20" y2="18" stroke="white" strokeWidth="2"/></svg><div style={{flex:1}}><div style={popLbl}>In Google Drive speichern</div><div style={popSub}>Im Kundenordner/Schriftverkehr ablegen</div></div></button>
+                        <button onClick={function(){setShowBearbeitenPopup(false);alert('Bearbeitungsstand wird gespeichert...');}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><rect x="4" y="4" width="20" height="20" rx="2" stroke="white" strokeWidth="2"/><rect x="8" y="4" width="12" height="8" rx="1" stroke="white" strokeWidth="1.5"/><rect x="8" y="18" width="12" height="6" rx="1" stroke="white" strokeWidth="1.5"/></svg><div style={{flex:1}}><div style={popLbl}>Speichern</div><div style={popSub}>Bearbeitungsstand lokal sichern</div></div></button>
+                        <button onClick={function(){setShowBearbeitenPopup(false);alert('Gespeicherte Dokumente werden geladen...');}} style={popBtn}><svg viewBox="0 0 28 28" fill="none" style={icoS}><path d="M4 8V6a2 2 0 012-2h5l2 3h9a2 2 0 012 2v1" stroke="white" strokeWidth="2"/><path d="M2 12a2 2 0 012-2h20a2 2 0 012 2l-2 12a2 2 0 01-2 2H6a2 2 0 01-2-2L2 12z" stroke="white" strokeWidth="2"/></svg><div style={{flex:1}}><div style={popLbl}>Gespeicherte Dokumente</div><div style={popSub}>Angefangene Schreiben weiterbearbeiten</div></div></button>
+                    </div>
+                    <button onClick={function(){setShowBearbeitenPopup(false);}} style={{width:'100%',marginTop:'12px',padding:'14px 32px',borderRadius:'var(--radius-md)',border:'none',background:ROT,color:'#fff',cursor:'pointer',fontSize:'14px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'1px',boxShadow:ROT_SHADOW,touchAction:'manipulation'}}>Abbrechen</button>
+                </div></div>)}
+
+                {/* MAIL-DIALOG */}
+                {showMailDialog&&(<div className="modal-overlay" onClick={function(){setShowMailDialog(false);}}><div className="modal" onClick={function(e){e.stopPropagation();}} style={{maxWidth:'400px',padding:'24px'}}><div className="modal-title">E-Mail versenden</div><div style={{marginBottom:'12px'}}><label style={{fontSize:'11px',color:'var(--text-muted)',display:'block',marginBottom:'4px'}}>Empfaenger E-Mail</label><input value={mailAdresse} onChange={function(e){setMailAdresse(e.target.value);}} placeholder="empfaenger@firma.de" style={{width:'100%',padding:'10px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'14px',color:'var(--text-primary)',boxSizing:'border-box'}} />{kunde&&(kunde.ag_email||kunde.bl_email||kunde.arch_email)&&(<div style={{display:'flex',gap:'4px',marginTop:'6px',flexWrap:'wrap'}}>{kunde.ag_email&&<button onClick={function(){setMailAdresse(kunde.ag_email);}} style={{padding:'4px 8px',fontSize:'10px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'6px',cursor:'pointer'}}>AG: {kunde.ag_email}</button>}{kunde.bl_email&&<button onClick={function(){setMailAdresse(kunde.bl_email);}} style={{padding:'4px 8px',fontSize:'10px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'6px',cursor:'pointer'}}>BL: {kunde.bl_email}</button>}{kunde.arch_email&&<button onClick={function(){setMailAdresse(kunde.arch_email);}} style={{padding:'4px 8px',fontSize:'10px',background:'rgba(30,136,229,0.1)',color:'#1E88E5',border:'1px solid rgba(30,136,229,0.2)',borderRadius:'6px',cursor:'pointer'}}>Arch: {kunde.arch_email}</button>}</div>)}</div><div style={{display:'flex',gap:'8px'}}><button onClick={function(){setShowMailDialog(false);}} style={{flex:1,padding:'12px',borderRadius:'var(--radius-md)',border:'none',background:ROT,color:'#fff',cursor:'pointer',fontSize:'13px',fontWeight:600,fontFamily:'Oswald, sans-serif',textTransform:'uppercase'}}>Abbrechen</button><button onClick={confirmAndSend} style={{flex:2,padding:'12px',borderRadius:'var(--radius-md)',border:'none',background:BLAU,color:'#fff',cursor:'pointer',fontSize:'13px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',opacity:mailAdresse?1:0.5}}>Senden</button></div></div></div>)}
+
+                </div>);
+            }
+
+            return null;
         }
 
-        /* ═══════════════════════════════════════════
-           RECHNUNGSAUSGANGSBUCH -- Alle Rechnungen auf einen Blick
-           Auto-Save · Alarm bei Zahlungsziel · Umsatzanalyse · Editierbar
-           ═══════════════════════════════════════════ */
-
         function RechnungsAusgangsbuch({ kunde, onBack }) {
-            const AB_KEY = 'tw_ausgangsbuch';
-            const SETTINGS_KEY = 'tw_ausgangsbuch_settings';
+            var AB_KEY = 'tw_ausgangsbuch';
+            var SETTINGS_KEY = 'tw_ausgangsbuch_settings';
 
-            const [eintraege, setEintraege] = useState([]);
-            const [showSettings, setShowSettings] = useState(false);
-            const [showAnalyse, setShowAnalyse] = useState(false);
-            const [editId, setEditId] = useState(null);
-            const [editData, setEditData] = useState({});
-            const [filterStatus, setFilterStatus] = useState('alle'); // 'alle' | 'offen' | 'bezahlt' | 'ueberfaellig' | 'gemahnt' | 'storniert'
-            const [sortField, setSortField] = useState('datum');
-            const [sortDir, setSortDir] = useState('desc');
-            const [settings, setSettings] = useState({
+            var [eintraege, setEintraege] = useState([]);
+            var [showSettings, setShowSettings] = useState(false);
+            var [showAnalyse, setShowAnalyse] = useState(false);
+            var [editId, setEditId] = useState(null);
+            var [editData, setEditData] = useState({});
+            var [filterStatus, setFilterStatus] = useState('alle');
+            var [filterMonat, setFilterMonat] = useState('alle');
+            var [suchText, setSuchText] = useState('');
+            var [sortField, setSortField] = useState('datum');
+            var [sortDir, setSortDir] = useState('desc');
+            var [showDruckansicht, setShowDruckansicht] = useState(false);
+            var [settings, setSettings] = useState({
                 standardMwst: 19,
                 standardZahlungsziel: 30,
                 standardSkonto: 2,
                 standardSkontoTage: 10,
                 alarmTageVorher: 3,
-                firmenname: 'Thomas Willwacher Fliesenlegermeister e.K.'
+                firmenname: 'Thomas Willwacher Fliesenlegermeister e.K.',
+                steuernummer: '',
+                ustIdNr: '',
+                basiszinssatz: 1.27,
+                basiszinssatzStand: '2026-01-01'
             });
 
-            // Laden
+            // ══ Basiszinssatz-Tabelle (halbjaehrlich aktualisiert) ══
+            var BASISZINS = [
+                { ab: '2026-01-01', satz: 1.27 },
+                { ab: '2025-07-01', satz: 2.27 },
+                { ab: '2025-01-01', satz: 2.27 },
+                { ab: '2024-07-01', satz: 3.37 },
+                { ab: '2024-01-01', satz: 3.62 }
+            ];
+            var getBasiszins = function(datum) {
+                var d = datum || new Date().toISOString().split('T')[0];
+                for (var i = 0; i < BASISZINS.length; i++) { if (d >= BASISZINS[i].ab) return BASISZINS[i].satz; }
+                return 1.27;
+            };
+
+            // ══ Laden ══
             useEffect(function() {
                 try {
                     var data = JSON.parse(localStorage.getItem(AB_KEY) || '[]');
                     setEintraege(data);
                     var s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
-                    if (s) setSettings(s);
+                    if (s) setSettings(function(prev) { return Object.assign({}, prev, s); });
                 } catch(e) {}
             }, []);
 
-            // Speichern
+            // ══ Speichern ══
             var saveEintraege = function(newData) {
                 setEintraege(newData);
                 localStorage.setItem(AB_KEY, JSON.stringify(newData));
             };
-            var saveSettings = function(newSettings) {
-                setSettings(newSettings);
-                localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
+            var saveSettings = function(newS) {
+                setSettings(newS);
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify(newS));
             };
 
-            // Formatierung
+            // ══ Formatierung ══
             var fmt = function(v) { return (parseFloat(v) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+            var fmtDatum = function(d) {
+                if (!d) return '--';
+                var p = d.split('-');
+                return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : d;
+            };
             var today = new Date().toISOString().split('T')[0];
 
-            // Alarm-Check: Tage bis/seit Zahlungsziel
+            // ══ Status-Definitionen ══
+            var STATUS = {
+                offen:        { label: 'Offen',         farbe: '#f39c12', bg: 'rgba(243,156,18,0.12)' },
+                teilbezahlt:  { label: 'Teilbezahlt',   farbe: '#e67e22', bg: 'rgba(230,126,34,0.12)' },
+                bezahlt:      { label: 'Bezahlt',       farbe: '#27ae60', bg: 'rgba(39,174,96,0.12)' },
+                ueberfaellig: { label: 'Ueberfaellig',  farbe: '#e74c3c', bg: 'rgba(231,76,60,0.12)' },
+                gemahnt:      { label: 'Gemahnt',       farbe: '#c0392b', bg: 'rgba(192,57,43,0.12)' },
+                inkasso:      { label: 'Inkasso',       farbe: '#8e44ad', bg: 'rgba(142,68,173,0.12)' },
+                storniert:    { label: 'Storniert',     farbe: '#7f8c8d', bg: 'rgba(127,140,141,0.12)' },
+                gutschrift:   { label: 'Gutschrift',    farbe: '#2980b9', bg: 'rgba(41,128,185,0.12)' }
+            };
+            var MAHNSTUFEN = {
+                0: { label: '--', farbe: 'var(--text-muted)' },
+                1: { label: 'Erinnerung', farbe: '#f39c12' },
+                2: { label: '1. Mahnung', farbe: '#e67e22' },
+                3: { label: '2. Mahnung', farbe: '#e74c3c' },
+                4: { label: 'Inkasso', farbe: '#8e44ad' }
+            };
+
+            // ══ Tage-Berechnung ══
             var getDaysInfo = function(entry) {
-                if (!entry.zahlungszielDatum || entry.status === 'bezahlt' || entry.status === 'storniert') return null;
-                var ziel = new Date(entry.zahlungszielDatum);
+                if (!entry.faelligkeitsDatum && !entry.zahlungszielDatum) return null;
+                if (entry.status === 'bezahlt' || entry.status === 'storniert' || entry.status === 'gutschrift') return null;
+                var zielStr = entry.faelligkeitsDatum || entry.zahlungszielDatum;
+                var ziel = new Date(zielStr);
                 var now = new Date(today);
                 var diff = Math.round((ziel - now) / (1000 * 60 * 60 * 24));
                 return { days: diff, overdue: diff < 0, warning: diff >= 0 && diff <= settings.alarmTageVorher };
             };
 
-            // Filter + Sort
+            // ══ Verzugszinsen ══
+            var berechneVerzugszinsen = function(entry) {
+                if (entry.status === 'bezahlt' || entry.status === 'storniert') return 0;
+                var faellig = new Date(entry.faelligkeitsDatum || entry.zahlungszielDatum);
+                var heute = new Date();
+                var verzugsTage = Math.max(0, Math.round((heute - faellig) / (1000*60*60*24)));
+                if (verzugsTage <= 0) return 0;
+                var istVerbraucher = entry.kundeTyp === 'b2c';
+                var zinssatz = getBasiszins(entry.faelligkeitsDatum) + (istVerbraucher ? 5.0 : 9.0);
+                var offenerBetrag = entry.restbetrag || entry.bruttoBetrag || 0;
+                return Math.round(offenerBetrag * (zinssatz / 100) * verzugsTage / 365 * 100) / 100;
+            };
+
+            // ══ Verfuegbare Monate ══
+            var verfuegbareMonate = React.useMemo(function() {
+                var ms = {};
+                eintraege.forEach(function(e) {
+                    var m = (e.datum || '').substring(0, 7);
+                    if (m) ms[m] = true;
+                });
+                return Object.keys(ms).sort().reverse();
+            }, [eintraege]);
+
+            // ══ Filter + Sort ══
             var filtered = eintraege.filter(function(e) {
-                if (filterStatus === 'alle') return true;
-                if (filterStatus === 'ueberfaellig') {
-                    var info = getDaysInfo(e);
-                    return info && info.overdue;
+                if (filterStatus !== 'alle') {
+                    if (filterStatus === 'ueberfaellig') {
+                        var info = getDaysInfo(e);
+                        if (!info || !info.overdue) return false;
+                    } else if (e.status !== filterStatus) return false;
                 }
-                return e.status === filterStatus;
+                if (filterMonat !== 'alle') {
+                    if (!(e.datum || '').startsWith(filterMonat)) return false;
+                }
+                if (suchText) {
+                    var s = suchText.toLowerCase();
+                    var haystack = ((e.dokumentNr || e.rechnungsNr || '') + ' ' + (e.kundeName || e.kunde || '') + ' ' + (e.bauvorhaben || '')).toLowerCase();
+                    if (haystack.indexOf(s) === -1) return false;
+                }
+                return true;
             });
             filtered.sort(function(a, b) {
                 var va = a[sortField] || '', vb = b[sortField] || '';
+                if (sortField === 'nettoBetrag' || sortField === 'bruttoBetrag') {
+                    va = parseFloat(va) || 0; vb = parseFloat(vb) || 0;
+                }
                 if (typeof va === 'number') return sortDir === 'asc' ? va - vb : vb - va;
                 return sortDir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
             });
 
-            // Statistiken
-            var ueberfaelligeCount = eintraege.filter(function(e) { var i = getDaysInfo(e); return i && i.overdue; }).length;
-            var offeneCount = eintraege.filter(function(e) { return e.status === 'offen'; }).length;
-            var gesamtOffen = eintraege.filter(function(e) { return e.status === 'offen'; }).reduce(function(s,e) { return s + (e.bruttoBetrag || 0); }, 0);
-            var gesamtBezahlt = eintraege.filter(function(e) { return e.status === 'bezahlt'; }).reduce(function(s,e) { return s + (e.bruttoBetrag || 0); }, 0);
+            // ══ Statistiken ══
+            var stats = React.useMemo(function() {
+                var offen = 0, offenCount = 0, bezahlt = 0, bezahltCount = 0, ueberfaelligCount = 0, gesamtNetto = 0, gesamtBrutto = 0, gesamtMwst = 0;
+                eintraege.forEach(function(e) {
+                    if (e.status === 'storniert' || e.status === 'gutschrift') return;
+                    gesamtNetto += (e.nettoBetrag || 0);
+                    gesamtMwst += (e.mwstBetrag || 0);
+                    gesamtBrutto += (e.bruttoBetrag || 0);
+                    if (e.status === 'bezahlt') { bezahlt += (e.bruttoBetrag || 0); bezahltCount++; }
+                    if (e.status === 'offen' || e.status === 'teilbezahlt' || e.status === 'gemahnt' || e.status === 'ueberfaellig' || e.status === 'inkasso') {
+                        offen += (e.restbetrag != null ? e.restbetrag : e.bruttoBetrag || 0); offenCount++;
+                    }
+                    var di = getDaysInfo(e);
+                    if (di && di.overdue) ueberfaelligCount++;
+                });
+                return { offen: offen, offenCount: offenCount, bezahlt: bezahlt, bezahltCount: bezahltCount, ueberfaelligCount: ueberfaelligCount, gesamtNetto: gesamtNetto, gesamtBrutto: gesamtBrutto, gesamtMwst: gesamtMwst };
+            }, [eintraege]);
 
-            // ── Eintrag bearbeiten ──
-            var startEdit = function(entry) {
-                setEditId(entry.id);
-                setEditData(Object.assign({}, entry));
+            // ══ Monats-Summen fuer Druckansicht ══
+            var monatsSummen = React.useMemo(function() {
+                var sum = { netto: 0, mwst: 0, brutto: 0, count: 0 };
+                filtered.forEach(function(e) {
+                    if (e.status !== 'storniert' && e.status !== 'gutschrift') {
+                        sum.netto += (e.nettoBetrag || 0);
+                        sum.mwst += (e.mwstBetrag || 0);
+                        sum.brutto += (e.bruttoBetrag || 0);
+                        sum.count++;
+                    }
+                });
+                return sum;
+            }, [filtered]);
+
+            // ══ Sortierung ══
+            var handleSort = function(field) {
+                if (sortField === field) { setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }
+                else { setSortField(field); setSortDir('asc'); }
             };
+            var sortIcon = function(field) {
+                if (sortField !== field) return ' \u2195';
+                return sortDir === 'asc' ? ' \u2191' : ' \u2193';
+            };
+
+            // ══ Aktionen ══
+            var startEdit = function(entry) { setEditId(entry.id); setEditData(Object.assign({}, entry)); };
             var saveEdit = function() {
-                var updated = eintraege.map(function(e) { return e.id === editId ? Object.assign({}, editData) : e; });
+                var d = Object.assign({}, editData);
+                // Auto-Berechnung MwSt + Brutto
+                if (d.nettoBetrag && d.mwstSatz) {
+                    d.mwstBetrag = Math.round((d.nettoBetrag * d.mwstSatz / 100) * 100) / 100;
+                    d.bruttoBetrag = Math.round((d.nettoBetrag + d.mwstBetrag) * 100) / 100;
+                }
+                // Faelligkeit berechnen
+                if (d.datum && d.zahlungszielTage) {
+                    var dd = new Date(d.datum);
+                    dd.setDate(dd.getDate() + parseInt(d.zahlungszielTage));
+                    d.faelligkeitsDatum = dd.toISOString().split('T')[0];
+                }
+                // Restbetrag
+                d.restbetrag = d.bruttoBetrag - (d.zahlungsSumme || 0);
+                if (d.restbetrag <= 0 && d.zahlungsSumme > 0) d.status = 'bezahlt';
+                d.geaendertAm = new Date().toISOString();
+                var updated = eintraege.map(function(e) { return e.id === editId ? d : e; });
                 saveEintraege(updated);
-                setEditId(null);
-                setEditData({});
+                setEditId(null); setEditData({});
             };
             var cancelEdit = function() { setEditId(null); setEditData({}); };
 
-            // ── Eintrag löschen ──
             var deleteEntry = function(id) {
-                if (!confirm('Rechnung wirklich aus dem Ausgangsbuch löschen?')) return;
+                if (!confirm('Eintrag wirklich loeschen? (GoBD: Stornierung ist empfohlen statt Loeschung)')) return;
                 saveEintraege(eintraege.filter(function(e) { return e.id !== id; }));
             };
 
-            // ── Status ändern ──
             var changeStatus = function(id, newStatus) {
                 var updated = eintraege.map(function(e) {
                     if (e.id !== id) return e;
-                    var upd = Object.assign({}, e, { status: newStatus });
+                    var upd = Object.assign({}, e, { status: newStatus, geaendertAm: new Date().toISOString() });
                     if (newStatus === 'bezahlt' && !upd.zahlungsDatum) upd.zahlungsDatum = today;
-                    if (newStatus === 'bezahlt' && !upd.zahlungsBetrag) upd.zahlungsBetrag = upd.bruttoBetrag;
+                    if (newStatus === 'bezahlt') { upd.zahlungsSumme = upd.bruttoBetrag; upd.restbetrag = 0; }
+                    if (newStatus === 'gemahnt') upd.mahnStufe = Math.min((upd.mahnStufe || 0) + 1, 4);
                     return upd;
                 });
                 saveEintraege(updated);
             };
 
-            // ── Manueller Eintrag ──
             var addManualEntry = function() {
+                var lfdNr = eintraege.length + 1;
                 var newEntry = {
                     id: 'RE_' + Date.now(),
-                    rechnungsNr: '',
+                    lfdNr: lfdNr,
+                    dokumentNr: '', rechnungsNr: '',
+                    dokumentTyp: 'einzel', dokumentLabel: 'Rechnung',
                     typ: 'Rechnung',
-                    datum: today,
+                    datum: today, leistungsdatum: '',
+                    kundeName: kunde ? (kunde.auftraggeber || kunde.name || '') : '',
                     kunde: kunde ? (kunde.auftraggeber || kunde.name || '') : '',
+                    kundeTyp: 'b2b',
                     bauvorhaben: kunde ? (kunde.adresse || kunde.baumassnahme || '') : '',
-                    nettoBetrag: 0,
-                    mwstBetrag: 0,
-                    mwstSatz: settings.standardMwst,
-                    bruttoBetrag: 0,
+                    auftragsnummer: '',
+                    nettoBetrag: 0, mwstSatz: settings.standardMwst, mwstBetrag: 0, bruttoBetrag: 0,
                     zahlungszielTage: settings.standardZahlungsziel,
-                    zahlungszielDatum: '',
-                    zahlbetrag: 0,
+                    faelligkeitsDatum: '',
+                    skontoProzent: settings.standardSkonto,
+                    skontoTage: settings.standardSkontoTage,
                     status: 'offen',
-                    zahlungsDatum: null,
+                    mahnStufe: 0,
+                    zahlungsDatum: null, zahlungsSumme: 0, restbetrag: 0,
                     notiz: '',
-                    erstelltAm: new Date().toISOString()
+                    erstelltAm: new Date().toISOString(),
+                    geaendertAm: new Date().toISOString()
                 };
-                var updated = [newEntry, ...eintraege];
+                var updated = [newEntry].concat(eintraege);
                 saveEintraege(updated);
                 startEdit(newEntry);
             };
 
-            // ═══ UMSATZANALYSE ═══
+            // ══ Drucken ══
+            var handleDrucken = function() {
+                setShowDruckansicht(true);
+                setTimeout(function() { window.print(); }, 300);
+            };
+
+            // ══ EDIT-FORMULAR (Modal) ══
+            var renderEditForm = function() {
+                var d = editData;
+                var set = function(key, val) {
+                    setEditData(function(prev) {
+                        var n = Object.assign({}, prev);
+                        n[key] = val;
+                        // Auto-Berechnung bei Aenderung von Netto oder MwSt
+                        if (key === 'nettoBetrag' || key === 'mwstSatz') {
+                            var netto = key === 'nettoBetrag' ? parseFloat(val) || 0 : (n.nettoBetrag || 0);
+                            var satz = key === 'mwstSatz' ? parseFloat(val) || 0 : (n.mwstSatz || 19);
+                            n.mwstBetrag = Math.round(netto * satz / 100 * 100) / 100;
+                            n.bruttoBetrag = Math.round((netto + n.mwstBetrag) * 100) / 100;
+                        }
+                        // Faelligkeit bei Datum/Zahlungsziel-Aenderung
+                        if (key === 'datum' || key === 'zahlungszielTage') {
+                            var dat = key === 'datum' ? val : n.datum;
+                            var tage = key === 'zahlungszielTage' ? parseInt(val) || 30 : parseInt(n.zahlungszielTage) || 30;
+                            if (dat) {
+                                var dd = new Date(dat);
+                                dd.setDate(dd.getDate() + tage);
+                                n.faelligkeitsDatum = dd.toISOString().split('T')[0];
+                            }
+                        }
+                        return n;
+                    });
+                };
+                var iStyle = { width:'100%', padding:'8px 10px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'13px', boxSizing:'border-box' };
+                var fields = [
+                    { key:'dokumentNr', label:'Rechnungsnummer', type:'text' },
+                    { key:'dokumentLabel', label:'Typ (z.B. 2. Abschlagsrechnung)', type:'text' },
+                    { key:'datum', label:'Rechnungsdatum', type:'date' },
+                    { key:'leistungsdatum', label:'Leistungsdatum/-zeitraum', type:'text' },
+                    { key:'kundeName', label:'Kunde', type:'text' },
+                    { key:'kundeTyp', label:'Kundentyp', type:'select', options: [
+                        { v:'b2b', l:'B2B (Unternehmer)' }, { v:'b2c', l:'B2C (Privatkunde)' }, { v:'b2g', l:'B2G (Oeffentl. Auftraggeber)' }
+                    ]},
+                    { key:'bauvorhaben', label:'Objekt / Bauvorhaben', type:'text' },
+                    { key:'auftragsnummer', label:'Auftragsnummer / Kostenstelle', type:'text' },
+                    { key:'nettoBetrag', label:'Nettobetrag (EUR)', type:'text', isNum:true },
+                    { key:'mwstSatz', label:'MwSt-Satz (%)', type:'text', isNum:true },
+                    { key:'mwstBetrag', label:'MwSt-Betrag (EUR) — auto', type:'text', isNum:true, disabled:true },
+                    { key:'bruttoBetrag', label:'Bruttobetrag (EUR) — auto', type:'text', isNum:true, disabled:true },
+                    { key:'zahlungszielTage', label:'Zahlungsziel (Tage)', type:'text', isNum:true },
+                    { key:'faelligkeitsDatum', label:'Faelligkeitsdatum — auto', type:'date', disabled:true },
+                    { key:'skontoProzent', label:'Skonto (%)', type:'text', isNum:true },
+                    { key:'skontoTage', label:'Skonto-Frist (Tage)', type:'text', isNum:true },
+                    { key:'status', label:'Status', type:'select', options: Object.keys(STATUS).map(function(k) { return { v:k, l:STATUS[k].label }; }) },
+                    { key:'mahnStufe', label:'Mahnstufe', type:'select', options: [0,1,2,3,4].map(function(i) { return { v:i, l:MAHNSTUFEN[i].label }; }) },
+                    { key:'zahlungsDatum', label:'Zahlung eingegangen am', type:'date' },
+                    { key:'zahlungsSumme', label:'Gezahlter Betrag (EUR)', type:'text', isNum:true },
+                    { key:'notiz', label:'Bemerkung / Notiz', type:'text' }
+                ];
+
+                return (
+                    <div className="modal-overlay" style={{zIndex:4000}} onClick={cancelEdit}>
+                        <div style={{width:'95%', maxWidth:'560px', maxHeight:'90vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', padding:'20px', boxSizing:'border-box'}} onClick={function(e) { e.stopPropagation(); }}>
+                            <div style={{fontWeight:'700', fontSize:'16px', marginBottom:'16px', fontFamily:'Oswald', textTransform:'uppercase', letterSpacing:'1px', color:'var(--text-primary)'}}>Eintrag bearbeiten</div>
+                            {fields.map(function(f) {
+                                if (f.type === 'select') {
+                                    return (
+                                        <div key={f.key} style={{marginBottom:'8px'}}>
+                                            <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block', marginBottom:'2px'}}>{f.label}</label>
+                                            <select value={d[f.key] != null ? d[f.key] : ''} onChange={function(e) { set(f.key, f.isNum ? parseInt(e.target.value) : e.target.value); }} style={iStyle}>
+                                                {f.options.map(function(o) { return <option key={o.v} value={o.v}>{o.l}</option>; })}
+                                            </select>
+                                        </div>
+                                    );
+                                }
+                                return (
+                                    <div key={f.key} style={{marginBottom:'8px'}}>
+                                        <label style={{fontSize:'10px', color: f.disabled ? 'var(--accent-blue)' : 'var(--text-muted)', display:'block', marginBottom:'2px'}}>{f.label}</label>
+                                        <input type={f.type} inputMode={f.isNum ? 'decimal' : undefined}
+                                            value={d[f.key] != null ? d[f.key] : ''} disabled={f.disabled}
+                                            onChange={function(e) { set(f.key, f.isNum ? parseFloat(e.target.value) || 0 : e.target.value); }}
+                                            style={Object.assign({}, iStyle, f.disabled ? {opacity:0.7, fontWeight:'600', color:'var(--accent-blue)'} : {})} />
+                                    </div>
+                                );
+                            })}
+                            <div style={{display:'flex', gap:'8px', marginTop:'16px'}}>
+                                <button onClick={saveEdit} style={{flex:1, padding:'12px', background:'var(--success)', color:'white', border:'none', borderRadius:'10px', fontSize:'14px', fontWeight:'700', cursor:'pointer', fontFamily:'Oswald', textTransform:'uppercase', letterSpacing:'1px'}}>Speichern</button>
+                                <button onClick={cancelEdit} style={{flex:1, padding:'12px', background:'var(--bg-tertiary)', color:'var(--text-secondary)', border:'1px solid var(--border-subtle)', borderRadius:'10px', fontSize:'14px', cursor:'pointer'}}>Abbrechen</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // ══ ANALYSE-PANEL ══
             var renderAnalyse = function() {
-                // Nach Monat gruppieren
                 var monatsUmsaetze = {};
                 eintraege.forEach(function(e) {
                     if (e.status === 'storniert') return;
-                    var monat = (e.datum || '').substring(0, 7); // YYYY-MM
+                    var monat = (e.datum || '').substring(0, 7);
                     if (!monat) return;
-                    if (!monatsUmsaetze[monat]) monatsUmsaetze[monat] = { netto: 0, brutto: 0, count: 0, bezahlt: 0 };
+                    if (!monatsUmsaetze[monat]) monatsUmsaetze[monat] = { netto:0, mwst:0, brutto:0, count:0, bezahlt:0, offen:0 };
                     monatsUmsaetze[monat].netto += (e.nettoBetrag || 0);
+                    monatsUmsaetze[monat].mwst += (e.mwstBetrag || 0);
                     monatsUmsaetze[monat].brutto += (e.bruttoBetrag || 0);
                     monatsUmsaetze[monat].count++;
                     if (e.status === 'bezahlt') monatsUmsaetze[monat].bezahlt += (e.bruttoBetrag || 0);
+                    else monatsUmsaetze[monat].offen += (e.bruttoBetrag || 0);
                 });
                 var monate = Object.keys(monatsUmsaetze).sort().reverse();
-                var maxBrutto = Math.max.apply(null, monate.map(function(m) { return monatsUmsaetze[m].brutto; }).concat([1]));
+                var monatsnamen = ['', 'Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
-                // Quartale
-                var quartale = {};
-                monate.forEach(function(m) {
-                    var parts = m.split('-');
-                    var q = 'Q' + Math.ceil(parseInt(parts[1]) / 3) + '/' + parts[0];
-                    if (!quartale[q]) quartale[q] = { netto: 0, brutto: 0, count: 0 };
-                    quartale[q].netto += monatsUmsaetze[m].netto;
-                    quartale[q].brutto += monatsUmsaetze[m].brutto;
-                    quartale[q].count += monatsUmsaetze[m].count;
-                });
-
-                var jahresGesamt = eintraege.filter(function(e) {
-                    return e.status !== 'storniert' && (e.datum || '').startsWith(new Date().getFullYear().toString());
-                }).reduce(function(s,e) { return s + (e.nettoBetrag || 0); }, 0);
-
-                var monatsnamen = ['', 'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
-
-                return React.createElement('div', { style: { padding: '16px' } },
-                    // Jahresübersicht
-                    React.createElement('div', { style: { padding: '14px', background: 'linear-gradient(135deg, rgba(30,136,229,0.1), rgba(46,204,113,0.1))', borderRadius: '12px', marginBottom: '16px', textAlign: 'center' } },
-                        React.createElement('div', { style: { fontSize: '11px', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase' } }, 'Jahresumsatz ' + new Date().getFullYear() + ' (netto)'),
-                        React.createElement('div', { style: { fontSize: '28px', fontWeight: '700', color: 'var(--success)', marginTop: '4px' } }, fmt(jahresGesamt) + ' €')
-                    ),
-                    // Monats-Balkendiagramm
-                    React.createElement('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '8px' } }, '📊 Monatsumsätze (brutto)'),
-                    monate.slice(0, 12).map(function(m) {
-                        var d = monatsUmsaetze[m];
-                        var pct = maxBrutto > 0 ? (d.brutto / maxBrutto * 100) : 0;
-                        var parts = m.split('-');
-                        var label = monatsnamen[parseInt(parts[1])] + ' ' + parts[0];
-                        return React.createElement('div', { key: m, style: { marginBottom: '6px' } },
-                            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' } },
-                                React.createElement('span', null, label + ' (' + d.count + ' RE)'),
-                                React.createElement('span', { style: { fontWeight: '700' } }, fmt(d.brutto) + ' €')
-                            ),
-                            React.createElement('div', { style: { height: '14px', background: 'var(--bg-tertiary)', borderRadius: '7px', overflow: 'hidden' } },
-                                React.createElement('div', { style: { height: '100%', width: pct + '%', borderRadius: '7px', background: 'linear-gradient(90deg, #1E88E5, #27ae60)', transition: 'width 0.3s' } })
-                            )
-                        );
-                    }),
-                    // Quartale
-                    Object.keys(quartale).length > 0 && React.createElement('div', { style: { marginTop: '16px' } },
-                        React.createElement('div', { style: { fontWeight: '700', fontSize: '13px', marginBottom: '8px' } }, '📈 Quartalsumsätze'),
-                        Object.keys(quartale).sort().reverse().map(function(q) {
-                            return React.createElement('div', { key: q, style: { display: 'flex', justifyContent: 'space-between', padding: '6px 10px', borderBottom: '1px solid var(--border-subtle)', fontSize: '12px' } },
-                                React.createElement('span', { style: { fontWeight: '600' } }, q + ' (' + quartale[q].count + ' RE)'),
-                                React.createElement('span', null, 'Netto: ' + fmt(quartale[q].netto) + ' € · Brutto: ' + fmt(quartale[q].brutto) + ' €')
-                            );
-                        })
-                    )
+                return (
+                    <div style={{padding:'16px', background:'var(--bg-secondary)', borderRadius:'12px', marginBottom:'12px'}}>
+                        <div style={{fontWeight:'700', fontSize:'14px', marginBottom:'12px', fontFamily:'Oswald', textTransform:'uppercase', letterSpacing:'1px'}}>Umsatzanalyse</div>
+                        <div style={{overflowX:'auto'}}>
+                            <table style={{width:'100%', borderCollapse:'collapse', fontSize:'12px'}}>
+                                <thead>
+                                    <tr style={{borderBottom:'2px solid var(--border-subtle)'}}>
+                                        <th style={{textAlign:'left', padding:'6px 8px', fontWeight:'700', color:'var(--text-muted)', fontSize:'10px', textTransform:'uppercase'}}>Monat</th>
+                                        <th style={{textAlign:'center', padding:'6px 4px', fontWeight:'700', color:'var(--text-muted)', fontSize:'10px'}}>Anz.</th>
+                                        <th style={{textAlign:'right', padding:'6px 8px', fontWeight:'700', color:'var(--text-muted)', fontSize:'10px'}}>Netto</th>
+                                        <th style={{textAlign:'right', padding:'6px 8px', fontWeight:'700', color:'var(--text-muted)', fontSize:'10px'}}>MwSt</th>
+                                        <th style={{textAlign:'right', padding:'6px 8px', fontWeight:'700', color:'var(--text-muted)', fontSize:'10px'}}>Brutto</th>
+                                        <th style={{textAlign:'right', padding:'6px 8px', fontWeight:'700', color:'var(--success)', fontSize:'10px'}}>Bezahlt</th>
+                                        <th style={{textAlign:'right', padding:'6px 8px', fontWeight:'700', color:'var(--accent-orange)', fontSize:'10px'}}>Offen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {monate.map(function(m) {
+                                        var d = monatsUmsaetze[m];
+                                        var parts = m.split('-');
+                                        var label = monatsnamen[parseInt(parts[1])] + ' ' + parts[0];
+                                        return (
+                                            <tr key={m} style={{borderBottom:'1px solid var(--border-subtle)'}}>
+                                                <td style={{padding:'6px 8px', fontWeight:'600'}}>{label}</td>
+                                                <td style={{padding:'6px 4px', textAlign:'center'}}>{d.count}</td>
+                                                <td style={{padding:'6px 8px', textAlign:'right', fontFamily:'monospace'}}>{fmt(d.netto)}</td>
+                                                <td style={{padding:'6px 8px', textAlign:'right', fontFamily:'monospace', color:'var(--text-muted)'}}>{fmt(d.mwst)}</td>
+                                                <td style={{padding:'6px 8px', textAlign:'right', fontFamily:'monospace', fontWeight:'600'}}>{fmt(d.brutto)}</td>
+                                                <td style={{padding:'6px 8px', textAlign:'right', fontFamily:'monospace', color:'var(--success)'}}>{fmt(d.bezahlt)}</td>
+                                                <td style={{padding:'6px 8px', textAlign:'right', fontFamily:'monospace', color: d.offen > 0 ? 'var(--accent-orange)' : 'var(--text-muted)'}}>{fmt(d.offen)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 );
             };
 
-            // ═══ EINSTELLUNGEN ═══
+            // ══ EINSTELLUNGEN ══
             var renderSettings = function() {
                 var s = Object.assign({}, settings);
-                var update = function(key, val) { var n = Object.assign({}, s); n[key] = val; saveSettings(n); };
-                var iStyle = { width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' };
-                return React.createElement('div', { style: { padding: '16px' } },
-                    React.createElement('div', { style: { fontWeight: '700', fontSize: '14px', marginBottom: '12px' } }, '⚙️ Einstellungen'),
-                    [
-                        { key: 'standardZahlungsziel', label: 'Standard-Zahlungsziel (Tage)', type: 'text', isNum: true },
-                        { key: 'standardMwst', label: 'Standard MwSt-Satz (%)', type: 'text', isNum: true },
-                        { key: 'standardSkonto', label: 'Standard Skonto (%)', type: 'text', isNum: true },
-                        { key: 'standardSkontoTage', label: 'Standard Skonto-Frist (Tage)', type: 'text', isNum: true },
-                        { key: 'alarmTageVorher', label: 'Alarm X Tage vor Zahlungsziel', type: 'text', isNum: true },
-                    ].map(function(field) {
-                        return React.createElement('div', { key: field.key, style: { marginBottom: '10px' } },
-                            React.createElement('label', { style: { fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' } }, field.label),
-                            React.createElement('input', {
-                                type: field.type, inputMode: field.isNum ? "numeric" : undefined, value: settings[field.key] || '',
-                                onChange: function(e) { update(field.key, field.isNum ? parseFloat(e.target.value) || 0 : e.target.value); },
-                                style: iStyle
-                            })
-                        );
-                    })
-                );
-            };
-
-            // ═══ STATUS-FARBEN ═══
-            var statusColors = { offen: '#f39c12', bezahlt: '#27ae60', gemahnt: '#e74c3c', storniert: '#7f8c8d' };
-            var statusLabels = { offen: 'Offen', bezahlt: 'Bezahlt', gemahnt: 'Gemahnt', storniert: 'Storniert' };
-
-            // ═══ EDIT-FORMULAR ═══
-            var renderEditForm = function() {
-                var d = editData;
-                var set = function(key, val) { setEditData(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
-                var iStyle = { width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' };
-                return React.createElement('div', { className: 'modal-overlay', style: { zIndex: 4000 } },
-                    React.createElement('div', { style: { width: '95%', maxWidth: '500px', maxHeight: '90vh', overflow: 'auto', background: 'var(--bg-primary)', borderRadius: '16px', padding: '20px' } },
-                        React.createElement('div', { style: { fontWeight: '700', fontSize: '15px', marginBottom: '16px' } }, '✏️ Eintrag bearbeiten'),
-                        [
-                            { key: 'rechnungsNr', label: 'Rechnungsnummer', type: 'text' },
-                            { key: 'typ', label: 'Rechnungstyp', type: 'text' },
-                            { key: 'datum', label: 'Rechnungsdatum', type: 'date' },
-                            { key: 'kunde', label: 'Kunde', type: 'text' },
-                            { key: 'bauvorhaben', label: 'Bauvorhaben', type: 'text' },
-                            { key: 'nettoBetrag', label: 'Netto (€)', type: 'text', isNum: true },
-                            { key: 'mwstSatz', label: 'MwSt (%)', type: 'text', isNum: true },
-                            { key: 'bruttoBetrag', label: 'Brutto (€)', type: 'text', isNum: true },
-                            { key: 'zahlungszielTage', label: 'Zahlungsziel (Tage)', type: 'text', isNum: true },
-                            { key: 'zahlungszielDatum', label: 'Zahlungsziel Datum', type: 'date' },
-                            { key: 'status', label: 'Status', type: 'select', options: ['offen', 'bezahlt', 'gemahnt', 'storniert'] },
-                            { key: 'zahlungsDatum', label: 'Zahlung eingegangen am', type: 'date' },
-                            { key: 'zahlungsBetrag', label: 'Zahlungsbetrag (€)', type: 'text', isNum: true },
-                            { key: 'notiz', label: 'Notiz', type: 'text' },
-                        ].map(function(f) {
-                            if (f.type === 'select') {
-                                return React.createElement('div', { key: f.key, style: { marginBottom: '8px' } },
-                                    React.createElement('label', { style: { fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' } }, f.label),
-                                    React.createElement('select', { value: d[f.key] || '', onChange: function(e) { set(f.key, e.target.value); }, style: iStyle },
-                                        f.options.map(function(o) { return React.createElement('option', { key: o, value: o }, statusLabels[o] || o); })
-                                    )
-                                );
-                            }
-                            return React.createElement('div', { key: f.key, style: { marginBottom: '8px' } },
-                                React.createElement('label', { style: { fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' } }, f.label),
-                                React.createElement('input', {
-                                    type: f.type, inputMode: f.isNum ? "numeric" : undefined, value: d[f.key] != null ? d[f.key] : '',
-                                    onChange: function(e) { set(f.key, f.isNum ? parseFloat(e.target.value) || 0 : e.target.value); },
-                                    style: iStyle
-                                })
+                var upd = function(key, val) { var n = Object.assign({}, s); n[key] = val; saveSettings(n); };
+                var iStyle = { width:'100%', padding:'8px 10px', background:'var(--bg-tertiary)', border:'1px solid var(--border-subtle)', borderRadius:'8px', color:'var(--text-primary)', fontSize:'13px', boxSizing:'border-box' };
+                var flds = [
+                    { k:'standardZahlungsziel', l:'Standard-Zahlungsziel (Tage)', num:true },
+                    { k:'standardMwst', l:'Standard MwSt-Satz (%)', num:true },
+                    { k:'standardSkonto', l:'Standard Skonto (%)', num:true },
+                    { k:'standardSkontoTage', l:'Standard Skonto-Frist (Tage)', num:true },
+                    { k:'alarmTageVorher', l:'Alarm X Tage vor Faelligkeit', num:true },
+                    { k:'steuernummer', l:'Steuernummer', num:false },
+                    { k:'ustIdNr', l:'USt-IdNr.', num:false },
+                    { k:'basiszinssatz', l:'Aktueller Basiszinssatz (%)', num:true }
+                ];
+                return (
+                    <div style={{padding:'16px', background:'var(--bg-secondary)', borderRadius:'12px', marginBottom:'12px'}}>
+                        <div style={{fontWeight:'700', fontSize:'14px', marginBottom:'12px', fontFamily:'Oswald', textTransform:'uppercase', letterSpacing:'1px'}}>Einstellungen</div>
+                        {flds.map(function(f) {
+                            return (
+                                <div key={f.k} style={{marginBottom:'8px'}}>
+                                    <label style={{fontSize:'10px', color:'var(--text-muted)', display:'block', marginBottom:'2px'}}>{f.l}</label>
+                                    <input type="text" inputMode={f.num ? 'decimal' : undefined} value={settings[f.k] || ''}
+                                        onChange={function(e) { upd(f.k, f.num ? parseFloat(e.target.value) || 0 : e.target.value); }} style={iStyle} />
+                                </div>
                             );
-                        }),
-                        React.createElement('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } },
-                            React.createElement('button', { onClick: saveEdit, style: { flex: 1, padding: '10px', background: 'var(--success)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' } }, '💾 Speichern'),
-                            React.createElement('button', { onClick: cancelEdit, style: { flex: 1, padding: '10px', background: 'var(--bg-tertiary)', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)', borderRadius: '10px', fontSize: '13px', cursor: 'pointer' } }, 'Abbrechen')
-                        )
-                    )
+                        })}
+                    </div>
                 );
             };
 
-            // ═══ HAUPTANSICHT ═══
+            // ══ STATUS-BADGE ══
+            var StatusBadge = function(props) {
+                var st = STATUS[props.status] || STATUS.offen;
+                return <span style={{padding:'2px 8px', borderRadius:'6px', fontSize:'10px', fontWeight:'700', background:st.bg, color:st.farbe, whiteSpace:'nowrap'}}>{st.label}</span>;
+            };
+
+            // ══ HAUPTANSICHT (Tabelle) ══
+            var thStyle = {
+                padding:'8px 6px', fontWeight:'700', fontSize:'10px', textTransform:'uppercase',
+                letterSpacing:'0.5px', color:'var(--text-muted)', borderBottom:'2px solid var(--border-subtle)',
+                position:'sticky', top:0, background:'var(--bg-primary)', cursor:'pointer',
+                userSelect:'none', whiteSpace:'nowrap', zIndex:2
+            };
+            var tdStyle = { padding:'7px 6px', fontSize:'11px', borderBottom:'1px solid var(--border-subtle)', verticalAlign:'top' };
+
             return (
-                <div className="page-container" style={{padding:'16px', minHeight:'100vh'}}>
-                    {/* Header */}
-                    <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px'}}>
-                        <button onClick={onBack} style={{background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'var(--text-primary)'}}>←</button>
+                <div className="page-container" style={{padding:'12px 10px', minHeight:'100vh'}}>
+                    {/* ══ HEADER ══ */}
+                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px'}} className="no-print">
+                        <button onClick={onBack} style={{background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'var(--text-primary)', padding:'4px'}}>&#8592;</button>
                         <div style={{flex:1}}>
-                            <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>📒 Rechnungsausgangsbuch</div>
-                            <div style={{fontSize:'11px', color:'var(--text-muted)'}}>{eintraege.length} Einträge · {fmt(gesamtOffen)} € offen</div>
+                            <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)', fontFamily:'Oswald', textTransform:'uppercase', letterSpacing:'1px'}}>Rechnungsausgangsbuch</div>
+                            <div style={{fontSize:'11px', color:'var(--text-muted)'}}>{eintraege.length} Eintraege  |  {fmt(stats.offen)} EUR offen  |  {stats.ueberfaelligCount > 0 ? stats.ueberfaelligCount + ' ueberfaellig!' : 'keine ueberfaellig'}</div>
                         </div>
-                        <button onClick={function() { setShowAnalyse(!showAnalyse); setShowSettings(false); }} style={{padding:'6px 10px', background: showAnalyse ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: showAnalyse ? 'white' : 'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer'}}>📊</button>
-                        <button onClick={function() { setShowSettings(!showSettings); setShowAnalyse(false); }} style={{padding:'6px 10px', background: showSettings ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: showSettings ? 'white' : 'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'11px', fontWeight:'600', cursor:'pointer'}}>⚙️</button>
+                        <button onClick={handleDrucken} style={{padding:'6px 10px', background:'var(--bg-tertiary)', color:'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'18px', cursor:'pointer'}} title="Drucken">&#128424;</button>
+                        <button onClick={function() { setShowAnalyse(!showAnalyse); setShowSettings(false); }} style={{padding:'6px 10px', background: showAnalyse ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: showAnalyse ? 'white' : 'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'18px', cursor:'pointer'}} title="Analyse">&#128202;</button>
+                        <button onClick={function() { setShowSettings(!showSettings); setShowAnalyse(false); }} style={{padding:'6px 10px', background: showSettings ? 'var(--accent-blue)' : 'var(--bg-tertiary)', color: showSettings ? 'white' : 'var(--text-secondary)', border:'none', borderRadius:'8px', fontSize:'18px', cursor:'pointer'}} title="Einstellungen">&#9881;</button>
                     </div>
 
-                    {/* Alarm-Banner */}
-                    {ueberfaelligeCount > 0 && (
-                        <div style={{padding:'10px 14px', marginBottom:'12px', background:'rgba(231,76,60,0.12)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer'}}
+                    {/* ══ ALARM-BANNER ══ */}
+                    {stats.ueberfaelligCount > 0 && (
+                        <div className="no-print" style={{padding:'10px 14px', marginBottom:'10px', background:'rgba(231,76,60,0.12)', border:'1px solid rgba(231,76,60,0.3)', borderRadius:'10px', display:'flex', alignItems:'center', gap:'10px', cursor:'pointer'}}
                             onClick={function() { setFilterStatus('ueberfaellig'); }}>
-                            <span style={{fontSize:'20px'}}>🚨</span>
+                            <span style={{fontSize:'18px'}}>&#128680;</span>
                             <div>
-                                <div style={{fontWeight:'700', fontSize:'13px', color:'var(--accent-red-light)'}}>{ueberfaelligeCount} überfällige Rechnung{ueberfaelligeCount > 1 ? 'en' : ''}!</div>
-                                <div style={{fontSize:'11px', color:'var(--text-muted)'}}>Zahlungsziel überschritten -- Klicken zum Filtern</div>
+                                <div style={{fontWeight:'700', fontSize:'13px', color:'#e74c3c'}}>{stats.ueberfaelligCount} ueberfaellige Rechnung{stats.ueberfaelligCount > 1 ? 'en' : ''}!</div>
+                                <div style={{fontSize:'10px', color:'var(--text-muted)'}}>Zahlungsziel ueberschritten — Klicken zum Filtern</div>
                             </div>
                         </div>
                     )}
 
-                    {/* Statistik-Karten */}
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'6px', marginBottom:'12px'}}>
-                        <div style={{padding:'8px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
-                            <div style={{fontSize:'18px', fontWeight:'700', color:'var(--accent-orange-light)'}}>{offeneCount}</div>
-                            <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Offen</div>
-                        </div>
-                        <div style={{padding:'8px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
-                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--accent-red-light)'}}>{fmt(gesamtOffen)}€</div>
-                            <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Ausstehend</div>
-                        </div>
-                        <div style={{padding:'8px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
-                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--success)'}}>{fmt(gesamtBezahlt)}€</div>
-                            <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Bezahlt</div>
-                        </div>
-                    </div>
-
-                    {/* Settings / Analyse Panel */}
-                    {showSettings && renderSettings()}
-                    {showAnalyse && renderAnalyse()}
-
-                    {/* Filter-Tabs + Neuer Eintrag */}
-                    <div style={{display:'flex', gap:'4px', marginBottom:'10px', flexWrap:'wrap', alignItems:'center'}}>
-                        {['alle', 'offen', 'ueberfaellig', 'bezahlt', 'gemahnt', 'storniert'].map(function(f) {
-                            var label = f === 'ueberfaellig' ? '⚠ Überfällig' : f === 'alle' ? 'Alle' : (statusLabels[f] || f);
-                            return React.createElement('button', {
-                                key: f, onClick: function() { setFilterStatus(f); },
-                                style: {
-                                    padding: '4px 10px', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                                    background: filterStatus === f ? 'var(--accent-blue)' : 'var(--bg-tertiary)',
-                                    color: filterStatus === f ? 'white' : 'var(--text-muted)'
-                                }
-                            }, label);
-                        })}
-                        <button onClick={addManualEntry} style={{marginLeft:'auto', padding:'4px 10px', background:'var(--success)', color:'white', border:'none', borderRadius:'6px', fontSize:'11px', fontWeight:'700', cursor:'pointer'}}>+ Neu</button>
-                    </div>
-
-                    {/* Rechnungsliste */}
-                    <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-                        {filtered.length === 0 && (
-                            <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px'}}>
-                                {eintraege.length === 0 ? 'Noch keine Rechnungen im Ausgangsbuch.\nErstelle eine Rechnung im Rechnungsmodul -- sie wird automatisch hier gespeichert!' : 'Keine Einträge für diesen Filter.'}
-                            </div>
-                        )}
-                        {filtered.map(function(entry) {
-                            var daysInfo = getDaysInfo(entry);
-                            var isOverdue = daysInfo && daysInfo.overdue;
-                            var isWarning = daysInfo && daysInfo.warning;
-                            var borderColor = isOverdue ? '#e74c3c' : isWarning ? '#f39c12' : 'var(--border-subtle)';
-
-                            return React.createElement('div', {
-                                key: entry.id,
-                                style: {
-                                    padding: '10px 12px', borderRadius: '10px', border: '1px solid ' + borderColor,
-                                    background: isOverdue ? 'rgba(231,76,60,0.06)' : isWarning ? 'rgba(243,156,18,0.06)' : 'var(--bg-secondary)',
-                                    position: 'relative'
-                                }
-                            },
-                                // Zeile 1: Nr + Typ + Status
-                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } },
-                                    React.createElement('div', { style: { fontWeight: '700', fontSize: '13px', color: 'var(--accent-blue)' } }, entry.rechnungsNr || '–'),
-                                    React.createElement('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } },
-                                        isOverdue && React.createElement('span', { style: { fontSize: '10px', color: '#e74c3c', fontWeight: '700' } }, Math.abs(daysInfo.days) + 'T überfällig!'),
-                                        isWarning && React.createElement('span', { style: { fontSize: '10px', color: '#f39c12', fontWeight: '700' } }, 'Fällig in ' + daysInfo.days + 'T'),
-                                        React.createElement('span', { style: {
-                                            padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: '700',
-                                            background: (statusColors[entry.status] || '#999') + '22', color: statusColors[entry.status] || '#999'
-                                        } }, statusLabels[entry.status] || entry.status)
-                                    )
-                                ),
-                                // Zeile 2: Kunde + Betrag
-                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '3px' } },
-                                    React.createElement('span', { style: { color: 'var(--text-secondary)' } }, (entry.typ || '') + ' · ' + (entry.kunde || '').substring(0, 30)),
-                                    React.createElement('span', { style: { fontWeight: '700', color: 'var(--text-primary)' } }, fmt(entry.bruttoBetrag) + ' €')
-                                ),
-                                // Zeile 3: Datum + Zahlungsziel
-                                React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' } },
-                                    React.createElement('span', null, 'Datum: ' + (entry.datum || '–') + (entry.bauvorhaben ? ' · ' + entry.bauvorhaben.substring(0, 25) : '')),
-                                    React.createElement('span', null, 'Ziel: ' + (entry.zahlungszielDatum || '–'))
-                                ),
-                                // Zeile 4: Aktionen
-                                React.createElement('div', { style: { display: 'flex', gap: '4px', marginTop: '6px', flexWrap: 'wrap' } },
-                                    entry.status === 'offen' && React.createElement('button', {
-                                        onClick: function() { changeStatus(entry.id, 'bezahlt'); },
-                                        style: { padding: '3px 8px', background: 'rgba(46,204,113,0.15)', color: '#27ae60', border: 'none', borderRadius: '5px', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }
-                                    }, '✓ Bezahlt'),
-                                    entry.status === 'offen' && isOverdue && React.createElement('button', {
-                                        onClick: function() { changeStatus(entry.id, 'gemahnt'); },
-                                        style: { padding: '3px 8px', background: 'rgba(231,76,60,0.15)', color: '#e74c3c', border: 'none', borderRadius: '5px', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }
-                                    }, '⚠ Gemahnt'),
-                                    React.createElement('button', {
-                                        onClick: function() { startEdit(entry); },
-                                        style: { padding: '3px 8px', background: 'var(--bg-tertiary)', color: 'var(--text-muted)', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }
-                                    }, '✏️'),
-                                    React.createElement('button', {
-                                        onClick: function() { deleteEntry(entry.id); },
-                                        style: { padding: '3px 8px', background: 'var(--bg-tertiary)', color: '#e74c3c', border: 'none', borderRadius: '5px', fontSize: '10px', cursor: 'pointer' }
-                                    }, '🗑️')
-                                )
+                    {/* ══ STATISTIK-KARTEN ══ */}
+                    <div className="no-print" style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:'6px', marginBottom:'10px'}}>
+                        {[
+                            { label:'Offen', val:stats.offenCount, color:'#f39c12' },
+                            { label:'Ausstehend', val:fmt(stats.offen) + ' EUR', color:'#e74c3c', small:true },
+                            { label:'Bezahlt', val:fmt(stats.bezahlt) + ' EUR', color:'#27ae60', small:true },
+                            { label:'Gesamt Netto', val:fmt(stats.gesamtNetto) + ' EUR', color:'#1E88E5', small:true }
+                        ].map(function(c, i) {
+                            return (
+                                <div key={i} style={{padding:'8px 6px', background:'var(--bg-secondary)', borderRadius:'10px', textAlign:'center'}}>
+                                    <div style={{fontSize: c.small ? '12px' : '18px', fontWeight:'700', color:c.color, fontFamily:'monospace'}}>{c.val}</div>
+                                    <div style={{fontSize:'9px', color:'var(--text-muted)', marginTop:'2px'}}>{c.label}</div>
+                                </div>
                             );
                         })}
                     </div>
 
-                    {/* Edit Modal */}
+                    {showSettings && renderSettings()}
+                    {showAnalyse && renderAnalyse()}
+
+                    {/* ══ FILTER-LEISTE ══ */}
+                    <div className="no-print" style={{display:'flex', gap:'4px', marginBottom:'8px', flexWrap:'wrap', alignItems:'center'}}>
+                        {['alle', 'offen', 'ueberfaellig', 'teilbezahlt', 'gemahnt', 'bezahlt', 'storniert'].map(function(f) {
+                            var label = f === 'ueberfaellig' ? 'Ueberfaellig' : f === 'alle' ? 'Alle' : (STATUS[f] ? STATUS[f].label : f);
+                            return <button key={f} onClick={function() { setFilterStatus(f); }}
+                                style={{padding:'4px 8px', border:'none', borderRadius:'6px', fontSize:'10px', fontWeight:'600', cursor:'pointer',
+                                    background: filterStatus === f ? 'var(--accent-blue)' : 'var(--bg-tertiary)',
+                                    color: filterStatus === f ? 'white' : 'var(--text-muted)'}}>{label}</button>;
+                        })}
+                        <select value={filterMonat} onChange={function(e) { setFilterMonat(e.target.value); }}
+                            style={{padding:'4px 8px', border:'1px solid var(--border-subtle)', borderRadius:'6px', fontSize:'10px', background:'var(--bg-tertiary)', color:'var(--text-primary)', cursor:'pointer'}}>
+                            <option value="alle">Alle Monate</option>
+                            {verfuegbareMonate.map(function(m) {
+                                var p = m.split('-'); var mn = ['','Jan','Feb','Mar','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+                                return <option key={m} value={m}>{mn[parseInt(p[1])]} {p[0]}</option>;
+                            })}
+                        </select>
+                        <input type="text" placeholder="Suche..." value={suchText} onChange={function(e) { setSuchText(e.target.value); }}
+                            style={{padding:'4px 8px', border:'1px solid var(--border-subtle)', borderRadius:'6px', fontSize:'10px', background:'var(--bg-tertiary)', color:'var(--text-primary)', flex:1, minWidth:'80px'}} />
+                        <button onClick={addManualEntry} style={{padding:'4px 10px', background:'var(--success)', color:'white', border:'none', borderRadius:'6px', fontSize:'10px', fontWeight:'700', cursor:'pointer', whiteSpace:'nowrap'}}>+ Neu</button>
+                    </div>
+
+                    {/* ══ DRUCK-HEADER (nur beim Drucken sichtbar) ══ */}
+                    <div className="print-only" style={{display:'none', marginBottom:'16px', textAlign:'center'}}>
+                        <div style={{fontSize:'16px', fontWeight:'700'}}>Rechnungsausgangsbuch</div>
+                        <div style={{fontSize:'12px'}}>{settings.firmenname}</div>
+                        {settings.steuernummer && <div style={{fontSize:'10px'}}>St.-Nr.: {settings.steuernummer}</div>}
+                        <div style={{fontSize:'10px', marginTop:'4px'}}>
+                            {filterMonat !== 'alle' ? 'Monat: ' + filterMonat : 'Alle Zeitraeume'} | Erstellt: {fmtDatum(today)} | {filtered.length} Eintraege
+                        </div>
+                    </div>
+
+                    {/* ══ HAUPTTABELLE ══ */}
+                    <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+                        <table className="ab-table" style={{width:'100%', borderCollapse:'collapse', minWidth:'900px'}}>
+                            <thead>
+                                <tr>
+                                    <th style={Object.assign({}, thStyle, {width:'30px', textAlign:'center'})} onClick={function() { handleSort('lfdNr'); }}>Nr.{sortIcon('lfdNr')}</th>
+                                    <th style={Object.assign({}, thStyle, {width:'90px'})} onClick={function() { handleSort('datum'); }}>Datum{sortIcon('datum')}</th>
+                                    <th style={Object.assign({}, thStyle, {width:'100px'})} onClick={function() { handleSort('dokumentNr'); }}>RE-Nr.{sortIcon('dokumentNr')}</th>
+                                    <th style={Object.assign({}, thStyle, {minWidth:'120px'})} onClick={function() { handleSort('kundeName'); }}>Kunde{sortIcon('kundeName')}</th>
+                                    <th style={Object.assign({}, thStyle, {minWidth:'100px'})}>Objekt</th>
+                                    <th style={Object.assign({}, thStyle, {width:'80px', textAlign:'right'})} onClick={function() { handleSort('nettoBetrag'); }}>Netto{sortIcon('nettoBetrag')}</th>
+                                    <th style={Object.assign({}, thStyle, {width:'50px', textAlign:'right'})}>MwSt</th>
+                                    <th style={Object.assign({}, thStyle, {width:'85px', textAlign:'right'})} onClick={function() { handleSort('bruttoBetrag'); }}>Brutto{sortIcon('bruttoBetrag')}</th>
+                                    <th style={Object.assign({}, thStyle, {width:'75px', textAlign:'center'})}>Zahlungsziel</th>
+                                    <th style={Object.assign({}, thStyle, {width:'65px', textAlign:'center'})}>Status</th>
+                                    <th style={Object.assign({}, thStyle, {width:'65px', textAlign:'center'})}>Mahnung</th>
+                                    <th style={Object.assign({}, thStyle, {width:'60px', textAlign:'center'})} className="no-print">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filtered.length === 0 && (
+                                    <tr><td colSpan="12" style={{padding:'30px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px'}}>
+                                        {eintraege.length === 0 ? 'Noch keine Eintraege. Erstelle eine Rechnung im Rechnungsmodul oder klicke + Neu.' : 'Keine Eintraege fuer diesen Filter.'}
+                                    </td></tr>
+                                )}
+                                {filtered.map(function(entry, idx) {
+                                    var daysInfo = getDaysInfo(entry);
+                                    var isOverdue = daysInfo && daysInfo.overdue;
+                                    var isWarning = daysInfo && daysInfo.warning;
+                                    var rowBg = isOverdue ? 'rgba(231,76,60,0.06)' : isWarning ? 'rgba(243,156,18,0.04)' : (idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)');
+                                    var mahnstufe = MAHNSTUFEN[entry.mahnStufe || 0] || MAHNSTUFEN[0];
+                                    var verzug = isOverdue ? berechneVerzugszinsen(entry) : 0;
+                                    var kundenName = entry.kundeName || entry.kunde || '--';
+                                    var reNr = entry.dokumentNr || entry.rechnungsNr || '--';
+
+                                    return (
+                                        <tr key={entry.id} style={{background:rowBg}}>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'center', color:'var(--text-muted)', fontSize:'10px'})}>{entry.lfdNr || idx + 1}</td>
+                                            <td style={Object.assign({}, tdStyle, {whiteSpace:'nowrap'})}>
+                                                <div style={{fontWeight:'600'}}>{fmtDatum(entry.datum)}</div>
+                                                {entry.dokumentLabel && <div style={{fontSize:'9px', color:'var(--text-muted)'}}>{entry.dokumentLabel}</div>}
+                                            </td>
+                                            <td style={Object.assign({}, tdStyle, {fontWeight:'700', color:'var(--accent-blue)'})}>{reNr}</td>
+                                            <td style={tdStyle}>
+                                                <div style={{fontWeight:'600', fontSize:'11px'}}>{kundenName.length > 25 ? kundenName.substring(0, 25) + '...' : kundenName}</div>
+                                                {entry.kundeTyp && <div style={{fontSize:'9px', color:'var(--text-muted)'}}>{entry.kundeTyp === 'b2b' ? 'Unternehmer' : entry.kundeTyp === 'b2c' ? 'Privat' : 'Oeffentl.'}</div>}
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <div style={{fontSize:'10px', color:'var(--text-secondary)'}}>{(entry.bauvorhaben || '--').substring(0, 30)}</div>
+                                                {entry.auftragsnummer && <div style={{fontSize:'9px', color:'var(--text-muted)'}}>Auftr: {entry.auftragsnummer}</div>}
+                                            </td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'right', fontFamily:'monospace', fontWeight:'600'})}>{fmt(entry.nettoBetrag)}</td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'right', fontFamily:'monospace', fontSize:'10px', color:'var(--text-muted)'})}>{entry.mwstSatz || 19}%</td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'right', fontFamily:'monospace', fontWeight:'700'})}>{fmt(entry.bruttoBetrag)}</td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'center'})}>
+                                                <div style={{fontSize:'10px', fontWeight: isOverdue ? '700' : '400', color: isOverdue ? '#e74c3c' : isWarning ? '#f39c12' : 'var(--text-secondary)'}}>
+                                                    {fmtDatum(entry.faelligkeitsDatum || entry.zahlungszielDatum)}
+                                                </div>
+                                                {daysInfo && (
+                                                    <div style={{fontSize:'9px', fontWeight:'700', color: isOverdue ? '#e74c3c' : '#f39c12'}}>
+                                                        {isOverdue ? Math.abs(daysInfo.days) + 'T ueberfaellig' : daysInfo.warning ? 'in ' + daysInfo.days + 'T' : ''}
+                                                    </div>
+                                                )}
+                                                {verzug > 0 && <div style={{fontSize:'8px', color:'#c0392b'}}>Zinsen: {fmt(verzug)}</div>}
+                                            </td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'center'})}><StatusBadge status={entry.status} /></td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'center'})}>
+                                                {(entry.mahnStufe || 0) > 0 ? (
+                                                    <span style={{fontSize:'10px', fontWeight:'700', color:mahnstufe.farbe}}>{mahnstufe.label}</span>
+                                                ) : (
+                                                    <span style={{fontSize:'10px', color:'var(--text-muted)'}}>--</span>
+                                                )}
+                                            </td>
+                                            <td style={Object.assign({}, tdStyle, {textAlign:'center'})} className="no-print">
+                                                <div style={{display:'flex', gap:'3px', justifyContent:'center', flexWrap:'wrap'}}>
+                                                    {(entry.status === 'offen' || entry.status === 'teilbezahlt') && (
+                                                        <button onClick={function() { changeStatus(entry.id, 'bezahlt'); }}
+                                                            style={{padding:'2px 5px', background:'rgba(46,204,113,0.15)', color:'#27ae60', border:'none', borderRadius:'4px', fontSize:'9px', fontWeight:'600', cursor:'pointer'}} title="Als bezahlt markieren">&#10003;</button>
+                                                    )}
+                                                    {isOverdue && entry.status !== 'bezahlt' && (
+                                                        <button onClick={function() { changeStatus(entry.id, 'gemahnt'); }}
+                                                            style={{padding:'2px 5px', background:'rgba(231,76,60,0.15)', color:'#e74c3c', border:'none', borderRadius:'4px', fontSize:'9px', fontWeight:'600', cursor:'pointer'}} title="Mahnstufe erhoehen">M</button>
+                                                    )}
+                                                    <button onClick={function() { startEdit(entry); }}
+                                                        style={{padding:'2px 5px', background:'var(--bg-tertiary)', color:'var(--text-muted)', border:'none', borderRadius:'4px', fontSize:'9px', cursor:'pointer'}} title="Bearbeiten">&#9998;</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                            {/* ══ SUMMENZEILE ══ */}
+                            {filtered.length > 0 && (
+                                <tfoot>
+                                    <tr style={{borderTop:'2px solid var(--border-subtle)', fontWeight:'700'}}>
+                                        <td colSpan="5" style={{padding:'8px 6px', fontSize:'11px', textAlign:'right', color:'var(--text-secondary)'}}>
+                                            Summe ({monatsSummen.count} Rechnungen):
+                                        </td>
+                                        <td style={{padding:'8px 6px', textAlign:'right', fontFamily:'monospace', fontSize:'12px', color:'var(--text-primary)'}}>{fmt(monatsSummen.netto)}</td>
+                                        <td style={{padding:'8px 6px', textAlign:'right', fontFamily:'monospace', fontSize:'10px', color:'var(--text-muted)'}}></td>
+                                        <td style={{padding:'8px 6px', textAlign:'right', fontFamily:'monospace', fontSize:'12px', fontWeight:'700', color:'var(--text-primary)'}}>{fmt(monatsSummen.brutto)}</td>
+                                        <td colSpan="4"></td>
+                                    </tr>
+                                    <tr>
+                                        <td colSpan="5" style={{padding:'4px 6px', fontSize:'10px', textAlign:'right', color:'var(--text-muted)'}}>
+                                            davon MwSt:
+                                        </td>
+                                        <td colSpan="2"></td>
+                                        <td style={{padding:'4px 6px', textAlign:'right', fontFamily:'monospace', fontSize:'10px', color:'var(--text-muted)'}}>{fmt(monatsSummen.mwst)}</td>
+                                        <td colSpan="4"></td>
+                                    </tr>
+                                </tfoot>
+                            )}
+                        </table>
+                    </div>
+
+                    {/* ══ DRUCK-FUSSNOTE (nur beim Drucken) ══ */}
+                    <div className="print-only" style={{display:'none', marginTop:'20px', paddingTop:'10px', borderTop:'1px solid #ccc', fontSize:'9px', color:'#666'}}>
+                        <div>{settings.firmenname} | {settings.steuernummer ? 'St.-Nr.: ' + settings.steuernummer : ''} {settings.ustIdNr ? '| USt-IdNr.: ' + settings.ustIdNr : ''}</div>
+                        <div>Basiszinssatz: {getBasiszins(today)}% (Stand {settings.basiszinssatzStand || today}) | Verzugszins B2B: {(getBasiszins(today) + 9).toFixed(2)}% | Verzugszins B2C: {(getBasiszins(today) + 5).toFixed(2)}%</div>
+                        <div style={{marginTop:'4px'}}>Dieses Ausgangsbuch wurde elektronisch erstellt. Aufbewahrungsfrist: 10 Jahre (HGB/AO). GoBD-konform gefuehrt.</div>
+                    </div>
+
+                    {/* ══ DRUCK-STYLES ══ */}
+                    <style dangerouslySetInnerHTML={{__html: `
+                        @media print {
+                            body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                            .no-print { display: none !important; }
+                            .print-only { display: block !important; }
+                            .page-container { padding: 0 !important; min-height: auto !important; background: white !important; }
+                            .ab-table { min-width: auto !important; font-size: 9px !important; }
+                            .ab-table th { position: static !important; background: #f5f5f5 !important; color: #333 !important; border-bottom: 2px solid #333 !important; font-size: 8px !important; padding: 4px 3px !important; }
+                            .ab-table td { color: #222 !important; border-bottom: 1px solid #ccc !important; padding: 3px 3px !important; font-size: 9px !important; }
+                            .ab-table tfoot td { border-top: 2px solid #333 !important; color: #222 !important; }
+                            .ab-table tr { background: transparent !important; }
+                            .ab-table tr:nth-child(even) { background: #f9f9f9 !important; }
+                            @page { margin: 10mm 8mm; size: landscape; }
+                        }
+                    `}} />
+
+                    {/* ══ Edit Modal ══ */}
                     {editId && renderEditForm()}
                 </div>
             );
