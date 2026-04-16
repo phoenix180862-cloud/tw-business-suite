@@ -6686,6 +6686,21 @@
                 };
             };
 
+            // ══════════════════════════════════════════════════════════
+            // AUTO-SAVE-TRIGGER — auch bei Foto-/Raum-Aenderungen feuern
+            // ══════════════════════════════════════════════════════════
+            // Der zentrale Auto-Save in tw-app.jsx reagiert nur auf
+            // app-weite States. Wenn der Benutzer im Aufmass-Modul aber
+            // Fotos aufnimmt oder Raumdaten eingibt, aendern sich nur
+            // modul-interne States. Deshalb triggern wir hier zusaetzlich
+            // den AutoSave.markDirty() — der Debounce (~1.5 s) verhindert
+            // trotzdem, dass bei schneller Eingabe zu oft gespeichert wird.
+            React.useEffect(function() {
+                if (window.TW && window.TW.AutoSave) {
+                    window.TW.AutoSave.markDirty({ ts: Date.now(), src: 'aufmass-inner' });
+                }
+            }, [phasenFotos, objektFotos, posCards, wandMasse, raumName, masse, tueren, fenster, abzuege]);
+
             // ── Listener einmal registrieren, nutzt Ref fuer immer aktuellen State ──
             React.useEffect(function() {
                 if (!window.TW || !window.TW.on) return;

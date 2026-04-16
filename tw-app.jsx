@@ -1,3 +1,56 @@
+        // ═══════════════════════════════════════════════════════════
+        // AUTO-SAVE STATUS-INDIKATOR
+        // ═══════════════════════════════════════════════════════════
+        // Kleine Komponente in der Navigationsleiste, die dem Benutzer
+        // jederzeit auf einen Blick zeigt, ob seine letzten Aenderungen
+        // gesichert sind. Ersetzt den frueheren roten "Speich."-Button.
+        // Farben: grau=idle, orange=pending/saving, gruen=saved, rot=error.
+        // ═══════════════════════════════════════════════════════════
+        function AutoSaveStatusIndicator() {
+            const [status, setStatus] = useState('idle');
+            const [lastSavedAt, setLastSavedAt] = useState(null);
+            const [, forceTick] = useState(0);
+
+            useEffect(function() {
+                if (!window.TW || !window.TW.AutoSave) return;
+                var unsub = window.TW.AutoSave.onStatusChange(function(s, at) {
+                    setStatus(s);
+                    if (at) setLastSavedAt(at);
+                });
+                // Ticker alle 20 s damit "vor X Sek." aktualisiert wird
+                var tick = setInterval(function() { forceTick(function(v){ return v+1; }); }, 20000);
+                return function() { if (unsub) unsub(); clearInterval(tick); };
+            }, []);
+
+            var label, bg, tip;
+            if (status === 'saving' || status === 'pending') {
+                label = 'Speichert';
+                bg = 'linear-gradient(135deg, #f39c12, #e67e22)';
+                tip = 'Aenderungen werden im Hintergrund gesichert';
+            } else if (status === 'error') {
+                label = 'Fehler';
+                bg = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                tip = 'Letzter Speicherversuch ist fehlgeschlagen';
+            } else if (lastSavedAt) {
+                var secs = Math.max(0, Math.floor((Date.now() - (new Date(lastSavedAt)).getTime())/1000));
+                var t = secs < 60 ? (secs + 's') : (Math.floor(secs/60) + 'm');
+                label = 'OK ' + t;
+                bg = 'linear-gradient(135deg, #27ae60, #1e8449)';
+                tip = 'Alle Aenderungen sind lokal gesichert (vor ' + t + ')';
+            } else {
+                label = 'Auto';
+                bg = 'linear-gradient(135deg, #7f8c8d, #555)';
+                tip = 'Auto-Speichern aktiv — alle Aenderungen werden automatisch gesichert';
+            }
+
+            return (
+                <div title={tip}
+                    style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none'}}>
+                    {label}
+                </div>
+            );
+        }
+
         function App() {
             // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser'
             const [page, setPage] = useState('start');
@@ -1436,13 +1489,21 @@
                AKTE & SPEICHERN — Bearbeitungsstand (WIP)
                ══════════════════════════════════════════════════ */
 
-            // ── "Speichern"-Button Handler ──
-            window._akteSpeichernHandler = function() {
-                if (!selectedKunde) { alert('Bitte zuerst einen Kunden w\u00e4hlen.'); return; }
+            // ══════════════════════════════════════════════════════════
+            // ZENTRALE SPEICHER-FUNKTION (leise, ohne Popups)
+            //
+            // Sammelt den aktuellen Zustand des aktiven Moduls und
+            // schreibt ihn via TWStorage.saveWip in die lokale IndexedDB.
+            // Wird sowohl vom alten Akten-Opener (manuell) als auch vom
+            // AutoSaveManager (automatisch via Debounce + Visibility)
+            // aufgerufen.
+            // ══════════════════════════════════════════════════════════
+            var _collectAndSaveWip = function(opts) {
+                if (!selectedKunde) return Promise.resolve(null);
                 var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
                 var modulName = PAGE_TO_MODUL[page];
-                if (!modulName) { alert('Auf dieser Seite gibt es nichts zu speichern.'); return; }
-                if (!window.TWStorage || !window.TWStorage.isReady()) { alert('Speicher nicht bereit.'); return; }
+                if (!modulName) return Promise.resolve(null);
+                if (!window.TWStorage || !window.TWStorage.isReady()) return Promise.resolve(null);
 
                 // State vom aktiven Modul einsammeln via Event-Bus
                 var stateData = null;
@@ -1453,7 +1514,7 @@
                     });
                 }
 
-                // Fallback: Basis-Daten aus App-State (fuer Module ohne Listener)
+                // Fallback: Basis-Daten aus App-State
                 if (!stateData) {
                     stateData = {
                         moduleState: {
@@ -1461,23 +1522,46 @@
                             importResult: importResult || null,
                             fertigeRaeume: fertigeRaeume || [],
                             selectedPositions: selectedPositions || [],
-                            aufmassGespeichert: aufmassGespeichert
+                            aufmassGespeichert: aufmassGespeichert,
+                            lastPage: page
                         },
                         meta: {
-                            beschreibung: MODUL_LABELS[modulName] + ' (Basis-Daten)',
-                            icon: MODUL_ICONS[modulName] || '\uD83D\uDCBE'
+                            beschreibung: (MODUL_LABELS[modulName] || modulName) + ' (Auto-Save)',
+                            icon: MODUL_ICONS[modulName] || '\uD83D\uDCBE',
+                            autoSaved: true
                         }
                     };
                 }
 
-                TWStorage.saveWip(kundeId, modulName, stateData.moduleState, page, stateData.meta)
-                    .then(function() {
-                        setAkteSaveToast('Gespeichert!');
-                        setTimeout(function() { setAkteSaveToast(null); }, 2000);
-                    })
-                    .catch(function(err) {
-                        alert('Speichern fehlgeschlagen: ' + err.message);
+                return TWStorage.saveWip(kundeId, modulName, stateData.moduleState, page, stateData.meta);
+            };
+
+            // AutoSaveManager mit dieser Funktion verdrahten
+            useEffect(function() {
+                if (window.TW && window.TW.AutoSave) {
+                    window.TW.AutoSave.setSaveFunction(function() {
+                        return _collectAndSaveWip();
                     });
+                }
+                // Kein Cleanup noetig: die Funktion wird bei jedem Render
+                // neu registriert und referenziert die aktuellen State-Closures.
+            });
+
+            // Auto-Save-Trigger: Bei JEDER relevanten State-Aenderung wird
+            // der Debounce-Timer neu gestartet (nach 1.5 s Ruhe wird gespeichert).
+            useEffect(function() {
+                if (!selectedKunde) return;
+                var modulName = PAGE_TO_MODUL[page];
+                if (!modulName) return;
+                if (!window.TW || !window.TW.AutoSave) return;
+                window.TW.AutoSave.markDirty({ ts: Date.now() });
+            }, [gesamtliste, importResult, fertigeRaeume, selectedPositions, aufmassGespeichert, selectedKunde, page]);
+
+            // ── "Speichern"-Handler (manueller Trigger — falls doch jemand klickt) ──
+            // Der rote Button ist entfernt, aber der Handler bleibt fuer
+            // andere Module (z.B. Akten-Dialog) verfuegbar. Keine Popups mehr.
+            window._akteSpeichernHandler = function() {
+                return _collectAndSaveWip();
             };
 
             // ── "Akte"-Button Handler ──
@@ -1525,6 +1609,56 @@
                     }
                 }, 300);
             };
+
+            // ══════════════════════════════════════════════════════════
+            // AUTO-WIEDERHERSTELLUNG beim Kundenwechsel
+            // ══════════════════════════════════════════════════════════
+            // Sobald ein Kunde ausgewaehlt wird, pruefen wir still, ob es
+            // einen unbeendeten Bearbeitungsstand gibt. Wenn ja, wird er
+            // automatisch wiederhergestellt — ohne Popup, ohne Nachfrage.
+            // Der Benutzer landet exakt auf der Seite, wo er zuletzt war,
+            // mit allen eingegebenen Daten. Waehrend des Restores wird der
+            // Auto-Save kurz unterdrueckt, damit keine Endlosschleife
+            // entsteht.
+            // ══════════════════════════════════════════════════════════
+            const [autoRestoreToast, setAutoRestoreToast] = useState(null);
+            const _lastRestoredKundeId = React.useRef(null);
+
+            useEffect(function() {
+                if (!selectedKunde) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                if (!kundeId) return;
+                if (_lastRestoredKundeId.current === kundeId) return; // schon geprueft
+                if (!window.TWStorage || !window.TWStorage.isReady()) return;
+
+                _lastRestoredKundeId.current = kundeId;
+
+                TWStorage.listWips(kundeId).then(function(wips) {
+                    if (!wips || wips.length === 0) return;
+                    // Neuesten WIP nehmen (listWips sortiert bereits absteigend)
+                    var latest = wips[0];
+                    if (!latest || !latest.id) return;
+                    // Vollstaendigen WIP-Datensatz mit moduleState laden
+                    return TWStorage.loadWip(kundeId, latest.modulName).then(function(wip) {
+                        if (!wip || !wip.moduleState) return;
+                        // Waehrend des Restores Auto-Save unterdruecken
+                        if (window.TW && window.TW.AutoSave) {
+                            window.TW.AutoSave.suppress(true);
+                            setTimeout(function() {
+                                window.TW.AutoSave.suppress(false);
+                            }, 2000);
+                        }
+                        handleWipRestore(wip);
+                        // Freundlicher Hinweis
+                        var savedDate = new Date(latest.savedAt);
+                        var dStr = savedDate.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+                        setAutoRestoreToast('Letzter Bearbeitungsstand vom ' + dStr + ' wiederhergestellt');
+                        setTimeout(function() { setAutoRestoreToast(null); }, 5000);
+                    });
+                }).catch(function(e) {
+                    console.warn('[Auto-Restore] Fehler:', e);
+                });
+            }, [selectedKunde]);
 
             // ── App-Datei oeffnen (PDF, HTML etc.) ──
             var handleOpenAppDatei = function(dateiId) {
@@ -1778,10 +1912,8 @@
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', opacity:0.55, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
                                 Akte
                             </button>
-                            <button onClick={function(){ if (window._akteSpeichernHandler) window._akteSpeichernHandler(); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', opacity:0.55, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
-                                Speich.
-                            </button>
+                            {/* AUTO-SAVE-STATUS-INDIKATOR (ersetzt den frueheren manuellen Speich.-Button) */}
+                            <AutoSaveStatusIndicator />
                         </div>
                     )}
 
@@ -1931,6 +2063,13 @@
                     {akteSaveToast && (
                         <div style={{position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'#27ae60', color:'#fff', padding:'10px 24px', borderRadius:'12px', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'8px', animation:'fadeIn 0.2s ease'}}>
                             <span style={{fontSize:'18px'}}>\u2713</span> {akteSaveToast}
+                        </div>
+                    )}
+
+                    {/* ═══ AUTO-WIEDERHERSTELLUNG TOAST ═══ */}
+                    {autoRestoreToast && (
+                        <div style={{position:'fixed', bottom:'130px', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', padding:'12px 28px', borderRadius:'12px', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'10px', maxWidth:'90vw', textAlign:'center'}}>
+                            <span style={{fontSize:'18px'}}>\u21BA</span> {autoRestoreToast}
                         </div>
                     )}
 

@@ -17,7 +17,7 @@
     'use strict';
 
     var DB_NAME = 'TWBusinessSuite';
-    var DB_VERSION = 5;
+    var DB_VERSION = 6;
     var _db = null;
     var _ready = false;
     var _readyCallbacks = [];
@@ -67,7 +67,8 @@
         appDateien:     { keyPath: 'id', indices: ['kundeId', 'ordnerName', 'docType', 'updatedAt', 'deviceId'] },
         syncLog:        { keyPath: 'id', indices: ['kundeId', 'action', 'deviceId', 'syncedAt', 'updatedAt'] },
         wip:            { keyPath: 'id', indices: ['kundeId', 'modulName', 'savedAt', 'deviceId'] },
-        ausgangsbuch:   { keyPath: 'id', indices: ['kundeId', 'status', 'datum', 'updatedAt'] }
+        ausgangsbuch:   { keyPath: 'id', indices: ['kundeId', 'status', 'datum', 'updatedAt'] },
+        fotos:          { keyPath: 'id', indices: ['kundeId', 'kontext', 'raumKey', 'driveUploaded', 'createdAt', 'updatedAt'] }
     };
 
     // ================================================================
@@ -332,8 +333,217 @@
     }
 
     // ================================================================
-    // AUSGANGSBUCH — IndexedDB statt localStorage
+    // FOTO-STORE — Bilder als Blobs in IndexedDB (persistent, effizient)
     // ================================================================
+    //
+    // Architektur-Gedanke: Fotos werden NICHT mehr als Base64 im React-State
+    // gehalten, sondern als Blobs in einem dedizierten Store. Der Aufmass-
+    // Datensatz enthaelt nur noch die Foto-ID als Referenz. Das spart ~33%
+    // Speicher gegenueber Base64 und macht Multi-Geraete-Sync moeglich.
+    //
+    // Foto-ID-Schema:
+    //   foto_<kundeId>_<kontext>_<raumKey>_<wandId>_<timestamp>
+    // Beispiel:
+    //   foto_abc123_phase_rohzustand_bad-1_wand-nord_1713275400000
+    //
+    // Felder im Foto-Record:
+    //   id           — eindeutige Foto-ID
+    //   kundeId      — zugeordneter Kunde
+    //   kontext      — 'phase' | 'objekt' | 'wand' | 'ki' | 'sonstige'
+    //   raumKey      — Raum-Identifier (z.B. Raumname oder Raum-ID)
+    //   subKey       — spezifischer Key innerhalb des Kontexts (z.B. Wand-ID, Phase)
+    //   blob         — das eigentliche Bild (JPEG-Blob)
+    //   meta         — Zeitstempel, Markierungen, Zuschnitt-Info, Phase, etc.
+    //   driveUploaded— 0/1: bereits in Drive hochgeladen?
+    //   driveFileId  — Drive-Datei-ID nach Upload (fuer spaetere Aktualisierung)
+    //   createdAt    — wann aufgenommen
+    //   updatedAt    — letzte Aenderung (z.B. bei Markierungen)
+    // ================================================================
+
+    // Hilfs-Funktion: Ein Bild auf vernuenftige Baustellen-Groesse komprimieren
+    // (max 1920px lange Kante, JPEG Qualitaet 0.85 — spart ~70-90% vs. Original)
+    function compressImageToBlob(dataUrlOrBlob, maxEdge, quality) {
+        maxEdge = maxEdge || 1920;
+        quality = (typeof quality === 'number') ? quality : 0.85;
+        return new Promise(function(resolve, reject) {
+            var img = new Image();
+            img.onload = function() {
+                try {
+                    var w = img.naturalWidth || img.width;
+                    var h = img.naturalHeight || img.height;
+                    var scale = 1;
+                    if (w > maxEdge || h > maxEdge) {
+                        scale = (w > h) ? (maxEdge / w) : (maxEdge / h);
+                    }
+                    var cw = Math.round(w * scale);
+                    var ch = Math.round(h * scale);
+                    var canvas = document.createElement('canvas');
+                    canvas.width = cw;
+                    canvas.height = ch;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, cw, ch);
+                    canvas.toBlob(function(blob) {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Canvas.toBlob fehlgeschlagen'));
+                    }, 'image/jpeg', quality);
+                } catch(e) { reject(e); }
+            };
+            img.onerror = function() { reject(new Error('Bild konnte nicht geladen werden')); };
+            if (typeof dataUrlOrBlob === 'string') {
+                img.src = dataUrlOrBlob;
+            } else if (dataUrlOrBlob instanceof Blob) {
+                img.src = URL.createObjectURL(dataUrlOrBlob);
+            } else {
+                reject(new Error('Ungueltiger Bild-Input'));
+            }
+        });
+    }
+
+    // Blob → Data-URL (fuer die Anzeige im <img src=...>)
+    function blobToDataURL(blob) {
+        return new Promise(function(resolve, reject) {
+            var r = new FileReader();
+            r.onload = function() { resolve(r.result); };
+            r.onerror = function() { reject(r.error); };
+            r.readAsDataURL(blob);
+        });
+    }
+
+    // Eindeutige Foto-ID erzeugen
+    function makeFotoId(kundeId, kontext, raumKey, subKey) {
+        var safe = function(s) { return String(s || 'x').replace(/[^a-zA-Z0-9_-]/g, '_'); };
+        return 'foto_' + safe(kundeId) + '_' + safe(kontext) + '_' +
+               safe(raumKey) + '_' + safe(subKey) + '_' + Date.now() +
+               '_' + Math.random().toString(36).substr(2, 5);
+    }
+
+    // Foto speichern (komprimiert, als Blob)
+    // fotoInput: Base64-DataURL, Blob oder File
+    // Rueckgabe: {id, dataUrl} — die dataUrl zur sofortigen Anzeige im State
+    function saveFoto(kundeId, kontext, raumKey, subKey, fotoInput, meta) {
+        if (!kundeId) return Promise.reject(new Error('kundeId fehlt'));
+        var id = (meta && meta.id) || makeFotoId(kundeId, kontext, raumKey, subKey);
+        return compressImageToBlob(fotoInput, 1920, 0.85).then(function(blob) {
+            var record = {
+                id: id,
+                kundeId: String(kundeId),
+                kontext: kontext || 'sonstige',
+                raumKey: raumKey || '',
+                subKey: subKey || '',
+                blob: blob,
+                size: blob.size,
+                mimeType: 'image/jpeg',
+                meta: meta || {},
+                driveUploaded: 0,
+                driveFileId: null,
+                createdAt: (meta && meta.createdAt) || new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            return putItem('fotos', record).then(function() {
+                logSyncAction(kundeId, 'foto_save', kontext + '/' + raumKey + '/' + subKey, id, '');
+                return blobToDataURL(blob).then(function(dataUrl) {
+                    return { id: id, dataUrl: dataUrl, size: blob.size };
+                });
+            });
+        });
+    }
+
+    // Foto-Metadaten aktualisieren (z.B. nach Zuschneiden oder Markieren)
+    // Wenn ein neuer Blob/DataURL mitgegeben wird, wird das Bild ersetzt.
+    function updateFoto(fotoId, patch, neuesBild) {
+        return getItem('fotos', fotoId).then(function(rec) {
+            if (!rec) return null;
+            if (patch && patch.meta) rec.meta = Object.assign({}, rec.meta || {}, patch.meta);
+            if (patch && patch.subKey) rec.subKey = patch.subKey;
+            rec.updatedAt = new Date().toISOString();
+            rec.driveUploaded = 0; // bei Aenderung erneut hochladen
+            var pre = Promise.resolve(null);
+            if (neuesBild) {
+                pre = compressImageToBlob(neuesBild, 1920, 0.85).then(function(blob) {
+                    rec.blob = blob;
+                    rec.size = blob.size;
+                });
+            }
+            return pre.then(function() {
+                return putItem('fotos', rec).then(function() {
+                    logSyncAction(rec.kundeId, 'foto_update', rec.kontext, rec.id, '');
+                    return blobToDataURL(rec.blob).then(function(dataUrl) {
+                        return { id: rec.id, dataUrl: dataUrl, size: rec.size };
+                    });
+                });
+            });
+        });
+    }
+
+    // Foto als DataURL laden (zur Anzeige)
+    function loadFotoAsDataURL(fotoId) {
+        return getItem('fotos', fotoId).then(function(rec) {
+            if (!rec || !rec.blob) return null;
+            return blobToDataURL(rec.blob).then(function(dataUrl) {
+                return { id: rec.id, dataUrl: dataUrl, meta: rec.meta || {}, kontext: rec.kontext, raumKey: rec.raumKey, subKey: rec.subKey, driveUploaded: rec.driveUploaded };
+            });
+        });
+    }
+
+    // Alle Fotos eines Kunden auflisten (ohne Blobs, nur Metadaten)
+    function listFotosByKunde(kundeId) {
+        return getByIndex('fotos', 'kundeId', String(kundeId)).then(function(records) {
+            return records.map(function(r) {
+                return {
+                    id: r.id, kontext: r.kontext, raumKey: r.raumKey, subKey: r.subKey,
+                    size: r.size, meta: r.meta || {}, driveUploaded: r.driveUploaded,
+                    driveFileId: r.driveFileId, createdAt: r.createdAt, updatedAt: r.updatedAt
+                };
+            });
+        });
+    }
+
+    // Alle Fotos eines Kunden mit DataURLs laden (fuer Anzeige im UI)
+    function loadFotosByKundeAsDataURLs(kundeId) {
+        return getByIndex('fotos', 'kundeId', String(kundeId)).then(function(records) {
+            return Promise.all(records.map(function(r) {
+                return blobToDataURL(r.blob).then(function(dataUrl) {
+                    return {
+                        id: r.id, dataUrl: dataUrl, kontext: r.kontext, raumKey: r.raumKey,
+                        subKey: r.subKey, meta: r.meta || {}, size: r.size,
+                        driveUploaded: r.driveUploaded, driveFileId: r.driveFileId,
+                        createdAt: r.createdAt, updatedAt: r.updatedAt
+                    };
+                });
+            }));
+        });
+    }
+
+    // Foto loeschen
+    function deleteFoto(fotoId) {
+        return getItem('fotos', fotoId).then(function(rec) {
+            if (!rec) return false;
+            return deleteItem('fotos', fotoId).then(function() {
+                logSyncAction(rec.kundeId, 'foto_delete', rec.kontext, fotoId, '');
+                return true;
+            });
+        });
+    }
+
+    // Nicht hochgeladene Fotos eines Kunden ermitteln (fuer Hintergrund-Drive-Sync)
+    function getUnuploadedFotos(kundeId) {
+        return getByIndex('fotos', 'kundeId', String(kundeId)).then(function(records) {
+            return records.filter(function(r) { return !r.driveUploaded; });
+        });
+    }
+
+    // Markiere Foto als hochgeladen (nach erfolgreichem Drive-Upload)
+    function markFotoAsUploaded(fotoId, driveFileId) {
+        return getItem('fotos', fotoId).then(function(rec) {
+            if (!rec) return null;
+            rec.driveUploaded = 1;
+            rec.driveFileId = driveFileId || null;
+            rec.updatedAt = new Date().toISOString();
+            return putItem('fotos', rec);
+        });
+    }
+
+
     function saveAusgangsbuchEintrag(eintrag) {
         if (!eintrag || !eintrag.id) return Promise.reject('Kein Eintrag oder ID');
         eintrag.updatedAt = new Date().toISOString();
@@ -1069,6 +1279,16 @@
         logSyncAction: logSyncAction, getUnsyncedChanges: getUnsyncedChanges, markAsSynced: markAsSynced,
         // Bearbeitungsstand (WIP)
         saveWip: saveWip, loadWip: loadWip, deleteWip: deleteWip, listWips: listWips, hasWip: hasWip,
+        // Foto-Store (Blobs, persistent, Multi-Geraete-faehig)
+        saveFoto: saveFoto, updateFoto: updateFoto,
+        loadFotoAsDataURL: loadFotoAsDataURL,
+        listFotosByKunde: listFotosByKunde,
+        loadFotosByKundeAsDataURLs: loadFotosByKundeAsDataURLs,
+        deleteFoto: deleteFoto,
+        getUnuploadedFotos: getUnuploadedFotos,
+        markFotoAsUploaded: markFotoAsUploaded,
+        compressImageToBlob: compressImageToBlob,
+        blobToDataURL: blobToDataURL,
         // Ausgangsbuch (IndexedDB statt localStorage)
         saveAusgangsbuchEintrag: saveAusgangsbuchEintrag, loadAusgangsbuch: loadAusgangsbuch,
         deleteAusgangsbuchEintrag: deleteAusgangsbuchEintrag, migrateAusgangsbuchFromLocalStorage: migrateAusgangsbuchFromLocalStorage,

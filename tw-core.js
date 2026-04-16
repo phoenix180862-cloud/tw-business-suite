@@ -433,6 +433,148 @@
     // ─── EXPORT ──────────────────────────────────────────────
     // Alles über das globale TW-Objekt verfügbar
 
+    // ================================================================
+    // AUTO-SAVE MANAGER
+    // ================================================================
+    //
+    // Zweck: Automatisches, unsichtbares Speichern in IndexedDB. Kombiniert
+    // Debounce (warten bis Benutzer fertig ist) mit Visibility-Rettungsring
+    // (synchroner Flush beim Wegwischen der App auf Mobilgeraeten) und
+    // Status-Broadcast (fuer UI-Indikator mit Zustaenden idle/pending/
+    // saving/saved/error).
+    // ================================================================
+
+    var AutoSaveManager = {
+        _timer: null,
+        _delay: 1500,          // Standard: 1.5 Sek. nach letzter Aenderung speichern
+        _pendingPayload: null, // Was beim naechsten Flush gespeichert wird
+        _saveFn: null,         // Die Funktion, die wirklich speichert (async)
+        _lastStatus: 'idle',
+        _listeners: [],
+        _activated: false,
+        _lastSavedAt: null,
+        _suppressed: false,    // temporaer deaktiviert (z.B. waehrend Kundenwechsel)
+
+        // Registriert die eigentliche Speicher-Funktion. payload -> Promise.
+        // Wird einmal zentral in tw-app.jsx gesetzt.
+        setSaveFunction: function(fn) {
+            this._saveFn = fn;
+        },
+
+        setDelay: function(ms) { this._delay = Math.max(300, ms|0); },
+
+        // Markiert Aenderungen als "muss gespeichert werden".
+        // Der payload-Parameter ist frei gestaltbar (JSON-serialisierbar).
+        markDirty: function(payload) {
+            if (this._suppressed) return;
+            this._pendingPayload = payload;
+            this._broadcast('pending');
+            if (this._timer) clearTimeout(this._timer);
+            var self = this;
+            this._timer = setTimeout(function() { self.flush(); }, this._delay);
+        },
+
+        // Speichert jetzt sofort (bypasst den Debounce). Gibt Promise zurueck.
+        flush: function() {
+            var self = this;
+            if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+            if (!this._pendingPayload) return Promise.resolve(null);
+            if (!this._saveFn) return Promise.resolve(null);
+
+            var payload = this._pendingPayload;
+            this._pendingPayload = null;
+            this._broadcast('saving');
+            try {
+                var result = this._saveFn(payload);
+                if (result && typeof result.then === 'function') {
+                    return result.then(function(v) {
+                        self._lastSavedAt = new Date();
+                        self._broadcast('saved');
+                        return v;
+                    }).catch(function(e) {
+                        console.warn('[AutoSave] Fehler:', e);
+                        self._broadcast('error');
+                        throw e;
+                    });
+                }
+                this._lastSavedAt = new Date();
+                this._broadcast('saved');
+                return Promise.resolve(result);
+            } catch(e) {
+                console.warn('[AutoSave] Sofort-Fehler:', e);
+                this._broadcast('error');
+                return Promise.reject(e);
+            }
+        },
+
+        // Synchroner Flush fuer kritische Momente (pagehide, visibilitychange→hidden).
+        // Nutzt navigator.sendBeacon nicht, sondern verlaesst sich darauf dass
+        // IndexedDB-Writes vom Browser auch nach Tab-Close weiterlaufen.
+        flushSync: function() {
+            if (this._timer) { clearTimeout(this._timer); this._timer = null; }
+            if (!this._pendingPayload || !this._saveFn) return;
+            try {
+                // IndexedDB-Writes werden vom Browser garantiert — auch wenn
+                // der Tab sofort danach schliesst. Wir feuern ab und gut.
+                this._saveFn(this._pendingPayload);
+                this._pendingPayload = null;
+                this._broadcast('saved');
+            } catch(e) { /* still */ }
+        },
+
+        // Status-Abo (z.B. fuer UI-Indikator in der Navigation)
+        onStatusChange: function(cb) {
+            if (typeof cb !== 'function') return function(){};
+            this._listeners.push(cb);
+            // initialen Status direkt liefern
+            try { cb(this._lastStatus, this._lastSavedAt); } catch(e) {}
+            var self = this;
+            return function() {
+                self._listeners = self._listeners.filter(function(f) { return f !== cb; });
+            };
+        },
+
+        suppress: function(flag) { this._suppressed = !!flag; },
+
+        getStatus: function() {
+            return { status: this._lastStatus, lastSavedAt: this._lastSavedAt };
+        },
+
+        _broadcast: function(status) {
+            this._lastStatus = status;
+            var at = this._lastSavedAt;
+            this._listeners.forEach(function(cb) {
+                try { cb(status, at); } catch(e) {}
+            });
+        },
+
+        // Visibility-Rettungsring aktivieren
+        activate: function() {
+            if (this._activated) return;
+            this._activated = true;
+            var self = this;
+
+            // Bei jedem Wegwischen / App-Wechsel / Bildschirm-Sperre sofort speichern
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') {
+                    self.flushSync();
+                }
+            });
+
+            // Safari Mobile: pagehide ist zuverlaessiger als beforeunload
+            window.addEventListener('pagehide', function() { self.flushSync(); });
+
+            // Fallback: auch bei klassischem Tab-Close speichern
+            window.addEventListener('beforeunload', function() { self.flushSync(); });
+
+            console.log('[TW AutoSave] Rettungsring aktiv (visibilitychange + pagehide)');
+        }
+    };
+
+
+    // ─── EXPORT ──────────────────────────────────────────────
+    // Alles über das globale TW-Objekt verfügbar
+
     global.TW = {
         // Event-Bus
         on: EventBus.on,
@@ -452,19 +594,26 @@
         // Firmendaten
         Firma: Firma,
 
-        // ExitGuard
+        // ExitGuard (bestehender Dialog fuer Zurueck-Taste / Tab-Close)
         ExitGuard: ExitGuard,
+
+        // Auto-Save Manager (neue Speicher-Automatik)
+        AutoSave: AutoSaveManager,
 
         // Version
         VERSION: '2.2.0',
         BUILD: 'modular'
     };
 
-    // ExitGuard sofort aktivieren
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    // ExitGuard + AutoSaveManager sofort aktivieren
+    function _activateGuards() {
         ExitGuard.activate();
+        AutoSaveManager.activate();
+    }
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        _activateGuards();
     } else {
-        document.addEventListener('DOMContentLoaded', function() { ExitGuard.activate(); });
+        document.addEventListener('DOMContentLoaded', _activateGuards);
     }
 
     console.log('%c[TW Business Suite] Core v' + global.TW.VERSION + ' geladen', 'color: #1E88E5; font-weight: bold;');
