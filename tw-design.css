@@ -6360,6 +6360,38 @@
         }
 
         /* ═══════════════════════════════════════════
+           HOCHFORMAT / SCHMALE HANDYS (bis 699px)
+           Umbruch in 2 Zeilen damit Buttons lesbar bleiben
+           ═══════════════════════════════════════════ */
+        @media (max-width: 699px) {
+            /* Beide Leisten umbrechen lassen */
+            .rb-nav-red,
+            .rb-nav-blue {
+                flex-wrap: wrap !important;
+                row-gap: 4px !important;
+            }
+            /* Rote Leiste: lange Labels -> min. ~48% Breite erzwingt 2 Spalten */
+            .rb-nav-red .rb-nav-btn {
+                flex: 1 1 calc(50% - 2px);
+                min-height: 38px;
+                white-space: normal;
+                line-height: 1.15;
+                font-size: 10.5px;
+                padding: 6px 4px;
+            }
+            /* Blaue Leiste: 7 Buttons -> min. ~24% erzwingt 4er-Raster (4+3) */
+            .rb-nav-blue .rb-nav-btn {
+                flex: 1 1 calc(25% - 3px);
+                min-height: 36px;
+                white-space: normal;
+                line-height: 1.15;
+                font-size: 10px;
+                padding: 5px 3px;
+                letter-spacing: 0.2px;
+            }
+        }
+
+        /* ═══════════════════════════════════════════
            TABLET-OPTIMIERUNG (ab 700px Breite)
            Alle Elemente skalieren auf Tablet-Groesse
            ═══════════════════════════════════════════ */
