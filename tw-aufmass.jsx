@@ -4391,6 +4391,16 @@
                                      Springt OHNE Raumauswahl und OHNE Positionsauswahl direkt ins Raumblatt. */}
                                 <button
                                     onClick={function() {
+                                        // Wenn bereits ein Raum ausgewaehlt wurde (Normalfall im Modal),
+                                        // diesen ins Raumblatt uebernehmen -- ohne Positionen.
+                                        if (activeRaum) {
+                                            var raumUebernehmen = activeRaum;
+                                            setShowPosModal(false);
+                                            setActiveRaum(null);
+                                            onSelectRaum(raumUebernehmen, []);
+                                            return;
+                                        }
+                                        // Fallback (sollte im Modal praktisch nie eintreten): leerer Direkt-Raum
                                         var direktRaum = {
                                             nr: '',
                                             geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
@@ -4421,7 +4431,9 @@
                                     {'\uD83D\uDCD0'} Aufmass direkt starten
                                 </button>
                                 <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'-2px'}}>
-                                    Ohne Raumauswahl und Positionsauswahl
+                                    {activeRaum
+                                        ? ('Raum ' + (activeRaum.bez || activeRaum.nr || '') + ' uebernehmen -- ohne Positionsauswahl')
+                                        : 'Ohne Raumauswahl und Positionsauswahl'}
                                 </div>
 
                                 <button className="modal-btn secondary" style={{width:'100%'}} onClick={() => { setShowPosModal(false); setActiveRaum(null); }}>
