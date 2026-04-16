@@ -1,74 +1,65 @@
-════════════════════════════════════════════════════════════
-  TW BUSINESS SUITE — UPDATE: Blauer Button + 3-Listen-Fix
-  Erstellt am: 10.04.2026
-════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════
+  TW Business Suite — Icon-Update (Variante E: Weiße Fliese)
+  Datum: 16.04.2026
+═══════════════════════════════════════════════════════════════
 
-INHALT DIESER LIEFERUNG:
-─────────────────────────
-1. tw-app.jsx                — AKTUALISIERT (gespeichertKomplett Modus + Parser-Fix)
-2. tw-aufmass.jsx            — AKTUALISIERT (nur blauer Button, kein gruener mehr)
-3. tw-modulwahl.jsx          — AKTUALISIERT (Schnellzugriff Kundendaten + Ordner-Browser)
-4. tw-shared-components.jsx  — AKTUALISIERT (OrdnerBrowser-Komponente hinzugefuegt)
-5. INSTALL.txt               — Diese Datei
+ÜBERBLICK
+─────────
+Dieses ZIP enthält das neue Homescreen-Icon für die TW Business
+Suite. Das bisherige Icon (abgeschnittener Logo-Ausschnitt) wird
+ersetzt durch ein klares Design: weiße Fliese auf rotem Grund
+mit schwarzem "TW" und dem charakteristischen roten Punkt.
 
-WAS WURDE GEAENDERT:
-────────────────────
+Das Icon ist direkt in die index.html eingebettet (Base64) —
+keine zusätzlichen Dateien auf dem Server nötig.
 
-HAUPTAENDERUNG: Ein Button, eine Funktion
-  → Der gruene Button "Gespeicherte Daten laden" wurde ENTFERNT
-  → Der blaue Button "Kundendaten laden" ist jetzt der EINZIGE Lade-Button
-  → Er macht ALLES in einem Schritt:
-    1. Ordnerstruktur vom Kunden komplett laden
-    2. "Kunden-Daten" Unterordner finden
-    3. Excel-Listen herunterladen
-    4. Parser startet automatisch (3 Listen: Stammdaten, Positionen, Raeume)
-    5. Daten werden fuer alle Module bereitgestellt
-    6. Navigation zur Daten-Uebersicht (zum Pruefen)
-    7. Von dort weiter zur Modulwahl
 
-FIX: 3 Listen werden wieder korrekt geladen
-  → Die bewaehrte Parser-Logik aus der funktionierenden Version
-  → Korrekte Navigation: Akte → Parser → Daten-Uebersicht → Modulwahl
-  → IndexedDB + localStorage Speicherung wie vorher
+ENTHALTENE DATEIEN
+──────────────────
+  index.html              Frisch gebaute App mit neuem Icon
+                          → Diese Datei ersetzt die alte
+                            index.html auf GitHub Pages
 
-NEU: Ordner-Browser als Bonus-Feature
-  → Auf der Modulwahl-Seite gibt es jetzt zwei Schnellzugriff-Buttons:
-    - "Kundendaten" → Daten-Uebersicht (Listen bearbeiten)
-    - "Ordner durchsuchen" → Ordner-Browser (Dateien ansehen/oeffnen)
-  → Der Ordner-Browser zeigt alle Dateien im Kundenordner
-  → Dateien oeffnen sich per Klick direkt in Google Drive
+  index-template.html     Aktualisiertes Template
+                          → Basis für zukünftige Builds
+                          → Ersetzt die alte Version im Repo
 
-INSTALLATION:
+  TW-Icon.svg             Quelldatei des Icons (editierbar)
+                          → Nur für Archivzwecke, muss NICHT
+                            auf GitHub hochgeladen werden
+
+
+INSTALLATION AUF GITHUB PAGES
+─────────────────────────────
+1. Auf GitHub einloggen und ins Repo der TW Business Suite
+2. Die alte "index.html" löschen oder überschreiben mit der
+   neuen index.html aus diesem ZIP
+3. Die alte "index-template.html" ebenfalls überschreiben
+4. Commit mit Nachricht: "Homescreen-Icon aktualisiert
+   (Variante E: Weiße Fliese)"
+5. Warten bis GitHub Pages die Änderung ausgerollt hat
+   (dauert meist 1-2 Minuten)
+
+
+AUF DEM HANDY AKTUALISIEREN
+───────────────────────────
+WICHTIG: Das Handy cached das alte Icon! Um das neue Icon
+sichtbar zu machen:
+
+  1. Alte "Aufmaß-App" vom Homescreen entfernen (lange
+     drücken → Entfernen)
+  2. App im Browser (Chrome/Safari) öffnen
+  3. Browser-Cache leeren (Einstellungen → Datenschutz →
+     Browserdaten löschen)
+  4. App neu auf den Homescreen legen:
+     - Chrome: Menü (⋮) → "Zum Startbildschirm hinzufügen"
+     - Safari: Teilen-Button → "Zum Home-Bildschirm"
+
+Das neue Icon sollte jetzt erscheinen.
+
+
+BEI PROBLEMEN
 ─────────────
-
-SCHRITT 1: Dateien kopieren
-  → Alle 4 .jsx Dateien ins Hauptverzeichnis kopieren
-  → (neben die bestehenden Dateien, alte Versionen ueberschreiben)
-     - tw-app.jsx
-     - tw-aufmass.jsx
-     - tw-modulwahl.jsx
-     - tw-shared-components.jsx
-
-SCHRITT 2: Build ausfuehren
-  → build.bat ausfuehren (Doppelklick)
-  → Dadurch wird die neue index.html erstellt
-
-SCHRITT 3: Testen
-  → start-server.bat ausfuehren
-  → Browser oeffnen: http://localhost:8080
-  → Startseite: Google Drive verbinden
-  → KUNDENAUSWAHL klicken
-  → Den BLAUEN Button "Kundendaten laden" waehlen
-  → Einen Kunden auswaehlen (z.B. BBS Montabaur)
-  → Die 3 Listen sollten automatisch geladen werden
-  → Danach: Daten-Uebersicht zeigt die Ergebnisse
-  → Weiter zur Modulwahl
-
-HINWEIS:
-────────
-Der KundenDatenParser (tw-kundendaten-parser.js) muss wie bisher
-in der index-template.html eingebunden sein:
-
-    <script src="tw-kundendaten-parser.js"></script>
-
-Falls noch nicht vorhanden, siehe INSTALL.txt vom 08.04.2026.
+Falls das alte Icon hartnäckig bleibt:
+- Handy neu starten
+- Oder: Im Browser die Website einmal im Inkognito-Modus öffnen

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgE" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#c41e1e"/>
+      <stop offset="100%" stop-color="#8a1414"/>
+    </linearGradient>
+    <pattern id="fliesen" x="0" y="0" width="128" height="128" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="128" height="128" fill="none"/>
+      <rect x="2" y="2" width="124" height="124" fill="none"
+            stroke="#ffffff" stroke-width="1" opacity="0.15"/>
+    </pattern>
+  </defs>
+
+  <!-- Roter Hintergrund -->
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#bgE)"/>
+
+  <!-- Fliesen-Raster als dezentes Overlay -->
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#fliesen)"/>
+
+  <!-- Zentrale weiße "Fliese" mit TW -->
+  <rect x="96" y="96" width="320" height="320" rx="20" ry="20"
+        fill="#f5f5f0"/>
+
+  <!-- TW in Oswald, schwarz -->
+  <text x="256" y="310" font-family="Oswald, Impact, sans-serif"
+        font-weight="700" font-size="240"
+        fill="#111111" text-anchor="middle" letter-spacing="-6">TW</text>
+
+  <!-- Roter Quadrat-Punkt als i-Punkt-Reminder -->
+  <rect x="240" y="128" width="32" height="32" fill="#c41e1e"/>
+</svg>
