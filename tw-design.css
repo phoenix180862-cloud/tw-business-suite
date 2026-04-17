@@ -6520,28 +6520,17 @@
 
         /* ═══════════════════════════════════════════
            SCHRIFTGROESSEN-TOGGLE — Body-Class .tw-font-large
-           Vergroessert ALLE Schriften um Faktor 1.5 (50% groesser)
-           Wirkt global ueber CSS-Selector body.tw-font-large *
+           FIX: Mit zoom-Property wird ALLES skaliert (Schrift, Padding, Buttons, Inputs) —
+           anstatt em-Kaskade, die bei festen px-Werten nicht greift.
            ═══════════════════════════════════════════ */
         body.tw-font-large {
-            font-size: 1.5em;
+            zoom: 1.25;
         }
-        body.tw-font-large input,
-        body.tw-font-large textarea,
-        body.tw-font-large select,
-        body.tw-font-large button {
-            font-size: 1.18em;
-        }
-        body.tw-font-large .pos-modal-title,
-        body.tw-font-large .header-title,
-        body.tw-font-large .page-title,
-        body.tw-font-large .page-subtitle,
-        body.tw-font-large .folder-name,
-        body.tw-font-large .folder-meta,
-        body.tw-font-large .breadcrumb,
-        body.tw-font-large .nav-btn,
-        body.tw-font-large .rb-nav-btn,
-        body.tw-font-large .loading-text,
-        body.tw-font-large .no-results-text {
-            font-size: 1.4em !important;
+        /* Fallback fuer Firefox (falls zoom dort Probleme macht) */
+        @supports not (zoom: 1.25) {
+            body.tw-font-large {
+                transform: scale(1.25);
+                transform-origin: 0 0;
+                width: 80%;
+            }
         }
