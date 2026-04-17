@@ -1,65 +1,60 @@
-═══════════════════════════════════════════════════════════════
-  TW Business Suite — Icon-Update (Variante E: Weiße Fliese)
-  Datum: 16.04.2026
-═══════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════
+  TW Business Suite — Konsolidierungs-Build
+  Datum: 17.04.2026
+═══════════════════════════════════════════════════════════
 
-ÜBERBLICK
-─────────
-Dieses ZIP enthält das neue Homescreen-Icon für die TW Business
-Suite. Das bisherige Icon (abgeschnittener Logo-Ausschnitt) wird
-ersetzt durch ein klares Design: weiße Fliese auf rotem Grund
-mit schwarzem "TW" und dem charakteristischen roten Punkt.
+WAS IST DAS?
+─────────────
+Dieses ZIP führt vier gestern getrennt gemachte Updates
+in einem sauberen Build zusammen:
 
-Das Icon ist direkt in die index.html eingebettet (Base64) —
-keine zusätzlichen Dateien auf dem Server nötig.
+  1. Speicherfunktion Phase 1 (Auto-Save, Status-Indikator)
+  2. Speicherfunktion Phase 2 (Foto-Store, Drive-Upload)
+  3. Hochformat-CSS-Fix für Handy-Navigationsleisten
+  4. Neues App-Icon (Variante E: Weiße Fliese auf Rot)
 
-
-ENTHALTENE DATEIEN
-──────────────────
-  index.html              Frisch gebaute App mit neuem Icon
-                          → Diese Datei ersetzt die alte
-                            index.html auf GitHub Pages
-
-  index-template.html     Aktualisiertes Template
-                          → Basis für zukünftige Builds
-                          → Ersetzt die alte Version im Repo
-
-  TW-Icon.svg             Quelldatei des Icons (editierbar)
-                          → Nur für Archivzwecke, muss NICHT
-                            auf GitHub hochgeladen werden
+Das letzte Update (Icon) hatte versehentlich die
+index.html aus einem alten Build erzeugt und damit die
+ersten beiden Updates aus der live laufenden App entfernt.
+Dieser Build stellt alles wieder her.
 
 
-INSTALLATION AUF GITHUB PAGES
-─────────────────────────────
-1. Auf GitHub einloggen und ins Repo der TW Business Suite
-2. Die alte "index.html" löschen oder überschreiben mit der
-   neuen index.html aus diesem ZIP
-3. Die alte "index-template.html" ebenfalls überschreiben
-4. Commit mit Nachricht: "Homescreen-Icon aktualisiert
-   (Variante E: Weiße Fliese)"
-5. Warten bis GitHub Pages die Änderung ausgerollt hat
-   (dauert meist 1-2 Minuten)
+INHALT DES ZIP
+──────────────
+  • index.html      — frisch gebaut (alle 4 Updates drin)
+  • tw-design.css   — Hochformat-Fix
+  • tw-storage.js   — Speicher-Phase 1+2 Engine
+  • tw-core.js      — AutoSave-Manager (Debounce + Rettungsring)
 
 
-AUF DEM HANDY AKTUALISIEREN
-───────────────────────────
-WICHTIG: Das Handy cached das alte Icon! Um das neue Icon
-sichtbar zu machen:
+INSTALLATION
+────────────
+1. Alle 4 Dateien auf GitHub hochladen (alte überschreiben)
+   → Repo öffnen
+   → "Add file" → "Upload files"
+   → Alle 4 Dateien hochziehen
+   → Commit Message: "Konsolidierungs-Build 17.04.2026"
+   → Commit drücken
 
-  1. Alte "Aufmaß-App" vom Homescreen entfernen (lange
-     drücken → Entfernen)
-  2. App im Browser (Chrome/Safari) öffnen
-  3. Browser-Cache leeren (Einstellungen → Datenschutz →
-     Browserdaten löschen)
-  4. App neu auf den Homescreen legen:
-     - Chrome: Menü (⋮) → "Zum Startbildschirm hinzufügen"
-     - Safari: Teilen-Button → "Zum Home-Bildschirm"
+2. 1-2 Minuten warten (GitHub Pages Deploy)
 
-Das neue Icon sollte jetzt erscheinen.
+3. App auf Handy / PC aufrufen
+   → Strg+F5 (PC) oder Cache leeren (Handy)
+
+
+VERIFIKATION (was sollte jetzt funktionieren)
+──────────────────────────────────────────────
+✓ Grüner Auto-Save-Indikator in der Navigation
+✓ "Speichern"-Button arbeitet wieder korrekt
+✓ Fotos werden automatisch in IndexedDB gesichert
+✓ Hintergrund-Upload zu Google Drive (wenn online)
+✓ Im Hochformat: 2-zeilige Button-Leiste in Raumblättern
+✓ Neues Icon auf dem Homescreen
 
 
 BEI PROBLEMEN
 ─────────────
-Falls das alte Icon hartnäckig bleibt:
-- Handy neu starten
-- Oder: Im Browser die Website einmal im Inkognito-Modus öffnen
+Falls etwas nicht stimmt, im Chat melden mit:
+  • Welche Funktion geht nicht?
+  • Auf welchem Gerät? (Handy/PC)
+  • Screenshot, falls möglich
