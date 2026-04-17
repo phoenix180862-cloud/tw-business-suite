@@ -5511,6 +5511,8 @@
 
             // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
+            // ── Raumblatt-Berechnen-Modal (VOB-Vorschau vor Fertigstellung) ──
+            const [calcModalOpen, setCalcModalOpen] = useState(false);
             const [wandMasse, setWandMasse] = useState(() => {
                 if (reEdit && reEdit.wandMasse) return reEdit.wandMasse.map(w => ({...w}));
                 if (hasData) {
@@ -8763,7 +8765,7 @@
                     {/* ═══ STICKY WRAPPER fuer beide Leisten ═══ */}
                     <div style={{position:'sticky', top:'95px', zIndex:98, background:'var(--bg-primary)', paddingBottom:'4px', borderBottom:'1px solid var(--border-subtle)'}}>
 
-                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raumblatt fertig stellen, Aufmass fertigstellen) ═══ */}
+                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raumblatt berechnen, Raumblatt fertig stellen, Aufmass fertigstellen) ═══ */}
                     <div className="rb-nav-red" style={{
                         display:'flex', gap:'3px', padding:'4px 0', marginBottom:'2px'
                     }}>
@@ -8773,6 +8775,11 @@
                         {onShowGesamtliste && (
                             <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { onShowGesamtliste(); }}>Gesamtliste</button>
                         )}
+                        <button className="rb-nav-btn rb-nav-red-btn"
+                            style={{background:'linear-gradient(135deg, #4a7a3e, #5d9150)', color:'#ffffff'}}
+                            onClick={function() { setCalcModalOpen(true); }}>
+                            {'\uD83D\uDCD0'} Raumblatt berechnen
+                        </button>
                         {onFinishRaum && (
                             <button className="rb-nav-btn rb-nav-red-btn" onClick={doRaumblattFertigstellen}>Raumblatt fertig stellen</button>
                         )}
@@ -11696,6 +11703,278 @@
                     </React.Fragment>)}
 
                     {/* ═══ MODALS (ausserhalb der Tabs, immer verfuegbar) ═══ */}
+
+                    {/* ═══ RAUMBLATT-BERECHNEN MODAL (VOB-Vorschau vor Fertigstellung) ═══ */}
+                    {calcModalOpen && (() => {
+                        // Pro Position: Rechenweg generieren, Ergebnis berechnen
+                        const calcRows = posCards.map(pos => {
+                            const rawSteps = buildRechenweg(pos);
+                            const rwSteps = enrichRechenweg(rawSteps);
+                            const ergebnis = calcPositionResult(pos);
+                            const isManual = pos.hasManualRW && pos.manualRechenweg && pos.manualRechenweg.length > 0;
+                            return { pos, rwSteps, ergebnis, isManual };
+                        });
+                        // Raum-Summen nach Einheit gruppieren
+                        const summen = {};
+                        calcRows.forEach(r => {
+                            if (r.ergebnis <= 0) return;
+                            const einh = r.pos.einheit || 'm²';
+                            if (!summen[einh]) summen[einh] = 0;
+                            summen[einh] += r.ergebnis;
+                        });
+                        const leereCount = calcRows.filter(r => r.ergebnis === 0).length;
+                        const fertigCount = calcRows.filter(r => r.ergebnis > 0).length;
+                        // Raum-Kopf-Daten
+                        const rKopf = {
+                            name: raumName || (raum && raum.name) || (raum && raum.nr) || 'Raum',
+                            nr: (raum && raum.nr) || '',
+                            laenge: L, breite: B, raumhoehe: RH,
+                            fliesenhoehe: H, abdichtungshoehe: AH,
+                            wandflaeche: wandflaeche, bodenflaeche: bodenflaeche,
+                            isMultiWall: isMultiWall, perimeter: perimeter
+                        };
+                        // Fertigstellen-Handler: nutzt bestehende Validierung + Fertigstellungs-Logik
+                        const doFertigstellenFromModal = () => {
+                            setCalcModalOpen(false);
+                            // Timeout damit Modal sauber zugeht bevor confirm-Dialog kommt
+                            setTimeout(function() { doRaumblattFertigstellen(); }, 50);
+                        };
+                        return (
+                            <div className="modal-overlay" style={{zIndex:2000}} onClick={function() { setCalcModalOpen(false); }}>
+                                <div onClick={function(e) { e.stopPropagation(); }} style={{
+                                    position:'fixed', top:'2vh', left:'2vw', right:'2vw', bottom:'2vh',
+                                    background:'var(--bg-primary)', borderRadius:'var(--radius-lg)',
+                                    display:'flex', flexDirection:'column',
+                                    border:'1px solid var(--border-color)', overflow:'hidden'
+                                }}>
+                                    {/* HEADER */}
+                                    <div style={{
+                                        padding:'14px 18px', borderBottom:'1px solid var(--border-color)',
+                                        background:'linear-gradient(135deg, rgba(74,122,62,0.15), rgba(93,145,80,0.08))',
+                                        display:'flex', alignItems:'center', gap:'12px'
+                                    }}>
+                                        <div style={{flex:1}}>
+                                            <div style={{fontSize:'11px', color:'#5d9150', textTransform:'uppercase', letterSpacing:'1.5px', fontWeight:600, fontFamily:'Oswald, sans-serif'}}>
+                                                {'\uD83D\uDCD0'} VOB/C DIN 18352 -- Raumblatt-Berechnung
+                                            </div>
+                                            <div style={{fontSize:'18px', fontWeight:700, color:'var(--text-white)', marginTop:'3px', fontFamily:'Oswald, sans-serif'}}>
+                                                {rKopf.nr ? (rKopf.nr + ' -- ') : ''}{rKopf.name}
+                                            </div>
+                                        </div>
+                                        <button style={{background:'none', border:'none', color:'var(--text-muted)', fontSize:'24px', cursor:'pointer', padding:'4px 10px'}}
+                                            onClick={function() { setCalcModalOpen(false); }}>{'\u2715'}</button>
+                                    </div>
+
+                                    {/* BODY (scrollbar) */}
+                                    <div style={{flex:1, overflow:'auto', padding:'14px 18px'}}>
+                                        {/* Raumkopf mit Grundmaszen */}
+                                        <div style={{
+                                            background:'var(--bg-secondary)', borderRadius:'var(--radius-md)',
+                                            padding:'12px 14px', marginBottom:'14px',
+                                            border:'1px solid var(--border-subtle)'
+                                        }}>
+                                            <div style={{fontSize:'10px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'8px', fontWeight:600}}>Raum-Masze</div>
+                                            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))', gap:'8px 14px', fontSize:'12px'}}>
+                                                {!rKopf.isMultiWall && rKopf.laenge > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Laenge:</span> <strong style={{color:'var(--text-white)'}}>{fmtDe(rKopf.laenge)} m</strong></div>
+                                                )}
+                                                {!rKopf.isMultiWall && rKopf.breite > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Breite:</span> <strong style={{color:'var(--text-white)'}}>{fmtDe(rKopf.breite)} m</strong></div>
+                                                )}
+                                                {rKopf.isMultiWall && rKopf.perimeter > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Umfang:</span> <strong style={{color:'var(--text-white)'}}>{fmtDe(rKopf.perimeter)} m</strong></div>
+                                                )}
+                                                {rKopf.raumhoehe > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Raumhoehe:</span> <strong style={{color:'var(--text-white)'}}>{fmtDe(rKopf.raumhoehe)} m</strong></div>
+                                                )}
+                                                {rKopf.fliesenhoehe > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Fliesenhoehe:</span> <strong style={{color:'var(--text-white)'}}>{fmtDe(rKopf.fliesenhoehe)} m</strong></div>
+                                                )}
+                                                {rKopf.abdichtungshoehe > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Abdichtungshoehe:</span> <strong style={{color:'var(--text-white)'}}>{fmtDe(rKopf.abdichtungshoehe)} m</strong></div>
+                                                )}
+                                                {rKopf.wandflaeche > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Wandflaeche brutto:</span> <strong style={{color:'#5d9150'}}>{fmtDe(rKopf.wandflaeche)} m{'\u00B2'}</strong></div>
+                                                )}
+                                                {rKopf.bodenflaeche > 0 && (
+                                                    <div><span style={{color:'var(--text-muted)'}}>Bodenflaeche:</span> <strong style={{color:'#5d9150'}}>{fmtDe(rKopf.bodenflaeche)} m{'\u00B2'}</strong></div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Positionen mit Rechenweg */}
+                                        {calcRows.length === 0 && (
+                                            <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px', fontStyle:'italic'}}>
+                                                Keine Positionen ausgewaehlt.
+                                            </div>
+                                        )}
+
+                                        {calcRows.map(function(row) {
+                                            const p = row.pos;
+                                            const einh = p.einheit || 'm\u00B2';
+                                            const hasErg = row.ergebnis > 0;
+                                            return (
+                                                <div key={p.pos} style={{
+                                                    background:'var(--bg-secondary)', borderRadius:'var(--radius-md)',
+                                                    marginBottom:'10px', overflow:'hidden',
+                                                    border:'1px solid ' + (hasErg ? 'rgba(93,145,80,0.25)' : 'rgba(231,76,60,0.15)'),
+                                                    borderLeft:'3px solid ' + (hasErg ? '#5d9150' : '#e74c3c')
+                                                }}>
+                                                    {/* Pos-Header */}
+                                                    <div style={{
+                                                        padding:'8px 12px', background:'var(--bg-tertiary)',
+                                                        display:'flex', alignItems:'center', gap:'10px',
+                                                        borderBottom:'1px solid var(--border-subtle)'
+                                                    }}>
+                                                        <span style={{
+                                                            background:'var(--bg-primary)', padding:'3px 8px', borderRadius:'4px',
+                                                            fontSize:'11px', fontWeight:700, color:'var(--accent-orange)',
+                                                            minWidth:'45px', textAlign:'center'
+                                                        }}>{p.pos}</span>
+                                                        <div style={{flex:1, fontSize:'13px', color:'var(--text-white)', fontWeight:500}}>
+                                                            {p.bez}
+                                                        </div>
+                                                        {row.isManual && (
+                                                            <span style={{fontSize:'10px', padding:'2px 6px', background:'rgba(230,126,34,0.15)', color:'var(--accent-orange)', borderRadius:'3px', fontWeight:600}}>
+                                                                {'\u270F\uFE0F'} Manuell
+                                                            </span>
+                                                        )}
+                                                        {!row.isManual && hasErg && (
+                                                            <span style={{fontSize:'10px', padding:'2px 6px', background:'rgba(93,145,80,0.15)', color:'#5d9150', borderRadius:'3px', fontWeight:600}}>
+                                                                {'\uD83E\uDD16'} VOB
+                                                            </span>
+                                                        )}
+                                                        <span style={{
+                                                            fontSize:'14px', fontWeight:700,
+                                                            color: hasErg ? '#5d9150' : 'var(--text-muted)',
+                                                            minWidth:'80px', textAlign:'right'
+                                                        }}>
+                                                            {hasErg ? (fmtDe(row.ergebnis) + ' ' + einh) : '--'}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Rechenweg */}
+                                                    <div style={{padding:'8px 12px'}}>
+                                                        {/* VOB-Rechenweg-Schritte */}
+                                                        {!row.isManual && row.rwSteps.filter(function(s){return s.type !== 'total';}).map(function(step, idx) {
+                                                            const sColor = step.type === 'abzug' ? '#e74c3c'
+                                                                : step.type === 'zurechnung' ? '#5d9150'
+                                                                : step.type === 'vob-info' ? 'var(--accent-orange)'
+                                                                : 'var(--text-secondary)';
+                                                            return (
+                                                                <div key={idx} style={{
+                                                                    display:'flex', gap:'10px', padding:'3px 0',
+                                                                    fontSize:'12px', lineHeight:'1.5',
+                                                                    alignItems:'baseline',
+                                                                    borderBottom:'1px dashed rgba(255,255,255,0.04)'
+                                                                }}>
+                                                                    <span style={{flex:'0 0 38%', color:'var(--text-secondary)'}}>{step.label}</span>
+                                                                    <span style={{flex:1, color:'var(--text-muted)', fontSize:'11px', fontFamily:'monospace'}}>{step.formel || ''}</span>
+                                                                    <span style={{flex:'0 0 auto', color:sColor, fontWeight:600, minWidth:'85px', textAlign:'right'}}>{step.ergebnis}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+
+                                                        {/* Manueller Rechenweg */}
+                                                        {row.isManual && p.manualRechenweg.map(function(z) {
+                                                            const val = parseRWZeile(z.text);
+                                                            if (val === 0) return null;
+                                                            return (
+                                                                <div key={z.id} style={{
+                                                                    display:'flex', gap:'10px', padding:'3px 0',
+                                                                    fontSize:'12px', lineHeight:'1.5',
+                                                                    alignItems:'baseline',
+                                                                    borderBottom:'1px dashed rgba(255,255,255,0.04)'
+                                                                }}>
+                                                                    <span style={{flex:1, color:'var(--text-secondary)'}}>
+                                                                        {z.vorzeichen === 'minus' ? '\u2212 ' : '+ '}{z.text}
+                                                                    </span>
+                                                                    <span style={{flex:'0 0 auto', color: z.vorzeichen === 'minus' ? '#e74c3c' : '#5d9150', fontWeight:600, minWidth:'85px', textAlign:'right'}}>
+                                                                        {z.vorzeichen === 'minus' ? '\u2212' : ''}{fmtDe(val)}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })}
+
+                                                        {/* Ergebnis-Zeile */}
+                                                        <div style={{
+                                                            display:'flex', gap:'10px', padding:'8px 0 2px 0',
+                                                            marginTop:'4px', borderTop:'1px solid var(--border-subtle)',
+                                                            alignItems:'baseline'
+                                                        }}>
+                                                            <span style={{flex:1, fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', fontWeight:600}}>Ergebnis</span>
+                                                            <span style={{
+                                                                fontSize:'14px', fontWeight:700,
+                                                                color: hasErg ? '#5d9150' : 'var(--text-muted)',
+                                                                minWidth:'85px', textAlign:'right'
+                                                            }}>
+                                                                {hasErg ? (fmtDe(row.ergebnis) + ' ' + einh) : 'leer'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* Raum-Summen nach Einheit */}
+                                        {Object.keys(summen).length > 0 && (
+                                            <div style={{
+                                                marginTop:'16px', padding:'14px 16px',
+                                                background:'linear-gradient(135deg, rgba(74,122,62,0.12), rgba(93,145,80,0.05))',
+                                                borderRadius:'var(--radius-md)', border:'1px solid rgba(93,145,80,0.25)'
+                                            }}>
+                                                <div style={{fontSize:'11px', color:'#5d9150', textTransform:'uppercase', letterSpacing:'1.5px', fontWeight:700, marginBottom:'10px', fontFamily:'Oswald, sans-serif'}}>
+                                                    Raum-Summen ({fertigCount} Positionen{leereCount > 0 ? ', ' + leereCount + ' leer' : ''})
+                                                </div>
+                                                <div style={{display:'flex', flexWrap:'wrap', gap:'18px'}}>
+                                                    {Object.keys(summen).map(function(einh) {
+                                                        return (
+                                                            <div key={einh} style={{fontSize:'14px'}}>
+                                                                <span style={{color:'var(--text-muted)'}}>Summe {einh}: </span>
+                                                                <strong style={{color:'#5d9150', fontSize:'16px'}}>{fmtDe(summen[einh])} {einh}</strong>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* FOOTER mit Aktions-Buttons */}
+                                    <div style={{
+                                        padding:'12px 18px', borderTop:'1px solid var(--border-color)',
+                                        background:'var(--bg-secondary)',
+                                        display:'flex', gap:'10px', alignItems:'center'
+                                    }}>
+                                        <div style={{flex:1, fontSize:'11px', color:'var(--text-muted)', fontStyle:'italic'}}>
+                                            {leereCount > 0
+                                                ? ('Hinweis: ' + leereCount + ' Position(en) ohne Ergebnis. Koennen spaeter in der Gesamtliste ergaenzt werden.')
+                                                : 'Alle Positionen berechnet -- bereit zur Fertigstellung.'}
+                                        </div>
+                                        <button style={{
+                                            padding:'10px 18px', borderRadius:'var(--radius-md)',
+                                            border:'1px solid var(--border-color)', background:'var(--bg-tertiary)',
+                                            color:'var(--text-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:600,
+                                            fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'
+                                        }}
+                                            onClick={function() { setCalcModalOpen(false); }}>
+                                            Schlieszen
+                                        </button>
+                                        <button style={{
+                                            padding:'10px 20px', borderRadius:'var(--radius-md)', border:'none',
+                                            background:'linear-gradient(135deg, #4a7a3e, #5d9150)',
+                                            color:'#ffffff', cursor:'pointer', fontSize:'12px', fontWeight:700,
+                                            fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                            boxShadow:'0 4px 14px rgba(74,122,62,0.3)'
+                                        }}
+                                            onClick={doFertigstellenFromModal}>
+                                            {'\u2713'} Raumblatt abschlieszen {'\u2192'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* ═══ MANUELLER RECHENWEG MODAL (Vollbild) ═══ */}
                     {rwModalPos && (() => {
