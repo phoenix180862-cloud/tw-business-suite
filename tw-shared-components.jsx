@@ -308,7 +308,7 @@
                               jacke === '#d35400' ? '#a04000' : '#1a5276';
             var sx = mirror ? -1 : 1;
             return (
-                <svg width="90" height="135" viewBox="0 0 90 135" xmlns="http://www.w3.org/2000/svg"
+                <svg width="90" height="125" viewBox="0 0 90 125" xmlns="http://www.w3.org/2000/svg"
                      style={{overflow:'visible', filter:'drop-shadow(2px 4px 6px rgba(0,0,0,0.45))', transform:'scaleX(' + sx + ')'}}>
                     {/* === GANZER KOERPER WIPPT === */}
                     <g>
@@ -431,16 +431,16 @@
 
         function BauteamAnimation() {
             // Container fuer beide Figuren - laufen gemeinsam ueber den Bildschirm
-            // Position: 80px ueberm unteren Rand (ca. 2cm hoeher als zuvor),
-            // damit die Figuren immer sichtbar bleiben
+            // Container 200px hoch - genug Platz fuer Figur (125px) + 72px Abstand vom unteren Rand
+            // Figuren und Boden sitzen auf gleicher Basislinie
             return (
-                <div style={{position:'relative', height:'170px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
+                <div style={{position:'relative', height:'200px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
                     {/* Fliesenstreifen als Boden */}
                     <div style={{position:'absolute', bottom:'72px', left:0, right:0, height:'2px',
                                  background:'linear-gradient(90deg, transparent 3%, rgba(149,165,166,0.4) 15%, rgba(149,165,166,0.5) 50%, rgba(149,165,166,0.4) 85%, transparent 97%)'}} />
 
                     {/* Bauteam laeuft */}
-                    <div className="tw-bauteam-walker" style={{position:'absolute', bottom:'78px', display:'flex', gap:'14px', alignItems:'flex-end'}}>
+                    <div className="tw-bauteam-walker" style={{position:'absolute', bottom:'72px', display:'flex', gap:'14px', alignItems:'flex-end'}}>
                         {/* Ivan - blaue Jacke */}
                         <BauarbeiterFigur
                             name="IVAN"
@@ -462,7 +462,7 @@
                     </div>
 
                     {/* Frisch verlegte Fliesen hinter dem Team */}
-                    <div className="tw-bauteam-tiles" style={{position:'absolute', bottom:'78px', display:'flex', gap:'2px', alignItems:'flex-end'}}>
+                    <div className="tw-bauteam-tiles" style={{position:'absolute', bottom:'72px', display:'flex', gap:'2px', alignItems:'flex-end'}}>
                         <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.45)', border:'1px solid rgba(77,166,255,0.3)', borderRadius:'2px'}} />
                         <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.38)', border:'1px solid rgba(77,166,255,0.25)', borderRadius:'2px'}} />
                         <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.30)', border:'1px solid rgba(77,166,255,0.20)', borderRadius:'2px'}} />
