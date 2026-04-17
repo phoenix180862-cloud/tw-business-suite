@@ -34,7 +34,8 @@
             var testGeminiKey = async function() {
                 if (!geminiKey) return;
                 setGeminiStatus('testing');
-                var modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+                // Fallback-Reihenfolge (April 2026): Neueste zuerst, dann alte als Sicherung
+                var modelsToTry = ['gemini-3-flash', 'gemini-3-pro', 'gemini-2.5-flash', 'gemini-2.5-pro'];
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
                     try {
                         var testModel = modelsToTry[mi];
@@ -9290,7 +9291,15 @@
                                         )}
 
                                         <div style={{display:'flex', gap:'6px'}}>
-                                            <button className="raum-action-btn finish" onClick={function() { setGrundrissModus('manual'); }}
+                                            <button className="raum-action-btn finish" onClick={function() {
+                                                // KRITISCH: KI-Ergebnis zuerst in den Raumblatt-State uebertragen,
+                                                // DANN erst in den manuellen Modus wechseln, damit die erkannten
+                                                // Waende, Tueren und Fenster uebernommen werden.
+                                                if (kiGrundrissState.kiResult) {
+                                                    applyKiGrundrissToRaumblatt(kiGrundrissState.kiResult);
+                                                }
+                                                setGrundrissModus('manual');
+                                            }}
                                                 style={{flex:1}}>
                                                 <span className="btn-icon">{'\uD83D\uDCD0'}</span>
                                                 <span className="btn-text">
