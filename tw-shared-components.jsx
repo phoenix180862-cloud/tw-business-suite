@@ -292,6 +292,191 @@
         }
 
         /* ═══════════════════════════════════════════
+           BAUTEAM ANIMATION - IVAN & MICHAL
+           Wiederverwendbare animierte Figur fuer alle Startseiten
+           ═══════════════════════════════════════════ */
+        function BauarbeiterFigur({ name, jacke, hose, helm, schuh, mirror }) {
+            // Realistischer Gehzyklus: 0.6s pro Schritt
+            // Beine pendeln gegenphasig (-22 / +22)
+            // Arme pendeln entgegengesetzt zum gleichseitigen Bein
+            // Koerper wippt leicht (Bounce alle 0.3s)
+            var dur = '0.6s';
+            var bounceDur = '0.3s';
+            var skin = '#fad7a0';
+            var skinShadow = '#e8c292';
+            var jackeDunkel = jacke === '#27ae60' ? '#1e8449' :
+                              jacke === '#d35400' ? '#a04000' : '#1a5276';
+            var sx = mirror ? -1 : 1;
+            return (
+                <svg width="90" height="135" viewBox="0 0 90 135" xmlns="http://www.w3.org/2000/svg"
+                     style={{overflow:'visible', filter:'drop-shadow(2px 4px 6px rgba(0,0,0,0.45))', transform:'scaleX(' + sx + ')'}}>
+                    {/* === GANZER KOERPER WIPPT === */}
+                    <g>
+                        <animateTransform attributeName="transform" type="translate" values="0,0;0,-2.5;0,0" dur={bounceDur} repeatCount="indefinite" />
+
+                        {/* === HELM === */}
+                        <ellipse cx="45" cy="14" rx="16" ry="10" fill={helm} />
+                        <ellipse cx="45" cy="11" rx="13" ry="6" fill={helm} opacity="0.6" />
+                        <rect x="29" y="13" width="32" height="3.5" rx="1.75" fill={helm} opacity="0.4" />
+                        {/* Helm-Schild vorn */}
+                        <ellipse cx="45" cy="20" rx="13" ry="2.5" fill={helm} opacity="0.7" />
+                        {/* Helm-Glanz */}
+                        <ellipse cx="40" cy="9" rx="4" ry="2" fill="#ffffff" opacity="0.5" />
+
+                        {/* === KOPF === */}
+                        <ellipse cx="45" cy="28" rx="9" ry="10" fill={skin} />
+                        {/* Ohren */}
+                        <ellipse cx="36" cy="29" rx="1.5" ry="2.5" fill={skinShadow} />
+                        <ellipse cx="54" cy="29" rx="1.5" ry="2.5" fill={skinShadow} />
+                        {/* Augen */}
+                        <ellipse cx="41" cy="27" rx="1.4" ry="1.8" fill="#2c3e50" />
+                        <ellipse cx="49" cy="27" rx="1.4" ry="1.8" fill="#2c3e50" />
+                        <circle cx="41.4" cy="26.4" r="0.5" fill="#ffffff" />
+                        <circle cx="49.4" cy="26.4" r="0.5" fill="#ffffff" />
+                        {/* Augenbrauen */}
+                        <path d="M38 24 Q41 23 44 24" stroke="#5d4037" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                        <path d="M46 24 Q49 23 52 24" stroke="#5d4037" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                        {/* Nase */}
+                        <path d="M45 28 Q44 31 45.5 32 Q47 31 45 28" fill={skinShadow} opacity="0.7" />
+                        {/* Mund - freundliches Laecheln */}
+                        <path d="M41 34 Q45 37 49 34" stroke="#a93226" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+                        {/* Wangen */}
+                        <ellipse cx="38" cy="32" rx="2" ry="1.2" fill="#f1948a" opacity="0.4" />
+                        <ellipse cx="52" cy="32" rx="2" ry="1.2" fill="#f1948a" opacity="0.4" />
+
+                        {/* === HALS === */}
+                        <rect x="42" y="36" width="6" height="4" fill={skinShadow} />
+
+                        {/* === KOERPER / WARNJACKE === */}
+                        {/* Hauptjacke */}
+                        <path d="M28 40 L62 40 L64 70 L26 70 Z" fill={jacke} />
+                        {/* Schulterhighlights */}
+                        <path d="M28 40 L34 40 L33 50 L27 50 Z" fill={jackeDunkel} opacity="0.3" />
+                        <path d="M56 40 L62 40 L63 50 L57 50 Z" fill={jackeDunkel} opacity="0.3" />
+                        {/* Warnstreifen oben */}
+                        <rect x="27" y="44" width="36" height="3.5" fill="#f39c12" opacity="0.85" />
+                        {/* Warnstreifen unten */}
+                        <rect x="26" y="61" width="38" height="3.5" fill="#f39c12" opacity="0.85" />
+                        {/* Reissverschluss */}
+                        <line x1="45" y1="40" x2="45" y2="70" stroke={jackeDunkel} strokeWidth="0.7" />
+                        {/* Namensschild auf der Brust - weisses Feld */}
+                        <rect x="33" y="50" width="24" height="9" rx="1.5" fill="#ffffff" stroke={jackeDunkel} strokeWidth="0.5" />
+                        <text x="45" y="56.5" textAnchor="middle" fill="#1a2332" fontSize="6.2"
+                              fontWeight="700" fontFamily="Oswald, Arial, sans-serif"
+                              transform={mirror ? 'scale(-1,1) translate(-90,0)' : ''}
+                              style={{letterSpacing:'0.5px'}}>
+                            {name}
+                        </text>
+
+                        {/* === LINKER ARM (mit Pendel) === */}
+                        <g>
+                            <animateTransform attributeName="transform" type="rotate"
+                                values="22,32,42;-22,32,42;22,32,42" dur={dur} repeatCount="indefinite" />
+                            {/* Oberarm in Jackenfarbe */}
+                            <rect x="22" y="40" width="11" height="18" rx="4" fill={jacke} />
+                            {/* Warnstreifen am Aermel */}
+                            <rect x="22" y="55" width="11" height="2" fill="#f39c12" opacity="0.85" />
+                            {/* Unterarm - Hautfarbe */}
+                            <rect x="23" y="56" width="9" height="11" rx="3.5" fill={skin} />
+                            {/* Hand */}
+                            <circle cx="27.5" cy="68" r="3.2" fill={skinShadow} />
+                        </g>
+
+                        {/* === RECHTER ARM (mit Pendel, gegenphasig) === */}
+                        <g>
+                            <animateTransform attributeName="transform" type="rotate"
+                                values="-22,58,42;22,58,42;-22,58,42" dur={dur} repeatCount="indefinite" />
+                            {/* Oberarm */}
+                            <rect x="57" y="40" width="11" height="18" rx="4" fill={jacke} />
+                            {/* Warnstreifen */}
+                            <rect x="57" y="55" width="11" height="2" fill="#f39c12" opacity="0.85" />
+                            {/* Unterarm */}
+                            <rect x="58" y="56" width="9" height="11" rx="3.5" fill={skin} />
+                            {/* Hand */}
+                            <circle cx="62.5" cy="68" r="3.2" fill={skinShadow} />
+                        </g>
+
+                        {/* === LINKES BEIN (gegenphasig zum linken Arm) === */}
+                        <g>
+                            <animateTransform attributeName="transform" type="rotate"
+                                values="-22,40,70;22,40,70;-22,40,70" dur={dur} repeatCount="indefinite" />
+                            {/* Hose Oberschenkel */}
+                            <rect x="34" y="69" width="10" height="20" rx="3" fill={hose} />
+                            {/* Hose Unterschenkel */}
+                            <rect x="34" y="87" width="10" height="20" rx="3" fill={hose} />
+                            {/* Knie-Highlight */}
+                            <ellipse cx="39" cy="89" rx="4" ry="2" fill="#000000" opacity="0.15" />
+                            {/* Schuh */}
+                            <ellipse cx="39" cy="111" rx="8" ry="4" fill={schuh} />
+                            <ellipse cx="39" cy="113" rx="8.5" ry="2" fill="#1a1a1a" />
+                            {/* Schuh-Highlight */}
+                            <ellipse cx="37" cy="109" rx="3" ry="1.5" fill="#ffffff" opacity="0.2" />
+                        </g>
+
+                        {/* === RECHTES BEIN === */}
+                        <g>
+                            <animateTransform attributeName="transform" type="rotate"
+                                values="22,50,70;-22,50,70;22,50,70" dur={dur} repeatCount="indefinite" />
+                            <rect x="46" y="69" width="10" height="20" rx="3" fill={hose} />
+                            <rect x="46" y="87" width="10" height="20" rx="3" fill={hose} />
+                            <ellipse cx="51" cy="89" rx="4" ry="2" fill="#000000" opacity="0.15" />
+                            <ellipse cx="51" cy="111" rx="8" ry="4" fill={schuh} />
+                            <ellipse cx="51" cy="113" rx="8.5" ry="2" fill="#1a1a1a" />
+                            <ellipse cx="49" cy="109" rx="3" ry="1.5" fill="#ffffff" opacity="0.2" />
+                        </g>
+                    </g>
+                </svg>
+            );
+        }
+
+        function BauteamAnimation() {
+            // Container fuer beide Figuren - laufen gemeinsam ueber den Bildschirm
+            // Position: 80px ueberm unteren Rand (ca. 2cm hoeher als zuvor),
+            // damit die Figuren immer sichtbar bleiben
+            return (
+                <div style={{position:'relative', height:'170px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
+                    {/* Fliesenstreifen als Boden */}
+                    <div style={{position:'absolute', bottom:'72px', left:0, right:0, height:'2px',
+                                 background:'linear-gradient(90deg, transparent 3%, rgba(149,165,166,0.4) 15%, rgba(149,165,166,0.5) 50%, rgba(149,165,166,0.4) 85%, transparent 97%)'}} />
+
+                    {/* Bauteam laeuft */}
+                    <div className="tw-bauteam-walker" style={{position:'absolute', bottom:'78px', display:'flex', gap:'14px', alignItems:'flex-end'}}>
+                        {/* Ivan - blaue Jacke */}
+                        <BauarbeiterFigur
+                            name="IVAN"
+                            jacke="#2471a3"
+                            hose="#2c3e50"
+                            helm="#f1c40f"
+                            schuh="#5d4037"
+                            mirror={false}
+                        />
+                        {/* Michal - gruene Jacke */}
+                        <BauarbeiterFigur
+                            name="MICHAL"
+                            jacke="#27ae60"
+                            hose="#34495e"
+                            helm="#e67e22"
+                            schuh="#5d4037"
+                            mirror={false}
+                        />
+                    </div>
+
+                    {/* Frisch verlegte Fliesen hinter dem Team */}
+                    <div className="tw-bauteam-tiles" style={{position:'absolute', bottom:'78px', display:'flex', gap:'2px', alignItems:'flex-end'}}>
+                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.45)', border:'1px solid rgba(77,166,255,0.3)', borderRadius:'2px'}} />
+                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.38)', border:'1px solid rgba(77,166,255,0.25)', borderRadius:'2px'}} />
+                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.30)', border:'1px solid rgba(77,166,255,0.20)', borderRadius:'2px'}} />
+                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.22)', border:'1px solid rgba(77,166,255,0.15)', borderRadius:'2px'}} />
+                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.15)', border:'1px solid rgba(77,166,255,0.10)', borderRadius:'2px'}} />
+                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.08)', border:'1px solid rgba(77,166,255,0.05)', borderRadius:'2px'}} />
+                    </div>
+
+                    <style dangerouslySetInnerHTML={{__html: '\n.tw-bauteam-walker { animation: twTeamWalk 18s linear infinite; }\n@keyframes twTeamWalk { 0% { left: -220px; } 100% { left: calc(100% + 30px); } }\n.tw-bauteam-tiles { animation: twTeamTiles 18s linear infinite; }\n@keyframes twTeamTiles { 0% { left: -310px; } 100% { left: calc(100% - 60px); } }\n'}} />
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
            NAV HEADER COMPONENT
            ═══════════════════════════════════════════ */
         function NavHeader({ page, onBack, onForward, canBack, canForward }) {
