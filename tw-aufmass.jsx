@@ -4055,13 +4055,6 @@
                                     </div>
                                     <div className="manual-raum-fields">
 
-                                        {/* Maße vom letzten Raum übernehmen */}
-                                        {lastRaumData && (
-                                            <button className="copy-masse-btn" onClick={handleCopyLastRoom}>
-                                                🔄 Maße vom letzten Raum übernehmen
-                                            </button>
-                                        )}
-
                                         {/* Raumnummer + Bezeichnung */}
                                         <div className="manual-raum-row">
                                             <div className="manual-raum-field">
@@ -4102,99 +4095,6 @@
                                                     </div>
                                                 )}
                                             </div>
-                                        </div>
-
-                                        {/* Wandmaße */}
-                                        <div className="manual-raum-field">
-                                            <span className="manual-raum-label">Wandmaße</span>
-                                            {manualWaende.map((w, idx) => (
-                                                <div key={idx} style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
-                                                    <span style={{fontFamily:'Oswald', fontWeight:700, color:'var(--accent-orange)',
-                                                        width:'28px', height:'28px', background:'rgba(230,126,34,0.12)', borderRadius:'50%',
-                                                        display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px', flexShrink:0}}>
-                                                        {w.id}
-                                                    </span>
-                                                    <div className="masse-input-wrap" style={{flex:1}}>
-                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000" style={{fontSize:'15px'}}
-                                                            value={w.l} onChange={e => updateWandL(idx, e.target.value)}
-                                                            onBlur={() => formatWandOnBlur(idx)}
-                                                            />
-                                                        <span className="masse-unit">m</span>
-                                                    </div>
-                                                    {manualWaende.length > 2 && (
-                                                        <button className="contact-remove-btn" onClick={() => removeWand(idx)} style={{marginTop:0}}>✕</button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                            <button className="add-abzug-btn" onClick={addWand} style={{marginTop:'2px'}}>＋ Wand hinzufügen</button>
-                                        </div>
-
-                                        {/* Raumhöhe */}
-                                        <div className="manual-raum-field" style={{maxWidth:'180px'}}>
-                                            <span className="manual-raum-label">Raumhöhe</span>
-                                            <div className="masse-input-wrap">
-                                                <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000" style={{fontSize:'15px'}}
-                                                    value={manualRaumhoehe} onChange={e => setManualRaumhoehe(e.target.value)}
-                                                    onBlur={() => { if (manualRaumhoehe && !isNaN(parseMass(manualRaumhoehe))) setManualRaumhoehe(formatMass(manualRaumhoehe)); }}
-                                                    />
-                                                <span className="masse-unit">m</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Fliesenhöhe + Umlaufend */}
-                                        <div className="manual-raum-field">
-                                            <span className="manual-raum-label">Fliesenhöhe</span>
-                                            <div style={{display:'flex', alignItems:'flex-end', gap:'16px', flexWrap:'wrap'}}>
-                                                <div className="masse-input-wrap" style={{maxWidth:'150px'}}>
-                                                    <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000" style={{fontSize:'15px'}}
-                                                        value={manualHoehe} onChange={e => setManualHoehe(e.target.value)}
-                                                        onBlur={() => { if (manualHoehe && !isNaN(parseMass(manualHoehe))) setManualHoehe(formatMass(manualHoehe)); }}
-                                                        />
-                                                    <span className="masse-unit">m</span>
-                                                </div>
-                                                <div className="umlaufend-group">
-                                                    <span className="umlaufend-label">Umlaufend</span>
-                                                    <div className="ja-nein-btns">
-                                                        <button className={`ja-nein-btn ${manualFliesenUmlaufend ? 'active ja' : ''}`}
-                                                            onClick={() => setManualFliesenUmlaufend(true)}>Ja</button>
-                                                        <button className={`ja-nein-btn ${!manualFliesenUmlaufend ? 'active nein' : ''}`}
-                                                            onClick={() => setManualFliesenUmlaufend(false)}>Nein</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {!manualFliesenUmlaufend && (
-                                                <div className="umlaufend-hint">
-                                                    ⚠ Nicht umlaufend → manuellen Rechenweg im Raumblatt verwenden
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Abdichtungshöhe + Umlaufend */}
-                                        <div className="manual-raum-field">
-                                            <span className="manual-raum-label">Abdichtungshöhe</span>
-                                            <div style={{display:'flex', alignItems:'flex-end', gap:'16px', flexWrap:'wrap'}}>
-                                                <div className="masse-input-wrap" style={{maxWidth:'150px'}}>
-                                                    <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000" style={{fontSize:'15px'}}
-                                                        value={manualAbdichtungshoehe} onChange={e => setManualAbdichtungshoehe(e.target.value)}
-                                                        onBlur={() => { if (manualAbdichtungshoehe && !isNaN(parseMass(manualAbdichtungshoehe))) setManualAbdichtungshoehe(formatMass(manualAbdichtungshoehe)); }}
-                                                        />
-                                                    <span className="masse-unit">m</span>
-                                                </div>
-                                                <div className="umlaufend-group">
-                                                    <span className="umlaufend-label">Umlaufend</span>
-                                                    <div className="ja-nein-btns">
-                                                        <button className={`ja-nein-btn ${manualAbdichtungUmlaufend ? 'active ja' : ''}`}
-                                                            onClick={() => setManualAbdichtungUmlaufend(true)}>Ja</button>
-                                                        <button className={`ja-nein-btn ${!manualAbdichtungUmlaufend ? 'active nein' : ''}`}
-                                                            onClick={() => setManualAbdichtungUmlaufend(false)}>Nein</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {!manualAbdichtungUmlaufend && (
-                                                <div className="umlaufend-hint">
-                                                    ⚠ Nicht umlaufend → manuellen Rechenweg in der Abdichtungs-Position verwenden
-                                                </div>
-                                            )}
                                         </div>
 
                                         <div className="modal-btn-group">
@@ -6058,7 +5958,9 @@
                         setTimeout(() => el.classList.remove('laser-field-highlight'), 600);
                     }
 
-                    // Nächstes Feld -- erst .masse-input im Container, dann beliebiges sichtbares Input
+                    // Naechstes Feld -- erst .masse-input im aktuellen Container, dann .masse-input
+                    // in der uebergeordneten Hierarchie (ueber .masse-section-Grenzen hinweg).
+                    // Wichtig fuer den Uebergang von Abdichtungshoehe -> Wandmaz A.
                     const container = el.closest('.masse-section') || el.closest('.raumblatt-content') || el.closest('.page-container');
                     if (container) {
                         const masseInputs = [...container.querySelectorAll('.masse-input')];
@@ -6069,14 +5971,19 @@
                                 masseInputs[idx + 1].select();
                             }, 50);
                         } else {
-                            // Letztes Masse-Feld: zum nächsten beliebigen sichtbaren Input springen
-                            const allSelector = 'input:not([disabled]):not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([readonly]),select:not([disabled])';
-                            const allInputs = [...container.querySelectorAll(allSelector)].filter(inp => inp.offsetParent !== null || inp.offsetWidth > 0);
-                            const globalIdx = allInputs.indexOf(el);
-                            if (globalIdx >= 0 && allInputs[globalIdx + 1]) {
+                            // Letztes Masse-Feld im aktuellen Container: in den uebergeordneten
+                            // Container wechseln (typischerweise .raumblatt-content) und das
+                            // naechste .masse-input dort fokussieren -- so landet der Laser nach
+                            // der letzten Hoehe automatisch bei Wand A.
+                            const outerContainer = el.closest('.raumblatt-content') || el.closest('.page-container') || document.body;
+                            const allMasseInputs = [...outerContainer.querySelectorAll('.masse-input')].filter(inp => {
+                                return !inp.disabled && (inp.offsetParent !== null || inp.offsetWidth > 0);
+                            });
+                            const globalIdx = allMasseInputs.indexOf(el);
+                            if (globalIdx >= 0 && allMasseInputs[globalIdx + 1]) {
                                 setTimeout(() => {
-                                    allInputs[globalIdx + 1].focus();
-                                    if (allInputs[globalIdx + 1].select) allInputs[globalIdx + 1].select();
+                                    allMasseInputs[globalIdx + 1].focus();
+                                    allMasseInputs[globalIdx + 1].select();
                                 }, 50);
                             } else {
                                 el.blur();
