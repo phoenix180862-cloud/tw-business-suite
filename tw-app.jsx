@@ -1695,30 +1695,52 @@
             };
 
             // ── WIP wiederherstellen (aus Akte heraus) ──
-            var handleWipRestore = function(wip) {
-                if (!wip || !wip.moduleState) return;
-                var targetPage = wip.page || MODUL_PAGES[wip.modulName] || 'modulwahl';
+            // WICHTIG: listWips() liefert aus Performance-Gruenden NUR Metadaten
+            // ohne moduleState. Daher muss hier erst der volle Record nachgeladen
+            // werden, bevor der State wiederhergestellt werden kann.
+            var handleWipRestore = function(wipMeta) {
+                if (!wipMeta || !wipMeta.modulName) return;
+                if (!selectedKunde) return;
+                if (!window.TWStorage || !window.TWStorage.isReady()) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
 
-                // Aufmass-spezifisch: Basis-State wiederherstellen
-                if (wip.modulName === 'aufmass' && wip.moduleState) {
-                    if (wip.moduleState.gesamtliste) setGesamtliste(wip.moduleState.gesamtliste);
-                    if (wip.moduleState.fertigeRaeume) setFertigeRaeume(wip.moduleState.fertigeRaeume);
-                    if (wip.moduleState.selectedPositions) setSelectedPositions(wip.moduleState.selectedPositions);
-                    if (wip.moduleState.aufmassGespeichert) setAufmassGespeichert(wip.moduleState.aufmassGespeichert);
+                // Modal sofort schliessen + Auto-Save fuer den Restore-Moment unterdruecken
+                setShowAkteModal(false);
+                if (window.TW && window.TW.AutoSave) {
+                    window.TW.AutoSave.suppress(true);
+                    setTimeout(function(){ if (window.TW && window.TW.AutoSave) window.TW.AutoSave.suppress(false); }, 1500);
                 }
 
-                setShowAkteModal(false);
-                navigateTo(targetPage);
-
-                // Nach Navigation: WIP-State ins Modul injizieren via Event-Bus
-                setTimeout(function() {
-                    if (window.TW && window.TW.emit) {
-                        TW.emit('wip:restoreState', {
-                            modulName: wip.modulName,
-                            moduleState: wip.moduleState
-                        });
+                TWStorage.loadWip(kundeId, wipMeta.modulName).then(function(wip) {
+                    if (!wip || !wip.moduleState) {
+                        alert('Der gespeicherte Stand konnte nicht geladen werden.');
+                        return;
                     }
-                }, 300);
+                    var targetPage = wip.page || MODUL_PAGES[wip.modulName] || 'modulwahl';
+
+                    // Aufmass-spezifisch: Basis-State wiederherstellen
+                    if (wip.modulName === 'aufmass' && wip.moduleState) {
+                        if (wip.moduleState.gesamtliste) setGesamtliste(wip.moduleState.gesamtliste);
+                        if (wip.moduleState.fertigeRaeume) setFertigeRaeume(wip.moduleState.fertigeRaeume);
+                        if (wip.moduleState.selectedPositions) setSelectedPositions(wip.moduleState.selectedPositions);
+                        if (wip.moduleState.aufmassGespeichert) setAufmassGespeichert(wip.moduleState.aufmassGespeichert);
+                    }
+
+                    navigateTo(targetPage);
+
+                    // Nach Navigation: WIP-State ins Modul injizieren via Event-Bus
+                    setTimeout(function() {
+                        if (window.TW && window.TW.emit) {
+                            TW.emit('wip:restoreState', {
+                                modulName: wip.modulName,
+                                moduleState: wip.moduleState
+                            });
+                        }
+                    }, 300);
+                }).catch(function(err) {
+                    console.warn('[Akte] WIP laden fehlgeschlagen:', err);
+                    alert('Der gespeicherte Stand konnte nicht geladen werden: ' + (err.message || 'Unbekannter Fehler'));
+                });
             };
 
             // ══════════════════════════════════════════════════════════
@@ -2158,19 +2180,19 @@
                                     </div>
                                     <button onClick={function(){ setShowAkteModal(false); }}
                                         style={{width:'36px', height:'36px', borderRadius:'50%', border:'none', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'18px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-secondary)'}}>
-                                        \u2715
+                                        {'\u2715'}
                                     </button>
                                 </div>
 
                                 <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'16px', padding:'8px 12px', background:'var(--bg-secondary)', borderRadius:'8px'}}>
-                                    Nur lokal erstellte Dokumente \u2014 keine Google Drive Originale
+                                    {'Nur lokal erstellte Dokumente \u2014 keine Google Drive Originale'}
                                 </div>
 
                                 {/* WIP-Eintraege (Bearbeitungsstaende) */}
                                 {akteData.wips && akteData.wips.length > 0 && (
                                     <div style={{marginBottom:'16px'}}>
                                         <div style={{fontSize:'12px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'8px', fontFamily:'Oswald, sans-serif'}}>
-                                            Bearbeitungsst\u00e4nde
+                                            {'Bearbeitungsst\u00e4nde'}
                                         </div>
                                         {akteData.wips.map(function(wip) {
                                             return (
@@ -2193,7 +2215,7 @@
                                                             {wip.savedAt ? new Date(wip.savedAt).toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : ''}
                                                         </div>
                                                     </div>
-                                                    <span style={{color:'var(--accent-blue)', fontSize:'12px', fontWeight:700, flexShrink:0}}>\u25B6</span>
+                                                    <span style={{color:'var(--accent-blue)', fontSize:'12px', fontWeight:700, flexShrink:0}}>{'\u25B6'}</span>
                                                 </button>
                                             );
                                         })}
@@ -2232,17 +2254,17 @@
                                 {/* Leer-Zustand */}
                                 {(!akteData.wips || akteData.wips.length === 0) && (!akteData.appDateien || akteData.appDateien.length === 0) && (
                                     <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)'}}>
-                                        <div style={{fontSize:'36px', marginBottom:'12px'}}>\uD83D\uDCC2</div>
+                                        <div style={{fontSize:'36px', marginBottom:'12px'}}>{'\uD83D\uDCC2'}</div>
                                         <div style={{fontSize:'14px', fontWeight:600}}>Noch keine lokalen Dokumente</div>
                                         <div style={{fontSize:'12px', marginTop:'6px'}}>
-                                            Erstelle ein Aufma\u00df, eine Rechnung oder einen Brief und dr\u00fccke "Speich." \u2014 dann erscheinen sie hier.
+                                            {'Erstelle ein Aufma\u00df, eine Rechnung oder einen Brief \u2014 der aktuelle Bearbeitungsstand wird automatisch gesichert und erscheint hier.'}
                                         </div>
                                     </div>
                                 )}
 
                                 <button onClick={function(){ setShowAkteModal(false); }}
                                     style={{width:'100%', padding:'12px', marginTop:'8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                    Schlie\u00dfen
+                                    {'Schlie\u00dfen'}
                                 </button>
                             </div>
                         </div>
