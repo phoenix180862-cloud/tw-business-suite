@@ -1,4 +1,39 @@
         // ═══════════════════════════════════════════════════════════
+        // FOTO-SYNC STATUS-INDIKATOR (Phase 2)
+        // ═══════════════════════════════════════════════════════════
+        // Zeigt neben dem Auto-Save-Indikator an, ob Fotos gerade nach
+        // Drive hochgeladen werden. Nur sichtbar, wenn tatsaechlich
+        // ein Upload laeuft oder gerade beendet wurde.
+        // ═══════════════════════════════════════════════════════════
+        function FotoSyncIndicator(props) {
+            const s = props && props.status;
+            if (!s) return null;
+            var label, bg, tip;
+            if (s.indexOf('uploading:') === 0) {
+                var parts = s.substring(10).split('/');
+                label = 'Upload ' + parts[0] + '/' + parts[1];
+                bg = 'linear-gradient(135deg, #3498db, #2980b9)';
+                tip = 'Fotos werden nach Google Drive hochgeladen';
+            } else if (s.indexOf('done:') === 0) {
+                label = 'Wolke OK';
+                bg = 'linear-gradient(135deg, #27ae60, #1e8449)';
+                tip = s.substring(5) + ' Foto(s) erfolgreich hochgeladen';
+            } else if (s === 'error') {
+                label = 'Wolke!';
+                bg = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                tip = 'Upload-Fehler — wird spaeter automatisch wiederholt';
+            } else {
+                return null;
+            }
+            return (
+                <div title={tip}
+                    style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'9px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none'}}>
+                    {label}
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════
         // AUTO-SAVE STATUS-INDIKATOR
         // ═══════════════════════════════════════════════════════════
         // Kleine Komponente in der Navigationsleiste, die dem Benutzer
@@ -1660,6 +1695,82 @@
                 });
             }, [selectedKunde]);
 
+            // ══════════════════════════════════════════════════════════
+            // PHASE 2: AUTO-DRIVE-SYNC FUER FOTOS
+            // ══════════════════════════════════════════════════════════
+            // Sobald Internet da ist UND ein Kunde aktiv ist UND Google
+            // Drive verbunden ist, werden alle noch nicht hochgeladenen
+            // Fotos des Kunden im Hintergrund nach Drive synchronisiert.
+            // Ausgeloest wird das durch drei Trigger:
+            //   1. Beim Kundenwechsel (nach Auto-Wiederherstellung)
+            //   2. Beim Online-Event (vom offline->online Wechsel)
+            //   3. Periodisch alle 3 Minuten, solange Kunde offen ist
+            // ══════════════════════════════════════════════════════════
+            const [fotoSyncStatus, setFotoSyncStatus] = useState(null);
+
+            var _startFotoSync = React.useCallback(function() {
+                if (!selectedKunde) return;
+                if (!navigator.onLine) return;
+                if (!window.TWStorage || !window.TWStorage.FotoSync) return;
+                if (!window.GoogleDriveService || !window.GoogleDriveService.accessToken) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                var driveOrdnerId = selectedKunde._driveFolderId;
+                if (!driveOrdnerId) return; // ohne Kundenordner-ID kein Upload
+                window.TWStorage.FotoSync.syncKunde(kundeId, driveOrdnerId).catch(function(e) {
+                    console.warn('[FotoSync] Lauf abgebrochen:', e.message);
+                });
+            }, [selectedKunde]);
+
+            // Progress-Subscription (setzt den Status fuer den UI-Indikator)
+            useEffect(function() {
+                if (!window.TWStorage || !window.TWStorage.FotoSync) return;
+                var unsub = window.TWStorage.FotoSync.onProgress(function(info) {
+                    if (!info) return;
+                    if (info.phase === 'uploading') {
+                        setFotoSyncStatus('uploading:' + (info.done || 0) + '/' + (info.total || 0));
+                    } else if (info.phase === 'done') {
+                        var r = info.result || {};
+                        if (r.uploaded > 0) {
+                            setFotoSyncStatus('done:' + r.uploaded);
+                            setTimeout(function() { setFotoSyncStatus(null); }, 4000);
+                        } else {
+                            setFotoSyncStatus(null);
+                        }
+                    } else if (info.phase === 'error') {
+                        setFotoSyncStatus('error');
+                        setTimeout(function() { setFotoSyncStatus(null); }, 5000);
+                    } else if (info.phase === 'idle') {
+                        setFotoSyncStatus(null);
+                    }
+                });
+                return function() { if (unsub) unsub(); };
+            }, []);
+
+            // Trigger 1: Beim Kundenwechsel (mit Verzoegerung, damit
+            // die Wiederherstellung zuerst laeuft)
+            useEffect(function() {
+                if (!selectedKunde) return;
+                var t = setTimeout(function() { _startFotoSync(); }, 3000);
+                return function() { clearTimeout(t); };
+            }, [selectedKunde, _startFotoSync]);
+
+            // Trigger 2: Online-Wechsel
+            useEffect(function() {
+                var onOnline = function() {
+                    console.log('[TW] Online erkannt — starte FotoSync');
+                    setTimeout(function() { _startFotoSync(); }, 1500);
+                };
+                window.addEventListener('online', onOnline);
+                return function() { window.removeEventListener('online', onOnline); };
+            }, [_startFotoSync]);
+
+            // Trigger 3: Periodisch alle 3 Minuten
+            useEffect(function() {
+                if (!selectedKunde) return;
+                var iv = setInterval(function() { _startFotoSync(); }, 3 * 60 * 1000);
+                return function() { clearInterval(iv); };
+            }, [selectedKunde, _startFotoSync]);
+
             // ── App-Datei oeffnen (PDF, HTML etc.) ──
             var handleOpenAppDatei = function(dateiId) {
                 if (!window.TWStorage) return;
@@ -1914,6 +2025,8 @@
                             </button>
                             {/* AUTO-SAVE-STATUS-INDIKATOR (ersetzt den frueheren manuellen Speich.-Button) */}
                             <AutoSaveStatusIndicator />
+                            {/* FOTO-SYNC-INDIKATOR (Phase 2) */}
+                            <FotoSyncIndicator status={fotoSyncStatus} />
                         </div>
                     )}
 
