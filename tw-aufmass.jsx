@@ -4547,25 +4547,21 @@
                     {/* ═══ POSITIONSAUSWAHL MODAL ═══ */}
                     {showPosModal && activeRaum && (
                         <div className="pos-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowPosModal(false); setActiveRaum(null); } }}>
-                            {/* FIX: X-Button entfernt (war gefaehrlich - zerstoert Raumauswahl).
-                                Titelzeile wird jetzt zur vollen Info-Zeile ohne Schwarz-Balken.
-                                Schliessen via Overlay-Click oder Abbrechen-Button unten. */}
+                            {/* Titelzeile: reiner Text links oben, kein roter Balken, kein Button */}
                             <div className="pos-modal-header" style={{
-                                background: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                                color: '#fff',
-                                padding: '10px 14px',
+                                background: 'transparent',
+                                padding: '8px 14px 4px',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0'
+                                justifyContent: 'flex-start'
                             }}>
                                 <div className="pos-modal-title" style={{
-                                    fontSize: '14px',
-                                    fontWeight: 700,
+                                    fontSize: '13px',
+                                    fontWeight: 600,
                                     fontFamily: 'Oswald, sans-serif',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.5px',
-                                    textAlign: 'center',
+                                    textAlign: 'left',
                                     color: '#fff'
                                 }}>
                                     {'\uD83D\uDCCB'} {activeRaum.bez} ({activeRaum.nr}) — {selectedPositions.length} Pos. ausgewaehlt
