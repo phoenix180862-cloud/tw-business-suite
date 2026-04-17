@@ -2395,9 +2395,10 @@
             return consolidated;
         }
     };
-    </script>
-    <!-- FirebaseService -->
-    <script>
+
+    // ═══════════════════════════════════════════════════════
+    // FIREBASE SERVICE
+    // ═══════════════════════════════════════════════════════
     window.FirebaseService = {
         app:null, db:null, auth:null, storage:null, initialized:false, configKey:'tw_firebase_config',
         getStoredConfig() { try { var c=localStorage.getItem(this.configKey); return c?JSON.parse(c):null; } catch(e){return null;} },
@@ -2464,5 +2465,3 @@
             s.forEach(function(c){t.push({id:c.key,...c.val()});}); return t;
         }
     };
-    </script>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
