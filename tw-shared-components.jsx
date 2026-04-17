@@ -480,8 +480,8 @@
            NAV HEADER COMPONENT
            ═══════════════════════════════════════════ */
         function NavHeader({ page, onBack, onForward, canBack, canForward }) {
-            // Auf Startseite und Modulwahl keine Vor/Zurueck-Buttons (Thomas' Wunsch)
-            var hideNavButtons = (page === 'start' || page === 'modulwahl');
+            // FIX: Nur auf Startseite ausblenden - Modulwahl + alle anderen zeigen Buttons
+            var hideNavButtons = (page === 'start');
 
             // Schriftgroessen-Toggle: Liest/Schreibt body-class und localStorage
             var [fontLarge, setFontLarge] = useState(function() {
@@ -527,22 +527,31 @@
                 };
             };
 
+            // FIX: Vor-Button IMMER aktiv - ermoeglicht Seitenwechsel auch in leeren Blaettern
+            // (wenn keine History da ist, tut onForward nichts, aber der Button fuehlt sich immer klickbar an)
+            var forwardHandler = function() {
+                if (canForward) {
+                    onForward();
+                } else if (typeof onForward === 'function') {
+                    // Versuche trotzdem - manche Module haben interne Tab-Navigation
+                    onForward();
+                }
+            };
+
             return (
                 <header className="app-header">
                     {!hideNavButtons && (
                         <div className="nav-bar" style={{display:'flex', gap:'6px'}}>
                             <button
-                                style={redBtnStyle(!canBack)}
-                                disabled={!canBack}
+                                style={redBtnStyle(false)}
                                 onClick={onBack}
                                 title="Eine Seite zurueck"
                             >
                                 {'\u2190'} Zurueck
                             </button>
                             <button
-                                style={redBtnStyle(!canForward)}
-                                disabled={!canForward}
-                                onClick={onForward}
+                                style={redBtnStyle(false)}
+                                onClick={forwardHandler}
                                 title="Eine Seite vor"
                             >
                                 Vor {'\u2192'}

@@ -4632,11 +4632,29 @@
                     {/* ═══ POSITIONSAUSWAHL MODAL ═══ */}
                     {showPosModal && activeRaum && (
                         <div className="pos-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowPosModal(false); setActiveRaum(null); } }}>
-                            <div className="pos-modal-header">
-                                <div className="pos-modal-title">
+                            {/* FIX: X-Button entfernt (war gefaehrlich - zerstoert Raumauswahl).
+                                Titelzeile wird jetzt zur vollen Info-Zeile ohne Schwarz-Balken.
+                                Schliessen via Overlay-Click oder Abbrechen-Button unten. */}
+                            <div className="pos-modal-header" style={{
+                                background: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                color: '#fff',
+                                padding: '10px 14px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0'
+                            }}>
+                                <div className="pos-modal-title" style={{
+                                    fontSize: '14px',
+                                    fontWeight: 700,
+                                    fontFamily: 'Oswald, sans-serif',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    textAlign: 'center',
+                                    color: '#fff'
+                                }}>
                                     {'\uD83D\uDCCB'} {activeRaum.bez} ({activeRaum.nr}) — {selectedPositions.length} Pos. ausgewaehlt
                                 </div>
-                                <button className="pos-modal-close" onClick={() => { setShowPosModal(false); setActiveRaum(null); }}>{'\u2715'}</button>
                             </div>
 
                             {/* PAKET C: Listen-Aktionen im Pos-Modal */}
