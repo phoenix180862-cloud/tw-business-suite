@@ -265,7 +265,7 @@
 
                 return (<div className="page-container" style={{padding:'0',minHeight:'100vh',paddingBottom:'80px'}}>
                 <div style={{margin:'8px',background:'#fff',borderRadius:'12px',padding:'22px 20px 16px',color:'#222',boxShadow:'0 4px 24px rgba(0,0,0,0.35)',minHeight:'85vh'}}>
-                    {/* BRIEFKOPF: Logo links + Adresse rechts -- identisch Rechnungsmodul */}
+                    {/* BRIEFKOPF: Logo links + Adresse rechts - identisch Rechnungsmodul */}
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'3mm'}}>
                         <div style={{display:'inline-flex',flexDirection:'column',alignItems:'flex-start'}}>
                             <div style={{fontFamily:'"Source Sans 3",sans-serif',fontStyle:'normal',fontWeight:700,color:'#c41e1e',fontSize:'14.5px',letterSpacing:'3px',marginBottom:'-18px',paddingLeft:'1px',position:'relative',zIndex:2}}>Thomas</div>
@@ -294,7 +294,7 @@
                         <div style={{textAlign:'right'}}><div style={{fontSize:'7.5pt',color:'#999'}}>Datum</div>{editMode?<input type="text" value={briefDatum} onChange={function(e){setBriefDatum(e.target.value);}} style={Object.assign({},pdfInput,{fontWeight:600,textAlign:'right'})} />:<div style={{fontSize:'10.5pt',fontWeight:600}}>Nisterau, {new Date(briefDatum).toLocaleDateString('de-DE')}</div>}</div>
                     </div>
 
-                    {/* 5cm Abstand -- wie im Rechnungsmodul (y+=20 nach Adresse) */}
+                    {/* 5cm Abstand - wie im Rechnungsmodul (y+=20 nach Adresse) */}
                     <div style={{height:'20mm'}}></div>
 
                     {/* BETREFF */}

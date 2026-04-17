@@ -527,7 +527,7 @@
             {/* === EINE weisse A4-Seite === */}
             <div style={{margin:'8px',background:'#fff',borderRadius:'12px',padding:'22px 20px 16px',color:'#222',boxShadow:'0 4px 24px rgba(0,0,0,0.35)',minHeight:'85vh'}}>
 
-                {/* --- BRIEFKOPF: Logo links + Adresse rechts (40% groesser, Thomas=FLM Staerke) --- */}
+                {/* BRIEFKOPF: Logo links + Adresse rechts (40% groesser, Thomas=FLM Staerke) */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'3mm'}}>
                     <div style={{display:'inline-flex',flexDirection:'column',alignItems:'flex-start'}}>
                         <div style={{fontFamily:'"Source Sans 3",serif',fontStyle:'italic',fontWeight:600,color:'#c41e1e',fontSize:'14px',marginBottom:'-16px',paddingLeft:'0px',position:'relative',zIndex:2}}>Thomas</div>
@@ -542,11 +542,11 @@
                     <div style={{textAlign:'right',fontSize:'9.5pt',color:'#333',lineHeight:1.7,paddingTop:'5mm'}}>Flurweg 14a<br/>56472 Nisterau<br/>Tel. 02661-63101<br/>Mobil 0170-2024161</div>
                 </div>
 
-                {/* --- Rote Trennlinie --- */}
+                {/* Rote Trennlinie */}
                 <hr style={{border:'none',borderTop:'2.5px solid #c41e1e',margin:'3mm 0 2mm'}} />
                 <div style={{fontSize:'7pt',color:'#aaa',borderBottom:'0.5px solid #ccc',display:'inline-block',paddingBottom:'1px',marginBottom:'5mm'}}>Thomas Willwacher Fliesenlegermeister e.K. {'\u00B7'} Flurweg 14a {'\u00B7'} 56472 Nisterau</div>
 
-                {/* --- EMPFAENGER (komplett editierbar) + DATUM rechts --- */}
+                {/* EMPFAENGER (komplett editierbar) + DATUM rechts */}
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'6mm'}}>
                     <div style={{flex:1,maxWidth:'55%'}}>
                         <input type="text" value={empfName} onChange={function(e){setEmpfName(e.target.value);}} placeholder="Firma / Name des Kunden" style={Object.assign({},pdfInput,{fontWeight:700,fontSize:'12px',marginBottom:'3px'})} />
@@ -560,10 +560,10 @@
                     </div>
                 </div>
 
-                {/* --- DOKUMENTTITEL (gross) --- */}
+                {/* DOKUMENTTITEL (gross) */}
                 <div style={{fontSize:'17pt',fontWeight:700,color:'#111',marginBottom:'4mm'}}>{tpLabel}</div>
 
-                {/* --- META-FELDER links untereinander (alle editierbar) --- */}
+                {/* META-FELDER links untereinander (alle editierbar) */}
                 <div style={{marginBottom:'5mm',fontSize:'9pt',lineHeight:2.2}}>
                     <div style={{display:'flex',alignItems:'center',gap:'4px'}}>
                         <span style={{display:'inline-block',width:'38mm',color:'#888',flexShrink:0}}>Leistungszeitraum:</span>
@@ -611,7 +611,7 @@
                     </div>}
                 </div>
 
-                {/* --- POSITIONEN-BEREICH: Mehrseitige A4-Darstellung --- */}
+                {/* POSITIONEN-BEREICH: Mehrseitige A4-Darstellung */}
                 {!positionenGeladen ? (
                     <div style={{border:'2px dashed #ccc',borderRadius:'8px',padding:'28px 16px',textAlign:'center',marginBottom:'12px'}}>
                         <div style={{color:'#999',fontSize:'11px',marginBottom:'12px'}}>Positionen werden nach "Daten laden" hier angezeigt.</div>
@@ -726,7 +726,7 @@
                 {/* Schlussrechnung: Kontozahlungen */}
                 {rechnungsTyp==='schluss'&&(<button onClick={function(){setShowKontoDialog(true);ladeKontozahlungen();}} style={{width:'100%',padding:'8px',marginBottom:'8px',borderRadius:'8px',border:'1px solid #27ae60',background:'rgba(39,174,96,0.06)',color:'#27ae60',fontSize:'10px',fontWeight:700,cursor:'pointer'}}>Kontozahlungen anzeigen ({kontozahlungen.length})</button>)}
 
-                {/* --- FUSSZEILE (Vorschau) --- */}
+                {/* FUSSZEILE (Vorschau) */}
                 <div style={{borderTop:'1.5px solid #c41e1e',paddingTop:'2mm',fontSize:'7.5pt',color:'#666',lineHeight:1.7,marginTop:'auto'}}>
                     <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontWeight:700,color:'#c41e1e'}}>Thomas Willwacher Fliesenlegermeister e.K.</span><span>Steuernummer: 30/220/1234/5</span></div>
                     <div style={{color:'#555',marginTop:'1mm'}}>Westerwald Bank eG {'\u00B7'} IBAN: DE12 5739 1800 0000 0000 00 {'\u00B7'} BIC: GENODE51WW1</div>

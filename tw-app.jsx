@@ -2046,7 +2046,7 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
-                    {/* -- GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe (ALLE Seiten inkl. Start) -- */}
+                    {/* GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe (ALLE Seiten inkl. Start) */}
                     {(true) && (
                         <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
                             <button onClick={function(){ navigateTo('start'); }}

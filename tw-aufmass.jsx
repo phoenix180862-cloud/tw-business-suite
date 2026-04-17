@@ -273,7 +273,7 @@
                     {/* ═══ VERBINDUNGS-BUTTONS (nebeneinander, kompakt) ═══ */}
                     <div style={{padding:'0 20px', marginBottom:'10px', width:'100%', maxWidth:'500px'}}>
                         <div style={{display:'flex', gap:'8px', marginBottom:'10px'}}>
-                            {/* -- Gemini KI -- */}
+                            {/* Gemini KI */}
                             <button
                                 onTouchEnd={function(e){ e.preventDefault(); setShowKiSettings(!showKiSettings); }}
                                 onClick={function(){ setShowKiSettings(!showKiSettings); }}
@@ -295,7 +295,7 @@
                                 {geminiConnected && <span style={{position:'absolute', top:'4px', right:'4px', width:'6px', height:'6px', borderRadius:'50%', background:'#2ecc71', boxShadow:'0 0 6px rgba(46,204,113,0.5)'}} />}
                             </button>
 
-                            {/* -- Google Drive -- */}
+                            {/* Google Drive */}
                             <button disabled={driveConnecting}
                                 onTouchEnd={function(e){ e.preventDefault(); if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
                                 onClick={function(){ if(!driveConnected && !driveConnecting) handleConnectDrive(); }}
@@ -321,7 +321,7 @@
                             </button>
                         </div>
 
-                        {/* -- KUNDENAUSWAHL Button (Hauptaktion = ROT!) -- */}
+                        {/* KUNDENAUSWAHL Button (Hauptaktion = ROT!) */}
                         <button
                             disabled={!geminiConnected && !driveConnected}
                             onTouchEnd={function(e){ e.preventDefault(); handleKundenauswahlClick(); }}
@@ -1326,7 +1326,7 @@
                             </div>
                             <div>
                                 <label style={labelStyle}>Menge</label>
-                                <input type="number" inputMode="decimal" step="0.01" value={form.menge} onChange={function(e){ setForm(Object.assign({}, form, {menge: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                                <input type="text" inputMode="decimal" value={form.menge} onChange={function(e){ setForm(Object.assign({}, form, {menge: e.target.value})); }} placeholder="0.00" style={inputStyle} />
                             </div>
                         </div>
                         <div style={{marginTop:'10px'}}>
@@ -1355,11 +1355,11 @@
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginTop:'10px'}}>
                             <div>
                                 <label style={labelStyle}>EP netto</label>
-                                <input type="number" inputMode="decimal" step="0.01" value={form.ep} onChange={function(e){ setForm(Object.assign({}, form, {ep: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                                <input type="text" inputMode="decimal" value={form.ep} onChange={function(e){ setForm(Object.assign({}, form, {ep: e.target.value})); }} placeholder="0.00" style={inputStyle} />
                             </div>
                             <div>
                                 <label style={labelStyle}>GP netto</label>
-                                <input type="number" inputMode="decimal" step="0.01" value={form.gp} onChange={function(e){ setForm(Object.assign({}, form, {gp: e.target.value})); }}
+                                <input type="text" inputMode="decimal" value={form.gp} onChange={function(e){ setForm(Object.assign({}, form, {gp: e.target.value})); }}
                                     placeholder={form.ep && form.menge ? String(Math.round(parseFloat(form.ep || 0) * parseFloat(form.menge || 0) * 100) / 100) : '0.00'} style={inputStyle} />
                             </div>
                         </div>
@@ -1671,7 +1671,7 @@
                                         </div>
                                         <div>
                                             <label style={labelStyle}>Flaeche (m2)</label>
-                                            <input type="number" inputMode="decimal" step="0.01" value={raumForm.flaeche} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {flaeche: e.target.value})); }} placeholder="0.00" style={inputStyle} />
+                                            <input type="text" inputMode="decimal" value={raumForm.flaeche} onChange={function(e){ setRaumForm(Object.assign({}, raumForm, {flaeche: e.target.value})); }} placeholder="0.00" style={inputStyle} />
                                         </div>
                                     </div>
                                     <div style={{marginTop:'10px'}}>
@@ -2087,12 +2087,12 @@
                                             border: isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent',
                                             borderBottom: isExpanded ? '1px solid var(--border-color)' : (isSelected ? '1px solid rgba(39,174,96,0.3)' : '1px solid transparent'),
                                             transition:'all 0.2s'}}>
-                                            {/* Checkbox -- toggelt Auswahl */}
+                                            {/* Checkbox - toggelt Auswahl */}
                                             <span onClick={function(e){ e.stopPropagation(); toggleFolder(folder.name); }}
                                                 style={{fontSize:'16px', width:'20px', textAlign:'center', cursor:'pointer'}}>
                                                 {isSelected ? '✅' : '⬜'}
                                             </span>
-                                            {/* Aufklapp-Pfeil + Ordner-Info -- toggelt Expand */}
+                                            {/* Aufklapp-Pfeil + Ordner-Info - toggelt Expand */}
                                             <div onClick={function(){ toggleExpand(folder.name); }}
                                                 style={{flex:1, display:'flex', alignItems:'center', gap:'6px', minWidth:0, cursor:'pointer'}}>
                                                 <span style={{fontSize:'12px', color:'var(--text-muted)', transition:'transform 0.2s', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)', display:'inline-block', width:'14px', textAlign:'center'}}>▶</span>
@@ -2900,7 +2900,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Update-Button -- Drive-Akten neu laden + KI-Analyse */}
+                                    {/* Update-Button - Drive-Akten neu laden + KI-Analyse */}
                                     {!deleteMode && onUpdateKunde && kunde._driveFolderId && (
                                         <button
                                             onClick={function(e) {
@@ -3067,7 +3067,7 @@
                             })}
                         </div>
 
-                        {/* Emoji-Animation -- wechselt je nach Phase */}
+                        {/* Emoji-Animation - wechselt je nach Phase */}
                         <div style={{fontSize:'42px', marginBottom:'8px', animation:'bounce 1.5s ease-in-out infinite'}}>
                             {progressPct >= 100 ? '🎉' : progressPct > 80 ? '🏆' : progressPct > 60 ? '🤖' : progressPct > 40 ? '📋' : progressPct > 20 ? '🔍' : '🚀'}
                         </div>
@@ -10941,7 +10941,7 @@
                                             <div className="masse-field" style={{marginBottom:'8px'}}>
                                                 <span className="masse-label">Anzahl (gleiche Türen)</span>
                                                 <div className="masse-input-wrap">
-                                                    <input className="masse-input" type="number" min="1" step="1"
+                                                    <input className="masse-input" type="text" inputMode="numeric"
                                                         value={t.anzahl || 1}
                                                         onChange={e => updateTuer(t.id, 'anzahl', parseInt(e.target.value) || 1)}
                                                         style={{textAlign:'center', fontWeight:'700', color:'var(--accent-blue)'}} />
@@ -11147,7 +11147,7 @@
                                             <div className="masse-field" style={{marginBottom:'8px'}}>
                                                 <span className="masse-label">Anzahl (gleiche Fenster)</span>
                                                 <div className="masse-input-wrap">
-                                                    <input className="masse-input" type="number" min="1" step="1"
+                                                    <input className="masse-input" type="text" inputMode="numeric"
                                                         value={f.anzahl || 1}
                                                         onChange={e => updateFenster(f.id, 'anzahl', parseInt(e.target.value) || 1)}
                                                         style={{textAlign:'center', fontWeight:'700', color:'var(--accent-blue)'}} />
