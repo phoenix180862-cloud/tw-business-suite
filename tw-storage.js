@@ -672,8 +672,122 @@
         function isRunning() { return _running; }
         function getCurrentKundeId() { return _currentKundeId; }
 
+        // Parst den Dateinamen einer im Bilder-Ordner hochgeladenen Datei zurueck
+        // zu den Ursprungs-Metadaten. Format (siehe _makeDateiName):
+        //   <kontext>_<raumKey>_<subKey>_<YYYY-MM-DDTHH-MM-SS>.jpg
+        // Gibt null zurueck, wenn der Name nicht dem Muster folgt.
+        function parseFotoDateiName(name) {
+            if (!name) return null;
+            var base = name.replace(/\.jpe?g$/i, '');
+            var parts = base.split('_');
+            if (parts.length < 4) return null;
+            var tsPart = parts[parts.length - 1];
+            // Timestamp-Form: 2025-04-17T14-32-18 -> ISO rekonstruieren
+            var tsMatch = /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})$/.exec(tsPart);
+            if (!tsMatch) return null;
+            var iso = tsMatch[1] + 'T' + tsMatch[2] + ':' + tsMatch[3] + ':' + tsMatch[4];
+            var subKey = parts[parts.length - 2];
+            var raumKey = parts[parts.length - 3];
+            var kontext = parts.slice(0, parts.length - 3).join('_');
+            return { kontext: kontext, raumKey: raumKey, subKey: subKey, createdAt: iso };
+        }
+
+        // Download-Sync: holt Fotos aus dem Drive-Bilder-Ordner, die lokal
+        // noch nicht vorhanden sind, und speichert sie in IndexedDB mit den
+        // aus dem Dateinamen parsed Metadaten. Multi-Geraete-Szenario:
+        //   - Handy macht Fotos -> FotoSync.syncKunde uploadet -> Drive
+        //   - Tablet/PC oeffnet Akte -> diese Funktion zieht sie runter
+        // Idempotent: bereits lokal vorhandene Drive-IDs werden uebersprungen.
+        function downloadMissingFotos(kundeId, kundeDriveOrdnerId) {
+            if (!kundeId) return Promise.reject(new Error('kundeId fehlt'));
+            if (!kundeDriveOrdnerId) return Promise.reject(new Error('Drive-Ordner-ID fehlt'));
+            if (!window.GoogleDriveService || !window.GoogleDriveService.accessToken) {
+                return Promise.reject(new Error('Google Drive nicht verbunden'));
+            }
+            var drv = window.GoogleDriveService;
+            var bilderOrdnerName = (window.DRIVE_ORDNER && window.DRIVE_ORDNER.bilder) || 'Bilder';
+
+            _broadcast({ phase: 'download-start', kundeId: kundeId });
+
+            // 1) Bilder-Ordner finden (falls nicht vorhanden: nichts zu tun)
+            return drv.listFolderContents(kundeDriveOrdnerId).then(function(contents) {
+                var bilderOrdner = (contents.folders || []).find(function(f) {
+                    return (f.name || '').toLowerCase() === bilderOrdnerName.toLowerCase();
+                });
+                if (!bilderOrdner) {
+                    _broadcast({ phase: 'download-done', kundeId: kundeId, downloaded: 0, total: 0, skipped: 0 });
+                    return { downloaded: 0, total: 0, skipped: 0 };
+                }
+                // 2) Alle Dateien im Bilder-Ordner listen
+                return drv.listFolderContents(bilderOrdner.id).then(function(sub) {
+                    var alleDateien = (sub.files || []).concat(sub.pdfs || []);
+                    // Nur Bilddateien
+                    var bildDateien = alleDateien.filter(function(d) {
+                        var n = (d.name || '').toLowerCase();
+                        return n.endsWith('.jpg') || n.endsWith('.jpeg') ||
+                               (d.mimeType && d.mimeType.indexOf('image') >= 0);
+                    });
+                    if (bildDateien.length === 0) {
+                        _broadcast({ phase: 'download-done', kundeId: kundeId, downloaded: 0, total: 0, skipped: 0 });
+                        return { downloaded: 0, total: 0, skipped: 0 };
+                    }
+                    // 3) Bereits lokal vorhandene Drive-IDs ermitteln (idempotent)
+                    return getByIndex('fotos', 'kundeId', kundeId).then(function(lokale) {
+                        var bekannteDriveIds = {};
+                        lokale.forEach(function(r) { if (r.driveFileId) bekannteDriveIds[r.driveFileId] = true; });
+                        var zuLaden = bildDateien.filter(function(d) { return !bekannteDriveIds[d.id]; });
+                        if (zuLaden.length === 0) {
+                            _broadcast({ phase: 'download-done', kundeId: kundeId, downloaded: 0, total: bildDateien.length, skipped: bildDateien.length });
+                            return { downloaded: 0, total: bildDateien.length, skipped: bildDateien.length };
+                        }
+                        _broadcast({ phase: 'downloading', kundeId: kundeId, total: zuLaden.length, done: 0 });
+                        // 4) Sequenziell downloaden und lokal speichern
+                        var done = 0, errors = 0;
+                        var chain = Promise.resolve();
+                        zuLaden.forEach(function(datei) {
+                            chain = chain.then(function() {
+                                return drv.downloadFile(datei.id).then(function(blob) {
+                                    var parsed = parseFotoDateiName(datei.name) || { kontext: 'sonstige', raumKey: '', subKey: '', createdAt: datei.modifiedTime || new Date().toISOString() };
+                                    // Direkt als Record speichern (ohne compressImageToBlob -- kommt ja schon komprimiert)
+                                    var id = 'foto_drive_' + datei.id;
+                                    var record = {
+                                        id: id,
+                                        kundeId: String(kundeId),
+                                        kontext: parsed.kontext || 'sonstige',
+                                        raumKey: parsed.raumKey || '',
+                                        subKey: parsed.subKey || '',
+                                        blob: blob,
+                                        size: blob.size,
+                                        mimeType: blob.type || 'image/jpeg',
+                                        meta: { source: 'drive-download', driveName: datei.name },
+                                        driveUploaded: 1,
+                                        driveFileId: datei.id,
+                                        createdAt: parsed.createdAt,
+                                        updatedAt: new Date().toISOString()
+                                    };
+                                    return putItem('fotos', record).then(function() {
+                                        done++;
+                                        _broadcast({ phase: 'downloading', kundeId: kundeId, total: zuLaden.length, done: done, current: datei.name });
+                                    });
+                                }).catch(function(err) {
+                                    errors++;
+                                    console.warn('[FotoSync Download] Fehler bei', datei.name, err.message);
+                                });
+                            });
+                        });
+                        return chain.then(function() {
+                            _broadcast({ phase: 'download-done', kundeId: kundeId, downloaded: done, total: zuLaden.length, errors: errors, skipped: bildDateien.length - zuLaden.length });
+                            return { downloaded: done, total: zuLaden.length, errors: errors, skipped: bildDateien.length - zuLaden.length };
+                        });
+                    });
+                });
+            });
+        }
+
         return {
             syncKunde: syncKunde,
+            downloadMissingFotos: downloadMissingFotos,
+            parseFotoDateiName: parseFotoDateiName,
             onProgress: onProgress,
             isRunning: isRunning,
             getCurrentKundeId: getCurrentKundeId

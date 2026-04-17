@@ -2105,11 +2105,20 @@
                     if (!info) return;
                     if (info.phase === 'uploading') {
                         setFotoSyncStatus('uploading:' + (info.done || 0) + '/' + (info.total || 0));
+                    } else if (info.phase === 'downloading') {
+                        setFotoSyncStatus('downloading:' + (info.done || 0) + '/' + (info.total || 0));
                     } else if (info.phase === 'done') {
                         var r = info.result || {};
                         if (r.uploaded > 0) {
                             setFotoSyncStatus('done:' + r.uploaded);
                             setTimeout(function() { setFotoSyncStatus(null); }, 4000);
+                        } else {
+                            setFotoSyncStatus(null);
+                        }
+                    } else if (info.phase === 'download-done') {
+                        if ((info.downloaded || 0) > 0) {
+                            setFotoSyncStatus('download-done:' + info.downloaded);
+                            setTimeout(function() { setFotoSyncStatus(null); }, 4500);
                         } else {
                             setFotoSyncStatus(null);
                         }
@@ -2147,6 +2156,52 @@
                 var iv = setInterval(function() { _startFotoSync(); }, 3 * 60 * 1000);
                 return function() { clearInterval(iv); };
             }, [selectedKunde, _startFotoSync]);
+
+            // ══════════════════════════════════════════════════════════
+            // FOTO-DOWNLOAD-SYNC (Multi-Geraete-Szenario)
+            // Handy macht Fotos -> Drive. Tablet/PC oeffnet Akte ->
+            // diese Funktion zieht fehlende Fotos aus Drive runter.
+            // Idempotent: bereits lokale Drive-IDs werden uebersprungen.
+            // ══════════════════════════════════════════════════════════
+            var _startFotoDownloadSync = React.useCallback(function() {
+                if (!selectedKunde) return;
+                if (!navigator.onLine) return;
+                if (!window.TWStorage || !window.TWStorage.FotoSync || !window.TWStorage.FotoSync.downloadMissingFotos) return;
+                if (!window.GoogleDriveService || !window.GoogleDriveService.accessToken) return;
+                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                var driveOrdnerId = selectedKunde._driveFolderId;
+                if (!driveOrdnerId) return;
+                window.TWStorage.FotoSync.downloadMissingFotos(kundeId, driveOrdnerId).then(function(result) {
+                    if (result && result.downloaded > 0) {
+                        console.log('[FotoDownloadSync] ' + result.downloaded + ' Foto(s) von Drive geladen.');
+                    }
+                }).catch(function(e) {
+                    console.warn('[FotoDownloadSync] Lauf abgebrochen:', e.message);
+                });
+            }, [selectedKunde]);
+
+            // Trigger: Beim Kundenwechsel (5s nach Upload-Sync, damit Kollisionen vermieden werden)
+            useEffect(function() {
+                if (!selectedKunde) return;
+                var t = setTimeout(function() { _startFotoDownloadSync(); }, 5000);
+                return function() { clearTimeout(t); };
+            }, [selectedKunde, _startFotoDownloadSync]);
+
+            // Trigger: Online-Wechsel -> nach Upload noch Download pruefen
+            useEffect(function() {
+                var onOnline = function() {
+                    setTimeout(function() { _startFotoDownloadSync(); }, 4000);
+                };
+                window.addEventListener('online', onOnline);
+                return function() { window.removeEventListener('online', onOnline); };
+            }, [_startFotoDownloadSync]);
+
+            // Trigger: Periodisch alle 5 Minuten (versetzt zum Upload-Sync)
+            useEffect(function() {
+                if (!selectedKunde) return;
+                var iv = setInterval(function() { _startFotoDownloadSync(); }, 5 * 60 * 1000);
+                return function() { clearInterval(iv); };
+            }, [selectedKunde, _startFotoDownloadSync]);
 
             // ── App-Datei oeffnen (PDF, HTML etc.) ──
             var handleOpenAppDatei = function(dateiId) {
