@@ -3688,6 +3688,382 @@
         }
 
         /* ═══════════════════════════════════════════
+           LOKALE KUNDEN-LISTE — aus IndexedDB
+           Zeigt alle lokal gespeicherten Kunden mit Datum
+           und Loeschen-Moeglichkeit. Klick auf Kunde
+           oeffnet den LokalenOrdnerBrowser (offline).
+           ═══════════════════════════════════════════ */
+        function LokaleKundenListe({ onSelectKunde, onBack }) {
+            var [kunden, setKunden] = useState([]);
+            var [loading, setLoading] = useState(true);
+            var [error, setError] = useState(null);
+            var [deleteConfirm, setDeleteConfirm] = useState(null); // kunde-id
+
+            function ladeKunden() {
+                setLoading(true);
+                setError(null);
+                if (!window.TWStorage || !window.TWStorage.listKunden) {
+                    setError('Lokaler Speicher nicht verfuegbar.');
+                    setLoading(false);
+                    return;
+                }
+                window.TWStorage.listKunden().then(function(list) {
+                    // Nach updatedAt absteigend sortieren (neueste zuerst)
+                    var sorted = (list || []).slice().sort(function(a, b) {
+                        var ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+                        var tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+                        return tb - ta;
+                    });
+                    setKunden(sorted);
+                    setLoading(false);
+                }).catch(function(err) {
+                    setError('Fehler beim Laden: ' + (err.message || err));
+                    setLoading(false);
+                });
+            }
+
+            useEffect(function() { ladeKunden(); }, []);
+
+            function handleDelete(kundeId) {
+                if (!window.TWStorage || !window.TWStorage.deleteKundeData) {
+                    alert('Loeschen nicht verfuegbar.');
+                    return;
+                }
+                window.TWStorage.deleteKundeData(kundeId).then(function() {
+                    setDeleteConfirm(null);
+                    ladeKunden();
+                }).catch(function(err) {
+                    alert('Fehler beim Loeschen: ' + (err.message || err));
+                });
+            }
+
+            function formatDatum(iso) {
+                if (!iso) return 'ohne Datum';
+                try {
+                    var d = new Date(iso);
+                    var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+                    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear()
+                        + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+                } catch(e) { return 'ungueltiges Datum'; }
+            }
+
+            return (
+                <div style={{padding:'16px', minHeight:'100vh', background:'var(--bg-primary)'}}>
+                    {/* Header */}
+                    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'16px', flexWrap:'wrap'}}>
+                        <button onClick={onBack}
+                            style={{padding:'10px 16px', borderRadius:'var(--radius-md)', border:'none', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', cursor:'pointer', fontSize:'12px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', display:'flex', alignItems:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.8px'}}>
+                            {'\u2190'} Zurueck
+                        </button>
+                        <div style={{flex:1, minWidth:'120px'}}>
+                            <div style={{fontSize:'15px', fontWeight:'700', color:'var(--text-primary)'}}>
+                                {'\uD83D\uDCBE'} Gespeicherte Kundendaten
+                            </div>
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                {kunden.length} {kunden.length === 1 ? 'Kunde' : 'Kunden'} lokal gespeichert
+                            </div>
+                        </div>
+                        <button onClick={ladeKunden}
+                            style={{padding:'8px 12px', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-muted)', cursor:'pointer', fontSize:'11px', fontWeight:'600'}}
+                            title="Liste aktualisieren">
+                            {'\uD83D\uDD04'}
+                        </button>
+                    </div>
+
+                    {/* Loading */}
+                    {loading && (<div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)', fontSize:'14px'}}>Kundenliste wird geladen...</div>)}
+
+                    {/* Error */}
+                    {error && !loading && (<div style={{padding:'16px', borderRadius:'12px', background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', fontSize:'13px', textAlign:'center', marginBottom:'16px'}}>{error}</div>)}
+
+                    {/* Leere Liste */}
+                    {!loading && !error && kunden.length === 0 && (
+                        <div style={{textAlign:'center', padding:'40px 20px', color:'var(--text-muted)', fontSize:'13px', lineHeight:'1.6'}}>
+                            <div style={{fontSize:'40px', marginBottom:'12px', opacity:0.4}}>{'\uD83D\uDCE6'}</div>
+                            Keine lokal gespeicherten Kundendaten vorhanden.
+                            <br />
+                            <span style={{fontSize:'11px', opacity:0.7}}>Lade zuerst einen Kunden ueber "Kundendaten laden" von Google Drive.</span>
+                        </div>
+                    )}
+
+                    {/* Kundenliste */}
+                    {!loading && !error && kunden.length > 0 && (
+                        <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                            {kunden.map(function(kunde) {
+                                var isConfirming = deleteConfirm === kunde.id;
+                                return (
+                                    <div key={kunde.id}
+                                        style={{display:'flex', alignItems:'center', gap:'10px', padding:'14px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', transition:'all 0.2s ease'}}>
+                                        {/* Kunden-Info + Klick-Bereich */}
+                                        <button onClick={function() { if(onSelectKunde) onSelectKunde(kunde); }}
+                                            style={{flex:1, minWidth:0, display:'flex', alignItems:'center', gap:'12px', padding:0, border:'none', background:'transparent', cursor:'pointer', textAlign:'left', touchAction:'manipulation'}}>
+                                            <span style={{fontSize:'28px', flexShrink:0}}>{'\uD83D\uDC77'}</span>
+                                            <div style={{flex:1, minWidth:0}}>
+                                                <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                    {kunde.name || kunde.auftraggeber || 'Ohne Namen'}
+                                                </div>
+                                                {kunde.baumassnahme && (
+                                                    <div style={{fontSize:'11px', color:'var(--text-muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', marginTop:'2px'}}>
+                                                        {kunde.baumassnahme}
+                                                    </div>
+                                                )}
+                                                <div style={{fontSize:'10px', color:'var(--accent-blue)', marginTop:'4px', fontFamily:'Oswald, sans-serif', letterSpacing:'0.3px'}}>
+                                                    {'\uD83D\uDD52'} Bearbeitet: {formatDatum(kunde.updatedAt)}
+                                                </div>
+                                            </div>
+                                            <span style={{color:'var(--text-muted)', fontSize:'18px', flexShrink:0}}>{'\u203A'}</span>
+                                        </button>
+                                        {/* Loeschen-Button */}
+                                        {!isConfirming ? (
+                                            <button onClick={function() { setDeleteConfirm(kunde.id); }}
+                                                style={{padding:'8px 10px', borderRadius:'var(--radius-sm)', border:'1px solid rgba(231,76,60,0.3)', background:'rgba(231,76,60,0.08)', color:'#e74c3c', cursor:'pointer', fontSize:'16px', flexShrink:0, touchAction:'manipulation'}}
+                                                title="Lokale Daten dieses Kunden loeschen">
+                                                {'\uD83D\uDDD1\uFE0F'}
+                                            </button>
+                                        ) : (
+                                            <div style={{display:'flex', gap:'4px', flexShrink:0}}>
+                                                <button onClick={function() { handleDelete(kunde.id); }}
+                                                    style={{padding:'8px 12px', borderRadius:'var(--radius-sm)', border:'none', background:'#e74c3c', color:'#fff', cursor:'pointer', fontSize:'11px', fontWeight:'700', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', touchAction:'manipulation'}}>
+                                                    Loeschen
+                                                </button>
+                                                <button onClick={function() { setDeleteConfirm(null); }}
+                                                    style={{padding:'8px 10px', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-muted)', cursor:'pointer', fontSize:'11px', fontWeight:'600', touchAction:'manipulation'}}>
+                                                    Abbr.
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Hinweis */}
+                    {!loading && !error && kunden.length > 0 && (
+                        <div style={{marginTop:'20px', padding:'12px 14px', borderRadius:'10px', background:'rgba(30,136,229,0.06)', border:'1px solid rgba(30,136,229,0.15)', fontSize:'11px', color:'var(--text-muted)', lineHeight:'1.5'}}>
+                            {'\u2139\uFE0F'} Antippe einen Kunden, um offline die lokal gespeicherten Ordner und Dokumente zu durchsuchen. Loeschen entfernt NUR die lokalen Daten, der Google-Drive-Ordner bleibt unveraendert.
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
+           LOKALER ORDNER-BROWSER — aus IndexedDB
+           Nutzt TWStorage.OfflineBrowser fuer Offline-Anzeige
+           gespeicherter Ordner/Dateien. Dateien werden als Blob
+           ueber Object-URL geoeffnet (kein Drive noetig).
+           ═══════════════════════════════════════════ */
+        function LokalerOrdnerBrowser({ kunde, onBack }) {
+            var [folders, setFolders] = useState([]);
+            var [files, setFiles] = useState([]);
+            var [path, setPath] = useState([]); // Array von {id, name}
+            var [loading, setLoading] = useState(false);
+            var [error, setError] = useState(null);
+
+            var kundeId = kunde ? kunde.id : null;
+            var kundeName = kunde ? (kunde.name || kunde.auftraggeber || 'Kunde') : 'Kunde';
+
+            function loadRoot() {
+                if (!kundeId || !window.TWStorage || !window.TWStorage.OfflineBrowser) {
+                    setError('Offline-Browser nicht verfuegbar.');
+                    return;
+                }
+                setLoading(true);
+                setError(null);
+                setFolders([]);
+                setFiles([]);
+                window.TWStorage.OfflineBrowser.getRootFolders(kundeId).then(function(roots) {
+                    var fo = (roots || []).map(function(o) { return { id: o.id, name: o.name }; });
+                    setFolders(fo);
+                    // Auf der Root-Ebene zeigen wir vorerst nur Ordner (normalerweise
+                    // liegen im Kunden-Root nur die 10 Unter-Ordner der TW-Struktur).
+                    setFiles([]);
+                    setLoading(false);
+                }).catch(function(e) {
+                    setError('Fehler beim Laden: ' + (e.message || e));
+                    setLoading(false);
+                });
+            }
+
+            function loadSubFolder(folderId) {
+                if (!window.TWStorage || !window.TWStorage.OfflineBrowser) return;
+                setLoading(true);
+                setError(null);
+                setFolders([]);
+                setFiles([]);
+                Promise.all([
+                    window.TWStorage.OfflineBrowser.getSubFolders(folderId),
+                    window.TWStorage.OfflineBrowser.getFiles(folderId)
+                ]).then(function(results) {
+                    var subs = results[0] || [];
+                    var dateien = results[1] || [];
+                    setFolders(subs.map(function(o) { return { id: o.id, name: o.name }; }));
+                    setFiles(dateien.map(function(d) {
+                        return {
+                            id: d.id, name: d.name || '?', mimeType: d.mimeType || '',
+                            size: d.sizeBytes ? (d.sizeBytes / 1024 / 1024).toFixed(1) + ' MB' : '-'
+                        };
+                    }));
+                    setLoading(false);
+                }).catch(function(e) {
+                    setError('Fehler beim Laden: ' + (e.message || e));
+                    setLoading(false);
+                });
+            }
+
+            useEffect(function() { loadRoot(); }, [kundeId]);
+
+            function goIntoFolder(folder) {
+                setPath(function(prev) { return prev.concat([{ id: folder.id, name: folder.name }]); });
+                loadSubFolder(folder.id);
+            }
+
+            function goUp() {
+                setPath(function(prev) {
+                    if (prev.length <= 1) { loadRoot(); return []; }
+                    var np = prev.slice(0, -1);
+                    loadSubFolder(np[np.length - 1].id);
+                    return np;
+                });
+            }
+
+            function openFile(dateiId) {
+                if (!window.TWStorage || !window.TWStorage.OfflineBrowser) return;
+                window.TWStorage.OfflineBrowser.openFile(dateiId).then(function(result) {
+                    if (!result || !result.url) {
+                        alert('Datei nicht lokal verfuegbar.\nBitte Drive-Sync durchfuehren.');
+                        return;
+                    }
+                    // Neuer Tab mit Blob-URL: Browser zeigt PDF, Bilder etc. direkt an.
+                    window.open(result.url, '_blank');
+                }).catch(function(err) {
+                    alert('Datei kann nicht geoeffnet werden: ' + (err.message || err));
+                });
+            }
+
+            function getIcon(name, mime) {
+                var n = (name || '').toLowerCase();
+                var m = mime || '';
+                if (n.endsWith('.pdf') || m.indexOf('pdf') >= 0) return '\uD83D\uDCC4';
+                if (n.endsWith('.xlsx') || n.endsWith('.xls') || m.indexOf('spreadsheet') >= 0) return '\uD83D\uDCCA';
+                if (n.endsWith('.docx') || n.endsWith('.doc') || m.indexOf('word') >= 0) return '\uD83D\uDDD2\uFE0F';
+                if (m.indexOf('image') >= 0 || n.match(/\.(jpg|jpeg|png|gif|webp|heic|bmp|tif|tiff|svg)$/)) return '\uD83D\uDDBC\uFE0F';
+                return '\uD83D\uDCC1';
+            }
+
+            return (
+                <div style={{padding:'16px', minHeight:'100vh', background:'var(--bg-primary)'}}>
+                    {/* Header */}
+                    <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'12px', flexWrap:'wrap'}}>
+                        <button onClick={onBack} style={{padding:'10px 16px', borderRadius:'var(--radius-md)', border:'none', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', cursor:'pointer', fontSize:'12px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', display:'flex', alignItems:'center', gap:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.8px'}}>
+                            {'\u2190'} Zurueck
+                        </button>
+                        <div style={{flex:1, minWidth:'120px'}}>
+                            <div style={{fontSize:'15px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                {'\uD83D\uDCBE'} {kundeName.split(' \u2013 ')[0]}
+                            </div>
+                            <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                Offline-Ansicht {'\u00B7'} {folders.length} Ordner, {files.length} Dateien
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Breadcrumb */}
+                    {path.length > 0 && (
+                        <div style={{display:'flex', alignItems:'center', gap:'4px', marginBottom:'12px', flexWrap:'wrap', fontSize:'12px'}}>
+                            <span onClick={function() { setPath([]); loadRoot(); }} style={{cursor:'pointer', color:'var(--accent-blue)', fontWeight:'600', touchAction:'manipulation'}}>
+                                {'\uD83C\uDFE0'} Root
+                            </span>
+                            {path.map(function(p, idx) {
+                                var isLast = idx === path.length - 1;
+                                return (
+                                    <React.Fragment key={p.id}>
+                                        <span style={{color:'var(--text-muted)'}}>{'\u203A'}</span>
+                                        <span onClick={isLast ? undefined : function() { var np = path.slice(0, idx + 1); setPath(np); loadSubFolder(p.id); }}
+                                            style={{cursor: isLast ? 'default' : 'pointer', color: isLast ? 'var(--text-primary)' : 'var(--accent-blue)', fontWeight: isLast ? '700' : '600', maxWidth:'140px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', touchAction:'manipulation'}}>
+                                            {p.name}
+                                        </span>
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Zurueck */}
+                    {path.length > 0 && (
+                        <button onClick={goUp} style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', width:'100%', padding:'16px 20px', marginBottom:'12px', borderRadius:'14px', border:'2px solid var(--accent-blue)', background:'rgba(30,136,229,0.08)', cursor:'pointer', color:'var(--accent-blue)', fontSize:'16px', fontWeight:'700', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', touchAction:'manipulation', boxShadow:'0 2px 10px rgba(30,136,229,0.15)'}}>
+                            {'\u2B06\uFE0F'} {'\u00DCbergeordneter Ordner'}
+                        </button>
+                    )}
+
+                    {/* Loading */}
+                    {loading && (<div style={{textAlign:'center', padding:'40px', color:'var(--text-muted)'}}><div style={{fontSize:'14px'}}>Ordner wird geladen...</div></div>)}
+
+                    {/* Error */}
+                    {error && !loading && (<div style={{padding:'16px', borderRadius:'12px', background:'rgba(231,76,60,0.1)', border:'1px solid rgba(231,76,60,0.3)', color:'#e74c3c', fontSize:'13px', textAlign:'center', marginBottom:'16px'}}>{error}</div>)}
+
+                    {/* ORDNER */}
+                    {!loading && folders.length > 0 && (
+                        <div style={{display:'flex', flexDirection:'column', gap:'6px', marginBottom:'16px'}}>
+                            {folders.map(function(folder) {
+                                return (
+                                    <button key={folder.id} onClick={function() { goIntoFolder(folder); }}
+                                        style={{display:'flex', alignItems:'center', gap:'12px', width:'100%', padding:'14px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', textAlign:'left', touchAction:'manipulation'}}>
+                                        <span style={{fontSize:'26px'}}>{'\uD83D\uDCC1'}</span>
+                                        <div style={{flex:1, minWidth:0}}>
+                                            <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{folder.name}</div>
+                                        </div>
+                                        <span style={{color:'var(--text-muted)', fontSize:'18px'}}>{'\u203A'}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* DATEIEN */}
+                    {!loading && files.length > 0 && (
+                        <div>
+                            <div style={{fontSize:'11px', fontWeight:'700', color:'var(--accent-blue)', textTransform:'uppercase', letterSpacing:'0.8px', marginBottom:'8px', paddingLeft:'4px'}}>
+                                {files.length} {files.length === 1 ? 'Datei' : 'Dateien'}
+                            </div>
+                            <div style={{display:'flex', flexDirection:'column', gap:'5px'}}>
+                                {files.map(function(datei) {
+                                    return (
+                                        <button key={datei.id} onClick={function() { openFile(datei.id); }}
+                                            style={{display:'flex', alignItems:'center', gap:'10px', width:'100%', padding:'12px 14px', borderRadius:'10px', border:'1px solid rgba(30,136,229,0.25)', background:'rgba(30,136,229,0.05)', cursor:'pointer', textAlign:'left', touchAction:'manipulation'}}>
+                                            <span style={{fontSize:'22px'}}>{getIcon(datei.name, datei.mimeType)}</span>
+                                            <div style={{flex:1, minWidth:0}}>
+                                                <div style={{fontSize:'13px', fontWeight:'600', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{datei.name}</div>
+                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginTop:'2px'}}>{datei.size}</div>
+                                            </div>
+                                            <span style={{fontSize:'12px', padding:'5px 12px', borderRadius:'var(--radius-sm)', background:'var(--accent-blue)', color:'#fff', fontWeight:'600', whiteSpace:'nowrap', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                {'\u00D6ffnen'}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Leer */}
+                    {!loading && !error && folders.length === 0 && files.length === 0 && (
+                        <div style={{textAlign:'center', padding:'40px 20px', color:'var(--text-muted)', fontSize:'13px', lineHeight:'1.6'}}>
+                            <div style={{fontSize:'40px', marginBottom:'12px', opacity:0.4}}>{'\uD83D\uDCC2'}</div>
+                            Dieser Ordner ist leer oder noch nicht lokal gespeichert.
+                            {path.length === 0 && (
+                                <div style={{marginTop:'10px', fontSize:'11px', opacity:0.7}}>
+                                    Tipp: Lade den Kunden ueber "Kundendaten laden" komplett von Drive,<br/>um die Ordnerstruktur offline verfuegbar zu machen.
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
 
@@ -3727,8 +4103,10 @@
             var testGeminiKey = async function() {
                 if (!geminiKey) return;
                 setGeminiStatus('testing');
-                // Fallback-Reihenfolge (April 2026): Neueste zuerst, dann alte als Sicherung
-                var modelsToTry = ['gemini-3-flash', 'gemini-3-pro', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+                // Fallback-Reihenfolge: stabile Modelle zuerst. 3.1 Pro Preview wird
+                // bewusst NICHT automatisch als Default gesetzt (Preview-Risiko).
+                // Fuer Preview-Nutzung: User waehlt manuell ueber die Model-Buttons.
+                var modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash'];
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
                     try {
                         var testModel = modelsToTry[mi];
@@ -4244,6 +4622,18 @@
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
+                },
+                {
+                    id: 'lokalGespeichert',
+                    icon: '\uD83D\uDCBE',
+                    title: 'Gespeicherte Kundendaten aufrufen',
+                    desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
+                    color: '#1E88E5',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
+                    badge: 'OFFLINE',
+                    disabled: false,
+                    disabledHint: null,
                 },
                 {
                     id: 'manuell',
@@ -9191,9 +9581,16 @@
                 if (raum && raum.waende && raum.waende.length > 0) {
                     return raum.waende.map(w => ({ id: w.id, l: formatMass(w.l) }));
                 }
-                // WICHTIG: KEINE Wandmaße aus Vorraum übernehmen!
-                // Neuer Raum beginnt immer mit leeren Wandmaßen
-                return [];
+                // Manueller Raum OHNE Waende -> mit 4 leeren Default-Waenden (A,B,C,D) starten,
+                // damit das Raumblatt identisch zur Raumerkennung aussieht.
+                // Bei Bedarf koennen ueber den "+ Wand hinzufuegen"-Button weitere Waende
+                // hinzugefuegt werden.
+                return [
+                    { id: 'A', l: '' },
+                    { id: 'B', l: '' },
+                    { id: 'C', l: '' },
+                    { id: 'D', l: '' }
+                ];
             });
             const [abzuege, setAbzuege] = useState(() => {
                 // ═══ RE-EDIT: Gespeicherte Daten direkt übernehmen ═══
@@ -19658,7 +20055,7 @@
         }
 
         function App() {
-            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser'
+            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
             const [page, setPage] = useState('start');
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
@@ -19963,6 +20360,14 @@
                     navigateTo('manuellEingabe');
                     return;
                 }
+                // Lokal gespeicherte Kundendaten: Offline-Liste aus IndexedDB laden,
+                // KEINEN Drive-Roundtrip. Ideal fuer Baustelle ohne Internet.
+                if (modus === 'lokalGespeichert') {
+                    setIsDriveMode(false);
+                    setDriveStatus('offline');
+                    navigateTo('lokalKundenListe');
+                    return;
+                }
                 // Alle anderen Modi laden zuerst die Kundenliste aus Google Drive
                 if (isDriveMode || (startConnections && startConnections.driveConnected)) {
                     setLoading(true);
@@ -20234,15 +20639,17 @@
                     };
                     setSelectedKunde(enriched);
 
-                    // 2. KI-Ordneranalyse starten
-                    setLoadProgress('🤖 KI-Ordneranalyse läuft...');
+                    // 2. KI-Ordneranalyse - DEAKTIVIERT (April 2026)
+                    // Die OrdnerAnalyseEngine analysierte zuvor alle 10 Kundenordner
+                    // und verursachte unnoetige KI-Kosten. Die KI-Grundriss-Funktion im
+                    // Aufmass-Modul arbeitet unabhaengig davon und sucht gezielt NUR im
+                    // Zeichnungsordner. Kundendaten kommen jetzt ausschliesslich aus
+                    // dem "Kunden-Daten"-Ordner (siehe KundenDatenParser).
+                    setLoadProgress('📂 Kundendaten werden geladen...');
                     window._kiDisabled = false;
 
-                    var result = await window.OrdnerAnalyseEngine.analyzeKundeForApp(
-                        enriched,
-                        function(p) { if (p && p.message) setLoadProgress('🔄 ' + p.message); }
-                    );
-                    setOrdnerAnalyseMeta(result.meta || null);
+                    var result = { positionen: [], kundendaten: {}, vertrag: {}, meta: null };
+                    setOrdnerAnalyseMeta(null);
 
                     // 3. Positionen in LV_POSITIONEN injizieren
                     if (result.positionen && result.positionen.length > 0) {
@@ -21593,6 +22000,19 @@
                         />;
                     case 'ordnerBrowser':
                         return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} onGoToModulwahl={function(){ navigateTo('modulwahl'); }} />;
+                    case 'lokalKundenListe':
+                        return <LokaleKundenListe
+                            onBack={function(){ navigateTo('kundenModus'); }}
+                            onSelectKunde={function(k){
+                                setSelectedKunde(k);
+                                setIsDriveMode(false);
+                                setDriveStatus('offline');
+                                navigateTo('lokalOrdnerBrowser');
+                            }} />;
+                    case 'lokalOrdnerBrowser':
+                        return <LokalerOrdnerBrowser
+                            kunde={selectedKunde}
+                            onBack={function(){ navigateTo('lokalKundenListe'); }} />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}

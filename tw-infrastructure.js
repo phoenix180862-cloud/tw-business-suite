@@ -43,23 +43,21 @@
     // API-Key holen: https://aistudio.google.com/apikey
     // → "Create API Key" klicken → Key kopieren → hier eintragen
     //
-    // MODELL-STRATEGIE (Stand April 2026):
-    // - 'pro'  → gemini-3-pro: State-of-the-Art fuer Dokumentanalyse & Vision
-    //           (Google: "generational leap in visual and spatial reasoning")
-    // - 'flash' → gemini-3-flash: schnelles, guenstiges Modell fuer Einfachanfragen
-    // - 'pro31' → gemini-3.1-pro-preview: neuestes Preview-Modell fuer experimentelle
-    //           Nutzung (instabil, Rate-Limits strenger)
-    // Die Startseite testet beim Connect mehrere Modelle in Fallback-Reihenfolge und
-    // setzt automatisch das zuerst verfuegbare als aktiv.
+    // MODELL-STRATEGIE (Stand April 2026, verifiziert gegen offizielle Google-Doku):
+    // - 'flash' → gemini-2.5-flash: schneller Workhorse, STABLE, keine Abkuendigungsgefahr
+    // - 'pro'   → gemini-2.5-pro:   Premium-Modell fuer Dokumentanalyse & Vision, STABLE
+    // - 'pro31' → gemini-3.1-pro-preview: State-of-the-Art Frontier-Modell, PREVIEW
+    //           (kann jederzeit abgekuendigt werden; zum Ausprobieren)
+    // Gemini-3-Stable existiert AKTUELL NICHT (gemini-3-pro-preview wurde am 9.3.2026 eingestellt).
     const GEMINI_CONFIG = {
         API_KEY: localStorage.getItem('gemini_api_key') || '',
-        MODEL: localStorage.getItem('gemini_model') || 'gemini-3-flash',
-        MODEL_PRO: 'gemini-3-pro',
+        MODEL: localStorage.getItem('gemini_model') || 'gemini-2.5-pro',
+        MODEL_PRO: 'gemini-2.5-pro',
         MODEL_PRO_31: 'gemini-3.1-pro-preview',
         MODELS: {
-            'flash': { id: 'gemini-3-flash', name: 'Gemini 3 Flash', icon: '⚡', desc: 'Schnell & günstig', color: '#1E88E5' },
-            'pro':   { id: 'gemini-3-pro',   name: 'Gemini 3 Pro',   icon: '🧠', desc: 'Präzise Analyse (State-of-the-Art)', color: '#8e44ad' },
-            'pro31': { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', icon: '🚀', desc: 'Neuestes Preview-Modell', color: '#e74c3c' }
+            'flash': { id: 'gemini-2.5-flash',       name: 'Gemini 2.5 Flash',       icon: '⚡',  desc: 'Schnell & günstig (stable)',           color: '#1E88E5' },
+            'pro':   { id: 'gemini-2.5-pro',         name: 'Gemini 2.5 Pro',         icon: '🧠', desc: 'Präzise Analyse (stable, empfohlen)',  color: '#8e44ad' },
+            'pro31': { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', icon: '🚀', desc: 'Frontier-Modell (Preview, instabil)', color: '#e74c3c' }
         },
         BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
         MAX_RETRIES: 3,

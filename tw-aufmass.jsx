@@ -34,8 +34,10 @@
             var testGeminiKey = async function() {
                 if (!geminiKey) return;
                 setGeminiStatus('testing');
-                // Fallback-Reihenfolge (April 2026): Neueste zuerst, dann alte als Sicherung
-                var modelsToTry = ['gemini-3-flash', 'gemini-3-pro', 'gemini-2.5-flash', 'gemini-2.5-pro'];
+                // Fallback-Reihenfolge: stabile Modelle zuerst. 3.1 Pro Preview wird
+                // bewusst NICHT automatisch als Default gesetzt (Preview-Risiko).
+                // Fuer Preview-Nutzung: User waehlt manuell ueber die Model-Buttons.
+                var modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash'];
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
                     try {
                         var testModel = modelsToTry[mi];
@@ -551,6 +553,18 @@
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
+                },
+                {
+                    id: 'lokalGespeichert',
+                    icon: '\uD83D\uDCBE',
+                    title: 'Gespeicherte Kundendaten aufrufen',
+                    desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
+                    color: '#1E88E5',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
+                    badge: 'OFFLINE',
+                    disabled: false,
+                    disabledHint: null,
                 },
                 {
                     id: 'manuell',
@@ -5498,9 +5512,16 @@
                 if (raum && raum.waende && raum.waende.length > 0) {
                     return raum.waende.map(w => ({ id: w.id, l: formatMass(w.l) }));
                 }
-                // WICHTIG: KEINE Wandmaße aus Vorraum übernehmen!
-                // Neuer Raum beginnt immer mit leeren Wandmaßen
-                return [];
+                // Manueller Raum OHNE Waende -> mit 4 leeren Default-Waenden (A,B,C,D) starten,
+                // damit das Raumblatt identisch zur Raumerkennung aussieht.
+                // Bei Bedarf koennen ueber den "+ Wand hinzufuegen"-Button weitere Waende
+                // hinzugefuegt werden.
+                return [
+                    { id: 'A', l: '' },
+                    { id: 'B', l: '' },
+                    { id: 'C', l: '' },
+                    { id: 'D', l: '' }
+                ];
             });
             const [abzuege, setAbzuege] = useState(() => {
                 // ═══ RE-EDIT: Gespeicherte Daten direkt übernehmen ═══

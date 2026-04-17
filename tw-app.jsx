@@ -87,7 +87,7 @@
         }
 
         function App() {
-            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser'
+            // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
             const [page, setPage] = useState('start');
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
@@ -392,6 +392,14 @@
                     navigateTo('manuellEingabe');
                     return;
                 }
+                // Lokal gespeicherte Kundendaten: Offline-Liste aus IndexedDB laden,
+                // KEINEN Drive-Roundtrip. Ideal fuer Baustelle ohne Internet.
+                if (modus === 'lokalGespeichert') {
+                    setIsDriveMode(false);
+                    setDriveStatus('offline');
+                    navigateTo('lokalKundenListe');
+                    return;
+                }
                 // Alle anderen Modi laden zuerst die Kundenliste aus Google Drive
                 if (isDriveMode || (startConnections && startConnections.driveConnected)) {
                     setLoading(true);
@@ -663,15 +671,17 @@
                     };
                     setSelectedKunde(enriched);
 
-                    // 2. KI-Ordneranalyse starten
-                    setLoadProgress('🤖 KI-Ordneranalyse läuft...');
+                    // 2. KI-Ordneranalyse - DEAKTIVIERT (April 2026)
+                    // Die OrdnerAnalyseEngine analysierte zuvor alle 10 Kundenordner
+                    // und verursachte unnoetige KI-Kosten. Die KI-Grundriss-Funktion im
+                    // Aufmass-Modul arbeitet unabhaengig davon und sucht gezielt NUR im
+                    // Zeichnungsordner. Kundendaten kommen jetzt ausschliesslich aus
+                    // dem "Kunden-Daten"-Ordner (siehe KundenDatenParser).
+                    setLoadProgress('📂 Kundendaten werden geladen...');
                     window._kiDisabled = false;
 
-                    var result = await window.OrdnerAnalyseEngine.analyzeKundeForApp(
-                        enriched,
-                        function(p) { if (p && p.message) setLoadProgress('🔄 ' + p.message); }
-                    );
-                    setOrdnerAnalyseMeta(result.meta || null);
+                    var result = { positionen: [], kundendaten: {}, vertrag: {}, meta: null };
+                    setOrdnerAnalyseMeta(null);
 
                     // 3. Positionen in LV_POSITIONEN injizieren
                     if (result.positionen && result.positionen.length > 0) {
@@ -2022,6 +2032,19 @@
                         />;
                     case 'ordnerBrowser':
                         return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} onGoToModulwahl={function(){ navigateTo('modulwahl'); }} />;
+                    case 'lokalKundenListe':
+                        return <LokaleKundenListe
+                            onBack={function(){ navigateTo('kundenModus'); }}
+                            onSelectKunde={function(k){
+                                setSelectedKunde(k);
+                                setIsDriveMode(false);
+                                setDriveStatus('offline');
+                                navigateTo('lokalOrdnerBrowser');
+                            }} />;
+                    case 'lokalOrdnerBrowser':
+                        return <LokalerOrdnerBrowser
+                            kunde={selectedKunde}
+                            onBack={function(){ navigateTo('lokalKundenListe'); }} />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}
