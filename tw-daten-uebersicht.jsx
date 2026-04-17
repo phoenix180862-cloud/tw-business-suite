@@ -33,11 +33,14 @@
                 objekt_netto: objekt.auftragssummeNetto || kd.auftragssummeNetto || '',
                 objekt_brutto: objekt.auftragssummeBrutto || kd.auftragssummeBrutto || '',
             });
-            var allPos = (ir.positionen || (kunde && kunde._lvPositionen) || []);
+            // Positionen: bevorzugt aus _masterPositionen lesen (Trennung Daten <-> Aufmass)
+            // Fallback: importResult.positionen, dann kunde._lvPositionen
+            var allPos = (kunde && kunde._masterPositionen) || (ir.positionen) || (kunde && kunde._lvPositionen) || [];
             var [positionen, setPositionen] = useState(allPos.map(function(p, idx) {
                 return { _idx: idx, pos: p.pos || '', bez: p.bez || '', einheit: p.einheit || 'm\u00b2', menge: p.menge || 0, einzelpreis: p.einzelpreis || 0, kategorie: p.kategorie || '', _istNachtrag: p._istNachtrag || false };
             }));
-            var allRaeume = (ir.raeume || (kunde && kunde._raeume) || []);
+            // Raeume: bevorzugt aus _masterRaeume lesen
+            var allRaeume = (kunde && kunde._masterRaeume) || (ir.raeume) || (kunde && kunde._raeume) || [];
             var [raeume, setRaeume] = useState(allRaeume.map(function(r, idx) {
                 return { _idx: idx, nr: r.nr || '', bez: r.bez || '', geschoss: r.geschoss || '', flaeche: r.flaeche || 0, umfang: r.umfang || 0, bemerkung: r.bemerkung || '' };
             }));
@@ -62,6 +65,35 @@
                 setSavedMsg('Daten gespeichert und in Module geladen!');
                 setTimeout(function() { setSavedMsg(''); setActiveTab('stammdaten'); }, 2000);
             };
+
+            // ── AUTO-SAVE: Speichere automatisch bei Tab-Wechsel oder Unmount ──
+            // Damit der User nicht mehr bewusst auf "Bearbeitung beenden" klicken muss.
+            // Schreibt in den selben Slot wie handleSave, aber OHNE UI-Effekt (kein Modus-Wechsel, keine Meldung).
+            var autoSaveSilent = React.useRef(null);
+            autoSaveSilent.current = function() {
+                if (!editMode) return; // Nur speichern, wenn ueberhaupt bearbeitet wurde
+                if (onSave) {
+                    try {
+                        onSave({ stammFelder: stammFelder, positionen: positionen, raeume: raeume, _autoSave: true });
+                        console.log('[DatenUebersicht] Auto-Save ausgeloest');
+                    } catch(e) { console.warn('[DatenUebersicht] Auto-Save Fehler:', e); }
+                }
+            };
+
+            // Auto-Save bei Tab-Wechsel
+            useEffect(function() {
+                return function() {
+                    // Cleanup beim Tab-Wechsel: aktuelle Daten silently speichern
+                    if (autoSaveSilent.current) autoSaveSilent.current();
+                };
+            }, [activeTab]);
+
+            // Auto-Save beim Unmount der gesamten Komponente
+            useEffect(function() {
+                return function() {
+                    if (autoSaveSilent.current) autoSaveSilent.current();
+                };
+            }, []);
 
             // ── Spracheingabe (globaler Service) ──
             var activeMic = useSpeech();
@@ -141,9 +173,14 @@
                         {!editMode ? (
                             <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
                         ) : (
-                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beenden & Daten in Module laden</button>
+                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beenden &amp; Daten in Module laden</button>
                         )}
                     </div>
+                    {editMode && (
+                        <div style={{padding:'8px 12px', marginBottom:'12px', background:'rgba(46,204,113,0.10)', border:'1px solid rgba(46,204,113,0.25)', borderRadius:'8px', fontSize:'11px', color:'#27ae60', textAlign:'center', fontStyle:'italic'}}>
+                            {'\uD83D\uDCBE'} Auto-Save aktiv: Aenderungen werden automatisch gespeichert beim Tab-Wechsel oder Verlassen der Seite.
+                        </div>
+                    )}
 
                     {activeTab === 'stammdaten' && (
                         <div>

@@ -325,96 +325,176 @@
         showExitDialog: function() {
             if (this._overlay) return; // Schon offen
 
-            var overlay = document.createElement('div');
-            overlay.id = 'tw-exit-guard-overlay';
-            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;' +
-                'background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;' +
-                'animation:twExitFadeIn 0.2s ease;';
+            // Asynchroner Check: Hat aktueller Stand ungesyncte Aenderungen?
+            // Wenn ja: Dialog mit drittem Button "Jetzt syncen und beenden"
+            var hatUnsynced = false;
+            var unsyncedCount = 0;
+            var unsyncedKundenAnzahl = 0;
+            var driveConnected = !!(window.GoogleDriveService && window.GoogleDriveService.accessToken);
 
-            var dialog = document.createElement('div');
-            dialog.style.cssText = 'background:linear-gradient(135deg,#1a2332 0%,#243447 100%);' +
-                'border-radius:20px;padding:36px 32px;max-width:420px;width:90%;text-align:center;' +
-                'box-shadow:0 25px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08);' +
-                'border:1px solid rgba(255,165,0,0.3);';
+            var renderDialog = function() {
+                var overlay = document.createElement('div');
+                overlay.id = 'tw-exit-guard-overlay';
+                overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:999999;' +
+                    'background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;' +
+                    'animation:twExitFadeIn 0.2s ease;';
 
-            // Icon
-            var icon = document.createElement('div');
-            icon.style.cssText = 'font-size:52px;margin-bottom:16px;';
-            icon.textContent = '\u26A0\uFE0F';
-            dialog.appendChild(icon);
+                var dialog = document.createElement('div');
+                dialog.style.cssText = 'background:linear-gradient(135deg,#1a2332 0%,#243447 100%);' +
+                    'border-radius:20px;padding:36px 32px;max-width:460px;width:90%;text-align:center;' +
+                    'box-shadow:0 25px 60px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.08);' +
+                    'border:1px solid ' + (hatUnsynced ? 'rgba(46,204,113,0.5)' : 'rgba(255,165,0,0.3)') + ';';
 
-            // Titel
-            var title = document.createElement('div');
-            title.style.cssText = 'font-family:Oswald,sans-serif;font-size:22px;font-weight:600;' +
-                'color:#ffffff;margin-bottom:12px;letter-spacing:0.5px;';
-            title.textContent = 'App verlassen?';
-            dialog.appendChild(title);
+                // Icon
+                var icon = document.createElement('div');
+                icon.style.cssText = 'font-size:52px;margin-bottom:16px;';
+                icon.textContent = hatUnsynced ? '\uD83D\uDD04' : '\u26A0\uFE0F';
+                dialog.appendChild(icon);
 
-            // Text
-            var text = document.createElement('div');
-            text.style.cssText = 'font-family:"Source Sans 3",sans-serif;font-size:15px;' +
-                'color:rgba(255,255,255,0.7);margin-bottom:28px;line-height:1.5;';
-            text.textContent = 'Nicht gespeicherte Daten k\u00F6nnten verloren gehen. M\u00F6chten Sie die App wirklich beenden?';
-            dialog.appendChild(text);
+                // Titel
+                var title = document.createElement('div');
+                title.style.cssText = 'font-family:Oswald,sans-serif;font-size:22px;font-weight:600;' +
+                    'color:#ffffff;margin-bottom:12px;letter-spacing:0.5px;';
+                title.textContent = hatUnsynced ? 'Aenderungen noch nicht synchron' : 'App verlassen?';
+                dialog.appendChild(title);
 
-            // Button-Container
-            var btnBox = document.createElement('div');
-            btnBox.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+                // Text
+                var text = document.createElement('div');
+                text.style.cssText = 'font-family:"Source Sans 3",sans-serif;font-size:15px;' +
+                    'color:rgba(255,255,255,0.75);margin-bottom:28px;line-height:1.55;';
+                if (hatUnsynced) {
+                    text.innerHTML = '<strong style="color:#27ae60;">' + unsyncedCount + ' Datei(en)</strong> bei <strong style="color:#27ae60;">' +
+                        unsyncedKundenAnzahl + ' Kunde(n)</strong> sind lokal gespeichert,<br>aber noch nicht auf Google Drive.<br><br>' +
+                        '<span style="color:rgba(255,255,255,0.55);font-size:13px;">' +
+                        'Du kannst jetzt syncen oder warten bis zur naechsten automatischen Synchronisation (alle 4-6h).' +
+                        '</span>';
+                } else {
+                    text.textContent = 'Nicht gespeicherte Daten koennten verloren gehen. Moechten Sie die App wirklich beenden?';
+                }
+                dialog.appendChild(text);
 
-            // Zurueck-Button (primaer)
-            var btnBack = document.createElement('button');
-            btnBack.style.cssText = 'padding:14px 24px;border:none;border-radius:12px;cursor:pointer;' +
-                'font-family:Oswald,sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;' +
-                'background:linear-gradient(135deg,#1E88E5,#1565C0);color:#fff;' +
-                'box-shadow:0 4px 15px rgba(30,136,229,0.4);transition:all 0.2s;';
-            btnBack.textContent = '\u2190  Zur\u00FCck zur Bearbeitung';
-            btnBack.onclick = function() {
-                ExitGuard._closeDialog();
+                // Button-Container
+                var btnBox = document.createElement('div');
+                btnBox.style.cssText = 'display:flex;flex-direction:column;gap:10px;';
+
+                // Zurueck-Button (primaer)
+                var btnBack = document.createElement('button');
+                btnBack.style.cssText = 'padding:14px 24px;border:none;border-radius:12px;cursor:pointer;' +
+                    'font-family:Oswald,sans-serif;font-size:17px;font-weight:600;letter-spacing:0.5px;' +
+                    'background:linear-gradient(135deg,#1E88E5,#1565C0);color:#fff;' +
+                    'box-shadow:0 4px 15px rgba(30,136,229,0.4);transition:all 0.2s;';
+                btnBack.textContent = '\u2190  Zurueck zur Bearbeitung';
+                btnBack.onclick = function() {
+                    ExitGuard._closeDialog();
+                };
+                btnBox.appendChild(btnBack);
+
+                // Sync-und-beenden-Button (NEU - nur wenn unsynced UND Drive verbunden)
+                if (hatUnsynced && driveConnected) {
+                    var btnSync = document.createElement('button');
+                    btnSync.style.cssText = 'padding:14px 24px;border:none;border-radius:12px;cursor:pointer;' +
+                        'font-family:Oswald,sans-serif;font-size:16px;font-weight:600;letter-spacing:0.5px;' +
+                        'background:linear-gradient(135deg,#27ae60,#1e8449);color:#fff;' +
+                        'box-shadow:0 4px 15px rgba(39,174,96,0.4);transition:all 0.2s;';
+                    btnSync.textContent = '\uD83D\uDD04  Jetzt syncen und beenden';
+                    btnSync.onclick = async function() {
+                        btnSync.disabled = true;
+                        btnSync.textContent = 'Synchronisiere...';
+                        btnSync.style.opacity = '0.7';
+                        try {
+                            // Alle Kunden mit pending Aenderungen syncen
+                            var alleAppDateien = await window.TWStorage.getAll('appDateien');
+                            var pendByKunde = {};
+                            alleAppDateien.forEach(function(d) {
+                                if (d.syncStatus === 'pending' && d.kundeId) {
+                                    pendByKunde[d.kundeId] = true;
+                                }
+                            });
+                            var kundenIds = Object.keys(pendByKunde);
+                            for (var ki = 0; ki < kundenIds.length; ki++) {
+                                var kid = kundenIds[ki];
+                                var kunde = await window.TWStorage.loadKunde(kid);
+                                if (!kunde) continue;
+                                var folderId = kunde.driveFolderId || kunde.folderId;
+                                if (!folderId) continue;
+                                btnSync.textContent = 'Sync ' + (ki+1) + '/' + kundenIds.length + '...';
+                                try {
+                                    await window.TWStorage.DriveUploadSync.uploadAppDateien(kid, folderId);
+                                } catch(e) { console.warn('[ExitGuard Sync]', e); }
+                            }
+                            ExitGuard.deactivate();
+                            window.close();
+                            setTimeout(function() {
+                                document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;' +
+                                    'height:100vh;background:#0d1520;color:rgba(255,255,255,0.5);font-family:Oswald,sans-serif;' +
+                                    'font-size:20px;text-align:center;padding:20px;">' +
+                                    '<div>\u2705 Synchronisiert.<br>TW Business Suite wurde beendet.<br><br>' +
+                                    '<span style="font-size:14px;color:rgba(255,255,255,0.3);">Sie koennen diesen Tab jetzt schliessen.</span></div></div>';
+                            }, 200);
+                        } catch(err) {
+                            btnSync.disabled = false;
+                            btnSync.textContent = '\uD83D\uDD04  Jetzt syncen und beenden';
+                            btnSync.style.opacity = '1';
+                            alert('Sync fehlgeschlagen:\n' + err.message + '\n\nDie App wurde NICHT beendet.');
+                        }
+                    };
+                    btnBox.appendChild(btnSync);
+                }
+
+                // Beenden-Button (sekundaer, gefaehrlich)
+                var btnExit = document.createElement('button');
+                btnExit.style.cssText = 'padding:12px 24px;border:1px solid rgba(231,76,60,0.4);' +
+                    'border-radius:12px;cursor:pointer;font-family:Oswald,sans-serif;font-size:15px;' +
+                    'font-weight:500;letter-spacing:0.3px;background:rgba(231,76,60,0.15);' +
+                    'color:#e74c3c;transition:all 0.2s;';
+                btnExit.textContent = hatUnsynced ? 'Ohne Sync beenden' : 'App beenden';
+                btnExit.onclick = function() {
+                    ExitGuard.deactivate();
+                    window.close();
+                    setTimeout(function() {
+                        document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;' +
+                            'height:100vh;background:#0d1520;color:rgba(255,255,255,0.5);font-family:Oswald,sans-serif;' +
+                            'font-size:20px;text-align:center;padding:20px;">' +
+                            '<div>TW Business Suite wurde beendet.<br><br>' +
+                            '<span style="font-size:14px;color:rgba(255,255,255,0.3);">Sie koennen diesen Tab jetzt schliessen.</span></div></div>';
+                    }, 200);
+                };
+                btnBox.appendChild(btnExit);
+
+                dialog.appendChild(btnBox);
+                overlay.appendChild(dialog);
+
+                // Style-Animation injizieren
+                if (!document.getElementById('tw-exit-guard-styles')) {
+                    var style = document.createElement('style');
+                    style.id = 'tw-exit-guard-styles';
+                    style.textContent = '@keyframes twExitFadeIn{from{opacity:0}to{opacity:1}}';
+                    document.head.appendChild(style);
+                }
+
+                document.body.appendChild(overlay);
+                ExitGuard._overlay = overlay;
+
+                // ESC = zurueck
+                ExitGuard._escHandler = function(e) {
+                    if (e.key === 'Escape') ExitGuard._closeDialog();
+                };
+                window.addEventListener('keydown', ExitGuard._escHandler);
             };
-            btnBox.appendChild(btnBack);
 
-            // Beenden-Button (sekundaer, gefaehrlich)
-            var btnExit = document.createElement('button');
-            btnExit.style.cssText = 'padding:12px 24px;border:1px solid rgba(231,76,60,0.4);' +
-                'border-radius:12px;cursor:pointer;font-family:Oswald,sans-serif;font-size:15px;' +
-                'font-weight:500;letter-spacing:0.3px;background:rgba(231,76,60,0.15);' +
-                'color:#e74c3c;transition:all 0.2s;';
-            btnExit.textContent = 'App beenden';
-            btnExit.onclick = function() {
-                ExitGuard.deactivate();
-                // Versuche Tab/Fenster zu schliessen
-                window.close();
-                // Falls window.close() nicht funktioniert (Browser-Beschraenkung):
-                // Leere Seite zeigen
-                setTimeout(function() {
-                    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;' +
-                        'height:100vh;background:#0d1520;color:rgba(255,255,255,0.5);font-family:Oswald,sans-serif;' +
-                        'font-size:20px;text-align:center;padding:20px;">' +
-                        '<div>TW Business Suite wurde beendet.<br><br>' +
-                        '<span style="font-size:14px;color:rgba(255,255,255,0.3);">Sie k\u00F6nnen diesen Tab jetzt schlie\u00DFen.</span></div></div>';
-                }, 200);
-            };
-            btnBox.appendChild(btnExit);
-
-            dialog.appendChild(btnBox);
-            overlay.appendChild(dialog);
-
-            // Style-Animation injizieren
-            if (!document.getElementById('tw-exit-guard-styles')) {
-                var style = document.createElement('style');
-                style.id = 'tw-exit-guard-styles';
-                style.textContent = '@keyframes twExitFadeIn{from{opacity:0}to{opacity:1}}';
-                document.head.appendChild(style);
+            // Async-Check, dann Dialog rendern
+            if (window.TWStorage && window.TWStorage.isReady() && window.TWStorage.DriveUploadSync) {
+                window.TWStorage.DriveUploadSync.hasAnyUnsyncedChanges().then(function(status) {
+                    hatUnsynced = !!status.has;
+                    unsyncedCount = status.count || 0;
+                    unsyncedKundenAnzahl = status.kundenAnzahl || 0;
+                    renderDialog();
+                }).catch(function() {
+                    renderDialog(); // Fallback ohne Sync-Check
+                });
+            } else {
+                renderDialog();
             }
-
-            document.body.appendChild(overlay);
-            this._overlay = overlay;
-
-            // ESC = zurueck
-            this._escHandler = function(e) {
-                if (e.key === 'Escape') ExitGuard._closeDialog();
-            };
-            window.addEventListener('keydown', this._escHandler);
         },
 
         _closeDialog: function() {

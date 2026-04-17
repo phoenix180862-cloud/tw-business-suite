@@ -452,6 +452,10 @@
                     });
                     LV_POSITIONEN[kundeId] = lvPos;
                     kunde._lvPositionen = lvPos;
+                    // MASTER-LISTE: Trennung Daten <-> Aufmass
+                    // Diese Kopie ist die "Quelle der Wahrheit" der Daten-Liste
+                    // und wird NIEMALS vom Aufmass-Modul ueberschrieben.
+                    kunde._masterPositionen = JSON.parse(JSON.stringify(lvPos));
                     kunde._lvPositionenKey = kundeId;
                 }
 
@@ -459,6 +463,8 @@
                 if (result.raeume) {
                     kunde._raeume = result.raeume;
                     kunde.raeume = result.raeume;
+                    // MASTER-LISTE fuer Raeume
+                    kunde._masterRaeume = JSON.parse(JSON.stringify(result.raeume));
                 }
 
                 // ImportResult IMMER aktualisieren (auch wenn nur Positionen geaendert)
@@ -931,8 +937,75 @@
                 // ═══ MODUS: KUNDENDATEN KOMPLETT LADEN (Ordner + 3 Listen parsen) ═══
                 if (kundeMode === 'gespeichert' || kundeMode === 'gespeichertKomplett') {
                     setLoading(true);
-                    setLoadProgress('Lade Kundendaten...');
+                    setLoadProgress('Pruefe lokalen Speicher...');
                     navigateTo('akte');
+
+                    var driveFolderIdEarly = kunde.id || kunde._driveFolderId || null;
+
+                    // ─── PHASE 1: Cache-Check — wurde dieser Kunde schon mal komplett geladen? ───
+                    var cachedKunde = null;
+                    if (driveFolderIdEarly && window.TWStorage && window.TWStorage.isReady()) {
+                        try {
+                            cachedKunde = await window.TWStorage.loadKunde(driveFolderIdEarly);
+                        } catch(e) { console.warn('[Cache-Check]', e); }
+                    }
+
+                    // ─── PHASE 2a: Cache-Hit → Lokal laden + Drive-Diff im Hintergrund ───
+                    if (cachedKunde && cachedKunde._fullyLoaded && cachedKunde._lvPositionen && cachedKunde._raeume) {
+                        console.log('[Kundenladen] Cache-Hit fuer', kunde.name, '- nutze lokale Daten');
+                        setLoadProgress('Lokale Daten gefunden - lade ohne Internet...');
+
+                        // Lokale Daten direkt verwenden
+                        var kundeId = driveFolderIdEarly;
+                        LV_POSITIONEN[kundeId] = cachedKunde._lvPositionen;
+                        if (cachedKunde._importResult) setImportResult(cachedKunde._importResult);
+
+                        var enrichedFromCache = Object.assign({}, kunde, cachedKunde, {
+                            _driveFolderId: driveFolderIdEarly,
+                            _loadFromKundendaten: true,
+                            _fromCache: true,
+                        });
+                        setSelectedKunde(enrichedFromCache);
+                        setLoadProgress(cachedKunde._lvPositionen.length + ' Positionen + ' + cachedKunde._raeume.length + ' Raeume aus lokalem Speicher');
+
+                        // Drive-Diff im Hintergrund (asynchron, blockiert UI nicht)
+                        var service = window.GoogleDriveService;
+                        if (service && service.accessToken && driveFolderIdEarly) {
+                            (async function() {
+                                try {
+                                    var lastSync = await window.TWStorage.DriveUploadSync.getLastSyncTime(driveFolderIdEarly);
+                                    var driveCheck = await window.TWStorage.DriveUploadSync.checkDriveNewerThan(driveFolderIdEarly, lastSync);
+                                    if (driveCheck.newer) {
+                                        console.log('[Hintergrund-Sync] Drive hat ' + driveCheck.anzahlGeaenderter + ' neuere Dateien');
+                                        // Wenn Kollege parallel gearbeitet hat: User informieren
+                                        var msg = '\u26A0\uFE0F Es gibt ' + driveCheck.anzahlGeaenderter + ' neuere Datei(en) auf Drive fuer diesen Kunden.\n\n' +
+                                                  'Vermutlich hat ein Kollege parallel gearbeitet.\n\n' +
+                                                  'Beispiel:\n  - ' + (driveCheck.geaenderteDateien || []).slice(0, 3).join('\n  - ') + '\n\n' +
+                                                  'Jetzt komplett neu von Drive laden? (Bestehende lokale Aenderungen koennten ueberschrieben werden.)';
+                                        if (confirm(msg)) {
+                                            // Hard-Refresh: Cache leeren, dann normal laden
+                                            cachedKunde = null;
+                                            window.location.reload();
+                                        }
+                                    } else {
+                                        // Drive ist gleich oder aelter als lokal - alles ok
+                                        TWStorage.DriveSync.syncKundenOrdner(driveFolderIdEarly, driveFolderIdEarly, function(info) {
+                                            console.log('[Hintergrund-Sync] ' + info.message);
+                                        }).catch(function(e) { console.warn('[Hintergrund-Sync]', e.message); });
+                                    }
+                                } catch(e) { console.warn('[Hintergrund-Diff]', e); }
+                            })();
+                        }
+
+                        setLoading(false);
+                        await new Promise(function(r){ setTimeout(r, 800); });
+                        setKundeMode('analysiert');
+                        navigateTo('datenUebersicht');
+                        return;
+                    }
+
+                    // ─── PHASE 2b: Cache-Miss → Erst-Laden komplett von Drive ───
+                    setLoadProgress('Erstes Laden - alles von Google Drive holen...');
                     try {
                         var service = window.GoogleDriveService;
                         // Drive-Folder-ID aus allen moeglichen Quellen ermitteln
@@ -1024,6 +1097,9 @@
                                     enriched._gespeichertAm = new Date().toLocaleString('de-DE');
                                     enriched._parseQuelle = 'kunden-daten-parser';
                                     enriched.raeume = impResult.raeume;
+                                    // MASTER-LISTEN initialisieren (Trennung Daten <-> Aufmass)
+                                    enriched._masterPositionen = JSON.parse(JSON.stringify(impResult.positionen || []));
+                                    enriched._masterRaeume = JSON.parse(JSON.stringify(impResult.raeume || []));
 
                                     // 8. Lokal speichern fuer spaetere Verwendung
                                     var localKey2 = 'aufmass_kunde_' + kundeId;

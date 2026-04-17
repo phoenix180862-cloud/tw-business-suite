@@ -2530,7 +2530,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.85);
+            background: rgba(13, 21, 32, 0.92);
             z-index: 300;
             display: flex;
             flex-direction: column;
@@ -2538,33 +2538,40 @@
         }
 
         .pos-modal-header {
-            padding: 16px 20px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
+            padding: 6px 14px;
+            background: transparent;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 10px;
+            min-height: 32px;
         }
 
         .pos-modal-title {
             font-family: 'Oswald', sans-serif;
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text-white);
+            font-size: 12px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.75);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: 0.4px;
         }
 
         .pos-modal-close {
-            width: 36px;
-            height: 36px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
-            border: none;
-            background: var(--bg-card);
-            color: var(--text-light);
-            font-size: 18px;
+            border: 1px solid rgba(231, 76, 60, 0.4);
+            background: rgba(231, 76, 60, 0.12);
+            color: #e74c3c;
+            font-size: 13px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .pos-modal-body {
@@ -6505,4 +6512,32 @@
             textarea {
                 font-size: 17px !important;
             }
+        }
+
+        /* ═══════════════════════════════════════════
+           SCHRIFTGROESSEN-TOGGLE — Body-Class .tw-font-large
+           Vergroessert ALLE Schriften um Faktor 1.5 (50% groesser)
+           Wirkt global ueber CSS-Selector body.tw-font-large *
+           ═══════════════════════════════════════════ */
+        body.tw-font-large {
+            font-size: 1.5em;
+        }
+        body.tw-font-large input,
+        body.tw-font-large textarea,
+        body.tw-font-large select,
+        body.tw-font-large button {
+            font-size: 1.18em;
+        }
+        body.tw-font-large .pos-modal-title,
+        body.tw-font-large .header-title,
+        body.tw-font-large .page-title,
+        body.tw-font-large .page-subtitle,
+        body.tw-font-large .folder-name,
+        body.tw-font-large .folder-meta,
+        body.tw-font-large .breadcrumb,
+        body.tw-font-large .nav-btn,
+        body.tw-font-large .rb-nav-btn,
+        body.tw-font-large .loading-text,
+        body.tw-font-large .no-results-text {
+            font-size: 1.4em !important;
         }

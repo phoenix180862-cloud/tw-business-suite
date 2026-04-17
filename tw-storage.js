@@ -17,7 +17,7 @@
     'use strict';
 
     var DB_NAME = 'TWBusinessSuite';
-    var DB_VERSION = 6;
+    var DB_VERSION = 7;
     var _db = null;
     var _ready = false;
     var _readyCallbacks = [];
@@ -68,7 +68,8 @@
         syncLog:        { keyPath: 'id', indices: ['kundeId', 'action', 'deviceId', 'syncedAt', 'updatedAt'] },
         wip:            { keyPath: 'id', indices: ['kundeId', 'modulName', 'savedAt', 'deviceId'] },
         ausgangsbuch:   { keyPath: 'id', indices: ['kundeId', 'status', 'datum', 'updatedAt'] },
-        fotos:          { keyPath: 'id', indices: ['kundeId', 'kontext', 'raumKey', 'driveUploaded', 'createdAt', 'updatedAt'] }
+        fotos:          { keyPath: 'id', indices: ['kundeId', 'kontext', 'raumKey', 'driveUploaded', 'createdAt', 'updatedAt'] },
+        positionsListen: { keyPath: 'id', indices: ['kundeId', 'bezeichner', 'updatedAt'] }
     };
 
     // ================================================================
@@ -1211,7 +1212,7 @@
 
     function deleteKundeData(kundeId) {
         var storesWithKundeId = ['aufmass', 'rechnungen', 'raeume', 'gesamtlisten',
-            'positionen', 'schriftverkehr', 'kiAkten', 'driveOrdner', 'driveDateien', 'appDateien', 'syncLog', 'wip', 'ausgangsbuch'];
+            'positionen', 'schriftverkehr', 'kiAkten', 'driveOrdner', 'driveDateien', 'appDateien', 'syncLog', 'wip', 'ausgangsbuch', 'positionsListen'];
         var promises = storesWithKundeId.map(function(storeName) {
             return getByIndex(storeName, 'kundeId', kundeId).then(function(items) {
                 return Promise.all(items.map(function(item) { return deleteItem(storeName, item.id); }));
@@ -1333,6 +1334,62 @@
     }
 
     var DriveUploadSync = {
+        // Vor-Sync-Check: Pruefe ob Drive seit unserem letzten Sync neuer geworden ist
+        // (z.B. weil ein Kollege parallel etwas geaendert hat).
+        // Liefert {newer: bool, neuesteAenderung: ISO-String, anzahlGeaenderter: int}
+        checkDriveNewerThan: async function(driveFolderId, sinceIsoString) {
+            var service = global.GoogleDriveService;
+            if (!service || !service.accessToken) throw new Error('Google Drive nicht verbunden');
+            if (!sinceIsoString) {
+                return { newer: false, neuesteAenderung: null, anzahlGeaenderter: 0 };
+            }
+            try {
+                // 1. Kunden-Ordner direkt durchsuchen
+                var query1 = "'" + driveFolderId + "' in parents and trashed=false";
+                var data1 = await service._fetchJSON(
+                    'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query1) +
+                    '&fields=files(id,name,mimeType,modifiedTime)&orderBy=modifiedTime desc&pageSize=200'
+                );
+                var directItems = data1.files || [];
+
+                // 2. Alle Unterordner ermitteln und deren Inhalte ebenfalls pruefen
+                var subFolders = directItems.filter(function(f) {
+                    return f.mimeType === 'application/vnd.google-apps.folder';
+                });
+                var allFiles = directItems.filter(function(f) {
+                    return f.mimeType !== 'application/vnd.google-apps.folder';
+                });
+                for (var i = 0; i < subFolders.length; i++) {
+                    var query2 = "'" + subFolders[i].id + "' in parents and trashed=false";
+                    var data2 = await service._fetchJSON(
+                        'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query2) +
+                        '&fields=files(id,name,mimeType,modifiedTime)&orderBy=modifiedTime desc&pageSize=200'
+                    );
+                    var sub = (data2.files || []).filter(function(f) {
+                        return f.mimeType !== 'application/vnd.google-apps.folder';
+                    });
+                    allFiles = allFiles.concat(sub);
+                }
+
+                var sinceMs = new Date(sinceIsoString).getTime();
+                var neuere = allFiles.filter(function(f) {
+                    if (!f.modifiedTime) return false;
+                    return new Date(f.modifiedTime).getTime() > sinceMs;
+                });
+                neuere.sort(function(a, b) { return b.modifiedTime.localeCompare(a.modifiedTime); });
+                return {
+                    newer: neuere.length > 0,
+                    neuesteAenderung: neuere.length > 0 ? neuere[0].modifiedTime : null,
+                    anzahlGeaenderter: neuere.length,
+                    geaenderteDateien: neuere.slice(0, 10).map(function(f){ return f.name; })
+                };
+            } catch(err) {
+                console.warn('[TW-Sync] Vor-Sync-Check fehlgeschlagen:', err);
+                // Im Fehlerfall: lieber synchronisieren lassen, statt blockieren
+                return { newer: false, neuesteAenderung: null, anzahlGeaenderter: 0, error: err.message };
+            }
+        },
+
         uploadAppDateien: async function(kundeId, driveFolderId, onProgress) {
             var service = global.GoogleDriveService;
             if (!service || !service.accessToken) throw new Error('Google Drive nicht verbunden');
@@ -1356,6 +1413,8 @@
                 } catch(err) { errors.push({ file: datei.name, error: err.message }); }
             }
             if (onProgress) onProgress({ message: uploaded+'/'+pending.length+' hochgeladen', percent: 100 });
+            // Sync-Zeitstempel speichern
+            await saveAppState('lastSync_' + kundeId, new Date().toISOString());
             return { uploaded: uploaded, errors: errors, total: pending.length };
         },
         getUploadStatus: async function(kundeId) {
@@ -1363,6 +1422,54 @@
             var pend = all.filter(function(d) { return d.syncStatus === 'pending'; });
             return { total: all.length, pending: pend.length, synced: all.length - pend.length,
                 pendingFiles: pend.map(function(d) { return { name: d.name, ordner: d.ordnerName }; }) };
+        },
+
+        // Pruefe pro Kunde, ob ungesyncte Aenderungen vorliegen (App-Dateien ODER Foto-Uploads)
+        hasUnsyncedChanges: async function(kundeId) {
+            try {
+                var appDateien = await getByIndex('appDateien', 'kundeId', kundeId);
+                var pendDateien = appDateien.filter(function(d) { return d.syncStatus === 'pending'; });
+                if (pendDateien.length > 0) return { has: true, count: pendDateien.length, type: 'appDateien' };
+                // Auch ungeladene Fotos pruefen
+                var fotos = await getByIndex('fotos', 'kundeId', kundeId);
+                var pendFotos = fotos.filter(function(f) { return !f.uploadedAt; });
+                if (pendFotos.length > 0) return { has: true, count: pendFotos.length, type: 'fotos' };
+                return { has: false, count: 0 };
+            } catch(err) {
+                console.warn('[TW-Sync] hasUnsyncedChanges Fehler:', err);
+                return { has: false, count: 0, error: err.message };
+            }
+        },
+
+        // GLOBAL: Pruefe alle Kunden auf ungesyncte Aenderungen
+        // Wird beim ExitGuard verwendet
+        hasAnyUnsyncedChanges: async function() {
+            try {
+                var alleAppDateien = await getAllItems('appDateien');
+                var pendAppDateien = alleAppDateien.filter(function(d) { return d.syncStatus === 'pending'; });
+                if (pendAppDateien.length > 0) {
+                    // Eindeutige Kunden-IDs
+                    var kundenIds = {};
+                    pendAppDateien.forEach(function(d) { if (d.kundeId) kundenIds[d.kundeId] = true; });
+                    return { has: true, count: pendAppDateien.length, kundenAnzahl: Object.keys(kundenIds).length };
+                }
+                var alleFotos = await getAllItems('fotos');
+                var pendFotos = alleFotos.filter(function(f) { return !f.uploadedAt; });
+                if (pendFotos.length > 0) {
+                    var kundenIds2 = {};
+                    pendFotos.forEach(function(f) { if (f.kundeId) kundenIds2[f.kundeId] = true; });
+                    return { has: true, count: pendFotos.length, kundenAnzahl: Object.keys(kundenIds2).length };
+                }
+                return { has: false, count: 0 };
+            } catch(err) {
+                console.warn('[TW-Sync] hasAnyUnsyncedChanges Fehler:', err);
+                return { has: false, count: 0, error: err.message };
+            }
+        },
+
+        getLastSyncTime: async function(kundeId) {
+            var ts = await loadAppState('lastSync_' + kundeId);
+            return ts || null;
         }
     };
 
@@ -1387,6 +1494,55 @@
     // ================================================================
     // EXPORT
     // ================================================================
+    // ================================================================
+    // POSITIONS-LISTEN-BIBLIOTHEK (Paket C)
+    // Vorbereitete Positionslisten zu Raeumen oder als reine Vorlagen
+    // ================================================================
+
+    function savePositionsListe(listenObj) {
+        // Erwartet: { id?, kundeId, bezeichner, raumIds: [], positionen: [] }
+        if (!listenObj.id) {
+            listenObj.id = 'pl_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+            listenObj.erstelltAm = new Date().toISOString();
+        }
+        listenObj.updatedAt = new Date().toISOString();
+        listenObj.raumIds = listenObj.raumIds || [];
+        listenObj.positionen = listenObj.positionen || [];
+        return putItem('positionsListen', listenObj);
+    }
+
+    function loadPositionsListenByKunde(kundeId) {
+        return getByIndex('positionsListen', 'kundeId', kundeId).then(function(items) {
+            // Nach Aenderungsdatum absteigend sortieren (neueste zuerst)
+            return items.sort(function(a, b) {
+                return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+            });
+        });
+    }
+
+    function loadPositionsListenByRaum(kundeId, raumId) {
+        return loadPositionsListenByKunde(kundeId).then(function(items) {
+            return items.filter(function(l) {
+                return l.raumIds && l.raumIds.indexOf(raumId) >= 0;
+            });
+        });
+    }
+
+    function deletePositionsListe(listenId) {
+        return deleteItem('positionsListen', listenId);
+    }
+
+    // Liefert ein Set (als Object) von raumIds, die mindestens eine vorbereitete Liste haben
+    function getRaeumeMitVorbereiteterListe(kundeId) {
+        return loadPositionsListenByKunde(kundeId).then(function(items) {
+            var raumSet = {};
+            items.forEach(function(l) {
+                (l.raumIds || []).forEach(function(rid) { raumSet[rid] = true; });
+            });
+            return raumSet;
+        });
+    }
+
     global.TWStorage = {
         init: initDB,
         isReady: function() { return _ready; },
@@ -1432,6 +1588,12 @@
         deviceId: _deviceId,
         getStorageInfo: getStorageInfo, requestPersistentStorage: requestPersistentStorage,
         getRecordCounts: getRecordCounts, clearAllData: clearAllData, deleteKundeData: deleteKundeData,
+        // Positions-Listen-Bibliothek (Paket C)
+        savePositionsListe: savePositionsListe,
+        loadPositionsListenByKunde: loadPositionsListenByKunde,
+        loadPositionsListenByRaum: loadPositionsListenByRaum,
+        deletePositionsListe: deletePositionsListe,
+        getRaeumeMitVorbereiteterListe: getRaeumeMitVorbereiteterListe,
         setupEventListeners: setupEventListeners,
         CONFIG: CONFIG, DB_NAME: DB_NAME, DB_VERSION: DB_VERSION, STORES: STORES
     };

@@ -480,18 +480,86 @@
            NAV HEADER COMPONENT
            ═══════════════════════════════════════════ */
         function NavHeader({ page, onBack, onForward, canBack, canForward }) {
+            // Auf Startseite und Modulwahl keine Vor/Zurueck-Buttons (Thomas' Wunsch)
+            var hideNavButtons = (page === 'start' || page === 'modulwahl');
+
+            // Schriftgroessen-Toggle: Liest/Schreibt body-class und localStorage
+            var [fontLarge, setFontLarge] = useState(function() {
+                return localStorage.getItem('tw_font_scale') === 'large';
+            });
+
+            // Beim Mount + bei Aenderung: body-class setzen
+            useEffect(function() {
+                if (fontLarge) {
+                    document.body.classList.add('tw-font-large');
+                    localStorage.setItem('tw_font_scale', 'large');
+                } else {
+                    document.body.classList.remove('tw-font-large');
+                    localStorage.setItem('tw_font_scale', 'normal');
+                }
+            }, [fontLarge]);
+
+            var toggleFont = function() { setFontLarge(function(prev){ return !prev; }); };
+
+            // Roter Stil fuer Vor/Zurueck und Schrift-Toggle
+            var redBtnStyle = function(disabled, active) {
+                return {
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: disabled
+                        ? 'rgba(120,120,120,0.18)'
+                        : (active ? 'linear-gradient(135deg, #e84040, #ff5252)'
+                                  : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))'),
+                    color: disabled ? 'rgba(255,255,255,0.35)' : '#fff',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    fontFamily: 'Oswald, sans-serif',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                    boxShadow: disabled ? 'none' : '0 3px 10px rgba(196,30,30,0.3)',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                };
+            };
+
             return (
                 <header className="app-header">
-                    <div className="nav-bar">
-                        <button className="nav-btn" disabled={!canBack} onClick={onBack}>
-                            ◀
-                        </button>
-                        <button className="nav-btn" disabled={!canForward} onClick={onForward}>
-                            ▶
-                        </button>
-                    </div>
-                    <span className="header-title">TW Business Suite</span>
-                    <span className="header-version">v1.0</span>
+                    {!hideNavButtons && (
+                        <div className="nav-bar" style={{display:'flex', gap:'6px'}}>
+                            <button
+                                style={redBtnStyle(!canBack)}
+                                disabled={!canBack}
+                                onClick={onBack}
+                                title="Eine Seite zurueck"
+                            >
+                                {'\u2190'} Zurueck
+                            </button>
+                            <button
+                                style={redBtnStyle(!canForward)}
+                                disabled={!canForward}
+                                onClick={onForward}
+                                title="Eine Seite vor"
+                            >
+                                Vor {'\u2192'}
+                            </button>
+                        </div>
+                    )}
+                    <span className="header-title" style={{flex: hideNavButtons ? 1 : undefined, textAlign: hideNavButtons ? 'center' : undefined}}>
+                        TW Business Suite
+                    </span>
+                    {/* Schriftgroessen-Toggle (rechts, immer sichtbar) */}
+                    <button
+                        style={Object.assign(redBtnStyle(false, fontLarge), { padding:'8px 12px' })}
+                        onClick={toggleFont}
+                        title={fontLarge ? 'Schrift auf normal zurueckstellen' : 'Schrift +50% vergroessern'}
+                    >
+                        {fontLarge ? 'A\u2193 Klein' : 'A\u2191 Gross'}
+                    </button>
                 </header>
             );
         }
