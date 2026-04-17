@@ -123,6 +123,16 @@
             const [akteData, setAkteData] = useState({ wips: [], appDateien: [] });
             const [akteSaveToast, setAkteSaveToast] = useState(null);
 
+            // ── Aufmass-Vorlage (Speichern/Laden via Drive) ──
+            // vorlageBusy: { action: 'save'|'list'|'load', message: '...' } waehrend I/O
+            const [vorlageBusy, setVorlageBusy] = useState(null);
+            // vorlageToast: Erfolgsmeldung nach Speichern/Laden
+            const [vorlageToast, setVorlageToast] = useState(null);
+            // vorlageList: Array mit Drive-Vorlagen; null = Modal geschlossen, [] = leer (geoeffnet)
+            const [vorlageList, setVorlageList] = useState(null);
+            // kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
+            const [kundeOpenDialog, setKundeOpenDialog] = useState(null);
+
             var PAGE_TO_MODUL = {
                 'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
                 'rechnung': 'rechnung', 'ausgangsbuch': 'ausgangsbuch',
@@ -426,6 +436,265 @@
                 setKundeMode('neu');
                 setShowAuth(true);
             };
+
+            // ═══════════════════════════════════════════
+            // AUFMASS-VORLAGE: Speichern, Auflisten, Laden
+            // Workflow:
+            //  1. Speichern: Aktuelle Aufmass-Daten werden als JSON zusammengestellt
+            //     und in den "Kunden-Daten"-Ordner auf Google Drive hochgeladen.
+            //     Dateiname: "Aufmass Vorlage vom DD.MM.YYYY HH-MM.json"
+            //  2. Auflisten: Alle "Aufmass Vorlage"-Dateien im Kunden-Daten-Ordner
+            //     werden von Drive geholt und als Liste praesentiert.
+            //  3. Laden: Ausgewaehlte Vorlage wird heruntergeladen, JSON geparst,
+            //     LV_POSITIONEN, Raeume, importResult etc. in States/IndexedDB geschrieben.
+            // ═══════════════════════════════════════════
+
+            // Baut das Vorlage-JSON aus dem aktuellen Kunden-Zustand
+            const buildAufmassVorlage = async (kunde) => {
+                if (!kunde) throw new Error('Kein Kunde aktiv');
+                var kundeId = kunde._driveFolderId || kunde.id;
+                if (!kundeId) throw new Error('Kunde hat keine ID');
+
+                var storage = window.TWStorage;
+                var gesamtliste = null, raeume = [], aufmassItems = [], positionsListen = [];
+                if (storage) {
+                    try { gesamtliste = await storage.loadGesamtliste(kundeId); } catch(e) {}
+                    try { raeume = (await storage.getByIndex('raeume', 'kundeId', kundeId)) || []; } catch(e) {}
+                    try { aufmassItems = (await storage.getByIndex('aufmass', 'kundeId', kundeId)) || []; } catch(e) {}
+                    try { positionsListen = (await storage.loadPositionsListenByKunde(kundeId)) || []; } catch(e) {}
+                }
+
+                // Kunden-Stammdaten bereinigen (keine Drive-Files/Folders, keine Fotos)
+                var kundeClean = Object.assign({}, kunde);
+                delete kundeClean.folders;
+                delete kundeClean.files;
+                delete kundeClean.dateien;
+
+                return {
+                    version: '1.0',
+                    type: 'aufmass-vorlage',
+                    createdAt: new Date().toISOString(),
+                    createdBy: 'TW Business Suite',
+                    kundeId: kundeId,
+                    kundeName: kunde.name || kunde.auftraggeber || '',
+                    kundeBaumassnahme: kunde.baumassnahme || '',
+                    // Kern-Daten
+                    kunde: kundeClean,
+                    lvPositionen: (typeof LV_POSITIONEN !== 'undefined') ? (LV_POSITIONEN[kundeId] || []) : [],
+                    gesamtliste: gesamtliste || null,
+                    raeume: raeume,
+                    aufmassItems: aufmassItems,
+                    positionsListen: positionsListen,
+                    importResult: kunde._importResult || importResult || null,
+                };
+            };
+
+            // Vorlage zu Drive hochladen
+            const saveAufmassVorlage = async () => {
+                if (!selectedKunde) {
+                    alert('Bitte zuerst einen Kunden laden.');
+                    return;
+                }
+                var service = window.GoogleDriveService;
+                if (!service || !service.accessToken) {
+                    alert('Google Drive ist nicht verbunden.\nBitte zuerst mit Drive verbinden.');
+                    return;
+                }
+                var kundeDriveId = selectedKunde._driveFolderId || selectedKunde.id;
+                if (!kundeDriveId) {
+                    alert('Dieser Kunde hat keinen Google-Drive-Ordner.');
+                    return;
+                }
+
+                setVorlageBusy({ action: 'save', message: 'Aufmass-Vorlage wird erstellt...' });
+                try {
+                    // 1. Vorlage-JSON bauen
+                    var vorlage = await buildAufmassVorlage(selectedKunde);
+                    setVorlageBusy({ action: 'save', message: 'Kunden-Daten-Ordner wird gesucht...' });
+
+                    // 2. Kunden-Daten-Ordner finden oder erstellen
+                    var kundenDatenOrdnerId = await service.findOrCreateFolder(kundeDriveId, 'Kunden-Daten');
+
+                    // 3. Dateiname mit Datum + Uhrzeit
+                    var now = new Date();
+                    var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+                    var dateStr = pad(now.getDate()) + '.' + pad(now.getMonth() + 1) + '.' + now.getFullYear()
+                                + ' ' + pad(now.getHours()) + '-' + pad(now.getMinutes());
+                    var fileName = 'Aufmass Vorlage vom ' + dateStr + '.json';
+
+                    setVorlageBusy({ action: 'save', message: 'Hochladen nach Google Drive...' });
+
+                    // 4. Upload
+                    var blob = new Blob([JSON.stringify(vorlage, null, 2)], { type: 'application/json' });
+                    var result = await service.uploadFile(kundenDatenOrdnerId, fileName, 'application/json', blob);
+
+                    setVorlageBusy(null);
+                    setVorlageToast({ type: 'success', message: '✓ Vorlage gespeichert: ' + fileName });
+                    setTimeout(function(){ setVorlageToast(null); }, 4000);
+                } catch(err) {
+                    console.error('[Vorlage speichern]', err);
+                    setVorlageBusy(null);
+                    alert('Fehler beim Speichern der Vorlage:\n' + (err.message || err));
+                }
+            };
+
+            // Alle Vorlagen im Kunden-Daten-Ordner auflisten
+            const listAufmassVorlagen = async (kunde) => {
+                if (!kunde) throw new Error('Kein Kunde');
+                var service = window.GoogleDriveService;
+                if (!service || !service.accessToken) throw new Error('Drive nicht verbunden');
+                var kundeDriveId = kunde._driveFolderId || kunde.id;
+                if (!kundeDriveId) throw new Error('Kunde hat keinen Drive-Ordner');
+
+                // Kunden-Daten-Ordner suchen (bereits existierende find-Logik)
+                var contents = await service.listFolderContents(kundeDriveId);
+                var kundenDatenOrdner = (contents.folders || []).find(function(f) {
+                    var n = (f.name || '').toLowerCase();
+                    return n.indexOf('kunden-daten') >= 0 || n === 'kundendaten' || n === 'kunden_daten';
+                });
+                if (!kundenDatenOrdner) return [];
+
+                // Dateien listen und filtern
+                var subContents = await service.listFolderContents(kundenDatenOrdner.id);
+                var allFiles = (subContents.files || []).concat(subContents.pdfs || []);
+                var vorlagen = allFiles.filter(function(f) {
+                    var n = (f.name || '').toLowerCase();
+                    // Akzeptiert "aufmass vorlage", "aufmaß vorlage", auch mit Bindestrich
+                    return (n.indexOf('aufmass vorlage') >= 0 || n.indexOf('aufmaß vorlage') >= 0 || n.indexOf('aufmass-vorlage') >= 0)
+                        && n.endsWith('.json');
+                });
+
+                // Nach Datum sortieren: neueste zuerst
+                vorlagen.sort(function(a, b) {
+                    var ta = new Date(a.modifiedTime || a.createdTime || 0).getTime();
+                    var tb = new Date(b.modifiedTime || b.createdTime || 0).getTime();
+                    return tb - ta;
+                });
+
+                return vorlagen;
+            };
+
+            // Vorlage-Datei herunterladen, JSON parsen und in die App laden
+            const loadAufmassVorlage = async (kunde, vorlageFile) => {
+                var service = window.GoogleDriveService;
+                if (!service || !service.accessToken) throw new Error('Drive nicht verbunden');
+
+                setVorlageBusy({ action: 'load', message: 'Vorlage wird heruntergeladen...' });
+
+                // 1. Datei herunterladen
+                var blob = await service.downloadFile(vorlageFile.id);
+                var text = await blob.text();
+                var vorlage;
+                try { vorlage = JSON.parse(text); }
+                catch(e) { throw new Error('Vorlage-Datei ist kein gueltiges JSON.'); }
+
+                if (vorlage.type !== 'aufmass-vorlage') {
+                    throw new Error('Datei ist keine Aufmass-Vorlage (type="' + (vorlage.type || 'unbekannt') + '")');
+                }
+
+                setVorlageBusy({ action: 'load', message: 'Daten werden eingespielt...' });
+
+                var kundeId = kunde._driveFolderId || kunde.id;
+                var storage = window.TWStorage;
+
+                // 2. LV_POSITIONEN setzen
+                if (vorlage.lvPositionen && vorlage.lvPositionen.length) {
+                    LV_POSITIONEN[kundeId] = vorlage.lvPositionen;
+                }
+
+                // 3. In IndexedDB speichern, damit offline weiter verfuegbar
+                if (storage) {
+                    try {
+                        if (vorlage.gesamtliste) await storage.saveGesamtliste(kundeId, vorlage.gesamtliste);
+                    } catch(e) { console.warn('[Vorlage] gesamtliste save:', e); }
+                    try {
+                        if (vorlage.raeume && vorlage.raeume.length) {
+                            for (var i = 0; i < vorlage.raeume.length; i++) {
+                                await storage.saveRaum(kundeId, vorlage.raeume[i]);
+                            }
+                        }
+                    } catch(e) { console.warn('[Vorlage] raeume save:', e); }
+                    try {
+                        if (vorlage.aufmassItems && vorlage.aufmassItems.length) {
+                            for (var j = 0; j < vorlage.aufmassItems.length; j++) {
+                                await storage.put('aufmass', vorlage.aufmassItems[j]);
+                            }
+                        }
+                    } catch(e) { console.warn('[Vorlage] aufmass save:', e); }
+                    try {
+                        if (vorlage.positionsListen && vorlage.positionsListen.length) {
+                            for (var k = 0; k < vorlage.positionsListen.length; k++) {
+                                await storage.savePositionsListe(vorlage.positionsListen[k]);
+                            }
+                        }
+                    } catch(e) { console.warn('[Vorlage] positionsListen save:', e); }
+                }
+
+                // 4. importResult setzen
+                if (vorlage.importResult) setImportResult(vorlage.importResult);
+
+                // 5. selectedKunde anreichern
+                var enriched = Object.assign({}, kunde, vorlage.kunde || {}, {
+                    _driveFolderId: kundeId,
+                    _lvPositionen: vorlage.lvPositionen,
+                    _importResult: vorlage.importResult,
+                    _fullyLoaded: true,
+                    _fromVorlage: true,
+                    _vorlageGeladenAt: new Date().toISOString(),
+                    _vorlageName: vorlageFile.name,
+                });
+                setSelectedKunde(enriched);
+                setKundeMode('gespeichertKomplett');
+
+                setVorlageBusy(null);
+                setVorlageToast({ type: 'success', message: '✓ Vorlage geladen: ' + vorlageFile.name });
+                setTimeout(function(){ setVorlageToast(null); }, 4000);
+            };
+
+            // Button-Handler: "Vorlage laden" (oeffnet Drive-Vorlagen-Liste)
+            const openVorlagenListe = async () => {
+                if (!selectedKunde) {
+                    alert('Bitte zuerst einen Kunden laden.');
+                    return;
+                }
+                var service = window.GoogleDriveService;
+                if (!service || !service.accessToken) {
+                    alert('Google Drive ist nicht verbunden.\nVorlagen werden auf Drive gespeichert und koennen ohne Drive-Verbindung nicht geladen werden.');
+                    return;
+                }
+                setVorlageBusy({ action: 'list', message: 'Vorlagen werden auf Google Drive gesucht...' });
+                try {
+                    var list = await listAufmassVorlagen(selectedKunde);
+                    setVorlageBusy(null);
+                    setVorlageList(list);
+                } catch(err) {
+                    console.error('[Vorlagen listen]', err);
+                    setVorlageBusy(null);
+                    alert('Fehler beim Suchen der Vorlagen:\n' + (err.message || err));
+                }
+            };
+
+            // Eine Vorlage aus der Liste auswaehlen und laden
+            const handleVorlageAuswaehlen = async (vorlageFile) => {
+                if (!selectedKunde) return;
+                setVorlageList(null); // Modal schliessen
+                try {
+                    await loadAufmassVorlage(selectedKunde, vorlageFile);
+                    // Nach erfolgreichem Laden zur Modulwahl
+                    navigateTo('modulwahl');
+                } catch(err) {
+                    console.error('[Vorlage laden]', err);
+                    setVorlageBusy(null);
+                    alert('Fehler beim Laden der Vorlage:\n' + (err.message || err));
+                }
+            };
+
+            // Sichtbarkeit der Vorlage-Buttons (oberhalb der Schnellnavi):
+            // Nur auf Seiten, wo Speichern/Laden Sinn macht und ein Kunde geladen ist.
+            const showVorlageBar = (
+                selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)
+                && ['modulwahl', 'raumerkennung', 'raumblatt', 'akte', 'geladen', 'datenUebersicht', 'auswahl', 'lokalOrdnerBrowser', 'ordnerBrowser'].indexOf(page) >= 0
+            );
 
             const handleKundeAnalysiert = () => {
                 setKundeMode('analysiert');
@@ -2035,69 +2304,10 @@
                     case 'lokalKundenListe':
                         return <LokaleKundenListe
                             onBack={function(){ navigateTo('kundenModus'); }}
-                            onSelectKunde={async function(k){
-                                // ═══ Kompletter Lokal-Lade-Flow ═══
-                                // Genau wie der Drive-Flow (handleSelectKunde Cache-Hit-Pfad),
-                                // damit LV_POSITIONEN, importResult, Raeume etc. alle gesetzt sind
-                                // und das Aufmass-Modul direkt funktioniert.
-                                var kundeId = k.id || k._driveFolderId;
-                                if (!kundeId || !window.TWStorage) {
-                                    alert('Kunde kann nicht geladen werden.');
-                                    return;
-                                }
-                                setLoading(true);
-                                setLoadProgress('Lokale Kundendaten werden geladen...');
-                                try {
-                                    // 1. Kompletten Kunden-Cache laden
-                                    var cached = null;
-                                    try { cached = await window.TWStorage.loadKunde(kundeId); } catch(e) { console.warn('[LokalLoad] loadKunde:', e); }
-                                    var kundeData = cached || k;
-
-                                    // 2. Positionen in LV_POSITIONEN injizieren
-                                    if (kundeData._lvPositionen && kundeData._lvPositionen.length > 0) {
-                                        LV_POSITIONEN[kundeId] = kundeData._lvPositionen;
-                                    } else {
-                                        // Fallback: aus Gesamtliste-Store
-                                        try {
-                                            var gl = await window.TWStorage.loadGesamtliste(kundeId);
-                                            if (gl && gl.length > 0) LV_POSITIONEN[kundeId] = gl;
-                                        } catch(e) { console.warn('[LokalLoad] loadGesamtliste:', e); }
-                                    }
-
-                                    // 3. importResult setzen
-                                    if (kundeData._importResult) {
-                                        setImportResult(kundeData._importResult);
-                                    } else {
-                                        // Fallback: aus driveCache
-                                        try {
-                                            var ir = await window.TWStorage.loadDriveCache('importResult', 'importResult_' + kundeId);
-                                            if (ir && ir.data) setImportResult(ir.data);
-                                        } catch(e) { console.warn('[LokalLoad] loadDriveCache:', e); }
-                                    }
-
-                                    // 4. Angereichertes Kunde-Objekt setzen
-                                    var enriched = Object.assign({}, k, kundeData, {
-                                        _driveFolderId: kundeId,
-                                        _loadFromKundendaten: true,
-                                        _fromCache: true,
-                                        _fullyLoaded: true,
-                                    });
-                                    setSelectedKunde(enriched);
-                                    setKundeMode('gespeichertKomplett');
-                                    setIsDriveMode(false);
-                                    setDriveStatus('offline');
-                                    setLoading(false);
-                                    setLoadProgress('');
-
-                                    // 5. Zur Modulwahl navigieren -- von dort aus sind alle
-                                    // Module (Aufmass, Rechnung, Schriftverkehr) erreichbar,
-                                    // und ueber die untere Navi auch der lokale Ordner-Browser.
-                                    navigateTo('modulwahl');
-                                } catch(err) {
-                                    setLoading(false);
-                                    setLoadProgress('');
-                                    alert('Fehler beim Laden: ' + (err.message || err));
-                                }
+                            onSelectKunde={function(k){
+                                // Klick auf lokalen Kunden oeffnet Auswahl-Dialog:
+                                // "Normal aufrufen" oder "Aufmass-Vorlage laden".
+                                setKundeOpenDialog({ kunde: k });
                             }} />;
                     case 'lokalOrdnerBrowser':
                         return <LokalerOrdnerBrowser
@@ -2149,6 +2359,21 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
+                    {/* AUFMASS-VORLAGE BUTTONS (oberhalb der Schnellnavi) */}
+                    {showVorlageBar && (
+                        <div style={{display:'flex', gap:'6px', padding:'6px 10px 0', background:'var(--bg-primary)'}}>
+                            <button onClick={saveAufmassVorlage} disabled={!!vorlageBusy}
+                                style={{flex:1, padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor: vorlageBusy ? 'not-allowed' : 'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.4px', opacity: vorlageBusy ? 0.5 : 1, boxShadow:'0 2px 8px rgba(196,30,30,0.25)'}}>
+                                <span>{'\uD83D\uDCE4'}</span>
+                                <span>Aufmass Vorlage speichern</span>
+                            </button>
+                            <button onClick={openVorlagenListe} disabled={!!vorlageBusy}
+                                style={{flex:1, padding:'10px 8px', borderRadius:'var(--radius-sm)', border:'none', cursor: vorlageBusy ? 'not-allowed' : 'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.4px', opacity: vorlageBusy ? 0.5 : 1, boxShadow:'0 2px 8px rgba(196,30,30,0.25)'}}>
+                                <span>{'\uD83D\uDCE5'}</span>
+                                <span>Aufmass Vorlage laden</span>
+                            </button>
+                        </div>
+                    )}
                     {/* GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe (ALLE Seiten inkl. Start) */}
                     {(true) && (
                         <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
@@ -2379,6 +2604,185 @@
                                 navigateTo('ordnerAnalyse');
                             }}
                         />
+                    )}
+                    {/* ═══ VORLAGE: Busy-Overlay ═══ */}
+                    {vorlageBusy && (
+                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.65)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+                            <div style={{background:'var(--bg-secondary)', padding:'28px 36px', borderRadius:'14px', border:'1px solid var(--border-color)', textAlign:'center', maxWidth:'400px'}}>
+                                <div style={{fontSize:'32px', marginBottom:'10px'}}>
+                                    {vorlageBusy.action === 'save' ? '\uD83D\uDCE4' : (vorlageBusy.action === 'list' ? '\uD83D\uDD0D' : '\uD83D\uDCE5')}
+                                </div>
+                                <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase'}}>
+                                    Aufmass-Vorlage
+                                </div>
+                                <div style={{fontSize:'12px', color:'var(--text-muted)'}}>{vorlageBusy.message}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ VORLAGE: Erfolgs-Toast ═══ */}
+                    {vorlageToast && (
+                        <div style={{position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)', background:'#27ae60', color:'#fff', padding:'12px 20px', borderRadius:'12px', fontSize:'13px', fontWeight:'600', zIndex:9998, boxShadow:'0 6px 20px rgba(39,174,96,0.4)', maxWidth:'90vw'}}>
+                            {vorlageToast.message}
+                        </div>
+                    )}
+
+                    {/* ═══ VORLAGE: Kunde-Open-Dialog (Normal / Vorlage laden) ═══ */}
+                    {kundeOpenDialog && (
+                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.65)', zIndex:9997, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
+                             onClick={function(){ setKundeOpenDialog(null); }}>
+                            <div onClick={function(e){ e.stopPropagation(); }}
+                                 style={{background:'var(--bg-secondary)', padding:'24px', borderRadius:'16px', border:'1px solid var(--border-color)', maxWidth:'440px', width:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+                                <div style={{fontSize:'12px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', fontFamily:'Oswald, sans-serif', marginBottom:'6px'}}>
+                                    Kunde oeffnen
+                                </div>
+                                <div style={{fontSize:'20px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'4px', overflow:'hidden', textOverflow:'ellipsis'}}>
+                                    {(kundeOpenDialog.kunde && (kundeOpenDialog.kunde.name || kundeOpenDialog.kunde.auftraggeber)) || 'Kunde'}
+                                </div>
+                                {kundeOpenDialog.kunde && kundeOpenDialog.kunde.baumassnahme && (
+                                    <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'18px'}}>
+                                        {kundeOpenDialog.kunde.baumassnahme}
+                                    </div>
+                                )}
+                                <div style={{fontSize:'13px', color:'var(--text-muted)', marginBottom:'18px', lineHeight:'1.5'}}>
+                                    Wie moechtest du diesen Kunden oeffnen?
+                                </div>
+
+                                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                    {/* Button 1: Normal */}
+                                    <button onClick={async function(){
+                                        var k = kundeOpenDialog.kunde;
+                                        setKundeOpenDialog(null);
+                                        var kundeId = k.id || k._driveFolderId;
+                                        if (!kundeId || !window.TWStorage) { alert('Kunde kann nicht geladen werden.'); return; }
+                                        setLoading(true); setLoadProgress('Lokale Kundendaten werden geladen...');
+                                        try {
+                                            var cached = null;
+                                            try { cached = await window.TWStorage.loadKunde(kundeId); } catch(e) {}
+                                            var kundeData = cached || k;
+                                            if (kundeData._lvPositionen && kundeData._lvPositionen.length > 0) {
+                                                LV_POSITIONEN[kundeId] = kundeData._lvPositionen;
+                                            } else {
+                                                try { var gl = await window.TWStorage.loadGesamtliste(kundeId); if (gl && gl.length > 0) LV_POSITIONEN[kundeId] = gl; } catch(e) {}
+                                            }
+                                            if (kundeData._importResult) setImportResult(kundeData._importResult);
+                                            else { try { var ir = await window.TWStorage.loadDriveCache('importResult', 'importResult_' + kundeId); if (ir && ir.data) setImportResult(ir.data); } catch(e) {} }
+                                            var enriched = Object.assign({}, k, kundeData, {
+                                                _driveFolderId: kundeId, _loadFromKundendaten: true, _fromCache: true, _fullyLoaded: true,
+                                            });
+                                            setSelectedKunde(enriched);
+                                            setKundeMode('gespeichertKomplett');
+                                            setIsDriveMode(false); setDriveStatus('offline');
+                                            setLoading(false); setLoadProgress('');
+                                            navigateTo('modulwahl');
+                                        } catch(err) { setLoading(false); setLoadProgress(''); alert('Fehler: ' + (err.message || err)); }
+                                    }}
+                                        style={{padding:'14px 18px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', cursor:'pointer', fontSize:'14px', fontWeight:'700', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', display:'flex', alignItems:'center', gap:'12px', boxShadow:'0 4px 15px rgba(30,136,229,0.3)'}}>
+                                        <span style={{fontSize:'24px'}}>{'\uD83D\uDCC2'}</span>
+                                        <span style={{flex:1, textAlign:'left'}}>
+                                            <div>Normal aufrufen</div>
+                                            <div style={{fontSize:'10px', opacity:0.8, letterSpacing:'0', textTransform:'none', fontWeight:'500', marginTop:'2px'}}>Kunde mit lokalen Daten oeffnen</div>
+                                        </span>
+                                    </button>
+                                    {/* Button 2: Vorlage laden */}
+                                    <button onClick={async function(){
+                                        var k = kundeOpenDialog.kunde;
+                                        setKundeOpenDialog(null);
+                                        setSelectedKunde(k);
+                                        var service = window.GoogleDriveService;
+                                        if (!service || !service.accessToken) {
+                                            alert('Google Drive ist nicht verbunden.\nVorlagen koennen ohne Drive nicht geladen werden.');
+                                            return;
+                                        }
+                                        setVorlageBusy({ action: 'list', message: 'Vorlagen auf Drive werden gesucht...' });
+                                        try {
+                                            var list = await listAufmassVorlagen(k);
+                                            setVorlageBusy(null);
+                                            setVorlageList(list);
+                                        } catch(err) {
+                                            setVorlageBusy(null);
+                                            alert('Fehler beim Suchen der Vorlagen:\n' + (err.message || err));
+                                        }
+                                    }}
+                                        style={{padding:'14px 18px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', cursor:'pointer', fontSize:'14px', fontWeight:'700', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', display:'flex', alignItems:'center', gap:'12px', boxShadow:'0 4px 15px rgba(30,136,229,0.3)'}}>
+                                        <span style={{fontSize:'24px'}}>{'\uD83D\uDCE5'}</span>
+                                        <span style={{flex:1, textAlign:'left'}}>
+                                            <div>Aufmass-Vorlage laden</div>
+                                            <div style={{fontSize:'10px', opacity:0.8, letterSpacing:'0', textTransform:'none', fontWeight:'500', marginTop:'2px'}}>Vorbereitete Vorlage aus Google Drive</div>
+                                        </span>
+                                    </button>
+                                    {/* Abbrechen */}
+                                    <button onClick={function(){ setKundeOpenDialog(null); }}
+                                        style={{padding:'10px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:'12px', fontWeight:'600', marginTop:'4px'}}>
+                                        Abbrechen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ VORLAGE: Liste der verfuegbaren Vorlagen ═══ */}
+                    {vorlageList !== null && (
+                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.7)', zIndex:9997, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
+                             onClick={function(){ setVorlageList(null); }}>
+                            <div onClick={function(e){ e.stopPropagation(); }}
+                                 style={{background:'var(--bg-secondary)', padding:'20px', borderRadius:'16px', border:'1px solid var(--border-color)', maxWidth:'520px', width:'100%', maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+                                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'16px'}}>
+                                    <div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', fontFamily:'Oswald, sans-serif', marginBottom:'2px'}}>
+                                            Verfuegbare Vorlagen
+                                        </div>
+                                        <div style={{fontSize:'16px', fontWeight:'700', color:'var(--text-primary)'}}>
+                                            {(selectedKunde && (selectedKunde.name || selectedKunde.auftraggeber)) || 'Kunde'}
+                                        </div>
+                                    </div>
+                                    <button onClick={function(){ setVorlageList(null); }}
+                                        style={{padding:'6px 10px', borderRadius:'var(--radius-sm)', border:'1px solid var(--border-color)', background:'var(--bg-primary)', color:'var(--text-muted)', cursor:'pointer', fontSize:'13px'}}>
+                                        {'\u2715'}
+                                    </button>
+                                </div>
+
+                                {vorlageList.length === 0 ? (
+                                    <div style={{textAlign:'center', padding:'40px 20px', color:'var(--text-muted)', fontSize:'13px', lineHeight:'1.6'}}>
+                                        <div style={{fontSize:'40px', marginBottom:'12px', opacity:0.4}}>{'\uD83D\uDCC2'}</div>
+                                        Keine Vorlagen fuer diesen Kunden vorhanden.
+                                        <br />
+                                        <span style={{fontSize:'11px', opacity:0.7}}>Speichere zuerst eine Vorlage mit dem roten "Aufmass Vorlage speichern"-Button.</span>
+                                    </div>
+                                ) : (
+                                    <div style={{overflowY:'auto', flex:1, display:'flex', flexDirection:'column', gap:'8px', paddingRight:'4px'}}>
+                                        {vorlageList.map(function(v) {
+                                            var datStr = '';
+                                            try {
+                                                var d = new Date(v.modifiedTime || v.createdTime);
+                                                var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+                                                datStr = pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+                                            } catch(e) {}
+
+                                            return (
+                                                <button key={v.id} onClick={function(){ handleVorlageAuswaehlen(v); }}
+                                                    style={{padding:'14px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-primary)', cursor:'pointer', textAlign:'left', display:'flex', alignItems:'center', gap:'12px', touchAction:'manipulation'}}>
+                                                    <span style={{fontSize:'26px', flexShrink:0}}>{'\uD83D\uDCC4'}</span>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'13px', fontWeight:'700', color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                                            {v.name}
+                                                        </div>
+                                                        {datStr && (
+                                                            <div style={{fontSize:'11px', color:'var(--accent-blue)', marginTop:'3px', fontFamily:'Oswald, sans-serif', letterSpacing:'0.3px'}}>
+                                                                {'\uD83D\uDD52'} {datStr}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span style={{fontSize:'11px', padding:'6px 10px', borderRadius:'var(--radius-sm)', background:'var(--accent-blue)', color:'#fff', fontWeight:'700', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', flexShrink:0}}>
+                                                        Laden
+                                                    </span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </React.Fragment>
             );
