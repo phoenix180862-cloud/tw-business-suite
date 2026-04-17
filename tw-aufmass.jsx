@@ -5465,7 +5465,15 @@
             // ── NEU: Wand-Verwaltung States ──
             const [wandAnzahl, setWandAnzahl] = useState(4);
             const [wandAnzahlPopupOpen, setWandAnzahlPopupOpen] = useState(false);
-            const [masseKopieren, setMasseKopieren] = useState(false);
+            // "Masse kopieren"-Schalter: wird in localStorage persistiert, damit der
+            // Zustand vom Vorraum automatisch auf den naechsten Raum uebernommen wird.
+            // Thomas will: einmal "JA" gedrueckt -> bleibt "JA" bis explizit "NEIN".
+            const [masseKopieren, setMasseKopieren] = useState(function() {
+                try { return localStorage.getItem('tw_masseKopieren') === 'true'; } catch(e) { return false; }
+            });
+            useEffect(function() {
+                try { localStorage.setItem('tw_masseKopieren', String(masseKopieren)); } catch(e) {}
+            }, [masseKopieren]);
 
             // ── NEU: Handskizze erweiterte States ──
             const [zeichnenAktiv, setZeichnenAktiv] = useState(false);

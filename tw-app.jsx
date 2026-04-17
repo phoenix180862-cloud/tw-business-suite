@@ -1898,7 +1898,7 @@
                     case 'manuellEingabe':
                         return <ManuelleEingabe onFertig={handleManuellFertig} onBack={function(){ navigateTo('kundenModus'); }} kunde={selectedKunde} />;
                     case 'auswahl':
-                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} onGoToModulwahl={selectedKunde ? function(){ navigateTo('modulwahl'); } : null} onGoToDaten={selectedKunde ? function(){ navigateTo('datenUebersicht'); } : null} onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo('ordnerBrowser'); } : null} />;
+                        return <Kundenauswahl onSelect={handleSelectKunde} loading={loading} kunden={isDriveMode ? driveKunden : null} onUpdateKunde={handleUpdateKunde} kundeMode={kundeMode} onBack={function(){ navigateTo('kundenModus'); }} onGoToModulwahl={selectedKunde ? function(){ navigateTo('modulwahl'); } : null} onGoToDaten={selectedKunde ? function(){ navigateTo('datenUebersicht'); } : null} onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo(isDriveMode ? 'ordnerBrowser' : 'lokalOrdnerBrowser'); } : null} />;
                     case 'akte':
                         return <KundenAkte
                             kunde={selectedKunde}
@@ -2020,7 +2020,7 @@
                             onBack={function(){ navigateTo('auswahl'); }}
                         />;
                     case 'modulwahl':
-                        return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} onOrdnerBrowser={function(){ navigateTo('ordnerBrowser'); }} />;
+                        return <ModulWahl kunde={selectedKunde} onSelectModul={handleSelectModul} ordnerAnalyseMeta={ordnerAnalyseMeta} onDatenBearbeiten={function(){ navigateTo('datenUebersicht'); }} onOrdnerBrowser={function(){ navigateTo(isDriveMode ? 'ordnerBrowser' : 'lokalOrdnerBrowser'); }} />;
                     case 'datenUebersicht':
                         return <DatenUebersicht
                             kunde={selectedKunde}
@@ -2028,23 +2028,81 @@
                             onSave={handleDatenUebersichtSave}
                             onBack={function(){ navigateTo('modulwahl'); }}
                             onWeiterZuModulen={function(){ navigateTo('modulwahl'); }}
-                            onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo('ordnerBrowser'); } : null}
+                            onGoToOrdner={selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id) ? function(){ navigateTo(isDriveMode ? 'ordnerBrowser' : 'lokalOrdnerBrowser'); } : null}
                         />;
                     case 'ordnerBrowser':
                         return <OrdnerBrowser kunde={selectedKunde} onBack={function(){ navigateTo('modulwahl'); }} onGoToDaten={function(){ navigateTo('datenUebersicht'); }} onGoToModulwahl={function(){ navigateTo('modulwahl'); }} />;
                     case 'lokalKundenListe':
                         return <LokaleKundenListe
                             onBack={function(){ navigateTo('kundenModus'); }}
-                            onSelectKunde={function(k){
-                                setSelectedKunde(k);
-                                setIsDriveMode(false);
-                                setDriveStatus('offline');
-                                navigateTo('lokalOrdnerBrowser');
+                            onSelectKunde={async function(k){
+                                // ═══ Kompletter Lokal-Lade-Flow ═══
+                                // Genau wie der Drive-Flow (handleSelectKunde Cache-Hit-Pfad),
+                                // damit LV_POSITIONEN, importResult, Raeume etc. alle gesetzt sind
+                                // und das Aufmass-Modul direkt funktioniert.
+                                var kundeId = k.id || k._driveFolderId;
+                                if (!kundeId || !window.TWStorage) {
+                                    alert('Kunde kann nicht geladen werden.');
+                                    return;
+                                }
+                                setLoading(true);
+                                setLoadProgress('Lokale Kundendaten werden geladen...');
+                                try {
+                                    // 1. Kompletten Kunden-Cache laden
+                                    var cached = null;
+                                    try { cached = await window.TWStorage.loadKunde(kundeId); } catch(e) { console.warn('[LokalLoad] loadKunde:', e); }
+                                    var kundeData = cached || k;
+
+                                    // 2. Positionen in LV_POSITIONEN injizieren
+                                    if (kundeData._lvPositionen && kundeData._lvPositionen.length > 0) {
+                                        LV_POSITIONEN[kundeId] = kundeData._lvPositionen;
+                                    } else {
+                                        // Fallback: aus Gesamtliste-Store
+                                        try {
+                                            var gl = await window.TWStorage.loadGesamtliste(kundeId);
+                                            if (gl && gl.length > 0) LV_POSITIONEN[kundeId] = gl;
+                                        } catch(e) { console.warn('[LokalLoad] loadGesamtliste:', e); }
+                                    }
+
+                                    // 3. importResult setzen
+                                    if (kundeData._importResult) {
+                                        setImportResult(kundeData._importResult);
+                                    } else {
+                                        // Fallback: aus driveCache
+                                        try {
+                                            var ir = await window.TWStorage.loadDriveCache('importResult', 'importResult_' + kundeId);
+                                            if (ir && ir.data) setImportResult(ir.data);
+                                        } catch(e) { console.warn('[LokalLoad] loadDriveCache:', e); }
+                                    }
+
+                                    // 4. Angereichertes Kunde-Objekt setzen
+                                    var enriched = Object.assign({}, k, kundeData, {
+                                        _driveFolderId: kundeId,
+                                        _loadFromKundendaten: true,
+                                        _fromCache: true,
+                                        _fullyLoaded: true,
+                                    });
+                                    setSelectedKunde(enriched);
+                                    setKundeMode('gespeichertKomplett');
+                                    setIsDriveMode(false);
+                                    setDriveStatus('offline');
+                                    setLoading(false);
+                                    setLoadProgress('');
+
+                                    // 5. Zur Modulwahl navigieren -- von dort aus sind alle
+                                    // Module (Aufmass, Rechnung, Schriftverkehr) erreichbar,
+                                    // und ueber die untere Navi auch der lokale Ordner-Browser.
+                                    navigateTo('modulwahl');
+                                } catch(err) {
+                                    setLoading(false);
+                                    setLoadProgress('');
+                                    alert('Fehler beim Laden: ' + (err.message || err));
+                                }
                             }} />;
                     case 'lokalOrdnerBrowser':
                         return <LokalerOrdnerBrowser
                             kunde={selectedKunde}
-                            onBack={function(){ navigateTo('lokalKundenListe'); }} />;
+                            onBack={function(){ navigateTo(selectedKunde && selectedKunde._fullyLoaded ? 'modulwahl' : 'lokalKundenListe'); }} />;
                     case 'ordnerAnalyse':
                         return <OrdnerAnalyseUebersicht
                             kunde={selectedKunde}
@@ -2110,8 +2168,8 @@
                                 style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'datenUebersicht' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : (page === 'datenUebersicht' ? 1 : 0.55), textShadow: page === 'datenUebersicht' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'datenUebersicht' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'datenUebersicht' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'datenUebersicht' ? 2 : 1}}>
                                 Daten
                             </button>
-                            <button onClick={function(){ navigateTo('ordnerBrowser'); }} disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'ordnerBrowser' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: page === 'ordnerBrowser' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !(selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 0.4 : (page === 'ordnerBrowser' ? 1 : 0.55), textShadow: page === 'ordnerBrowser' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'ordnerBrowser' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'ordnerBrowser' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'ordnerBrowser' ? 2 : 1}}>
+                            <button onClick={function(){ navigateTo(isDriveMode ? 'ordnerBrowser' : 'lokalOrdnerBrowser'); }} disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
+                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !(selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 0.4 : ((page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 1 : 0.55), textShadow: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 'scale(1.05)' : 'scale(1)', zIndex: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 2 : 1}}>
                                 Ordner
                             </button>
                             <button onClick={function(){ navigateTo('modulwahl'); }} disabled={!selectedKunde}
