@@ -26,6 +26,10 @@
             const [syncStatus, setSyncStatus] = useState({ projects:0, users:0, lastSync:null });
             const [log, setLog] = useState([]);
             const [busy, setBusy] = useState(false);
+            // ── Etappe 6: Einladungen ──
+            const [invitations, setInvitations] = useState([]);
+            // ── Etappe 8: Audit-Log ──
+            const [auditLog, setAuditLog] = useState([]);
 
             // ── Init Firebase on mount ──
             useEffect(function() {
@@ -40,6 +44,30 @@
             useEffect(function() {
                 if (!fbOk) return;
                 var unsub = window.FirebaseService.onUsersChange(function(d) { setUsers(d); });
+                return unsub;
+            }, [fbOk]);
+
+            // ── Etappe 6: Echtzeit-Listener fuer Einladungen ──
+            useEffect(function() {
+                if (!fbOk) return;
+                var unsub = window.FirebaseService.onInvitationsChange(function(list) {
+                    setInvitations(list);
+                });
+                return unsub;
+            }, [fbOk]);
+
+            // ── Etappe 8: Echtzeit-Listener fuer Audit-Log + 90-Tage-Cleanup ──
+            useEffect(function() {
+                if (!fbOk) return;
+                // Cleanup: Eintraege aelter als 90 Tage entfernen (fire-and-forget)
+                window.FirebaseService.cleanupOldAuditEvents(90).then(function(r) {
+                    if (r.geloescht > 0) {
+                        console.log('[Audit-Cleanup] ' + r.geloescht + ' alte Eintraege entfernt');
+                    }
+                });
+                var unsub = window.FirebaseService.onAuditLogChange(function(list) {
+                    setAuditLog(list);
+                }, 200);
                 return unsub;
             }, [fbOk]);
 
@@ -77,15 +105,93 @@
                 localStorage.removeItem('tw_firebase_config'); window.location.reload();
             }
             async function handleApprove(uid, name) {
-                await window.FirebaseService.approveUser(uid); addLog('OK Freigegeben: ' + (name||uid.substring(0,8)));
+                await window.FirebaseService.approveUser(uid);
+                await window.FirebaseService.logAuditEvent('device_approved', { uid: uid, name: name || '' });
+                addLog('OK Freigegeben: ' + (name||uid.substring(0,8)));
             }
             async function handleReject(uid, name) {
                 if (!confirm('"' + (name||'') + '" ablehnen?')) return;
-                await window.FirebaseService.rejectUser(uid); addLog('X Abgelehnt: ' + (name||uid.substring(0,8)));
+                await window.FirebaseService.rejectUser(uid);
+                await window.FirebaseService.logAuditEvent('device_rejected', { uid: uid, name: name || '' });
+                addLog('X Abgelehnt: ' + (name||uid.substring(0,8)));
             }
             async function handleSync() {
                 setBusy(true); addLog('Sync...'); await reload();
                 addLog('Fertig -- ' + syncStatus.projects + ' Projekte, ' + syncStatus.users + ' User'); setBusy(false);
+            }
+
+            // ── Etappe 6: Einladungen ──
+            async function handleCreateInvitation(data) {
+                try {
+                    var result = await window.FirebaseService.createInvitation(data);
+                    await window.FirebaseService.logAuditEvent('invitation_created', {
+                        mitarbeiter: data.mitarbeiter,
+                        code: result.code,
+                        gueltigBis: data.gueltigBis
+                    });
+                    addLog('Einladung erstellt: ' + data.mitarbeiter + ' (Code ' + result.code + ')');
+                    return result;
+                } catch(e) {
+                    addLog('Einladung fehlgeschlagen: ' + e.message);
+                    throw e;
+                }
+            }
+            async function handleWiderrufeInvitation(code, mitarbeiter) {
+                if (!confirm('Einladung fuer "' + (mitarbeiter||'?') + '" widerrufen?\n\nDer Code ist danach ungueltig.')) return;
+                try {
+                    await window.FirebaseService.widerrufeInvitation(code);
+                    await window.FirebaseService.logAuditEvent('invitation_revoked', {
+                        code: code,
+                        mitarbeiter: mitarbeiter || ''
+                    });
+                    addLog('Einladung widerrufen: ' + code);
+                } catch(e) {
+                    alert('Widerruf fehlgeschlagen: ' + e.message);
+                }
+            }
+            async function handleDeleteInvitation(code, mitarbeiter) {
+                if (!confirm('Einladung fuer "' + (mitarbeiter||'?') + '" endgueltig loeschen?')) return;
+                try {
+                    await window.FirebaseService.deleteInvitation(code);
+                    await window.FirebaseService.logAuditEvent('invitation_deleted', {
+                        code: code,
+                        mitarbeiter: mitarbeiter || ''
+                    });
+                    addLog('Einladung geloescht: ' + code);
+                } catch(e) {
+                    alert('Loeschen fehlgeschlagen: ' + e.message);
+                }
+            }
+
+            // ── Etappe 8: Geraete-Aktionen (Sperren / Freigeben / Entfernen) ──
+            async function handleLockDevice(uid, name) {
+                if (!confirm('Geraet "' + (name||'?') + '" sperren?\n\nDer Mitarbeiter verliert sofort den Zugriff, das Geraet bleibt aber registriert.')) return;
+                try {
+                    await window.FirebaseService.lockDevice(uid);
+                    await window.FirebaseService.logAuditEvent('device_locked', { uid: uid, name: name || '' });
+                    addLog('Geraet gesperrt: ' + (name || uid.substring(0,8)));
+                } catch(e) {
+                    alert('Sperren fehlgeschlagen: ' + e.message);
+                }
+            }
+            async function handleUnlockDevice(uid, name) {
+                try {
+                    await window.FirebaseService.unlockDevice(uid);
+                    await window.FirebaseService.logAuditEvent('device_unlocked', { uid: uid, name: name || '' });
+                    addLog('Geraet entsperrt: ' + (name || uid.substring(0,8)));
+                } catch(e) {
+                    alert('Entsperren fehlgeschlagen: ' + e.message);
+                }
+            }
+            async function handleRemoveDevice(uid, name) {
+                if (!confirm('Geraet "' + (name||'?') + '" endgueltig entfernen?\n\nDer Mitarbeiter braucht eine neue Einladung um sich wieder anzumelden.')) return;
+                try {
+                    await window.FirebaseService.removeDevice(uid);
+                    await window.FirebaseService.logAuditEvent('device_removed', { uid: uid, name: name || '' });
+                    addLog('Geraet entfernt: ' + (name || uid.substring(0,8)));
+                } catch(e) {
+                    alert('Entfernen fehlgeschlagen: ' + e.message);
+                }
             }
 
             // ════════════════════════════════════════════════════
@@ -98,8 +204,16 @@
                 return <TeamVerwaltung
                     fbOk={fbOk}
                     users={users}
+                    invitations={invitations}
+                    auditLog={auditLog}
                     onApprove={handleApprove}
                     onReject={handleReject}
+                    onCreateInvitation={handleCreateInvitation}
+                    onWiderrufeInvitation={handleWiderrufeInvitation}
+                    onDeleteInvitation={handleDeleteInvitation}
+                    onLockDevice={handleLockDevice}
+                    onUnlockDevice={handleUnlockDevice}
+                    onRemoveDevice={handleRemoveDevice}
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
@@ -112,6 +226,7 @@
                     log={log}
                     busy={busy}
                     projects={projects}
+                    auditLog={auditLog}
                     onConnect={handleConnect}
                     onDisconnect={handleDisconnect}
                     onSync={handleSync}
@@ -977,6 +1092,14 @@
             const [fehler, setFehler] = useState(null);
             // ── Etappe 4: Nachlade-Dialog ──
             const [dialogOffen, setDialogOffen] = useState(false);
+            // ── Etappe 5: Upload & Delete ──
+            const [uploadDialogOffen, setUploadDialogOffen] = useState(false);
+            const [uploadDateien, setUploadDateien] = useState([]); // File[] aus Input/Drop
+            const [dragActive, setDragActive] = useState(false);
+            const [loeschenDatei, setLoeschenDatei] = useState(null); // {id, name} oder null
+
+            // ── Upload-Berechtigung (nur in Bilder/Stunden-Ordner) ──
+            var darfUpload = unterordner.permission === 'upload';
 
             // ── Aktueller Ordner = letztes Element im Pfad ──
             var aktuell = pfad[pfad.length - 1];
@@ -1015,17 +1138,114 @@
                 window.open(url, '_blank');
             }
 
-            // ── Etappe 4: Nach erfolgreichem Kopieren Liste neu laden ──
+            // ── Etappe 7: Auto-Sync nach Dateiaenderungen (fire-and-forget) ──
+            // Versucht Firebase-Sync im Hintergrund. Fehler werden geloggt, aber
+            // nicht an den Nutzer eskaliert — die Drive-Aktion war bereits erfolgreich.
+            async function autoSyncZuFirebase() {
+                if (!baustelle || !baustelle.name) return;
+                if (!window.FirebaseService || !window.FirebaseService.db) return;
+                try {
+                    var pid = baustelle.id || baustelle.name;
+                    var erg = await window.TWStaging.syncStagingNachFirebase(baustelle.name, pid);
+                    console.log('[Auto-Sync] OK fuer', baustelle.name);
+                    // Etappe 9: Auch Auto-Syncs ins Audit-Log
+                    if (window.FirebaseService.logAuditEvent) {
+                        window.FirebaseService.logAuditEvent('sync_completed', {
+                            baustelle: baustelle.name,
+                            gesamt: erg.gesamt || 0,
+                            auto: true
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Auto-Sync] fehlgeschlagen fuer', baustelle.name, e);
+                    if (window.FirebaseService.logAuditEvent) {
+                        window.FirebaseService.logAuditEvent('sync_failed', {
+                            baustelle: baustelle.name,
+                            fehler: e.message || String(e),
+                            auto: true
+                        });
+                    }
+                }
+            }
+
+            // ── Etappe 4: Nach erfolgreichem Kopieren Liste neu laden + Auto-Sync ──
             function handleDialogFertig() {
                 setDialogOffen(false);
                 ladeInhalt();
+                autoSyncZuFirebase();
+            }
+
+            // ── Etappe 5: Datei-Input Change ──
+            function handleFileInputChange(e) {
+                var files = Array.from(e.target.files || []);
+                if (files.length === 0) return;
+                setUploadDateien(files);
+                setUploadDialogOffen(true);
+                // Input zuruecksetzen, damit dieselbe Datei erneut gewaehlt werden kann
+                e.target.value = '';
+            }
+
+            // ── Etappe 5: Drag & Drop Handler ──
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!darfUpload) return;
+                setDragActive(true);
+            }
+            function handleDragLeave(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(false);
+            }
+            function handleDrop(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragActive(false);
+                if (!darfUpload) return;
+                var files = Array.from(e.dataTransfer.files || []);
+                if (files.length === 0) return;
+                setUploadDateien(files);
+                setUploadDialogOffen(true);
+            }
+
+            // ── Etappe 5: Upload-Dialog Fertig-Callback + Auto-Sync (Etappe 7) ──
+            function handleUploadFertig() {
+                setUploadDialogOffen(false);
+                setUploadDateien([]);
+                ladeInhalt();
+                autoSyncZuFirebase();
+            }
+
+            // ── Etappe 5: Loeschen-Dialog oeffnen ──
+            function handleLoeschenStart(f, e) {
+                if (e) { e.stopPropagation(); }
+                setLoeschenDatei({ id: f.id, name: f.name });
+            }
+
+            // ── Etappe 5: Loeschen bestaetigt (permanent: true/false) + Auto-Sync (Etappe 7) ──
+            async function handleLoeschenBestaetigt(permanent) {
+                var ziel = loeschenDatei;
+                setLoeschenDatei(null);
+                if (!ziel) return;
+                try {
+                    await window.TWStaging.deleteDateiAusStaging(ziel.id, permanent);
+                    ladeInhalt();
+                    autoSyncZuFirebase();
+                } catch (e) {
+                    alert('Loeschen fehlgeschlagen: ' + (e.message || e));
+                }
             }
 
             return (
-                <div className="page-container" style={{
-                    padding: '16px',
-                    minHeight: '100vh'
-                }}>
+                <div
+                    className="page-container"
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    style={{
+                        padding: '16px',
+                        minHeight: '100vh'
+                    }}>
                     <UnterseitenHeader
                         icon={unterordner.icon}
                         titel={unterordner.name}
@@ -1085,7 +1305,7 @@
                         style={{
                             width: '100%',
                             padding: '14px 16px',
-                            marginBottom: '14px',
+                            marginBottom: '10px',
                             borderRadius: 'var(--radius-md)',
                             border: 'none',
                             background: 'linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-light) 100%)',
@@ -1109,20 +1329,113 @@
                         <span>Aus Original nachladen</span>
                     </button>
 
-                    {/* Info-Hinweis: Nur Ansicht (fuer Handy-Sicht) */}
-                    <div style={{
-                        padding: '10px 14px',
-                        marginBottom: '14px',
-                        background: 'rgba(77,166,255,0.08)',
-                        border: '1px solid rgba(77,166,255,0.2)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '12px',
-                        color: 'var(--text-light)',
-                        lineHeight: 1.5
-                    }}>
-                        📖 <strong>Nur Ansicht</strong> — Dateien koennen geoeffnet werden. Mitarbeiter
-                        sehen nur diesen Ordner, niemals die Original-Kundenakte.
-                    </div>
+                    {/* Etappe 5: Upload-Button (nur in Bilder/Stunden-Ordnern) */}
+                    {darfUpload && (
+                        <React.Fragment>
+                            <input
+                                type="file"
+                                id="staging-file-input"
+                                multiple
+                                style={{ display: 'none' }}
+                                onChange={handleFileInputChange}
+                            />
+                            <button
+                                onClick={function(){
+                                    var el = document.getElementById('staging-file-input');
+                                    if (el) el.click();
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 16px',
+                                    marginBottom: '14px',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #2e9b4a 0%, #43b85e 100%)',
+                                    color: '#fff',
+                                    fontFamily: "'Oswald', sans-serif",
+                                    fontSize: '14px',
+                                    fontWeight: 600,
+                                    letterSpacing: '1.5px',
+                                    textTransform: 'uppercase',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 4px 15px rgba(46,155,74,0.30)',
+                                    transition: 'all 0.25s ease',
+                                    touchAction: 'manipulation',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px'
+                                }}
+                            >
+                                <span style={{ fontSize: '20px' }}>📤</span>
+                                <span>Datei hochladen</span>
+                            </button>
+                        </React.Fragment>
+                    )}
+
+                    {/* Info-Hinweis: Nur Ansicht vs. Upload erlaubt */}
+                    {darfUpload ? (
+                        <div style={{
+                            padding: '10px 14px',
+                            marginBottom: '14px',
+                            background: 'rgba(46,155,74,0.10)',
+                            border: '1px solid rgba(46,155,74,0.25)',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '12px',
+                            color: 'var(--text-light)',
+                            lineHeight: 1.5
+                        }}>
+                            ✍️ <strong>Mitarbeiter duerfen hier hochladen und loeschen</strong> —
+                            Dateien landen nur im Staging, die Original-Kundenakte bleibt unberuehrt.
+                            Dateien koennen per Klick auf das Papierkorb-Symbol entfernt werden.
+                        </div>
+                    ) : (
+                        <div style={{
+                            padding: '10px 14px',
+                            marginBottom: '14px',
+                            background: 'rgba(77,166,255,0.08)',
+                            border: '1px solid rgba(77,166,255,0.2)',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: '12px',
+                            color: 'var(--text-light)',
+                            lineHeight: 1.5
+                        }}>
+                            📖 <strong>Nur Ansicht</strong> — Dateien koennen geoeffnet werden. Mitarbeiter
+                            sehen nur diesen Ordner, niemals die Original-Kundenakte.
+                        </div>
+                    )}
+
+                    {/* Etappe 5: Drag & Drop Overlay (nur sichtbar wenn aktiv) */}
+                    {darfUpload && dragActive && (
+                        <div style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(46,155,74,0.20)',
+                            border: '4px dashed #2e9b4a',
+                            zIndex: 9998,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            pointerEvents: 'none'
+                        }}>
+                            <div style={{
+                                background: '#fff',
+                                padding: '24px 32px',
+                                borderRadius: 'var(--radius-md)',
+                                boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+                                textAlign: 'center',
+                                color: '#2e9b4a'
+                            }}>
+                                <div style={{ fontSize: '40px', marginBottom: '8px' }}>📤</div>
+                                <div style={{
+                                    fontFamily: "'Oswald', sans-serif",
+                                    fontSize: '16px',
+                                    fontWeight: 600,
+                                    letterSpacing: '1px'
+                                }}>Dateien hier ablegen</div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Ladezustand */}
                     {laedt && (
@@ -1161,7 +1474,9 @@
                             <div style={{ fontSize: '44px', opacity: 0.4, marginBottom: '12px' }}>📂</div>
                             <div style={{ fontSize: '13px' }}>Dieser Ordner ist leer</div>
                             <div style={{ fontSize: '11px', marginTop: '6px' }}>
-                                Oben "Aus Original nachladen" antippen, um Dateien zu kopieren
+                                {darfUpload
+                                    ? 'Oben "Datei hochladen" antippen oder Dateien per Drag & Drop ablegen'
+                                    : 'Oben "Aus Original nachladen" antippen, um Dateien zu kopieren'}
                             </div>
                         </div>
                     )}
@@ -1236,43 +1551,80 @@
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {inhalt.files.map(function(f) {
                                     return (
-                                        <button
+                                        <div
                                             key={f.id}
-                                            onClick={function(){ handleDateiOeffnen(f); }}
                                             style={{
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '10px',
-                                                padding: '10px 12px',
+                                                gap: '6px',
+                                                padding: '0',
                                                 background: 'var(--bg-card)',
                                                 border: '1px solid var(--border-color)',
                                                 borderRadius: 'var(--radius-sm)',
-                                                color: 'var(--text-primary)',
-                                                textAlign: 'left',
-                                                cursor: 'pointer',
-                                                touchAction: 'manipulation'
+                                                overflow: 'hidden'
                                             }}
                                         >
-                                            <span style={{ fontSize: '18px' }}>{dateiIcon(f.name, f.mimeType)}</span>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{
-                                                    fontSize: '13px',
-                                                    fontFamily: "'Source Sans 3', sans-serif",
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap'
-                                                }}>{f.name}</div>
-                                                <div style={{
-                                                    fontSize: '10.5px',
-                                                    color: 'var(--text-muted)',
-                                                    marginTop: '1px'
-                                                }}>
-                                                    {formatiereGroesse(parseInt(f.size, 10) || 0)}
-                                                    {f.modifiedTime ? ' · ' + new Date(f.modifiedTime).toLocaleDateString('de-DE') : ''}
+                                            <button
+                                                onClick={function(){ handleDateiOeffnen(f); }}
+                                                style={{
+                                                    flex: 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    padding: '10px 12px',
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    color: 'var(--text-primary)',
+                                                    textAlign: 'left',
+                                                    cursor: 'pointer',
+                                                    touchAction: 'manipulation',
+                                                    minWidth: 0
+                                                }}
+                                            >
+                                                <span style={{ fontSize: '18px' }}>{dateiIcon(f.name, f.mimeType)}</span>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontSize: '13px',
+                                                        fontFamily: "'Source Sans 3', sans-serif",
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>{f.name}</div>
+                                                    <div style={{
+                                                        fontSize: '10.5px',
+                                                        color: 'var(--text-muted)',
+                                                        marginTop: '1px'
+                                                    }}>
+                                                        {formatiereGroesse(parseInt(f.size, 10) || 0)}
+                                                        {f.modifiedTime ? ' · ' + new Date(f.modifiedTime).toLocaleDateString('de-DE') : ''}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>↗</span>
-                                        </button>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>↗</span>
+                                            </button>
+                                            {darfUpload && (
+                                                <button
+                                                    onClick={function(e){ handleLoeschenStart(f, e); }}
+                                                    title="Datei loeschen"
+                                                    style={{
+                                                        width: '44px',
+                                                        height: '44px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        background: 'transparent',
+                                                        border: 'none',
+                                                        borderLeft: '1px solid var(--border-color)',
+                                                        color: 'var(--accent-red)',
+                                                        fontSize: '18px',
+                                                        cursor: 'pointer',
+                                                        touchAction: 'manipulation',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -1287,6 +1639,29 @@
                             zielOrdnerName={aktuell.name}
                             onSchliessen={function(){ setDialogOffen(false); }}
                             onFertig={handleDialogFertig}
+                        />
+                    )}
+
+                    {/* Etappe 5: Upload-Dialog */}
+                    {uploadDialogOffen && (
+                        <UploadDialog
+                            dateien={uploadDateien}
+                            zielOrdnerId={aktuell.id}
+                            zielOrdnerName={aktuell.name}
+                            onSchliessen={function(){
+                                setUploadDialogOffen(false);
+                                setUploadDateien([]);
+                            }}
+                            onFertig={handleUploadFertig}
+                        />
+                    )}
+
+                    {/* Etappe 5: Loeschen-Dialog */}
+                    {loeschenDatei && (
+                        <LoeschenDialog
+                            datei={loeschenDatei}
+                            onAbbrechen={function(){ setLoeschenDatei(null); }}
+                            onBestaetigt={handleLoeschenBestaetigt}
                         />
                     )}
                 </div>
@@ -2210,78 +2585,279 @@
         // UNTERSEITE 2: Geraete- und Team-Verwaltung
         // Recycling der bisherigen Team-Logik aus altem teamTab
         // ═══════════════════════════════════════════════════════
-        function TeamVerwaltung({ fbOk, users, onApprove, onReject, onBack }) {
+        function TeamVerwaltung({ fbOk, users, invitations, auditLog, onApprove, onReject, onCreateInvitation, onWiderrufeInvitation, onDeleteInvitation, onLockDevice, onUnlockDevice, onRemoveDevice, onBack }) {
+            const [neueEinladungOffen, setNeueEinladungOffen] = useState(false);
+            const [showQRCode, setShowQRCode] = useState(null); // Einladungs-Code, fuer den QR gezeigt wird
+
             var content;
             if (!fbOk) {
                 content = (
                     <div style={{ textAlign:'center', padding:'40px 16px', color:'var(--text-muted)' }}>
                         <div style={{ fontSize:'48px', opacity:0.4, marginBottom:'12px' }}>🔌</div>
                         <div style={{ fontSize:'13px', marginBottom:'6px' }}>Firebase nicht verbunden</div>
-                        <div style={{ fontSize:'12px' }}>Im Sync-Bereich verbinden, dann sind Team-Freigaben verfuegbar.</div>
+                        <div style={{ fontSize:'12px' }}>Im Sync-Bereich verbinden, dann sind Team-Freigaben und Einladungen verfuegbar.</div>
                     </div>
                 );
             } else {
+                // Einladungen nach Status gruppieren
+                var nowMs = Date.now();
+                var offeneEinladungen = invitations.filter(function(i){
+                    if (i.status !== 'offen') return false;
+                    if (i.gueltigBis && new Date(i.gueltigBis).getTime() < nowMs) return false;
+                    return true;
+                });
+                var abgelaufene = invitations.filter(function(i){
+                    if (i.status !== 'offen') return false;
+                    return i.gueltigBis && new Date(i.gueltigBis).getTime() < nowMs;
+                });
+                var eingeloeste = invitations.filter(function(i){ return i.status === 'eingeloest'; });
+                var widerrufene = invitations.filter(function(i){ return i.status === 'widerrufen'; });
+
                 content = (
                     <div>
+                        {/* ── Einladungs-Button ── */}
+                        <button
+                            onClick={function(){ setNeueEinladungOffen(true); }}
+                            style={{
+                                width: '100%',
+                                padding: '14px 16px',
+                                marginBottom: '14px',
+                                borderRadius: 'var(--radius-md)',
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                color: '#fff',
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '14px',
+                                fontWeight: 600,
+                                letterSpacing: '1.5px',
+                                textTransform: 'uppercase',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 15px rgba(30,136,229,0.30)',
+                                transition: 'all 0.25s ease',
+                                touchAction: 'manipulation',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '10px'
+                            }}
+                        >
+                            <span style={{ fontSize: '20px' }}>➕</span>
+                            <span>Neue Einladung erstellen</span>
+                        </button>
+
+                        {/* ── Offene Einladungen ── */}
                         <div className="ba-card">
                             <div className="ba-card-title">
-                                ⏳ Wartende Freigaben
-                                {users.pending.length > 0 && (
+                                📨 Offene Einladungen
+                                {offeneEinladungen.length > 0 && (
                                     <span style={{
                                         background:'var(--accent-orange)', color:'#fff',
                                         borderRadius:'10px', padding:'1px 8px',
                                         fontSize:'11px', fontWeight:700, marginLeft:'6px'
-                                    }}>{users.pending.length}</span>
+                                    }}>{offeneEinladungen.length}</span>
                                 )}
                             </div>
-                            {users.pending.length === 0 ? (
+                            {offeneEinladungen.length === 0 ? (
                                 <div style={{ textAlign:'center', padding:'16px', color:'var(--text-muted)', fontSize:'13px' }}>
-                                    Keine wartenden Anfragen
+                                    Keine offenen Einladungen
                                 </div>
-                            ) : users.pending.map(function(u) {
-                                var p = u.profile || {};
-                                var name = p.name || ((p.vorname||'') + ' ' + (p.nachname||'')).trim() || 'Unbekannt';
+                            ) : offeneEinladungen.map(function(inv) {
+                                var gueltig = inv.gueltigBis ? new Date(inv.gueltigBis).toLocaleDateString('de-DE') : '—';
                                 return (
-                                    <div key={u.uid} className="ba-row">
+                                    <div key={inv.code} className="ba-row">
                                         <div style={{ flex:1 }}>
-                                            <div className="ba-name">{name}</div>
-                                            <div className="ba-detail">{p.telefon||p.tel||''} · {p.email||''} · {u.language||'de'}</div>
+                                            <div className="ba-name">
+                                                {inv.mitarbeiter}
+                                                <span style={{
+                                                    marginLeft:'6px', fontSize:'10px',
+                                                    background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                                    padding:'1px 6px', borderRadius:'6px',
+                                                    fontFamily:"'Courier New', monospace", letterSpacing:'1px'
+                                                }}>{inv.code}</span>
+                                            </div>
+                                            <div className="ba-detail">
+                                                PIN: <span style={{ fontFamily:"'Courier New', monospace", fontWeight:600 }}>{inv.pin}</span>
+                                                {' · Gueltig bis: ' + gueltig}
+                                            </div>
                                         </div>
                                         <div style={{ display:'flex', gap:'6px' }}>
-                                            <button className="ba-btn grn" onClick={function(){ onApprove(u.uid, name); }}>✓</button>
-                                            <button className="ba-btn red" onClick={function(){ onReject(u.uid, name); }}>✗</button>
+                                            <button
+                                                className="ba-btn"
+                                                style={{ background:'var(--accent-blue)', color:'#fff' }}
+                                                onClick={function(){ setShowQRCode(inv); }}
+                                                title="QR-Code anzeigen"
+                                            >📱</button>
+                                            <button
+                                                className="ba-btn red"
+                                                onClick={function(){ onWiderrufeInvitation(inv.code, inv.mitarbeiter); }}
+                                                title="Einladung widerrufen"
+                                            >✗</button>
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
+
+                        {/* ── Wartende Freigaben (Geraete-Registrierung) ── */}
+                        {users.pending.length > 0 && (
+                            <div className="ba-card">
+                                <div className="ba-card-title">
+                                    ⏳ Wartende Geraete-Freigaben
+                                    <span style={{
+                                        background:'var(--accent-orange)', color:'#fff',
+                                        borderRadius:'10px', padding:'1px 8px',
+                                        fontSize:'11px', fontWeight:700, marginLeft:'6px'
+                                    }}>{users.pending.length}</span>
+                                </div>
+                                {users.pending.map(function(u) {
+                                    var p = u.profile || {};
+                                    var name = p.name || ((p.vorname||'') + ' ' + (p.nachname||'')).trim() || 'Unbekannt';
+                                    return (
+                                        <div key={u.uid} className="ba-row">
+                                            <div style={{ flex:1 }}>
+                                                <div className="ba-name">{name}</div>
+                                                <div className="ba-detail">{p.telefon||p.tel||''} · {p.email||''} · {u.language||'de'}</div>
+                                            </div>
+                                            <div style={{ display:'flex', gap:'6px' }}>
+                                                <button className="ba-btn grn" onClick={function(){ onApprove(u.uid, name); }}>✓</button>
+                                                <button className="ba-btn red" onClick={function(){ onReject(u.uid, name); }}>✗</button>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* ── Aktive Geraete ── */}
                         <div className="ba-card">
-                            <div className="ba-card-title">👥 Aktive Mitarbeiter ({users.approved.length})</div>
+                            <div className="ba-card-title">👥 Aktive Geraete ({users.approved.length})</div>
                             {users.approved.length === 0 ? (
                                 <div style={{ textAlign:'center', padding:'16px', color:'var(--text-muted)', fontSize:'13px' }}>
-                                    Noch keine Mitarbeiter
+                                    Noch keine aktiven Geraete
                                 </div>
                             ) : users.approved.map(function(u) {
                                 var p = u.profile || {};
+                                var istAdmin = u.role === 'admin';
+                                var istGesperrt = u.locked === true;
                                 return (
-                                    <div key={u.uid} className="ba-row">
-                                        <div style={{ flex:1 }}>
+                                    <div key={u.uid} className="ba-row" style={{
+                                        opacity: istGesperrt ? 0.6 : 1
+                                    }}>
+                                        <div style={{ flex:1, minWidth:0 }}>
                                             <div className="ba-name">
                                                 {p.name || 'Mitarbeiter'}
-                                                {u.role === 'admin' && (
+                                                {istAdmin && (
                                                     <span style={{
                                                         marginLeft:'6px', fontSize:'10px',
                                                         background:'var(--accent-blue)', color:'#fff',
                                                         padding:'1px 6px', borderRadius:'6px'
                                                     }}>ADMIN</span>
                                                 )}
+                                                {istGesperrt && (
+                                                    <span style={{
+                                                        marginLeft:'6px', fontSize:'10px',
+                                                        background:'rgba(196,30,30,0.2)', color:'var(--accent-red)',
+                                                        padding:'1px 6px', borderRadius:'6px',
+                                                        fontFamily:"'Oswald', sans-serif", fontWeight:600, letterSpacing:'0.5px'
+                                                    }}>GESPERRT</span>
+                                                )}
                                             </div>
-                                            <div className="ba-detail">Sprache: {u.language||'de'} · Aktiv</div>
+                                            <div className="ba-detail">
+                                                {(p.geraeteTyp || p.deviceType || 'Geraet')} · Sprache: {u.language||'de'}
+                                                {u.lastLogin && (' · Letzter Login: ' + new Date(u.lastLogin).toLocaleString('de-DE'))}
+                                            </div>
                                         </div>
+                                        {!istAdmin && (
+                                            <div style={{ display:'flex', gap:'6px', flexShrink:0 }}>
+                                                {istGesperrt ? (
+                                                    <button
+                                                        className="ba-btn grn"
+                                                        onClick={function(){ onUnlockDevice(u.uid, p.name); }}
+                                                        title="Geraet entsperren"
+                                                    >🔓</button>
+                                                ) : (
+                                                    <button
+                                                        className="ba-btn"
+                                                        style={{ background:'var(--accent-orange)', color:'#fff' }}
+                                                        onClick={function(){ onLockDevice(u.uid, p.name); }}
+                                                        title="Geraet sperren"
+                                                    >🔒</button>
+                                                )}
+                                                <button
+                                                    className="ba-btn red"
+                                                    onClick={function(){ onRemoveDevice(u.uid, p.name); }}
+                                                    title="Geraet endgueltig entfernen"
+                                                >🗑️</button>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
                         </div>
+
+                        {/* ── Etappe 8: Audit-Log ── */}
+                        <AuditLogPanel auditLog={auditLog} />
+
+                        {/* ── Archiv: Eingeloeste und widerrufene Einladungen ── */}
+                        {(eingeloeste.length > 0 || widerrufene.length > 0 || abgelaufene.length > 0) && (
+                            <div className="ba-card">
+                                <div className="ba-card-title">🗂️ Archiv ({eingeloeste.length + widerrufene.length + abgelaufene.length})</div>
+                                {eingeloeste.map(function(inv) {
+                                    return (
+                                        <div key={inv.code} className="ba-row" style={{ opacity:0.7 }}>
+                                            <div style={{ flex:1 }}>
+                                                <div className="ba-name">
+                                                    ✓ {inv.mitarbeiter}
+                                                    <span style={{
+                                                        marginLeft:'6px', fontSize:'10px',
+                                                        background:'rgba(46,155,74,0.2)', color:'#2e9b4a',
+                                                        padding:'1px 6px', borderRadius:'6px'
+                                                    }}>EINGELOEST</span>
+                                                </div>
+                                                <div className="ba-detail">Code {inv.code} · Geraet: {inv.geraetName || '—'}</div>
+                                            </div>
+                                            <button className="ba-btn red" onClick={function(){ onDeleteInvitation(inv.code, inv.mitarbeiter); }}>🗑️</button>
+                                        </div>
+                                    );
+                                })}
+                                {widerrufene.map(function(inv) {
+                                    return (
+                                        <div key={inv.code} className="ba-row" style={{ opacity:0.6 }}>
+                                            <div style={{ flex:1 }}>
+                                                <div className="ba-name">
+                                                    ✗ {inv.mitarbeiter}
+                                                    <span style={{
+                                                        marginLeft:'6px', fontSize:'10px',
+                                                        background:'rgba(196,30,30,0.2)', color:'var(--accent-red)',
+                                                        padding:'1px 6px', borderRadius:'6px'
+                                                    }}>WIDERRUFEN</span>
+                                                </div>
+                                                <div className="ba-detail">Code {inv.code}</div>
+                                            </div>
+                                            <button className="ba-btn red" onClick={function(){ onDeleteInvitation(inv.code, inv.mitarbeiter); }}>🗑️</button>
+                                        </div>
+                                    );
+                                })}
+                                {abgelaufene.map(function(inv) {
+                                    return (
+                                        <div key={inv.code} className="ba-row" style={{ opacity:0.6 }}>
+                                            <div style={{ flex:1 }}>
+                                                <div className="ba-name">
+                                                    ⏰ {inv.mitarbeiter}
+                                                    <span style={{
+                                                        marginLeft:'6px', fontSize:'10px',
+                                                        background:'rgba(230,126,34,0.2)', color:'var(--accent-orange)',
+                                                        padding:'1px 6px', borderRadius:'6px'
+                                                    }}>ABGELAUFEN</span>
+                                                </div>
+                                                <div className="ba-detail">Code {inv.code}</div>
+                                            </div>
+                                            <button className="ba-btn red" onClick={function(){ onDeleteInvitation(inv.code, inv.mitarbeiter); }}>🗑️</button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 );
             }
@@ -2291,10 +2867,493 @@
                     <UnterseitenHeader
                         icon="👥"
                         titel="Geraeteverwaltung"
-                        untertitel="Mitarbeiter und Zugangsberechtigungen"
+                        untertitel="Einladungen und aktive Geraete"
                         onBack={onBack}
                     />
                     {content}
+
+                    {/* Neue-Einladung-Dialog */}
+                    {neueEinladungOffen && (
+                        <NeueEinladungDialog
+                            onSchliessen={function(){ setNeueEinladungOffen(false); }}
+                            onErstellen={async function(data) {
+                                var result = await onCreateInvitation(data);
+                                setNeueEinladungOffen(false);
+                                setShowQRCode(result);
+                            }}
+                        />
+                    )}
+
+                    {/* QR-Code-Dialog */}
+                    {showQRCode && (
+                        <QRCodeDialog
+                            einladung={showQRCode}
+                            onSchliessen={function(){ setShowQRCode(null); }}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // AUDIT-LOG-PANEL (Etappe 8)
+        // Zeigt die letzten Geraete-/Einladungs-Events in einer
+        // chronologischen Liste. 90 Tage Aufbewahrung (auto-cleanup).
+        // ═══════════════════════════════════════════════════════
+        function AuditLogPanel({ auditLog }) {
+            const [alleSichtbar, setAlleSichtbar] = useState(false);
+
+            var events = auditLog || [];
+            // Wenn nicht alle angezeigt werden, nur die letzten 10
+            var anzuzeigen = alleSichtbar ? events : events.slice(0, 10);
+
+            // Event-Typ → Label + Icon + Farbe
+            function eventInfo(e) {
+                var actionType = e.actionType || 'unknown';
+                var mapping = {
+                    'invitation_created': { icon: '➕', label: 'Einladung erstellt',    color: 'var(--accent-blue)' },
+                    'invitation_revoked': { icon: '✗',  label: 'Einladung widerrufen',  color: 'var(--accent-red)' },
+                    'invitation_deleted': { icon: '🗑️', label: 'Einladung geloescht',   color: 'var(--text-muted)' },
+                    'device_approved':    { icon: '✓',  label: 'Geraet freigegeben',    color: '#2e9b4a' },
+                    'device_rejected':    { icon: '✗',  label: 'Geraete-Anfrage abgelehnt', color: 'var(--accent-red)' },
+                    'device_locked':      { icon: '🔒', label: 'Geraet gesperrt',       color: 'var(--accent-orange)' },
+                    'device_unlocked':    { icon: '🔓', label: 'Geraet entsperrt',      color: '#2e9b4a' },
+                    'device_removed':     { icon: '🗑️', label: 'Geraet entfernt',       color: 'var(--accent-red)' },
+                    'sync_completed':     { icon: '🔄', label: 'Sync erfolgreich',      color: '#2e9b4a' },
+                    'sync_failed':        { icon: '⚠️', label: 'Sync fehlgeschlagen',   color: 'var(--accent-red)' }
+                };
+                return mapping[actionType] || { icon: '•', label: actionType, color: 'var(--text-muted)' };
+            }
+
+            // Event-Details in kurzen Text wandeln
+            function eventDetailText(e) {
+                var d = e.details || {};
+                var parts = [];
+                if (d.mitarbeiter) parts.push(d.mitarbeiter);
+                if (d.name) parts.push(d.name);
+                if (d.code) parts.push('Code ' + d.code);
+                if (d.baustelle) parts.push('🏗️ ' + d.baustelle);
+                if (d.gesamt !== undefined) parts.push(d.gesamt + ' Dateien');
+                if (d.auto) parts.push('auto');
+                return parts.join(' · ');
+            }
+
+            function formatiereZeit(ts) {
+                if (!ts) return '';
+                var d = new Date(ts);
+                var heute = new Date();
+                heute.setHours(0,0,0,0);
+                var eventTag = new Date(ts);
+                eventTag.setHours(0,0,0,0);
+                var istHeute = eventTag.getTime() === heute.getTime();
+                var istGestern = (heute.getTime() - eventTag.getTime()) === 24*60*60*1000;
+                var zeit = d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+                if (istHeute)   return 'Heute ' + zeit;
+                if (istGestern) return 'Gestern ' + zeit;
+                return d.toLocaleDateString('de-DE') + ' ' + zeit;
+            }
+
+            return (
+                <div className="ba-card">
+                    <div className="ba-card-title">
+                        📋 Audit-Log
+                        <span style={{
+                            marginLeft:'6px', fontSize:'10px',
+                            color:'var(--text-muted)', fontWeight:400
+                        }}>({events.length} · 90 Tage)</span>
+                    </div>
+
+                    {events.length === 0 ? (
+                        <div style={{ textAlign:'center', padding:'16px', color:'var(--text-muted)', fontSize:'13px' }}>
+                            Noch keine Aktivitaeten aufgezeichnet
+                        </div>
+                    ) : (
+                        <div>
+                            {anzuzeigen.map(function(e) {
+                                var info = eventInfo(e);
+                                var detail = eventDetailText(e);
+                                return (
+                                    <div key={e.id} style={{
+                                        display:'flex', alignItems:'flex-start', gap:'10px',
+                                        padding:'8px 4px',
+                                        borderBottom:'1px solid var(--border-color)'
+                                    }}>
+                                        <span style={{
+                                            fontSize:'16px', flexShrink:0, width:'22px', textAlign:'center',
+                                            color: info.color
+                                        }}>{info.icon}</span>
+                                        <div style={{ flex:1, minWidth:0 }}>
+                                            <div style={{
+                                                fontSize:'13px', fontWeight:500,
+                                                color:'var(--text-primary)',
+                                                fontFamily:"'Source Sans 3', sans-serif"
+                                            }}>{info.label}</div>
+                                            {detail && (
+                                                <div style={{
+                                                    fontSize:'11px', color:'var(--text-light)',
+                                                    marginTop:'1px',
+                                                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
+                                                }}>{detail}</div>
+                                            )}
+                                        </div>
+                                        <span style={{
+                                            fontSize:'10.5px', color:'var(--text-muted)',
+                                            flexShrink:0, whiteSpace:'nowrap'
+                                        }}>{formatiereZeit(e.timestamp)}</span>
+                                    </div>
+                                );
+                            })}
+
+                            {events.length > 10 && (
+                                <button
+                                    onClick={function(){ setAlleSichtbar(!alleSichtbar); }}
+                                    style={{
+                                        width:'100%', padding:'10px',
+                                        marginTop:'8px',
+                                        background:'var(--bg-secondary)',
+                                        color:'var(--text-primary)',
+                                        border:'1px solid var(--border-color)',
+                                        borderRadius:'var(--radius-sm)',
+                                        fontSize:'12px', fontFamily:"'Oswald', sans-serif",
+                                        fontWeight:600, letterSpacing:'0.5px',
+                                        cursor:'pointer', touchAction:'manipulation'
+                                    }}>
+                                    {alleSichtbar
+                                        ? 'Weniger anzeigen'
+                                        : 'Alle ' + events.length + ' Eintraege anzeigen'}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // DIALOG: Neue Einladung erstellen (Etappe 6)
+        // ═══════════════════════════════════════════════════════
+        function NeueEinladungDialog({ onSchliessen, onErstellen }) {
+            var mitarbeiter = window.MITARBEITER_LISTE || [];
+            const [gewaehlt, setGewaehlt] = useState(mitarbeiter[0] ? mitarbeiter[0].name : '');
+            const [gueltigTage, setGueltigTage] = useState('7');
+            const [busy, setBusy] = useState(false);
+
+            // PIN wird beim Oeffnen des Dialogs einmal erzeugt und bleibt bis zum Erstellen
+            const [pin] = useState(function() {
+                var p = '';
+                for (var i=0; i<6; i++) p += Math.floor(Math.random()*10);
+                return p;
+            });
+
+            async function handleErstellen() {
+                if (!gewaehlt) { alert('Bitte Mitarbeiter auswaehlen.'); return; }
+                setBusy(true);
+                try {
+                    var tage = parseInt(gueltigTage, 10) || 7;
+                    var gueltigBis = new Date(Date.now() + tage*24*60*60*1000).toISOString();
+                    await onErstellen({
+                        mitarbeiter: gewaehlt,
+                        pin: pin,
+                        gueltigBis: gueltigBis
+                    });
+                } catch(e) {
+                    alert('Fehler: ' + (e.message || e));
+                    setBusy(false);
+                }
+            }
+
+            return (
+                <div
+                    onClick={busy ? undefined : onSchliessen}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        background: 'rgba(0,0,0,0.55)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '20px'
+                    }}>
+                    <div
+                        onClick={function(e){ e.stopPropagation(); }}
+                        style={{
+                            width: '100%',
+                            maxWidth: '460px',
+                            background: 'var(--bg-card)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '22px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        }}>
+                        <div style={{
+                            display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px',
+                            paddingBottom:'12px', borderBottom:'1px solid var(--border-color)'
+                        }}>
+                            <span style={{ fontSize:'24px' }}>➕</span>
+                            <div style={{
+                                fontFamily:"'Oswald', sans-serif", fontSize:'16px', fontWeight:600,
+                                letterSpacing:'1px', textTransform:'uppercase', color:'var(--text-primary)'
+                            }}>Neue Einladung</div>
+                        </div>
+
+                        {/* Mitarbeiter-Auswahl */}
+                        <div style={{ marginBottom:'14px' }}>
+                            <label style={{
+                                display:'block', fontSize:'11px', fontFamily:"'Oswald', sans-serif",
+                                fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                color:'var(--text-muted)', marginBottom:'6px'
+                            }}>Mitarbeiter</label>
+                            <select
+                                value={gewaehlt}
+                                onChange={function(e){ setGewaehlt(e.target.value); }}
+                                style={{
+                                    width:'100%', padding:'10px 12px',
+                                    background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                    border:'1px solid var(--border-color)', borderRadius:'var(--radius-sm)',
+                                    fontSize:'14px', fontFamily:"'Source Sans 3', sans-serif"
+                                }}>
+                                {mitarbeiter.map(function(m) {
+                                    return <option key={m.id} value={m.name}>{m.name} ({m.rolle})</option>;
+                                })}
+                            </select>
+                        </div>
+
+                        {/* Gueltigkeits-Dauer */}
+                        <div style={{ marginBottom:'14px' }}>
+                            <label style={{
+                                display:'block', fontSize:'11px', fontFamily:"'Oswald', sans-serif",
+                                fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                color:'var(--text-muted)', marginBottom:'6px'
+                            }}>Gueltig fuer (Tage)</label>
+                            <div style={{ display:'flex', gap:'6px' }}>
+                                {['1','3','7','14','30'].map(function(n) {
+                                    var aktiv = gueltigTage === n;
+                                    return (
+                                        <button
+                                            key={n}
+                                            onClick={function(){ setGueltigTage(n); }}
+                                            style={{
+                                                flex:1, padding:'8px 0',
+                                                background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
+                                                color: aktiv ? '#fff' : 'var(--text-primary)',
+                                                border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
+                                                borderRadius:'var(--radius-sm)',
+                                                fontSize:'13px', fontWeight: aktiv ? 600 : 400,
+                                                cursor:'pointer', touchAction:'manipulation'
+                                            }}>{n}</button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* PIN-Vorschau */}
+                        <div style={{
+                            padding:'14px', marginBottom:'16px',
+                            background:'rgba(30,136,229,0.10)',
+                            border:'1px solid rgba(30,136,229,0.25)',
+                            borderRadius:'var(--radius-sm)',
+                            textAlign:'center'
+                        }}>
+                            <div style={{
+                                fontSize:'11px', fontFamily:"'Oswald', sans-serif",
+                                fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                color:'var(--text-muted)', marginBottom:'6px'
+                            }}>6-stellige PIN</div>
+                            <div style={{
+                                fontFamily:"'Courier New', monospace",
+                                fontSize:'28px', fontWeight:700,
+                                letterSpacing:'6px',
+                                color:'var(--accent-blue)'
+                            }}>{pin}</div>
+                            <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'6px' }}>
+                                Diese PIN gilt nur fuer diese Einladung.
+                            </div>
+                        </div>
+
+                        {/* Info */}
+                        <div style={{
+                            padding:'10px 12px', marginBottom:'16px',
+                            background:'rgba(77,166,255,0.08)',
+                            border:'1px solid rgba(77,166,255,0.2)',
+                            borderRadius:'var(--radius-sm)',
+                            fontSize:'12px', color:'var(--text-light)', lineHeight:1.5
+                        }}>
+                            📱 Nach Klick auf "Erstellen" bekommst du einen QR-Code,
+                            den der Mitarbeiter auf seinem Handy scannt. Mit PIN meldet
+                            er das Geraet dann an.
+                        </div>
+
+                        {/* Buttons */}
+                        <div style={{ display:'flex', gap:'8px' }}>
+                            <button
+                                onClick={onSchliessen}
+                                disabled={busy}
+                                style={{
+                                    flex:1, padding:'12px',
+                                    background:'var(--bg-secondary)',
+                                    color:'var(--text-primary)',
+                                    border:'1px solid var(--border-color)',
+                                    borderRadius:'var(--radius-sm)',
+                                    fontSize:'13px', fontFamily:"'Oswald', sans-serif",
+                                    fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                    cursor: busy ? 'not-allowed' : 'pointer',
+                                    opacity: busy ? 0.5 : 1,
+                                    touchAction:'manipulation'
+                                }}>Abbrechen</button>
+                            <button
+                                onClick={handleErstellen}
+                                disabled={busy || !gewaehlt}
+                                style={{
+                                    flex:1, padding:'12px',
+                                    background: busy ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                    color:'#fff',
+                                    border:'none',
+                                    borderRadius:'var(--radius-sm)',
+                                    fontSize:'13px', fontFamily:"'Oswald', sans-serif",
+                                    fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                    cursor: busy ? 'wait' : 'pointer',
+                                    boxShadow: busy ? 'none' : '0 4px 15px rgba(30,136,229,0.30)',
+                                    touchAction:'manipulation'
+                                }}>{busy ? 'Erstellt...' : 'Erstellen'}</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // DIALOG: QR-Code anzeigen (Etappe 6)
+        // Zeigt Einladungs-QR-Code + PIN zum Scannen auf dem MA-Handy.
+        // ═══════════════════════════════════════════════════════
+        function QRCodeDialog({ einladung, onSchliessen }) {
+            const qrRef = React.useRef(null);
+
+            // Payload fuer QR: Code + optional URL zur MA-App
+            // Format: { code, pin } als JSON-String (MA-App parst das)
+            var payload = JSON.stringify({
+                code: einladung.code,
+                mitarbeiter: einladung.mitarbeiter,
+                v: 1
+            });
+
+            useEffect(function() {
+                if (!qrRef.current) return;
+                if (!window.QRCode) return;
+                // Alten QR entfernen (React-StrictMode kann useEffect doppelt triggern)
+                qrRef.current.innerHTML = '';
+                try {
+                    new window.QRCode(qrRef.current, {
+                        text: payload,
+                        width: 240,
+                        height: 240,
+                        colorDark: '#000000',
+                        colorLight: '#ffffff',
+                        correctLevel: window.QRCode.CorrectLevel.M
+                    });
+                } catch(e) {
+                    qrRef.current.innerHTML = '<div style="color:red;padding:20px">QR-Code-Fehler: '+e.message+'</div>';
+                }
+            }, [payload]);
+
+            var gueltig = einladung.gueltigBis ? new Date(einladung.gueltigBis).toLocaleDateString('de-DE') : '—';
+
+            return (
+                <div
+                    onClick={onSchliessen}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        background: 'rgba(0,0,0,0.75)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '20px'
+                    }}>
+                    <div
+                        onClick={function(e){ e.stopPropagation(); }}
+                        style={{
+                            width: '100%',
+                            maxWidth: '380px',
+                            background: 'var(--bg-card)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '22px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.5)'
+                        }}>
+                        <div style={{
+                            fontFamily:"'Oswald', sans-serif", fontSize:'14px', fontWeight:600,
+                            letterSpacing:'1px', textTransform:'uppercase',
+                            color:'var(--text-primary)', textAlign:'center', marginBottom:'4px'
+                        }}>Einladung fuer</div>
+                        <div style={{
+                            fontSize:'18px', fontWeight:700, textAlign:'center',
+                            color:'var(--accent-blue)', marginBottom:'14px'
+                        }}>{einladung.mitarbeiter}</div>
+
+                        {/* QR-Code */}
+                        <div style={{
+                            background:'#fff', padding:'16px', borderRadius:'var(--radius-sm)',
+                            display:'flex', justifyContent:'center', marginBottom:'14px'
+                        }}>
+                            <div ref={qrRef} />
+                        </div>
+
+                        {/* Code + PIN */}
+                        <div style={{
+                            background:'var(--bg-secondary)',
+                            borderRadius:'var(--radius-sm)', padding:'12px',
+                            marginBottom:'14px'
+                        }}>
+                            <div style={{
+                                display:'flex', justifyContent:'space-between',
+                                alignItems:'center', marginBottom:'8px'
+                            }}>
+                                <span style={{ fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px' }}>Code</span>
+                                <span style={{
+                                    fontFamily:"'Courier New', monospace", fontSize:'18px',
+                                    fontWeight:700, letterSpacing:'3px', color:'var(--text-primary)'
+                                }}>{einladung.code}</span>
+                            </div>
+                            <div style={{
+                                display:'flex', justifyContent:'space-between', alignItems:'center'
+                            }}>
+                                <span style={{ fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px' }}>PIN</span>
+                                <span style={{
+                                    fontFamily:"'Courier New', monospace", fontSize:'18px',
+                                    fontWeight:700, letterSpacing:'3px', color:'var(--accent-blue)'
+                                }}>{einladung.pin}</span>
+                            </div>
+                            <div style={{
+                                marginTop:'8px', paddingTop:'8px',
+                                borderTop:'1px solid var(--border-color)',
+                                fontSize:'11px', color:'var(--text-muted)', textAlign:'center'
+                            }}>Gueltig bis {gueltig}</div>
+                        </div>
+
+                        {/* Hinweis */}
+                        <div style={{
+                            padding:'10px 12px', marginBottom:'14px',
+                            background:'rgba(46,155,74,0.10)',
+                            border:'1px solid rgba(46,155,74,0.25)',
+                            borderRadius:'var(--radius-sm)',
+                            fontSize:'12px', color:'var(--text-light)', lineHeight:1.5
+                        }}>
+                            📱 <strong>So geht's:</strong><br/>
+                            1. Mitarbeiter-Handy oeffnet die MA-App<br/>
+                            2. QR-Code scannen<br/>
+                            3. PIN eingeben<br/>
+                            4. Du bekommst die Geraete-Freigabe in "Wartende Freigaben"
+                        </div>
+
+                        {/* Schliessen */}
+                        <button
+                            onClick={onSchliessen}
+                            style={{
+                                width:'100%', padding:'12px',
+                                background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                color:'#fff', border:'none',
+                                borderRadius:'var(--radius-sm)',
+                                fontSize:'13px', fontFamily:"'Oswald', sans-serif",
+                                fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                cursor:'pointer',
+                                boxShadow:'0 4px 15px rgba(30,136,229,0.30)',
+                                touchAction:'manipulation'
+                            }}>Schliessen</button>
+                    </div>
                 </div>
             );
         }
@@ -2303,59 +3362,36 @@
         // UNTERSEITE 3: Synchronisation (Sync + Config)
         // Recycling der bisherigen Sync- und Config-Tabs
         // ═══════════════════════════════════════════════════════
-        function SynchronisationsBereich({ fbOk, fbConfig, setFbConfig, syncStatus, log, busy, projects, onConnect, onDisconnect, onSync, onBack }) {
-            var syncPanel = !fbOk ? null : (
-                <div>
-                    <div className="ba-card">
-                        <div className="ba-card-title">📊 Status</div>
-                        <div className="ba-stats">
-                            <div className="ba-stat">
-                                <div className="ba-stat-val">{syncStatus.projects}</div>
-                                <div className="ba-stat-lbl">Projekte</div>
-                            </div>
-                            <div className="ba-stat">
-                                <div className="ba-stat-val">{syncStatus.users}</div>
-                                <div className="ba-stat-lbl">Benutzer</div>
-                            </div>
-                            <div className="ba-stat">
-                                <div className="ba-stat-val" style={{ fontSize:'15px' }}>
-                                    {syncStatus.lastSync ? new Date(syncStatus.lastSync).toLocaleTimeString('de-DE') : '-'}
-                                </div>
-                                <div className="ba-stat-lbl">Letzter Sync</div>
-                            </div>
-                            <div className="ba-stat">
-                                <div className="ba-stat-val" style={{ color:'var(--success)' }}>●</div>
-                                <div className="ba-stat-lbl">Firebase</div>
-                            </div>
-                        </div>
-                        <button className="ba-btn blu" onClick={onSync} disabled={busy}
-                            style={{ marginTop:'14px', width:'100%' }}>
-                            {busy ? '⏳ Sync...' : '🔄 Jetzt synchronisieren'}
-                        </button>
-                    </div>
-                    <div className="ba-card">
-                        <div className="ba-card-title">📋 Protokoll</div>
-                        <div className="ba-log">
-                            {log.length === 0 ? (
-                                <div style={{ color:'var(--text-muted)', textAlign:'center', padding:'8px' }}>
-                                    Noch keine Eintraege
-                                </div>
-                            ) : log.map(function(e,i) {
-                                return (
-                                    <div key={i} style={{
-                                        padding:'3px 0',
-                                        borderBottom:'1px solid var(--border-color)',
-                                        color:'var(--text-muted)'
-                                    }}>
-                                        <span style={{ color:'var(--accent-blue)' }}>[{e.time}]</span> {e.msg}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            );
+        function SynchronisationsBereich({ fbOk, fbConfig, setFbConfig, syncStatus, log, busy, projects, onConnect, onDisconnect, onSync, onBack, auditLog }) {
+            // Etappe 9: Aus Tabs wird eine einspaltige Ansicht mit Erweitert-Toggle
+            const [erweitertOffen, setErweitertOffen] = useState(false);
 
+            // ── Etappe 9: Kacheldaten aus Audit-Log berechnen ──
+            var ts24h = Date.now() - 24*60*60*1000;
+            var syncEvents = (auditLog || []).filter(function(e) {
+                return e.actionType === 'sync_completed' || e.actionType === 'sync_failed';
+            });
+            var letzterSync = syncEvents.length > 0 ? syncEvents[0] : null;
+            var fehlerLetzte24h = syncEvents.filter(function(e) {
+                return e.actionType === 'sync_failed' && (e.timestamp || 0) > ts24h;
+            }).length;
+
+            // Relativ-Zeit formatieren: "vor 5 Min", "vor 2 Std", "vor 3 Tagen"
+            function relativZeit(ts) {
+                if (!ts) return '—';
+                var diff = Date.now() - ts;
+                var sek = Math.floor(diff / 1000);
+                var min = Math.floor(sek / 60);
+                var std = Math.floor(min / 60);
+                var tage = Math.floor(std / 24);
+                if (sek < 60)  return 'gerade eben';
+                if (min < 60)  return 'vor ' + min + ' Min';
+                if (std < 24)  return 'vor ' + std + ' Std';
+                if (tage < 30) return 'vor ' + tage + ' Tag' + (tage === 1 ? '' : 'en');
+                return new Date(ts).toLocaleDateString('de-DE');
+            }
+
+            // ── Firebase-Config-Formular (im Erweitert-Bereich) ──
             var configFields = [
                 { k:'apiKey', l:'API Key *', p:'AIzaSy...' },
                 { k:'projectId', l:'Project ID *', p:'einkaufsliste-98199' },
@@ -2364,41 +3400,6 @@
                 { k:'storageBucket', l:'Storage Bucket', p:'...appspot.com' },
                 { k:'appId', l:'App ID', p:'1:123:web:abc...' }
             ];
-            var configPanel = (
-                <div className="ba-card">
-                    <div className="ba-card-title">🔧 Firebase Konfiguration</div>
-                    <p style={{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'14px', lineHeight:'1.5' }}>
-                        Zugangsdaten aus der Firebase Console eintragen.
-                    </p>
-                    {configFields.map(function(f) {
-                        return (
-                            <div key={f.k} className="ba-field">
-                                <label>{f.l}</label>
-                                <input
-                                    type="text"
-                                    value={fbConfig[f.k] || ''}
-                                    placeholder={f.p}
-                                    onChange={function(e) {
-                                        var v = e.target.value;
-                                        setFbConfig(function(prev) {
-                                            var n = Object.assign({}, prev);
-                                            n[f.k] = v;
-                                            return n;
-                                        });
-                                    }}
-                                />
-                            </div>
-                        );
-                    })}
-                    <div style={{ display:'flex', gap:'8px', marginTop:'16px' }}>
-                        <button className="ba-btn blu" onClick={onConnect}
-                            disabled={busy || !fbConfig.apiKey || !fbConfig.projectId}>
-                            {busy ? '⏳...' : (fbOk ? '🔗 Neu verbinden' : '🔗 Verbinden')}
-                        </button>
-                        {fbOk && <button className="ba-btn out" onClick={onDisconnect}>🔌 Trennen</button>}
-                    </div>
-                </div>
-            );
 
             return (
                 <div className="page-container" style={{ padding:'16px', minHeight:'100vh' }}>
@@ -2408,8 +3409,512 @@
                         untertitel={fbOk ? 'Verbunden mit ' + fbConfig.projectId : 'Nicht verbunden'}
                         onBack={onBack}
                     />
-                    {syncPanel}
-                    {configPanel}
+
+                    {/* ═══ Kein Firebase: Direkt zum Config ═══ */}
+                    {!fbOk && (
+                        <div>
+                            <div style={{
+                                padding:'16px', marginBottom:'14px',
+                                background:'rgba(230,126,34,0.10)',
+                                border:'1px solid rgba(230,126,34,0.25)',
+                                borderRadius:'var(--radius-md)',
+                                color:'var(--text-primary)', textAlign:'center'
+                            }}>
+                                <div style={{ fontSize:'32px', marginBottom:'8px' }}>🔌</div>
+                                <div style={{
+                                    fontFamily:"'Oswald', sans-serif", fontSize:'14px',
+                                    fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                    marginBottom:'4px'
+                                }}>Firebase nicht verbunden</div>
+                                <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>
+                                    Unter "Erweitert" die Zugangsdaten eintragen und verbinden.
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ Verbunden: Kachel-Dashboard + Staging-Sync ═══ */}
+                    {fbOk && (
+                        <div>
+                            {/* 3 Status-Kacheln */}
+                            <div style={{
+                                display:'grid',
+                                gridTemplateColumns:'repeat(3, 1fr)',
+                                gap:'8px',
+                                marginBottom:'14px'
+                            }}>
+                                {/* Letzter Sync */}
+                                <div style={{
+                                    padding:'14px 10px',
+                                    background: letzterSync && letzterSync.actionType === 'sync_completed'
+                                        ? 'linear-gradient(135deg, rgba(46,155,74,0.15), rgba(46,155,74,0.05))'
+                                        : 'var(--bg-card)',
+                                    border:'1px solid ' + (letzterSync && letzterSync.actionType === 'sync_completed' ? 'rgba(46,155,74,0.3)' : 'var(--border-color)'),
+                                    borderRadius:'var(--radius-md)',
+                                    textAlign:'center'
+                                }}>
+                                    <div style={{ fontSize:'22px', marginBottom:'4px' }}>🔄</div>
+                                    <div style={{
+                                        fontSize:'11px', color:'var(--text-muted)',
+                                        fontFamily:"'Oswald', sans-serif",
+                                        fontWeight:600, letterSpacing:'0.5px',
+                                        textTransform:'uppercase', marginBottom:'3px'
+                                    }}>Letzter Sync</div>
+                                    <div style={{
+                                        fontSize:'12px', fontWeight:600,
+                                        color: letzterSync ? 'var(--text-primary)' : 'var(--text-muted)',
+                                        fontFamily:"'Source Sans 3', sans-serif",
+                                        lineHeight:1.3
+                                    }}>
+                                        {letzterSync ? relativZeit(letzterSync.timestamp) : 'Noch nicht'}
+                                    </div>
+                                </div>
+
+                                {/* Projekte gesamt */}
+                                <div style={{
+                                    padding:'14px 10px',
+                                    background:'var(--bg-card)',
+                                    border:'1px solid var(--border-color)',
+                                    borderRadius:'var(--radius-md)',
+                                    textAlign:'center'
+                                }}>
+                                    <div style={{ fontSize:'22px', marginBottom:'4px' }}>📂</div>
+                                    <div style={{
+                                        fontSize:'11px', color:'var(--text-muted)',
+                                        fontFamily:"'Oswald', sans-serif",
+                                        fontWeight:600, letterSpacing:'0.5px',
+                                        textTransform:'uppercase', marginBottom:'3px'
+                                    }}>Baustellen</div>
+                                    <div style={{
+                                        fontSize:'18px', fontWeight:700,
+                                        color:'var(--text-primary)',
+                                        fontFamily:"'Source Sans 3', sans-serif"
+                                    }}>{syncStatus.projects || 0}</div>
+                                </div>
+
+                                {/* Fehler 24h */}
+                                <div style={{
+                                    padding:'14px 10px',
+                                    background: fehlerLetzte24h > 0
+                                        ? 'linear-gradient(135deg, rgba(196,30,30,0.15), rgba(196,30,30,0.05))'
+                                        : 'var(--bg-card)',
+                                    border:'1px solid ' + (fehlerLetzte24h > 0 ? 'rgba(196,30,30,0.3)' : 'var(--border-color)'),
+                                    borderRadius:'var(--radius-md)',
+                                    textAlign:'center'
+                                }}>
+                                    <div style={{ fontSize:'22px', marginBottom:'4px' }}>
+                                        {fehlerLetzte24h > 0 ? '⚠️' : '✓'}
+                                    </div>
+                                    <div style={{
+                                        fontSize:'11px', color:'var(--text-muted)',
+                                        fontFamily:"'Oswald', sans-serif",
+                                        fontWeight:600, letterSpacing:'0.5px',
+                                        textTransform:'uppercase', marginBottom:'3px'
+                                    }}>Fehler 24h</div>
+                                    <div style={{
+                                        fontSize:'18px', fontWeight:700,
+                                        color: fehlerLetzte24h > 0 ? 'var(--accent-red)' : '#2e9b4a',
+                                        fontFamily:"'Source Sans 3', sans-serif"
+                                    }}>{fehlerLetzte24h}</div>
+                                </div>
+                            </div>
+
+                            {/* Staging-Sync-Panel mit Reparieren-Buttons bei Fehlern */}
+                            <StagingSyncPanel fbOk={fbOk} fbConfig={fbConfig} auditLog={auditLog} />
+                        </div>
+                    )}
+
+                    {/* ═══ Erweitert-Toggle ═══ */}
+                    <button
+                        onClick={function(){ setErweitertOffen(!erweitertOffen); }}
+                        style={{
+                            width:'100%', marginTop:'20px', padding:'12px',
+                            background:'var(--bg-secondary)',
+                            color:'var(--text-light)',
+                            border:'1px solid var(--border-color)',
+                            borderRadius:'var(--radius-sm)',
+                            fontSize:'12px', fontFamily:"'Oswald', sans-serif",
+                            fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                            cursor:'pointer', touchAction:'manipulation',
+                            display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                        }}>
+                        <span style={{ transform: erweitertOffen ? 'rotate(90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>▶</span>
+                        <span>⚙️ Erweitert</span>
+                    </button>
+
+                    {erweitertOffen && (
+                        <div style={{ marginTop:'12px' }}>
+                            {/* Firebase-Config */}
+                            <div className="ba-card">
+                                <div className="ba-card-title">🔧 Firebase Konfiguration</div>
+                                <p style={{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'14px', lineHeight:'1.5' }}>
+                                    Zugangsdaten aus der Firebase Console eintragen.
+                                    {fbOk && <span style={{ color:'#2e9b4a', fontWeight:600 }}> Verbunden.</span>}
+                                </p>
+                                {configFields.map(function(f) {
+                                    return (
+                                        <div key={f.k} className="ba-field">
+                                            <label>{f.l}</label>
+                                            <input
+                                                type="text"
+                                                value={fbConfig[f.k] || ''}
+                                                placeholder={f.p}
+                                                onChange={function(e) {
+                                                    var v = e.target.value;
+                                                    setFbConfig(function(prev) {
+                                                        var n = Object.assign({}, prev);
+                                                        n[f.k] = v;
+                                                        return n;
+                                                    });
+                                                }}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                                <div style={{ display:'flex', gap:'8px', marginTop:'16px' }}>
+                                    <button className="ba-btn blu" onClick={onConnect}
+                                        disabled={busy || !fbConfig.apiKey || !fbConfig.projectId}>
+                                        {busy ? '⏳...' : (fbOk ? '🔗 Neu verbinden' : '🔗 Verbinden')}
+                                    </button>
+                                    {fbOk && <button className="ba-btn out" onClick={onDisconnect}>🔌 Trennen</button>}
+                                </div>
+                            </div>
+
+                            {/* Manuelles Sync */}
+                            {fbOk && (
+                                <div className="ba-card">
+                                    <div className="ba-card-title">🔁 Projekte neu laden</div>
+                                    <p style={{ fontSize:'12px', color:'var(--text-muted)', marginBottom:'12px', lineHeight:1.5 }}>
+                                        Laedt die Projekt- und Benutzer-Statistik aus Firebase neu.
+                                    </p>
+                                    <button className="ba-btn blu" onClick={onSync} disabled={busy}
+                                        style={{ width:'100%' }}>
+                                        {busy ? '⏳ Lade...' : '🔄 Statistik neu laden'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Protokoll */}
+                            {fbOk && log.length > 0 && (
+                                <div className="ba-card">
+                                    <div className="ba-card-title">📋 Sitzungs-Protokoll</div>
+                                    <div className="ba-log">
+                                        {log.map(function(e,i) {
+                                            return (
+                                                <div key={i} style={{
+                                                    padding:'3px 0',
+                                                    borderBottom:'1px solid var(--border-color)',
+                                                    color:'var(--text-muted)'
+                                                }}>
+                                                    <span style={{ color:'var(--accent-blue)' }}>[{e.time}]</span> {e.msg}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // STAGING-SYNC-PANEL (Etappe 7)
+        // Zeigt alle Staging-Baustellen und erlaubt manuelles Firebase-Sync.
+        // ═══════════════════════════════════════════════════════
+        function StagingSyncPanel({ fbOk, fbConfig, auditLog }) {
+            const [baustellen, setBaustellen] = useState([]);
+            const [ladeFehler, setLadeFehler] = useState(null);
+            const [laedt, setLaedt] = useState(false);
+            const [syncStatus, setSyncStatus] = useState({}); // { baustelleName: {running, ergebnis, fehler} }
+            const [allesLaeuft, setAllesLaeuft] = useState(false);
+
+            // ── Etappe 9: Map "Baustelle → letzter Sync-Audit-Event" ──
+            // Damit koennen wir bei Baustellen, die in der letzten Zeit fehlerhaft waren,
+            // einen "Reparieren"-Button anzeigen.
+            var auditPerBaustelle = {};
+            (auditLog || []).forEach(function(e) {
+                if (e.actionType !== 'sync_completed' && e.actionType !== 'sync_failed') return;
+                var b = e.details && e.details.baustelle;
+                if (!b) return;
+                // Nur den ersten Eintrag pro Baustelle behalten (auditLog ist neu->alt sortiert)
+                if (!auditPerBaustelle[b]) auditPerBaustelle[b] = e;
+            });
+
+            async function ladeBaustellen() {
+                setLaedt(true);
+                setLadeFehler(null);
+                try {
+                    if (!window.TWStaging) throw new Error('Staging-API nicht geladen');
+                    var list = await window.TWStaging.listStagingBaustellen();
+                    setBaustellen(list || []);
+                } catch (e) {
+                    setLadeFehler(e.message || String(e));
+                }
+                setLaedt(false);
+            }
+
+            useEffect(function() {
+                if (fbOk) ladeBaustellen();
+            }, [fbOk]);
+
+            async function syncEine(b) {
+                var name = b.name;
+                setSyncStatus(function(prev) {
+                    var n = Object.assign({}, prev);
+                    n[name] = { running: true };
+                    return n;
+                });
+                try {
+                    var pid = b.id || name;
+                    var erg = await window.TWStaging.syncStagingNachFirebase(name, pid);
+                    setSyncStatus(function(prev) {
+                        var n = Object.assign({}, prev);
+                        n[name] = { running: false, ergebnis: erg, zeit: new Date() };
+                        return n;
+                    });
+                    // Etappe 9: Audit-Event fuer erfolgreichen Sync
+                    if (window.FirebaseService && window.FirebaseService.logAuditEvent) {
+                        window.FirebaseService.logAuditEvent('sync_completed', {
+                            baustelle: name,
+                            gesamt: erg.gesamt || 0,
+                            unterordner: Object.keys(erg.unterordner || {}).length
+                        });
+                    }
+                } catch (e) {
+                    setSyncStatus(function(prev) {
+                        var n = Object.assign({}, prev);
+                        n[name] = { running: false, fehler: e.message || String(e), zeit: new Date() };
+                        return n;
+                    });
+                    // Etappe 9: Audit-Event fuer fehlgeschlagenen Sync
+                    if (window.FirebaseService && window.FirebaseService.logAuditEvent) {
+                        window.FirebaseService.logAuditEvent('sync_failed', {
+                            baustelle: name,
+                            fehler: e.message || String(e)
+                        });
+                    }
+                }
+            }
+
+            async function syncAlle() {
+                if (baustellen.length === 0) return;
+                setAllesLaeuft(true);
+                for (var i = 0; i < baustellen.length; i++) {
+                    await syncEine(baustellen[i]);
+                }
+                setAllesLaeuft(false);
+            }
+
+            if (!fbOk) {
+                return (
+                    <div style={{ textAlign:'center', padding:'30px 16px', color:'var(--text-muted)', fontSize:'13px' }}>
+                        <div style={{ fontSize:'40px', opacity:0.3, marginBottom:'10px' }}>🔌</div>
+                        Firebase ist nicht verbunden.<br/>
+                        Siehe Tab "Config".
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    {/* Info */}
+                    <div style={{
+                        padding:'10px 14px', marginBottom:'12px',
+                        background:'rgba(77,166,255,0.08)',
+                        border:'1px solid rgba(77,166,255,0.2)',
+                        borderRadius:'var(--radius-sm)',
+                        fontSize:'12px', color:'var(--text-light)', lineHeight:1.5
+                    }}>
+                        📂 <strong>Staging-Sync</strong> — repliziert Datei-Metadaten von Drive nach Firebase,
+                        damit die Mitarbeiter-App sie sehen kann. Dateien bleiben in Drive, die MA-App
+                        laedt sie direkt von dort.
+                    </div>
+
+                    {/* Sync-Alle-Button */}
+                    <button
+                        onClick={syncAlle}
+                        disabled={allesLaeuft || baustellen.length === 0}
+                        style={{
+                            width:'100%', padding:'14px 16px', marginBottom:'14px',
+                            borderRadius:'var(--radius-md)', border:'none',
+                            background: allesLaeuft ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                            color: allesLaeuft ? 'var(--text-muted)' : '#fff',
+                            fontFamily:"'Oswald', sans-serif", fontSize:'14px', fontWeight:600,
+                            letterSpacing:'1.5px', textTransform:'uppercase',
+                            cursor: allesLaeuft ? 'wait' : 'pointer',
+                            boxShadow: allesLaeuft ? 'none' : '0 4px 15px rgba(30,136,229,0.30)',
+                            touchAction:'manipulation',
+                            display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'
+                        }}>
+                        <span style={{ fontSize:'20px' }}>{allesLaeuft ? '⏳' : '🔄'}</span>
+                        <span>{allesLaeuft ? 'Synchronisiert...' : 'Alle Baustellen synchronisieren'}</span>
+                    </button>
+
+                    {/* Fehler beim Laden */}
+                    {ladeFehler && (
+                        <div style={{
+                            padding:'12px 14px', marginBottom:'12px',
+                            background:'rgba(196,30,30,0.1)',
+                            border:'1px solid rgba(196,30,30,0.3)',
+                            borderRadius:'var(--radius-md)',
+                            color:'var(--accent-red)', fontSize:'13px'
+                        }}>
+                            <strong>Fehler:</strong> {ladeFehler}
+                        </div>
+                    )}
+
+                    {/* Laden */}
+                    {laedt && (
+                        <div style={{ textAlign:'center', padding:'20px', color:'var(--text-muted)', fontSize:'13px' }}>
+                            ⏳ Baustellen werden geladen...
+                        </div>
+                    )}
+
+                    {/* Leer */}
+                    {!laedt && baustellen.length === 0 && !ladeFehler && (
+                        <div style={{ textAlign:'center', padding:'30px 16px', color:'var(--text-muted)' }}>
+                            <div style={{ fontSize:'40px', opacity:0.3, marginBottom:'10px' }}>📂</div>
+                            <div style={{ fontSize:'13px' }}>Noch keine Staging-Baustellen</div>
+                            <div style={{ fontSize:'11px', marginTop:'4px' }}>
+                                Erst im Baustellen-Bereich eine Staging-Umgebung anlegen.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Baustellen-Liste */}
+                    {!laedt && baustellen.length > 0 && (
+                        <div>
+                            <div style={{
+                                fontSize:'11px', fontFamily:"'Oswald', sans-serif",
+                                fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                color:'var(--text-muted)', marginBottom:'8px', paddingLeft:'4px'
+                            }}>
+                                Baustellen ({baustellen.length})
+                            </div>
+                            <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                                {baustellen.map(function(b) {
+                                    var status = syncStatus[b.name] || {};
+
+                                    // Etappe 9: Audit-Info fuer diese Baustelle (falls keine Session-Aktion gelaufen ist)
+                                    var audit = auditPerBaustelle[b.name];
+                                    var historischFehler = audit && audit.actionType === 'sync_failed';
+                                    var zeigeReparieren = historischFehler && !status.ergebnis && !status.running;
+
+                                    var statusBadge = null;
+                                    if (status.running) {
+                                        statusBadge = <span style={{
+                                            fontSize:'10px', padding:'2px 8px',
+                                            background:'rgba(30,136,229,0.20)', color:'var(--accent-blue)',
+                                            borderRadius:'6px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'0.5px'
+                                        }}>⏳ SYNCT...</span>;
+                                    } else if (status.fehler) {
+                                        statusBadge = <span style={{
+                                            fontSize:'10px', padding:'2px 8px',
+                                            background:'rgba(196,30,30,0.20)', color:'var(--accent-red)',
+                                            borderRadius:'6px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'0.5px'
+                                        }}>✗ FEHLER</span>;
+                                    } else if (status.ergebnis) {
+                                        statusBadge = <span style={{
+                                            fontSize:'10px', padding:'2px 8px',
+                                            background:'rgba(46,155,74,0.20)', color:'#2e9b4a',
+                                            borderRadius:'6px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'0.5px'
+                                        }}>✓ {status.ergebnis.gesamt} DATEIEN</span>;
+                                    } else if (historischFehler) {
+                                        statusBadge = <span style={{
+                                            fontSize:'10px', padding:'2px 8px',
+                                            background:'rgba(230,126,34,0.20)', color:'var(--accent-orange)',
+                                            borderRadius:'6px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'0.5px'
+                                        }}>⚠ FEHLERHAFT</span>;
+                                    } else if (audit && audit.actionType === 'sync_completed') {
+                                        statusBadge = <span style={{
+                                            fontSize:'10px', padding:'2px 8px',
+                                            background:'rgba(46,155,74,0.15)', color:'#2e9b4a',
+                                            borderRadius:'6px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'0.5px'
+                                        }}>✓ SYNCHRON</span>;
+                                    }
+
+                                    return (
+                                        <div key={b.id || b.name} style={{
+                                            padding:'12px',
+                                            background: zeigeReparieren
+                                                ? 'linear-gradient(135deg, rgba(230,126,34,0.08), rgba(230,126,34,0.02))'
+                                                : 'var(--bg-card)',
+                                            border:'1px solid ' + (zeigeReparieren ? 'rgba(230,126,34,0.30)' : 'var(--border-color)'),
+                                            borderRadius:'var(--radius-sm)'
+                                        }}>
+                                            <div style={{
+                                                display:'flex', justifyContent:'space-between',
+                                                alignItems:'center', marginBottom:'6px'
+                                            }}>
+                                                <div style={{
+                                                    flex:1, minWidth:0, fontSize:'13px', fontWeight:600,
+                                                    fontFamily:"'Source Sans 3', sans-serif",
+                                                    color:'var(--text-primary)',
+                                                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
+                                                }}>📂 {b.name}</div>
+                                                {statusBadge}
+                                            </div>
+                                            {status.zeit && (
+                                                <div style={{ fontSize:'10px', color:'var(--text-muted)', marginBottom:'8px' }}>
+                                                    Letzter Sync: {new Date(status.zeit).toLocaleTimeString('de-DE')}
+                                                </div>
+                                            )}
+                                            {!status.zeit && audit && audit.timestamp && (
+                                                <div style={{ fontSize:'10px', color:'var(--text-muted)', marginBottom:'8px' }}>
+                                                    Letzter Sync: {new Date(audit.timestamp).toLocaleString('de-DE', {
+                                                        day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
+                                                    })}
+                                                </div>
+                                            )}
+                                            {status.fehler && (
+                                                <div style={{
+                                                    fontSize:'11px', color:'var(--accent-red)',
+                                                    marginBottom:'8px', lineHeight:1.4
+                                                }}>{status.fehler}</div>
+                                            )}
+                                            {!status.fehler && historischFehler && audit.details && audit.details.fehler && (
+                                                <div style={{
+                                                    fontSize:'11px', color:'var(--accent-orange)',
+                                                    marginBottom:'8px', lineHeight:1.4
+                                                }}>Letzter Versuch: {audit.details.fehler}</div>
+                                            )}
+                                            <button
+                                                onClick={function(){ syncEine(b); }}
+                                                disabled={status.running || allesLaeuft}
+                                                style={{
+                                                    width:'100%', padding:'8px',
+                                                    background: zeigeReparieren
+                                                        ? 'linear-gradient(135deg, var(--accent-orange), var(--accent-orange-light))'
+                                                        : 'var(--bg-secondary)',
+                                                    color: zeigeReparieren ? '#fff' : 'var(--text-primary)',
+                                                    border: zeigeReparieren ? 'none' : '1px solid var(--border-color)',
+                                                    borderRadius:'var(--radius-sm)',
+                                                    fontSize:'12px', fontFamily:"'Oswald', sans-serif",
+                                                    fontWeight:600, letterSpacing:'0.5px',
+                                                    cursor: (status.running || allesLaeuft) ? 'wait' : 'pointer',
+                                                    opacity: (status.running || allesLaeuft) ? 0.5 : 1,
+                                                    boxShadow: zeigeReparieren ? '0 2px 8px rgba(230,126,34,0.25)' : 'none',
+                                                    touchAction:'manipulation'
+                                                }}>
+                                                {status.running
+                                                    ? '⏳ Synct...'
+                                                    : (zeigeReparieren
+                                                        ? '🔧 Reparieren (erneut syncen)'
+                                                        : '🔄 Diese Baustelle syncen')}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -2478,6 +3983,540 @@
                                 {untertitel}
                             </div>
                         )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // UPLOAD-DIALOG (Etappe 5)
+        // Zeigt die ausgewaehlten Dateien, warnt bei >50 MB,
+        // laedt sie einzeln hoch und zeigt Fortschritt.
+        // Phasen:
+        //   'vorschau'    — Datei-Liste + Warnungen, User bestaetigt
+        //   'hochladen'   — Upload laeuft, Progress je Datei
+        //   'fertig'      — Ergebnis-Zusammenfassung
+        // ═══════════════════════════════════════════════════════
+        function UploadDialog({ dateien, zielOrdnerId, zielOrdnerName, onSchliessen, onFertig }) {
+            const [phase, setPhase] = useState('vorschau');
+            const [fortschritt, setFortschritt] = useState({ current: 0, total: dateien.length, fileName: null, pct: 0 });
+            const [ergebnisse, setErgebnisse] = useState([]);
+
+            var warnSchwelleBytes = (window.STAGING_CONFIG && window.STAGING_CONFIG.WARN_COPY_SIZE_MB || 50) * 1024 * 1024;
+            var gesamtGroesse = dateien.reduce(function(sum, f){ return sum + (f.size || 0); }, 0);
+            var grosseDateien = dateien.filter(function(f){ return (f.size || 0) > warnSchwelleBytes; });
+
+            async function starteUpload() {
+                setPhase('hochladen');
+                var res = await window.TWStaging.uploadMultipleFiles(
+                    dateien,
+                    zielOrdnerId,
+                    { onConflict: 'umbenennen' },
+                    function(current, total, fileName, pct, result) {
+                        setFortschritt({ current: current, total: total, fileName: fileName, pct: pct });
+                    }
+                );
+                setErgebnisse(res);
+                setPhase('fertig');
+            }
+
+            var erfolge = ergebnisse.filter(function(r){ return r.ok; }).length;
+            var fehler = ergebnisse.filter(function(r){ return !r.ok; }).length;
+
+            return (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 9999,
+                    background: 'rgba(0,0,0,0.55)',
+                    display: 'flex', alignItems: 'flex-end', justifyContent: 'center'
+                }}
+                onClick={phase !== 'hochladen' ? onSchliessen : undefined}>
+                    <div
+                        onClick={function(e){ e.stopPropagation(); }}
+                        style={{
+                            width: '100%',
+                            maxWidth: '560px',
+                            maxHeight: '88vh',
+                            background: 'var(--bg-card)',
+                            borderTopLeftRadius: 'var(--radius-md)',
+                            borderTopRightRadius: 'var(--radius-md)',
+                            padding: '20px',
+                            overflow: 'auto',
+                            boxShadow: '0 -8px 30px rgba(0,0,0,0.4)'
+                        }}>
+                        {/* Header */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            marginBottom: '16px',
+                            paddingBottom: '12px',
+                            borderBottom: '1px solid var(--border-color)'
+                        }}>
+                            <span style={{ fontSize: '24px' }}>📤</span>
+                            <div style={{ flex: 1 }}>
+                                <div style={{
+                                    fontFamily: "'Oswald', sans-serif",
+                                    fontSize: '16px',
+                                    fontWeight: 600,
+                                    letterSpacing: '1px',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-primary)'
+                                }}>Dateien hochladen</div>
+                                <div style={{
+                                    fontSize: '11.5px',
+                                    color: 'var(--text-muted)',
+                                    marginTop: '2px'
+                                }}>nach: {zielOrdnerName}</div>
+                            </div>
+                        </div>
+
+                        {/* PHASE: VORSCHAU */}
+                        {phase === 'vorschau' && (
+                            <React.Fragment>
+                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                                    {dateien.length} Datei{dateien.length !== 1 ? 'en' : ''} · {formatiereGroesse(gesamtGroesse)} gesamt
+                                </div>
+
+                                {/* Warnung bei grossen Dateien */}
+                                {grosseDateien.length > 0 && (
+                                    <div style={{
+                                        padding: '10px 14px',
+                                        marginBottom: '12px',
+                                        background: 'rgba(230,126,34,0.10)',
+                                        border: '1px solid rgba(230,126,34,0.30)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontSize: '12px',
+                                        color: 'var(--text-light)',
+                                        lineHeight: 1.5
+                                    }}>
+                                        ⚠️ <strong>Grosse Datei{grosseDateien.length !== 1 ? 'en' : ''}</strong> —
+                                        {grosseDateien.length} Datei{grosseDateien.length !== 1 ? 'en' : ''} ueber {window.STAGING_CONFIG.WARN_COPY_SIZE_MB} MB.
+                                        Der Upload kann einige Minuten dauern. Bitte App nicht schliessen.
+                                    </div>
+                                )}
+
+                                {/* Datei-Liste */}
+                                <div style={{
+                                    maxHeight: '40vh',
+                                    overflow: 'auto',
+                                    marginBottom: '14px',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: 'var(--radius-sm)'
+                                }}>
+                                    {dateien.map(function(f, i) {
+                                        var zuGross = (f.size || 0) > warnSchwelleBytes;
+                                        return (
+                                            <div key={i} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                padding: '8px 12px',
+                                                borderBottom: i < dateien.length - 1 ? '1px solid var(--border-color)' : 'none'
+                                            }}>
+                                                <span style={{ fontSize: '16px' }}>{dateiIcon(f.name, f.type)}</span>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontSize: '13px',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap'
+                                                    }}>{f.name}</div>
+                                                    <div style={{
+                                                        fontSize: '10.5px',
+                                                        color: zuGross ? 'var(--accent-orange)' : 'var(--text-muted)',
+                                                        marginTop: '1px'
+                                                    }}>
+                                                        {formatiereGroesse(f.size || 0)}
+                                                        {zuGross ? ' · gross' : ''}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Buttons */}
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        onClick={onSchliessen}
+                                        style={{
+                                            flex: 1,
+                                            padding: '12px',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: 'none',
+                                            background: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                            color: '#fff',
+                                            fontFamily: "'Oswald', sans-serif",
+                                            fontSize: '13px',
+                                            fontWeight: 600,
+                                            letterSpacing: '1px',
+                                            textTransform: 'uppercase',
+                                            cursor: 'pointer',
+                                            touchAction: 'manipulation'
+                                        }}
+                                    >Abbrechen</button>
+                                    <button
+                                        onClick={starteUpload}
+                                        style={{
+                                            flex: 2,
+                                            padding: '12px',
+                                            borderRadius: 'var(--radius-md)',
+                                            border: 'none',
+                                            background: 'linear-gradient(135deg, #2e9b4a 0%, #43b85e 100%)',
+                                            color: '#fff',
+                                            fontFamily: "'Oswald', sans-serif",
+                                            fontSize: '13px',
+                                            fontWeight: 600,
+                                            letterSpacing: '1px',
+                                            textTransform: 'uppercase',
+                                            cursor: 'pointer',
+                                            touchAction: 'manipulation',
+                                            boxShadow: '0 4px 15px rgba(46,155,74,0.30)'
+                                        }}
+                                    >Upload starten</button>
+                                </div>
+                            </React.Fragment>
+                        )}
+
+                        {/* PHASE: HOCHLADEN */}
+                        {phase === 'hochladen' && (
+                            <React.Fragment>
+                                <div style={{
+                                    fontSize: '12px',
+                                    color: 'var(--text-muted)',
+                                    marginBottom: '10px'
+                                }}>
+                                    Datei {Math.min(fortschritt.current + 1, fortschritt.total)} von {fortschritt.total}
+                                </div>
+
+                                {fortschritt.fileName && (
+                                    <div style={{
+                                        padding: '12px 14px',
+                                        background: 'var(--bg-secondary)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        marginBottom: '14px'
+                                    }}>
+                                        <div style={{
+                                            fontSize: '13px',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                            marginBottom: '8px'
+                                        }}>{fortschritt.fileName}</div>
+                                        {/* Progress-Bar innerhalb der aktuellen Datei */}
+                                        <div style={{
+                                            height: '8px',
+                                            background: 'var(--border-color)',
+                                            borderRadius: '4px',
+                                            overflow: 'hidden'
+                                        }}>
+                                            <div style={{
+                                                height: '100%',
+                                                width: fortschritt.pct + '%',
+                                                background: 'linear-gradient(90deg, #2e9b4a, #43b85e)',
+                                                transition: 'width 0.2s ease'
+                                            }}/>
+                                        </div>
+                                        <div style={{
+                                            fontSize: '11px',
+                                            color: 'var(--text-muted)',
+                                            marginTop: '6px',
+                                            textAlign: 'right'
+                                        }}>{fortschritt.pct}%</div>
+                                    </div>
+                                )}
+
+                                {/* Gesamt-Fortschritt */}
+                                <div style={{
+                                    height: '6px',
+                                    background: 'var(--border-color)',
+                                    borderRadius: '3px',
+                                    overflow: 'hidden',
+                                    marginBottom: '8px'
+                                }}>
+                                    <div style={{
+                                        height: '100%',
+                                        width: (fortschritt.total > 0 ? Math.round((fortschritt.current / fortschritt.total) * 100) : 0) + '%',
+                                        background: 'var(--accent-blue)',
+                                        transition: 'width 0.3s ease'
+                                    }}/>
+                                </div>
+                                <div style={{
+                                    fontSize: '11px',
+                                    color: 'var(--text-muted)',
+                                    textAlign: 'center'
+                                }}>Upload laeuft — bitte nicht schliessen</div>
+                            </React.Fragment>
+                        )}
+
+                        {/* PHASE: FERTIG */}
+                        {phase === 'fertig' && (
+                            <React.Fragment>
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '8px',
+                                    marginBottom: '14px'
+                                }}>
+                                    <div style={{
+                                        flex: 1,
+                                        padding: '14px',
+                                        background: 'rgba(46,155,74,0.12)',
+                                        border: '1px solid rgba(46,155,74,0.3)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        textAlign: 'center'
+                                    }}>
+                                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#2e9b4a' }}>{erfolge}</div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>hochgeladen</div>
+                                    </div>
+                                    {fehler > 0 && (
+                                        <div style={{
+                                            flex: 1,
+                                            padding: '14px',
+                                            background: 'rgba(196,30,30,0.12)',
+                                            border: '1px solid rgba(196,30,30,0.3)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            textAlign: 'center'
+                                        }}>
+                                            <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent-red)' }}>{fehler}</div>
+                                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Fehler</div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fehler-Details */}
+                                {fehler > 0 && (
+                                    <div style={{
+                                        maxHeight: '30vh',
+                                        overflow: 'auto',
+                                        marginBottom: '14px',
+                                        padding: '10px',
+                                        background: 'rgba(196,30,30,0.06)',
+                                        border: '1px solid rgba(196,30,30,0.2)',
+                                        borderRadius: 'var(--radius-sm)'
+                                    }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--accent-red)', marginBottom: '6px' }}>
+                                            Fehlgeschlagene Dateien:
+                                        </div>
+                                        {ergebnisse.filter(function(r){ return !r.ok; }).map(function(r, i){
+                                            return (
+                                                <div key={i} style={{
+                                                    fontSize: '11px',
+                                                    color: 'var(--text-light)',
+                                                    marginBottom: '4px'
+                                                }}>
+                                                    <strong>{r.name}:</strong> {r.fehler}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={onFertig}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: 'none',
+                                        background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                        color: '#fff',
+                                        fontFamily: "'Oswald', sans-serif",
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        letterSpacing: '1px',
+                                        textTransform: 'uppercase',
+                                        cursor: 'pointer',
+                                        touchAction: 'manipulation',
+                                        boxShadow: '0 4px 15px rgba(30,136,229,0.30)'
+                                    }}
+                                >Fertig</button>
+                            </React.Fragment>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // LOESCHEN-DIALOG (Etappe 5)
+        // Zwei Optionen:
+        //   - In Papierkorb (30 Tage wiederherstellbar)
+        //   - Permanent loeschen (nicht wiederherstellbar)
+        // ═══════════════════════════════════════════════════════
+        function LoeschenDialog({ datei, onAbbrechen, onBestaetigt }) {
+            const [busy, setBusy] = useState(false);
+
+            async function handleClick(permanent) {
+                if (busy) return;
+                setBusy(true);
+                try {
+                    await onBestaetigt(permanent);
+                } finally {
+                    setBusy(false);
+                }
+            }
+
+            return (
+                <div
+                    onClick={busy ? undefined : onAbbrechen}
+                    style={{
+                        position: 'fixed', inset: 0, zIndex: 9999,
+                        background: 'rgba(0,0,0,0.55)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: '20px'
+                    }}>
+                    <div
+                        onClick={function(e){ e.stopPropagation(); }}
+                        style={{
+                            width: '100%',
+                            maxWidth: '420px',
+                            background: 'var(--bg-card)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '22px',
+                            boxShadow: '0 10px 40px rgba(0,0,0,0.4)'
+                        }}>
+                        {/* Header */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            marginBottom: '14px'
+                        }}>
+                            <span style={{ fontSize: '28px' }}>🗑️</span>
+                            <div style={{
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                letterSpacing: '1px',
+                                textTransform: 'uppercase',
+                                color: 'var(--text-primary)'
+                            }}>Datei loeschen?</div>
+                        </div>
+
+                        <div style={{
+                            padding: '10px 12px',
+                            background: 'var(--bg-secondary)',
+                            borderRadius: 'var(--radius-sm)',
+                            marginBottom: '14px',
+                            fontSize: '13px',
+                            color: 'var(--text-primary)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            {datei.name}
+                        </div>
+
+                        <div style={{
+                            fontSize: '12px',
+                            color: 'var(--text-muted)',
+                            lineHeight: 1.5,
+                            marginBottom: '16px'
+                        }}>
+                            Waehle wie die Datei geloescht werden soll:
+                        </div>
+
+                        {/* Option 1: Papierkorb */}
+                        <button
+                            onClick={function(){ handleClick(false); }}
+                            disabled={busy}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                marginBottom: '10px',
+                                borderRadius: 'var(--radius-md)',
+                                border: 'none',
+                                background: busy ? 'var(--border-color)' : 'linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-light) 100%)',
+                                color: '#fff',
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                letterSpacing: '1px',
+                                textTransform: 'uppercase',
+                                cursor: busy ? 'default' : 'pointer',
+                                touchAction: 'manipulation',
+                                boxShadow: busy ? 'none' : '0 4px 15px rgba(230,126,34,0.30)',
+                                textAlign: 'left',
+                                display: 'block'
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '18px' }}>♻️</span>
+                                <div>
+                                    <div>In Papierkorb</div>
+                                    <div style={{
+                                        fontSize: '10.5px',
+                                        fontWeight: 400,
+                                        letterSpacing: '0.3px',
+                                        textTransform: 'none',
+                                        opacity: 0.9,
+                                        marginTop: '2px'
+                                    }}>30 Tage wiederherstellbar (empfohlen)</div>
+                                </div>
+                            </div>
+                        </button>
+
+                        {/* Option 2: Permanent */}
+                        <button
+                            onClick={function(){ handleClick(true); }}
+                            disabled={busy}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                marginBottom: '14px',
+                                borderRadius: 'var(--radius-md)',
+                                border: 'none',
+                                background: busy ? 'var(--border-color)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                                color: '#fff',
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                letterSpacing: '1px',
+                                textTransform: 'uppercase',
+                                cursor: busy ? 'default' : 'pointer',
+                                touchAction: 'manipulation',
+                                boxShadow: busy ? 'none' : '0 4px 15px rgba(196,30,30,0.30)',
+                                textAlign: 'left',
+                                display: 'block'
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '18px' }}>⚠️</span>
+                                <div>
+                                    <div>Permanent loeschen</div>
+                                    <div style={{
+                                        fontSize: '10.5px',
+                                        fontWeight: 400,
+                                        letterSpacing: '0.3px',
+                                        textTransform: 'none',
+                                        opacity: 0.9,
+                                        marginTop: '2px'
+                                    }}>Nicht wiederherstellbar</div>
+                                </div>
+                            </div>
+                        </button>
+
+                        {/* Abbrechen */}
+                        <button
+                            onClick={onAbbrechen}
+                            disabled={busy}
+                            style={{
+                                width: '100%',
+                                padding: '10px',
+                                borderRadius: 'var(--radius-sm)',
+                                border: '1px solid var(--border-color)',
+                                background: 'transparent',
+                                color: 'var(--text-muted)',
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                letterSpacing: '0.5px',
+                                textTransform: 'uppercase',
+                                cursor: busy ? 'default' : 'pointer',
+                                touchAction: 'manipulation',
+                                opacity: busy ? 0.5 : 1
+                            }}
+                        >Abbrechen</button>
                     </div>
                 </div>
             );

@@ -408,6 +408,312 @@
             return ergebnisse;
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // ETAPPE 5: UPLOAD & DELETE
+        // ═══════════════════════════════════════════════════════════
+
+        // ── Einzelne Datei in einen Staging-Ordner hochladen ──
+        // zielOrdnerId: Drive-Ordner-ID (z.B. Staging-Unterordner "Bilder")
+        // file:         File-Objekt (aus <input type="file"> oder Drag&Drop)
+        // options:      { onProgress: fn(prozent), onConflict: 'ueberschreiben'|'umbenennen'|'ueberspringen' }
+        // Rueckgabe:    { status, fileId, name, size, modifiedTime }
+        async function uploadFileToStaging(zielOrdnerId, file, options) {
+            assertDriveReady();
+            if (!zielOrdnerId) throw new Error('zielOrdnerId fehlt');
+            if (!file) throw new Error('Keine Datei uebergeben');
+            options = options || {};
+            var onProgress = options.onProgress || function(){};
+            var onConflict = options.onConflict || 'umbenennen';
+
+            var zielName = file.name;
+
+            // ── Konflikt-Pruefung (gleicher Name bereits im Zielordner?) ──
+            var konflikt = await findDateiImOrdner(zielOrdnerId, zielName);
+            if (konflikt) {
+                if (onConflict === 'ueberspringen') {
+                    return { status: 'uebersprungen', reason: 'exists', fileId: null, name: zielName };
+                }
+                if (onConflict === 'ueberschreiben') {
+                    // Bestehende Datei in Drive-Papierkorb verschieben
+                    await gapi.client.drive.files.update({
+                        fileId: konflikt.id,
+                        resource: { trashed: true }
+                    });
+                }
+                if (onConflict === 'umbenennen') {
+                    // Zeitstempel anhaengen (Pattern wie copyFile)
+                    var ts = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
+                    var punktIndex = zielName.lastIndexOf('.');
+                    if (punktIndex > 0) {
+                        zielName = zielName.substring(0, punktIndex) + ' (' + ts + ')' + zielName.substring(punktIndex);
+                    } else {
+                        zielName = zielName + ' (' + ts + ')';
+                    }
+                }
+            }
+
+            // ── Multipart-Upload via XHR (damit wir onProgress bekommen) ──
+            // Ohne XHR haetten wir mit gapi.client keinen echten Progress,
+            // weil gapi.client den Body komplett puffert.
+            var metadata = {
+                name: zielName,
+                parents: [zielOrdnerId]
+            };
+
+            var boundary = '-------TWStagingBoundary' + Date.now();
+            var delimiter = '\r\n--' + boundary + '\r\n';
+            var closeDelim = '\r\n--' + boundary + '--';
+
+            // Datei als ArrayBuffer lesen (damit wir sie in den Multipart-Body packen koennen)
+            var arrayBuffer = await new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+                reader.onload = function(){ resolve(reader.result); };
+                reader.onerror = function(){ reject(new Error('Konnte Datei nicht lesen')); };
+                reader.readAsArrayBuffer(file);
+            });
+
+            var mimeType = file.type || 'application/octet-stream';
+
+            var metaPart = delimiter +
+                'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+                JSON.stringify(metadata);
+            var filePartHeader = delimiter +
+                'Content-Type: ' + mimeType + '\r\n' +
+                'Content-Transfer-Encoding: binary\r\n\r\n';
+
+            var metaBlob = new Blob([metaPart + filePartHeader], { type: 'text/plain' });
+            var closeBlob = new Blob([closeDelim], { type: 'text/plain' });
+            var body = new Blob([metaBlob, arrayBuffer, closeBlob], { type: 'multipart/related; boundary=' + boundary });
+
+            // Access-Token aus gapi holen
+            var token = gapi.client.getToken();
+            if (!token || !token.access_token) {
+                throw new Error('Kein gueltiges Access-Token. Bitte neu anmelden.');
+            }
+
+            var result = await new Promise(function(resolve, reject) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,modifiedTime');
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token.access_token);
+                xhr.setRequestHeader('Content-Type', 'multipart/related; boundary=' + boundary);
+
+                xhr.upload.onprogress = function(ev) {
+                    if (ev.lengthComputable) {
+                        var pct = Math.round((ev.loaded / ev.total) * 100);
+                        try { onProgress(pct); } catch(e){}
+                    }
+                };
+                xhr.onload = function() {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            resolve(JSON.parse(xhr.responseText));
+                        } catch(e) {
+                            reject(new Error('Antwort konnte nicht gelesen werden: ' + e.message));
+                        }
+                    } else {
+                        reject(new Error('Upload fehlgeschlagen (HTTP ' + xhr.status + '): ' + xhr.responseText));
+                    }
+                };
+                xhr.onerror = function() { reject(new Error('Netzwerk-Fehler beim Upload')); };
+                xhr.send(body);
+            });
+
+            return {
+                status: 'hochgeladen',
+                fileId: result.id,
+                name: result.name,
+                size: result.size,
+                modifiedTime: result.modifiedTime
+            };
+        }
+
+        // ── Mehrere Dateien hintereinander hochladen, mit Fortschrittsmeldung pro Datei ──
+        // onProgress: function(current, total, fileName, prozentInnerhalbDerDatei, result)
+        async function uploadMultipleFiles(fileListe, zielOrdnerId, options, onProgress) {
+            options = options || {};
+            onProgress = onProgress || function(){};
+            var total = fileListe.length;
+            var ergebnisse = [];
+            for (var i = 0; i < total; i++) {
+                var file = fileListe[i];
+                onProgress(i, total, file.name, 0, null);
+                try {
+                    var r = await uploadFileToStaging(zielOrdnerId, file, {
+                        onConflict: options.onConflict,
+                        onProgress: function(pct) {
+                            onProgress(i, total, file.name, pct, null);
+                        }
+                    });
+                    ergebnisse.push({ name: file.name, ok: true, ergebnis: r });
+                    onProgress(i + 1, total, file.name, 100, r);
+                } catch (e) {
+                    ergebnisse.push({
+                        name: file.name,
+                        ok: false,
+                        fehler: e.message || String(e)
+                    });
+                    onProgress(i + 1, total, file.name, 0, { status: 'fehler', fehler: e.message });
+                }
+            }
+            return ergebnisse;
+        }
+
+        // ── Datei loeschen (Papierkorb oder permanent) ──
+        // fileId:     Drive-File-ID
+        // permanent:  true = echtes Delete, false = nur Papierkorb (30 Tage wiederherstellbar)
+        // Rueckgabe:  { deleted: true, permanent: boolean }
+        async function deleteDateiAusStaging(fileId, permanent) {
+            assertDriveReady();
+            if (!fileId) throw new Error('fileId fehlt');
+            if (permanent) {
+                // Echtes Loeschen — nicht wiederherstellbar
+                await gapi.client.drive.files.delete({ fileId: fileId });
+                return { deleted: true, permanent: true };
+            }
+            // Papierkorb — bleibt 30 Tage wiederherstellbar
+            await gapi.client.drive.files.update({
+                fileId: fileId,
+                resource: { trashed: true }
+            });
+            return { deleted: true, permanent: false };
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // ETAPPE 7: Firebase-Sync der Staging-Daten
+        // ═══════════════════════════════════════════════════════════
+
+        // ── Eine einzelne Baustelle vom Drive-Staging nach Firebase replizieren ──
+        // Liest alle 4 Unterordner und schreibt pro Datei einen Metadaten-Eintrag
+        // nach projects/{projectId}/staging/{unterordner}/{fileId}
+        // baustelleName: z.B. 'Mueller, Max'
+        // projectId:     Firebase-Projekt-Schluessel (kann abweichen vom Drive-Name)
+        // onProgress:    optional function(schritt, details)
+        async function syncStagingNachFirebase(baustelleName, projectId, onProgress) {
+            if (!window.FirebaseService || !window.FirebaseService.db) {
+                throw new Error('Firebase nicht verbunden');
+            }
+            if (!baustelleName) throw new Error('baustelleName fehlt');
+            if (!projectId)     throw new Error('projectId fehlt');
+            onProgress = onProgress || function(){};
+
+            onProgress('start', { baustelle: baustelleName });
+
+            // 1. Staging-Info holen (4 Unterordner mit Drive-IDs)
+            var info = await getStagingInfo(baustelleName);
+            if (!info || !info.unterordner) {
+                throw new Error('Staging nicht vorhanden fuer ' + baustelleName);
+            }
+
+            var gesamtDateien = 0;
+            var syncErgebnis = {
+                baustelle: baustelleName,
+                projectId: projectId,
+                unterordner: {},
+                gesamt: 0,
+                fehler: []
+            };
+
+            // 2. Fuer jeden der 4 Unterordner Dateien listen und nach Firebase schreiben
+            var subfolderNames = window.STAGING_CONFIG.SUBFOLDERS || ['Zeichnungen','Baustellen-App','Bilder','Stunden'];
+            var permissions = window.STAGING_CONFIG.SUBFOLDER_PERMISSIONS || {};
+
+            for (var i = 0; i < subfolderNames.length; i++) {
+                var subname = subfolderNames[i];
+                var subInfo = info.unterordner[subname];
+                if (!subInfo || !subInfo.id) {
+                    onProgress('unterordner-fehlt', { name: subname });
+                    continue;
+                }
+
+                onProgress('unterordner', { name: subname });
+
+                try {
+                    // Alle Dateien des Unterordners auflisten
+                    var dateien = await listDateienInOrdner(subInfo.id);
+
+                    // Firebase-Map aufbauen: { fileId: metadata }
+                    var fbMap = {};
+                    for (var j = 0; j < dateien.length; j++) {
+                        var d = dateien[j];
+                        fbMap[d.id] = {
+                            name: d.name || '',
+                            mimeType: d.mimeType || '',
+                            size: parseInt(d.size, 10) || 0,
+                            modifiedTime: d.modifiedTime || null,
+                            driveUrl: 'https://drive.google.com/file/d/' + d.id + '/view',
+                            permission: permissions[subname] || 'readonly'
+                        };
+                    }
+
+                    // In Firebase schreiben (Set ueberschreibt den Unterordner — Drive ist Quelle der Wahrheit)
+                    var pfad = 'projects/' + projectId + '/staging/' + subname;
+                    await window.FirebaseService.db.ref(pfad).set(fbMap);
+
+                    syncErgebnis.unterordner[subname] = {
+                        ok: true,
+                        anzahl: dateien.length
+                    };
+                    gesamtDateien += dateien.length;
+
+                    onProgress('unterordner-ok', { name: subname, anzahl: dateien.length });
+                } catch (e) {
+                    syncErgebnis.unterordner[subname] = {
+                        ok: false,
+                        fehler: e.message || String(e)
+                    };
+                    syncErgebnis.fehler.push({ unterordner: subname, fehler: e.message });
+                    onProgress('unterordner-fehler', { name: subname, fehler: e.message });
+                }
+            }
+
+            syncErgebnis.gesamt = gesamtDateien;
+
+            // 3. Timestamp setzen
+            try {
+                await window.FirebaseService.db.ref('projects/' + projectId + '/lastStagingSync')
+                    .set(firebase.database.ServerValue.TIMESTAMP);
+            } catch (e) {
+                // Zeitstempel-Fehler ist nicht kritisch
+                console.warn('Timestamp-Fehler:', e);
+            }
+
+            onProgress('fertig', syncErgebnis);
+            return syncErgebnis;
+        }
+
+        // ── Alle gestagten Baustellen nach Firebase syncen ──
+        // Nimmt die Liste der Staging-Baustellen und syncchronisiert jede einzeln.
+        // kundenMap: Objekt { baustelleName: projectId } um Drive-Namen auf Firebase-Projekt-Keys zu mappen
+        //            (falls leer: baustelleName wird als projectId verwendet)
+        async function syncAlleStagings(kundenMap, onProgress) {
+            kundenMap = kundenMap || {};
+            onProgress = onProgress || function(){};
+
+            var baustellen = await listStagingBaustellen();
+            var alleErgebnisse = [];
+
+            for (var i = 0; i < baustellen.length; i++) {
+                var b = baustellen[i];
+                var pid = kundenMap[b.name] || b.name;
+                onProgress('baustelle-start', { index: i, total: baustellen.length, name: b.name });
+                try {
+                    var erg = await syncStagingNachFirebase(b.name, pid, function(step, det){
+                        onProgress('step', { baustelle: b.name, step: step, details: det });
+                    });
+                    alleErgebnisse.push({ ok: true, baustelle: b.name, ergebnis: erg });
+                } catch (e) {
+                    alleErgebnisse.push({
+                        ok: false,
+                        baustelle: b.name,
+                        fehler: e.message || String(e)
+                    });
+                }
+            }
+
+            onProgress('alle-fertig', { anzahl: alleErgebnisse.length });
+            return alleErgebnisse;
+        }
+
         // ── Exporte ──
         window.TWStaging = {
             ensureRootFolder: ensureRootFolder,
@@ -421,7 +727,14 @@
             listDateienInOrdner: listDateienInOrdner,
             findDateiImOrdner: findDateiImOrdner,
             copyFile: copyFile,
-            copyMultipleFiles: copyMultipleFiles
+            copyMultipleFiles: copyMultipleFiles,
+            // Etappe 5: Upload & Delete
+            uploadFileToStaging: uploadFileToStaging,
+            uploadMultipleFiles: uploadMultipleFiles,
+            deleteDateiAusStaging: deleteDateiAusStaging,
+            // Etappe 7: Firebase-Sync
+            syncStagingNachFirebase: syncStagingNachFirebase,
+            syncAlleStagings: syncAlleStagings
         };
 
     })();

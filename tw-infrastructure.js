@@ -2531,5 +2531,166 @@
             if(!this.db) return [];
             var s=await this.db.ref('projects/'+pid+'/photos').once('value'); var t=[];
             s.forEach(function(c){t.push({id:c.key,...c.val()});}); return t;
+        },
+
+        // ── Etappe 6: Einladungs-System (1 Einladung = 1 Geraet) ──
+        // Einladung wird unter 'invitations/{code}' gespeichert.
+        // code = 6-stelliger alphanumerischer Code (zugleich Dokument-Key)
+        // status: 'offen' | 'eingeloest' | 'abgelaufen' | 'widerrufen'
+        async createInvitation(data) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            // data: { mitarbeiter, pin, gueltigBis (ISO-String) }
+            var code = this._generateInvitationCode();
+            var payload = {
+                code: code,
+                mitarbeiter: data.mitarbeiter || '',
+                pin: data.pin || '',
+                erstelltAm: firebase.database.ServerValue.TIMESTAMP,
+                gueltigBis: data.gueltigBis || null,
+                status: 'offen',
+                eingeloestVon: null,
+                eingeloestAm: null,
+                geraetName: null
+            };
+            await this.db.ref('invitations/'+code).set(payload);
+            return { code: code, ...payload };
+        },
+        async listInvitations() {
+            if(!this.db) return [];
+            var s = await this.db.ref('invitations').once('value');
+            var list = [];
+            s.forEach(function(c){ list.push({ code: c.key, ...c.val() }); });
+            // Neueste zuerst
+            list.sort(function(a,b){ return (b.erstelltAm||0) - (a.erstelltAm||0); });
+            return list;
+        },
+        onInvitationsChange(cb) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('invitations');
+            var h = ref.on('value', function(snap) {
+                var list = [];
+                snap.forEach(function(c){ list.push({ code: c.key, ...c.val() }); });
+                list.sort(function(a,b){ return (b.erstelltAm||0) - (a.erstelltAm||0); });
+                cb(list);
+            });
+            return function(){ ref.off('value', h); };
+        },
+        async deleteInvitation(code) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('invitations/'+code).remove();
+        },
+        async widerrufeInvitation(code) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('invitations/'+code+'/status').set('widerrufen');
+        },
+        _generateInvitationCode() {
+            // 6-stellig alphanumerisch ohne verwechselbare Zeichen (0/O, 1/I/L)
+            var chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            var out = '';
+            for (var i=0; i<6; i++) {
+                out += chars.charAt(Math.floor(Math.random()*chars.length));
+            }
+            return out;
+        },
+
+        // ── Etappe 8: Audit-Log (90 Tage Aufbewahrung) ──
+        // Events landen unter 'audit_log/{auto-id}'. Nachvollziehbare Historie fuer
+        // Geraete-Aktionen (Einladung erstellt/widerrufen, Geraet freigegeben/gesperrt/entfernt).
+        //
+        // Event-Typen (actionType):
+        //   invitation_created   — Neue Einladung erstellt
+        //   invitation_revoked   — Einladung widerrufen
+        //   invitation_deleted   — Einladung geloescht
+        //   device_approved      — Geraete-Freigabe erteilt
+        //   device_rejected      — Geraete-Freigabe abgelehnt
+        //   device_locked        — Aktives Geraet gesperrt
+        //   device_unlocked      — Gesperrtes Geraet wieder freigegeben
+        //   device_removed       — Aktives Geraet entfernt
+        //   sync_completed       — (Etappe 9) Staging-Sync einer Baustelle erfolgreich
+        //   sync_failed          — (Etappe 9) Staging-Sync fehlgeschlagen
+        async logAuditEvent(actionType, details) {
+            if(!this.db) return;
+            try {
+                var entry = {
+                    actionType: actionType || 'unknown',
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    actor: 'admin',  // alle Master-App-Aktionen kommen vom Admin
+                    details: details || {}
+                };
+                await this.db.ref('audit_log').push(entry);
+            } catch(e) {
+                // Audit-Log-Fehler sollen die Haupt-Aktion nicht blockieren
+                console.warn('Audit-Log-Fehler:', e);
+            }
+        },
+        async listAuditEvents(limit) {
+            if(!this.db) return [];
+            limit = limit || 200;
+            var s = await this.db.ref('audit_log').orderByChild('timestamp').limitToLast(limit).once('value');
+            var list = [];
+            s.forEach(function(c){ list.push({ id: c.key, ...c.val() }); });
+            // Neueste zuerst
+            list.sort(function(a,b){ return (b.timestamp||0) - (a.timestamp||0); });
+            return list;
+        },
+        onAuditLogChange(cb, limit) {
+            if(!this.db) return function(){};
+            limit = limit || 200;
+            var ref = this.db.ref('audit_log').orderByChild('timestamp').limitToLast(limit);
+            var h = ref.on('value', function(snap) {
+                var list = [];
+                snap.forEach(function(c){ list.push({ id: c.key, ...c.val() }); });
+                list.sort(function(a,b){ return (b.timestamp||0) - (a.timestamp||0); });
+                cb(list);
+            });
+            return function(){ ref.off('value', h); };
+        },
+        async cleanupOldAuditEvents(maxAgeTage) {
+            if(!this.db) return { geloescht: 0 };
+            maxAgeTage = maxAgeTage || 90;
+            var grenzMs = Date.now() - (maxAgeTage * 24 * 60 * 60 * 1000);
+            try {
+                var snap = await this.db.ref('audit_log').orderByChild('timestamp').endAt(grenzMs).once('value');
+                var updates = {};
+                var anz = 0;
+                snap.forEach(function(c) {
+                    updates[c.key] = null;
+                    anz++;
+                });
+                if (anz > 0) {
+                    await this.db.ref('audit_log').update(updates);
+                }
+                return { geloescht: anz };
+            } catch(e) {
+                console.warn('Audit-Cleanup fehlgeschlagen:', e);
+                return { geloescht: 0, fehler: e.message };
+            }
+        },
+
+        // ── Etappe 8: Geraete-Aktionen (Sperren / Freigeben / Entfernen) ──
+        async lockDevice(uid) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('users/'+uid+'/locked').set(true);
+        },
+        async unlockDevice(uid) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('users/'+uid+'/locked').set(false);
+        },
+        async removeDevice(uid) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('users/'+uid).remove();
         }
     };
+
+    // ── Etappe 6: Stammliste der Mitarbeiter (Bauteam) ──
+    // Wird in der Master-App im "Neue Einladung"-Dialog als Dropdown gezeigt.
+    // Diese Liste ist LOKAL (kein Firebase), damit Chef auch offline einladen kann.
+    window.MITARBEITER_LISTE = [
+        { id: 'ivan',    name: 'Ivan',     rolle: 'Fliesenleger' },
+        { id: 'michal',  name: 'Michal',   rolle: 'Fliesenleger' },
+        { id: 'iurii',   name: 'Iurii',    rolle: 'Fliesenleger' },
+        { id: 'peter',   name: 'Peter',    rolle: 'Fliesenleger' },
+        { id: 'luca_am', name: 'Luca AM',  rolle: 'Azubi' },
+        { id: 'luca',    name: 'Luca',     rolle: 'Fliesenleger' },
+        { id: 'silke',   name: 'Silke',    rolle: 'Buero' }
+    ];
