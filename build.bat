@@ -6,15 +6,17 @@ echo.
 
 REM Erstelle die kombinierte index.html aus den einzelnen Modulen
 REM Die Quelldateien bleiben unveraendert!
+REM
+REM HINWEIS (Update 18.04.2026): index-template.html enthaelt jetzt bereits
+REM das ^<div id="root"^>^</div^>. Der Build fuegt NUR noch den Babel-Block an.
+REM (Vorher wurde div#root doppelt eingefuegt — Bug gefixt.)
 
 echo Erstelle index.html aus Modulen...
 
-REM Kopiere alles bis zum Loader-Bereich aus der index-template.html
+REM Kopiere index-template.html als Basis (enthaelt Head + externe Scripts + div#root)
 copy /Y index-template.html index.html >nul
 
-REM Fuege den Babel-Script-Anfang hinzu
-echo. >> index.html
-echo     ^<div id="root"^>^</div^> >> index.html
+REM Fuege den Babel-Script-Anfang hinzu (KEIN div#root mehr — ist schon im Template!)
 echo. >> index.html
 echo     ^<script type="text/babel"^> >> index.html
 

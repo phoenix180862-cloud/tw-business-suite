@@ -1,3 +1,20 @@
+---
+name: schriftverkehr-briefkopf
+description: >
+  Verbindliche Layout-Spezifikation der PDF-nahen Startseite/Vorschau im Schriftverkehr-Modul
+  (tw-schriftverkehr.jsx) — weisse A4-Seite fuer Mail und Brief/Post. Definiert den vom
+  Rechnungsmodul abweichenden Briefkopf: "Thomas"-Zeile NICHT italic (Unterschied zum Rechnungs-Logo),
+  Thomas-Groesse gleich wie "Fliesenlegermeister", weiterer Buchstabenabstand (3px Vollansicht,
+  1px A4), roter Punkt oben:10px/2px, auf der rechten Seite nur das Datum (keine Kundendaten),
+  Bauvorhaben + Unser Zeichen linksbuendig, Footer ausschliesslich "Thomas Willwacher
+  Fliesenlegermeister e.K." in rot (KEINE Bankdaten, KEINE Adresse im Footer), mehrseitig
+  bei langen Texten. Nutze diesen Skill IMMER wenn der User nach Schriftverkehr-Briefkopf,
+  Brief-Layout, Mail-Vorschau, Schriftverkehr-PDF, Briefpapier, Brief-Footer, Bauvorhaben-Feld,
+  "Unser Zeichen", Datum rechtsbuendig, Mehrseitigkeit bei Briefen, oder Anschriftenfeld im Brief
+  fragt. Auch triggern bei: "Brief sieht falsch aus", "Schriftverkehr-PDF anpassen",
+  "Logo im Brief", "Mail-Kopf", "Adresse im Brief", "Datum im Brief".
+---
+
 # SKILL: Schriftverkehr-Briefkopf — Verbindliche Referenz
 
 ## ZWECK
