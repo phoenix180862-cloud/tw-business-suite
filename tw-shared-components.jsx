@@ -892,29 +892,33 @@
             // Gesamtzyklus 45s, je 15s pro Gruppe
             // Jede Gruppe laeuft von links (-400px) nach rechts (100%) in 15s,
             // dann 30s unsichtbar (waehrend andere Gruppen laufen)
+            // HOEHE: 210px statt 200px, bottom:20px statt 72px
+            //        → Figuren laufen weiter unten, Koepfe liegen frei ueber dem Sync-Button.
+            //        CSS-Klassen tw-fig-1..tw-fig-9 geben jeder Figur individuelle
+            //        Bewegungs-Geschwindigkeit und Phase (unterschiedliche Schrittlaenge).
             return (
-                <div style={{position:'relative', height:'200px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
+                <div style={{position:'relative', height:'210px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
                     {/* Fliesenstreifen als Boden */}
-                    <div style={{position:'absolute', bottom:'72px', left:0, right:0, height:'2px',
+                    <div style={{position:'absolute', bottom:'20px', left:0, right:0, height:'2px',
                                  background:'linear-gradient(90deg, transparent 3%, rgba(149,165,166,0.4) 15%, rgba(149,165,166,0.5) 50%, rgba(149,165,166,0.4) 85%, transparent 97%)'}} />
 
                     {/* Gruppe 1: Ivan, Michal, Iurii */}
-                    <div className="tw-group tw-group-1" style={{position:'absolute', bottom:'72px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
-                        <FigurIvan />
-                        <FigurMichal />
-                        <FigurIurii />
+                    <div className="tw-group tw-group-1" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <div className="tw-fig-wrap tw-fig-1"><FigurIvan /></div>
+                        <div className="tw-fig-wrap tw-fig-2"><FigurMichal /></div>
+                        <div className="tw-fig-wrap tw-fig-3"><FigurIurii /></div>
                     </div>
 
                     {/* Gruppe 2: Peter, Luca (AM s.r.o.) */}
-                    <div className="tw-group tw-group-2" style={{position:'absolute', bottom:'72px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
-                        <FigurPeter />
-                        <FigurLucaAM />
+                    <div className="tw-group tw-group-2" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <div className="tw-fig-wrap tw-fig-4"><FigurPeter /></div>
+                        <div className="tw-fig-wrap tw-fig-5"><FigurLucaAM /></div>
                     </div>
 
                     {/* Gruppe 3: Luca, Silke (BIG BOSS) */}
-                    <div className="tw-group tw-group-3" style={{position:'absolute', bottom:'72px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
-                        <FigurLuca2 />
-                        <FigurSilke />
+                    <div className="tw-group tw-group-3" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <div className="tw-fig-wrap tw-fig-6"><FigurLuca2 /></div>
+                        <div className="tw-fig-wrap tw-fig-7"><FigurSilke /></div>
                     </div>
 
                     {/* CSS-Animationen fuer Gruppenwechsel und Gehzyklus */}
@@ -964,6 +968,49 @@
     background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 70%);
     filter: blur(3px);
 }
+
+/* ─── Individuelle Geh-Charakteristik pro Figur ───
+   Jede Figur bekommt eine andere Geschwindigkeit und Phase,
+   sodass sie NICHT im Gleichschritt laufen. Das wird erreicht,
+   indem wir die Animationen in den Kind-Elementen der Figur
+   auf anderen Speed/Delay-Werten laufen lassen. */
+.tw-fig-wrap { display: inline-block; }
+
+/* Ivan — schneller, forsch */
+.tw-fig-1 .tw-leg-l, .tw-fig-1 .tw-leg-r,
+.tw-fig-1 .tw-arm-l, .tw-fig-1 .tw-arm-r { animation-duration: 0.85s; }
+.tw-fig-1 .tw-figure { animation-duration: 0.425s; }
+
+/* Michal — gemaechlich, breitbeinig */
+.tw-fig-2 .tw-leg-l, .tw-fig-2 .tw-leg-r,
+.tw-fig-2 .tw-arm-l, .tw-fig-2 .tw-arm-r { animation-duration: 1.15s; animation-delay: -0.3s; }
+.tw-fig-2 .tw-figure { animation-duration: 0.575s; animation-delay: -0.15s; }
+
+/* Iurii — schlurfender Gang, langsamer Oberkoerper */
+.tw-fig-3 .tw-leg-l, .tw-fig-3 .tw-leg-r,
+.tw-fig-3 .tw-arm-l, .tw-fig-3 .tw-arm-r { animation-duration: 1.25s; animation-delay: -0.6s; }
+.tw-fig-3 .tw-figure { animation-duration: 0.75s; animation-delay: -0.3s; }
+
+/* Peter — zuegig, rhythmisch */
+.tw-fig-4 .tw-leg-l, .tw-fig-4 .tw-leg-r,
+.tw-fig-4 .tw-arm-l, .tw-fig-4 .tw-arm-r { animation-duration: 0.95s; animation-delay: -0.1s; }
+.tw-fig-4 .tw-figure { animation-duration: 0.475s; }
+
+/* Luca (AM) — locker, entspannt */
+.tw-fig-5 .tw-leg-l, .tw-fig-5 .tw-leg-r,
+.tw-fig-5 .tw-arm-l, .tw-fig-5 .tw-arm-r { animation-duration: 1.05s; animation-delay: -0.4s; }
+.tw-fig-5 .tw-figure { animation-duration: 0.525s; animation-delay: -0.2s; }
+
+/* Luca 2 — sehr flott */
+.tw-fig-6 .tw-leg-l, .tw-fig-6 .tw-leg-r,
+.tw-fig-6 .tw-arm-l, .tw-fig-6 .tw-arm-r { animation-duration: 0.8s; animation-delay: -0.2s; }
+.tw-fig-6 .tw-figure { animation-duration: 0.4s; }
+
+/* Silke — elegant, ruhig */
+.tw-fig-7 .tw-leg-l, .tw-fig-7 .tw-leg-r,
+.tw-fig-7 .tw-arm-l, .tw-fig-7 .tw-arm-r { animation-duration: 1.1s; animation-delay: -0.5s; }
+.tw-fig-7 .tw-figure { animation-duration: 0.55s; animation-delay: -0.25s; }
+
 .tw-group {
     left: -400px;
     opacity: 0;

@@ -237,7 +237,7 @@
 
                     {/* ═══ UHR & DATUM — Premium Design (GROSS) ═══ */}
                     <div style={{
-                        margin:'0 20px 20px', padding:'24px 20px',
+                        margin:'0 20px 12px', padding:'24px 20px',
                         background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
                         borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
                         border:'1px solid rgba(77,166,255,0.2)',
