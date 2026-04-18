@@ -27,7 +27,8 @@
         rechnung:         'Rechnung-A.Kontozahlung',
         lieferanten:      'Lieferanten',
         aufmass:          'Aufma\u00df',
-        bilder:           'Bilder'
+        bilder:           'Bilder',
+        baustellenApp:    'Baustellen-App'
     };
     window.DRIVE_ORDNER = DRIVE_ORDNER;
 
@@ -477,6 +478,32 @@
                 }),
             });
             return resp.id;
+        },
+
+        // ── Ordner suchen (read-only, legt nichts neu an) ──
+        // Rueckgabe: folderId als String, oder null wenn nicht gefunden.
+        async findFolder(parentId, folderName) {
+            const query = `'${parentId}' in parents and name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+            const data = await this._fetchJSON(
+                'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query) + '&fields=files(id,name)&pageSize=5'
+            );
+            if (data.files && data.files.length > 0) return data.files[0].id;
+            return null;
+        },
+
+        // ── Dateien in einem Ordner listen ──
+        // mimeType optional; wenn angegeben, wird nach diesem MIME-Typ gefiltert.
+        // Rueckgabe: Array von { id, name, modifiedTime, size } (kann leer sein).
+        async listFiles(folderId, mimeType) {
+            let query = `'${folderId}' in parents and trashed=false`;
+            if (mimeType) {
+                query += ` and mimeType='${mimeType}'`;
+            }
+            const data = await this._fetchJSON(
+                'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(query) +
+                '&fields=files(id,name,modifiedTime,size,mimeType)&orderBy=modifiedTime desc&pageSize=200'
+            );
+            return data.files || [];
         },
 
         // ── Datei hochladen (Multipart) ──

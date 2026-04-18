@@ -272,21 +272,21 @@
                         firstInput.focus();
                         if (firstInput.select) firstInput.select();
                     }
-                }, 200); // Kurze Verzögerung damit DOM gerendert ist
+                }, 200); // Kurze Verzoegerung damit DOM gerendert ist
                 return function() { clearTimeout(timer); };
             }, [page, showGesamtliste, showAuth]);
 
-            // ── 2. Enter-Navigation: Enter = nächstes Eingabefeld auf der aktuellen Seite ──
+            // ── 2. Enter-Navigation: Enter = naechstes Eingabefeld auf der aktuellen Seite ──
             useEffect(function() {
                 var handleGlobalEnter = function(e) {
                     if (e.key !== 'Enter') return;
-                    // Wenn ein Komponenten-Handler das Event bereits behandelt hat → überspringen
+                    // Wenn ein Komponenten-Handler das Event bereits behandelt hat → ueberspringen
                     if (e.defaultPrevented) return;
 
                     var el = e.target;
                     var tag = el.tagName;
 
-                    // Nur für Eingabefelder (nicht Textareas = Mehrzeiler, nicht Buttons)
+                    // Nur fuer Eingabefelder (nicht Textareas = Mehrzeiler, nicht Buttons)
                     if (tag === 'TEXTAREA') return;
                     if (tag === 'BUTTON') return;
 
@@ -309,7 +309,7 @@
                             'select:not([disabled])'
                         );
                         for (var i = 0; i < candidates.length; i++) {
-                            // Nur sichtbare Elemente (offsetParent !== null für sichtbare, ODER in fixed/sticky Position)
+                            // Nur sichtbare Elemente (offsetParent !== null fuer sichtbare, ODER in fixed/sticky Position)
                             if (candidates[i].offsetParent !== null || candidates[i].offsetWidth > 0) {
                                 allInputs.push(candidates[i]);
                             }
@@ -317,7 +317,7 @@
 
                         var idx = allInputs.indexOf(el);
                         if (idx >= 0 && idx < allInputs.length - 1) {
-                            // Nächstes Feld fokussieren
+                            // Naechstes Feld fokussieren
                             allInputs[idx + 1].focus();
                             if (allInputs[idx + 1].select) allInputs[idx + 1].select();
                         } else {
@@ -335,7 +335,7 @@
                         return;
                     }
 
-                    // ── FALL B: Kein Eingabefeld fokussiert → Seiten-Aktion auslösen ──
+                    // ── FALL B: Kein Eingabefeld fokussiert → Seiten-Aktion ausloesen ──
                     switch(page) {
                         case 'start':
                             if (!showAuth) { e.preventDefault(); handleKundeNeu(); }
@@ -359,7 +359,7 @@
                 });
             }, [historyIdx]);
 
-            // Globale Navigation für Module (z.B. Gesamtliste → Modulwahl)
+            // Globale Navigation fuer Module (z.B. Gesamtliste → Modulwahl)
             window._navigateToModulwahl = () => navigateTo('modulwahl');
 
             const goBack = () => {
@@ -559,7 +559,7 @@
                 var allFiles = (subContents.files || []).concat(subContents.pdfs || []);
                 var vorlagen = allFiles.filter(function(f) {
                     var n = (f.name || '').toLowerCase();
-                    // Akzeptiert "aufmass vorlage", "aufmaß vorlage", auch mit Bindestrich
+                    // Akzeptiert "aufmass vorlage", "aufmass vorlage", auch mit Bindestrich
                     return (n.indexOf('aufmass vorlage') >= 0 || n.indexOf('aufmaß vorlage') >= 0 || n.indexOf('aufmass-vorlage') >= 0)
                         && n.endsWith('.json');
                 });
@@ -910,7 +910,7 @@
                     return;
                 }
 
-                // Google Drive verbinden falls nötig
+                // Google Drive verbinden falls noetig
                 var service = window.GoogleDriveService;
                 if (!service.accessToken) {
                     try {
@@ -1002,7 +1002,7 @@
                     setImportResult(result);
                     setIsDriveMode(true);
 
-                    // 5. Lokal speichern (überschreibt alte Daten)
+                    // 5. Lokal speichern (ueberschreibt alte Daten)
                     try {
                         var localKey = 'aufmass_kunde_' + (kunde._driveFolderId || kunde.id || kunde.name || 'unknown');
                         var toSave = Object.assign({}, fullyLoaded);
@@ -1045,7 +1045,7 @@
             const handleSelectModul = (modulId) => {
                 switch(modulId) {
                     case 'aufmass':
-                        handleStartAufmass(); // → raumerkennung (NICHT zurück zu geladen!)
+                        handleStartAufmass(); // → raumerkennung (NICHT zurueck zu geladen!)
                         break;
                     case 'rechnung':
                         navigateTo('rechnung');
@@ -1442,7 +1442,7 @@
 
                 // ═══ MODUS: MANUELL ANLEGEN ═══
                 if (kundeMode === 'manuell') {
-                    // Kunde ausgewählt, jetzt manuelles Eingabeformular
+                    // Kunde ausgewaehlt, jetzt manuelles Eingabeformular
                     setSelectedKunde({
                         ...kunde,
                         _driveFolderId: kunde.id,
@@ -1484,7 +1484,7 @@
                     return;
                 }
 
-                // ═══ FALLBACK: Alte "analysiert" Logik für Kompatibilität ═══
+                // ═══ FALLBACK: Alte "analysiert" Logik fuer Kompatibilitaet ═══
                 if (kundeMode === 'analysiert') {
                     try {
                         var cached = localStorage.getItem(localKey);
@@ -1561,7 +1561,7 @@
                         console.log('🤖 Starte OrdnerAnalyseEngine für', kunde.name, 'Config:', config);
                         setLoadProgress('🤖 KI-Ordneranalyse wird gestartet...');
 
-                        // Ordner-Filter anwenden: nur ausgewählte Ordner an Engine übergeben
+                        // Ordner-Filter anwenden: nur ausgewaehlte Ordner an Engine uebergeben
                         var kundeForAnalysis = Object.assign({}, kunde);
                         if (config.mode === 'ordner' && config.selectedFolders && config.selectedFolders.length > 0) {
                             kundeForAnalysis.folders = (kunde.folders || []).filter(function(f) {
@@ -1618,7 +1618,7 @@
                         LV_POSITIONEN[kundeKey] = result.positionen;
                     }
 
-                    // Kundendaten + Räume + Zeichnungen in Kunde mergen
+                    // Kundendaten + Raeume + Zeichnungen in Kunde mergen
                     var kd = result.kundendaten || {};
                     var vt = result.vertrag || kd.vertrag || {};
                     var fullyLoaded = Object.assign({}, kunde, {
@@ -1782,14 +1782,14 @@
                     }]);
                 }
 
-                // ═══ ALLE Einstellungen für nächsten Raum übernehmen ═══
+                // ═══ ALLE Einstellungen fuer naechsten Raum uebernehmen ═══
                 const m = (roomResult && roomResult.masse) || {};
                 const rState = (roomResult && roomResult.raumState) || {};
-                // Wandmaße: aus raumState.wandMasse ODER aus masse.laenge/breite aufbauen
+                // Wandmasse: aus raumState.wandMasse ODER aus masse.laenge/breite aufbauen
                 var savedWaende = (rState.wandMasse || []).map(function(w) { return { id: w.id, l: w.l }; });
-                // Prüfe ob Wände TATSÄCHLICH Werte haben (nicht nur leere Einträge)
+                // Pruefe ob Waende TATSAeCHLICH Werte haben (nicht nur leere Eintraege)
                 var waendeHaveValues = savedWaende.some(function(w) { return w.l && parseMass(w.l) > 0; });
-                // WENN wandMasse leer/ohne Werte ABER Länge/Breite vorhanden → 4 Wände generieren
+                // WENN wandMasse leer/ohne Werte ABER Laenge/Breite vorhanden → 4 Waende generieren
                 if (!waendeHaveValues && (m.laenge || m.breite)) {
                     savedWaende = [
                         { id: 'A', l: m.laenge || '' },
@@ -1799,16 +1799,16 @@
                     ];
                 }
                 setLastRaumData({
-                    // ── Höhen aus dem Raumblatt ──
+                    // ── Hoehen aus dem Raumblatt ──
                     hoehe: parseMass(m.hoehe) || (selectedRaum && selectedRaum.fliesenhoehe) || 0,
                     raumhoehe: parseMass(m.raumhoehe) || (selectedRaum && selectedRaum.raumhoehe) || 0,
                     abdichtungshoehe: parseMass(m.abdichtungshoehe) || 0,
                     sockelhoehe: parseMass(m.sockelhoehe) || 0,
-                    // ── Wände (KRITISCH für Baugleich-Raum!) ──
+                    // ── Waende (KRITISCH fuer Baugleich-Raum!) ──
                     waende: savedWaende,
-                    // ── Komplette Masse (für Länge/Breite Übernahme) ──
+                    // ── Komplette Masse (fuer Laenge/Breite Uebernahme) ──
                     masse: { laenge: m.laenge || '', breite: m.breite || '', hoehe: m.hoehe || '', raumhoehe: m.raumhoehe || '', abdichtungshoehe: m.abdichtungshoehe || '', sockelhoehe: m.sockelhoehe || '', bodenManual: m.bodenManual || '' },
-                    // ── Abzüge/Einbauten für Baugleich ──
+                    // ── Abzuege/Einbauten fuer Baugleich ──
                     abzuege: ((roomResult && roomResult.raumState) && (roomResult && roomResult.raumState).abzuege) || [],
                     material: (selectedRaum && selectedRaum.material) || '',
                     // ── Schalter (Toggle-States) ──
@@ -1817,14 +1817,14 @@
                     fliesenDeckenhoch: (roomResult && roomResult.fliesenDeckenhoch) || false,
                     abdichtungDeckenhoch: (roomResult && roomResult.abdichtungDeckenhoch) || false,
                     bodenPlusTuerlaibung: (roomResult && roomResult.bodenPlusTuerlaibung) || false,
-                    // ── Tür/Fenster/Sonstige-Defaults (Schalter für Laibungen, Gefliest, Abgedichtet) ──
+                    // ── Tuer/Fenster/Sonstige-Defaults (Schalter fuer Laibungen, Gefliest, Abgedichtet) ──
                     tuerDefaults: (roomResult && roomResult.tuerDefaults) || null,
                     fensterDefaults: (roomResult && roomResult.fensterDefaults) || null,
                     sonstigeDefaults: (roomResult && roomResult.sonstigeDefaults) || null,
-                    // ── Komplette Einträge für Vorladung im nächsten Raum ──
+                    // ── Komplette Eintraege fuer Vorladung im naechsten Raum ──
                     tuerenEntries: (roomResult && roomResult.tuerenEntries) || null,
                     fensterEntries: (roomResult && roomResult.fensterEntries) || null,
-                    // ── PosCards mit manuellen Eingaben (Stück, manuelle Mengen etc.) ──
+                    // ── PosCards mit manuellen Eingaben (Stueck, manuelle Mengen etc.) ──
                     posCardsData: (roomResult && roomResult.raumState && roomResult.raumState.posCards) || null,
                     // ── Positionen (welche LV-Positionen sind aktiv) ──
                     positionen: selectedPositions || [],
@@ -1849,7 +1849,7 @@
                     alert('⚠ Raumdaten nicht vollständig gespeichert. Raum kann nicht erneut geöffnet werden.');
                     return;
                 }
-                // Raum aus Gesamtliste entfernen (wird nach Fertigstellung neu hinzugefügt)
+                // Raum aus Gesamtliste entfernen (wird nach Fertigstellung neu hinzugefuegt)
                 setGesamtliste(prev => prev.filter((_, i) => i !== roomIdx));
                 // Aus fertigeRaeume entfernen, damit er wieder bearbeitbar ist
                 if (room.raumNr) setFertigeRaeume(prev => prev.filter(nr => nr !== room.raumNr));

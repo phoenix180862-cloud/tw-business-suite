@@ -184,7 +184,7 @@
                             <button onClick={onClose} style={{background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'var(--text-muted)'}}>✕</button>
                         </div>
 
-                        {/* Schnellübersicht-Karten */}
+                        {/* Schnelluebersicht-Karten */}
                         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', padding:'12px 16px'}}>
                             <div style={{padding:'10px', borderRadius:'10px', background:'rgba(39,174,96,0.1)', border:'1px solid rgba(39,174,96,0.2)'}}>
                                 <div style={{fontSize:'11px', color:'#27ae60', fontWeight:'600'}}>AUFTRAGSSUMME</div>
@@ -331,7 +331,7 @@
            KI-ORDNERANALYSE -- UI-Komponenten
            ═══════════════════════════════════════════ */
 
-        // ── Kundenübersicht: Alle Kunden mit ihren Analysen ──
+        // ── Kundenuebersicht: Alle Kunden mit ihren Analysen ──
         function OrdnerAnalyseUebersicht({ kunde, onStartAnalyse, onReanalyzeOrdner, onOpenDetail, onBack, refreshKey }) {
             const [meta, setMeta] = useState(null);
             const [analysen, setAnalysen] = useState([]);
@@ -361,7 +361,7 @@
             var cfg = ORDNER_ANALYSE_CONFIG.ORDNER;
             var kundenId = kunde ? (kunde._driveFolderId || kunde.id || kunde.name) : '';
 
-            // Qualitäts-Score berechnen
+            // Qualitaets-Score berechnen
             var completedAnalysen = analysen.filter(function(a) { return a.status === 'completed'; });
             var avgQuality = completedAnalysen.length > 0 ? Math.round(completedAnalysen.reduce(function(s,a) { return s + (a.ergebnis && a.ergebnis.vollstaendigkeit ? 85 : 70); }, 0) / completedAnalysen.length) : 0;
             var gesamtFehler = crossRef && crossRef.zusammenfassung ? crossRef.zusammenfassung.gesamtFehler : 0;
@@ -446,7 +446,7 @@
                             );
                         })}
 
-                        {/* Zusätzliche (generische) Ordner die nicht den Standard-Typen zugeordnet werden konnten */}
+                        {/* Zusaetzliche (generische) Ordner die nicht den Standard-Typen zugeordnet werden konnten */}
                         {analysen.filter(function(a) { return a.ordnerNr && (a.ordnerNr.indexOf('99') === 0 || a.ordnerNr.indexOf('00') === 0); }).map(function(analyse) {
                             var status = analyse.status || 'pending';
                             var statusIcon = status === 'completed' ? '✅' : status === 'error' ? '❌' : '⏳';
@@ -555,7 +555,7 @@
                             {progress.phase === 'done' ? 'Analyse abgeschlossen!' : 'KI-Ordneranalyse läuft...'}
                         </div>
 
-                        {/* Große Prozentanzeige */}
+                        {/* Grosse Prozentanzeige */}
                         <div style={{fontSize:'36px', fontWeight:'700', color:'var(--accent-blue)', marginBottom:'8px', fontFamily:'monospace'}}>
                             {pct}%
                         </div>
@@ -652,7 +652,7 @@
                     );
                 }
 
-                // Räume (03)
+                // Raeume (03)
                 if (ergebnis.geschosse) {
                     var allRaeume = [];
                     (ergebnis.geschosse || []).forEach(function(g) { (g.raeume || []).forEach(function(r) { allRaeume.push(Object.assign({geschoss: g.geschoss}, r)); }); });

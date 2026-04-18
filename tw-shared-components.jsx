@@ -2,7 +2,7 @@
 
         /* ═══════════════════════════════════════════
            LEICA DISTO – Bluetooth Tastatur-Modus
-           DISTO am Gerät auf "Text" oder "Tabelle" stellen,
+           DISTO am Geraet auf "Text" oder "Tabelle" stellen,
            dann per Bluetooth mit Handy/Tablet koppeln.
            Der DISTO tippt Messwerte wie eine Tastatur.
            ═══════════════════════════════════════════ */
@@ -49,7 +49,7 @@
 
         // Short German number format: 3.456 → "3,456"
         const fmtDe = (n) => (typeof n === 'number' ? n.toFixed(3) : parseFloat(n).toFixed(3)).replace('.', ',');
-        // Formel-Parser: Wertet Rechenausdrücke aus wie "3,45+2,10+3,45+2,10" oder "4*1,95"
+        // Formel-Parser: Wertet Rechenausdruecke aus wie "3,45+2,10+3,45+2,10" oder "4*1,95"
         const parseFormel = (str) => {
             if (!str || !str.trim()) return 0;
             try {
@@ -87,7 +87,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           LV-POSITIONEN (werden aus KI-Analyse befüllt)
+           LV-POSITIONEN (werden aus KI-Analyse befuellt)
            ═══════════════════════════════════════════ */
         const LV_POSITIONEN = {
             'k001': [
@@ -160,9 +160,9 @@
 
         /* ═══════════════════════════════════════════
            KI-POSITIONSEMPFEHLUNG ENGINE
-           Sortiert Positionen nach Relevanz für den Raum
+           Sortiert Positionen nach Relevanz fuer den Raum
            ═══════════════════════════════════════════ */
-        // Lerngedächtnis: speichert User-Zuordnungen {raumTyp → [posKategorien]}
+        // Lerngedaechtnis: speichert User-Zuordnungen {raumTyp → [posKategorien]}
         const positionMemory = {};
 
         function learnFromSelection(raum, selectedPos) {
@@ -232,7 +232,7 @@
                 if (raumTyp === 'flur' && pos.kategorie === 'wand') score -= 10; // Flur selten Wandfliesen
                 if (raumTyp === 'flur' && pos.tags.includes('flur')) score += 15;
 
-                // Lerngedächtnis anwenden
+                // Lerngedaechtnis anwenden
                 if (positionMemory[raumTyp] && positionMemory[raumTyp][pos.kategorie]) {
                     score += positionMemory[raumTyp][pos.kategorie] * 5;
                 }
@@ -283,7 +283,7 @@
                         <span className="logo-wacher">wacher</span>
                     </div>
 
-                    {/* Row 3: "Fliesenlegermeister e.K." rot rechtsbündig */}
+                    {/* Row 3: "Fliesenlegermeister e.K." rot rechtsbuendig */}
                     <div className="logo-subtitle-row">
                         <span className="logo-subtitle-text">Fliesenlegermeister e.K.</span>
                     </div>
@@ -613,7 +613,7 @@
                 }
 
                 try {
-                    // Prüfe ob Google APIs geladen sind
+                    // Pruefe ob Google APIs geladen sind
                     if (typeof gapi === 'undefined') {
                         throw new Error('Google API (gapi) konnte nicht geladen werden. Prüfe deine Internetverbindung und ob Werbeblocker/Datenschutz-Extensions aktiv sind.');
                     }

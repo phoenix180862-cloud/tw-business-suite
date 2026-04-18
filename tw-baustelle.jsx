@@ -187,7 +187,7 @@
                         </div>
                     )}
 
-                    {/* Bereits veröffentlichte Projekte */}
+                    {/* Bereits veroeffentlichte Projekte */}
                     <div className="ba-card" style={{marginTop:'14px'}}>
                         <div className="ba-card-title">📁 Alle Baustellen in der App ({projects.length})</div>
                         {projects.length === 0 ? (

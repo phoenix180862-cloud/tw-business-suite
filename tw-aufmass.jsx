@@ -654,7 +654,7 @@
         }
 
         /* ═══════════════════════════════════════════
-           MANUELLE EINGABE -- LV-Positionen & Räume
+           MANUELLE EINGABE -- LV-Positionen & Raeume
            ═══════════════════════════════════════════ */
         /* ManuelleEingabe v4 — Identische 3 Listen wie DatenUebersicht + PDF-Export */
         function ManuelleEingabe({ onFertig, onBack, kunde }) {
@@ -828,7 +828,7 @@
                                     });
                                 }
                             } else {
-                                // Format C: Header-Zeile enthält Feldnamen, erste Datenzeile die Werte
+                                // Format C: Header-Zeile enthaelt Feldnamen, erste Datenzeile die Werte
                                 var firstRow = rows[0] || [];
                                 for (var ci = 0; ci < headers.length; ci++) {
                                     var hdr = String(headers[ci] || '').toLowerCase().trim().replace(/[_\-:]/g, ' ').replace(/\s+/g, ' ');
@@ -1867,7 +1867,7 @@
                 });
             };
 
-            // Datei öffnen/Vorschau
+            // Datei oeffnen/Vorschau
             var handleOpenFile = async function(file, e) {
                 if (e) e.stopPropagation();
                 if (!file || !file.id) {
@@ -1885,11 +1885,11 @@
                         var url = 'https://drive.google.com/thumbnail?id=' + file.id + '&sz=w800';
                         setPreviewUrl(url);
                     } else if (fileType.match(/\.(pdf|docx|doc|xlsx|xls|csv|pptx|ppt|txt)$/)) {
-                        // PDF, Office, Text: Google Drive native Vorschau (funktioniert zuverlässig für alle Typen)
+                        // PDF, Office, Text: Google Drive native Vorschau (funktioniert zuverlaessig fuer alle Typen)
                         var url = 'https://drive.google.com/file/d/' + file.id + '/preview';
                         setPreviewUrl(url);
                     } else {
-                        // Sonstige: Direkt in Google Drive öffnen (neuer Tab)
+                        // Sonstige: Direkt in Google Drive oeffnen (neuer Tab)
                         window.open('https://drive.google.com/file/d/' + file.id + '/view', '_blank');
                         setPreviewFile(null);
                     }
@@ -1914,7 +1914,7 @@
                 return '📄';
             };
 
-            // Dateigröße formatieren
+            // Dateigroesse formatieren
             var formatSize = function(bytes) {
                 if (!bytes) return '';
                 if (bytes < 1024) return bytes + ' B';
@@ -1926,7 +1926,7 @@
             var folders = (kunde.folders || []);
             var rootFiles = (kunde.files || []);
 
-            // Standard-Ordner (ORDNER_ANALYSE_CONFIG) für Anzeige
+            // Standard-Ordner (ORDNER_ANALYSE_CONFIG) fuer Anzeige
             var standardOrdner = ORDNER_ANALYSE_CONFIG.ORDNER;
 
             var toggleFolder = function(name) {
@@ -1971,7 +1971,7 @@
                 return '📁';
             };
 
-            // ── Daten aus ausgewählten Ordnern laden (ruft echte Drive-Lade-Logik auf) ──
+            // ── Daten aus ausgewaehlten Ordnern laden (ruft echte Drive-Lade-Logik auf) ──
             var handleDatenLaden = function() {
                 window._kiDisabled = true; // KI deaktivieren -- nur Daten laden, keine KI-Analyse
                 if (selectedCount === 0 && !includeRootFiles) {
@@ -2267,7 +2267,7 @@
                                 </div>
                             </button>
 
-                            {/* Button 2: Akte wählen und KI-Analyse starten */}
+                            {/* Button 2: Akte waehlen und KI-Analyse starten */}
                             <button onClick={handleAnalyse}
                                 style={{padding:'16px', borderRadius:'12px', border:'none', cursor:'pointer',
                                     background:'linear-gradient(135deg, #8e44ad 0%, #6C3483 100%)',
@@ -2342,7 +2342,7 @@
                             /* ── Vorab-Akte Auswahl-Modus aktiv ── */
                             <div>
                                 {vorabAkteFile ? (
-                                    /* Datei ausgewählt -- Bestätigung */
+                                    /* Datei ausgewaehlt -- Bestaetigung */
                                     <div style={{background:'rgba(39,174,96,0.1)', borderRadius:'10px', padding:'12px', border:'1px solid rgba(39,174,96,0.3)', marginBottom:'10px'}}>
                                         <div style={{fontSize:'12px', fontWeight:'700', color:'#27ae60', marginBottom:'6px'}}>✅ Ausgewählte Datei:</div>
                                         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
@@ -2508,7 +2508,7 @@
                                     </div>
                                 </div>
                             ) : (
-                                /* ── ANALYSE-ERGEBNIS: Vollständige Zusammenfassung ── */
+                                /* ── ANALYSE-ERGEBNIS: Vollstaendige Zusammenfassung ── */
                                 <div>
                                     <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
                                         <div style={{background:'rgba(30,136,229,0.08)', borderRadius:'8px', padding:'10px', textAlign:'center'}}>
@@ -2563,7 +2563,7 @@
                         </button>
                     )}
 
-                    {/* ═══ ZURÜCK-BUTTON ═══ */}
+                    {/* ═══ ZURUeCK-BUTTON ═══ */}
                     <div style={{paddingBottom:'20px'}}>
                         <button onTouchEnd={function(e){ e.preventDefault(); onBack(); }} onClick={onBack}
                             style={{padding:'12px 20px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'12px', fontWeight:'600', color:'var(--text-muted)'}}>
@@ -2634,7 +2634,7 @@
             const [deleting, setDeleting] = useState(false);
             const inputRef = React.useRef(null);
 
-            // Lösch-Modus toggle: beim Verlassen Auswahl zuruecksetzen
+            // Loesch-Modus toggle: beim Verlassen Auswahl zuruecksetzen
             var toggleDeleteMode = function() {
                 setDeleteMode(function(prev) {
                     if (prev) setSelectedForDelete({});
@@ -5106,7 +5106,7 @@
             // Alle LV-Positionen des Kunden (fuer Farb-Zuordnung Dropdown)
             var allLvPos = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
 
-            // ── Globaler Enter-Key Handler für ALLE Eingabefelder im Raumblatt ──
+            // ── Globaler Enter-Key Handler fuer ALLE Eingabefelder im Raumblatt ──
             React.useEffect(() => {
                 const inputSelector = 'input:not([disabled]):not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([readonly]),textarea:not([disabled]):not([readonly]),select:not([disabled])';
                 const handleEnterNav = (e) => {
@@ -5390,9 +5390,9 @@
             };
 
             const [masse, setMasse] = useState(() => {
-                // ═══ RE-EDIT aus Gesamtliste: Gespeicherte Maße direkt übernehmen ═══
+                // ═══ RE-EDIT aus Gesamtliste: Gespeicherte Masse direkt uebernehmen ═══
                 if (reEdit && reEdit.masse) return { ...reEdit.masse };
-                // ═══ BAUGLEICH: _masse direkt vom Vorraum übernehmen ═══
+                // ═══ BAUGLEICH: _masse direkt vom Vorraum uebernehmen ═══
                 if (raum && raum._masse) {
                     return {
                         laenge: raum._masse.laenge || '',
@@ -5405,7 +5405,7 @@
                     };
                 }
                 if (raum) {
-                    // Wände mit TATSÄCHLICHEN Werten vorhanden?
+                    // Waende mit TATSAeCHLICHEN Werten vorhanden?
                     var waendeHaveValues = raum.waende && raum.waende.length > 0 && raum.waende.some(function(w) { return w.l && parseMass(w.l) > 0; });
                     if (hasData && waendeHaveValues && raum.waende.length === 4) {
                         return {
@@ -5417,7 +5417,7 @@
                             bodenManual: raum.bodenManual ? formatMass(raum.bodenManual) : '',
                         };
                     }
-                    // Fallback: Höhen aus Raum oder lastRaumData, Länge/Breite aus lastRaumData.masse
+                    // Fallback: Hoehen aus Raum oder lastRaumData, Laenge/Breite aus lastRaumData.masse
                     var fallbackMasse = (raum && raum._masse) || (lastRaumData && lastRaumData.masse) || {};
                     return {
                         laenge: (waendeHaveValues && raum.waende.length > 0) ? formatMass(raum.waende[0].l) : (fallbackMasse.laenge || ''),
@@ -5514,7 +5514,7 @@
                 if (hasData) {
                     return raum.waende.map(w => ({ id: w.id, l: formatMass(w.l) }));
                 }
-                // Auch manuell eingegebene Wände übernehmen (z.B. aus Raumerkennung)
+                // Auch manuell eingegebene Waende uebernehmen (z.B. aus Raumerkennung)
                 if (raum && raum.waende && raum.waende.length > 0) {
                     return raum.waende.map(w => ({ id: w.id, l: formatMass(w.l) }));
                 }
@@ -5530,9 +5530,9 @@
                 ];
             });
             const [abzuege, setAbzuege] = useState(() => {
-                // ═══ RE-EDIT: Gespeicherte Daten direkt übernehmen ═══
+                // ═══ RE-EDIT: Gespeicherte Daten direkt uebernehmen ═══
                 if (reEdit && reEdit.abzuege) return reEdit.abzuege.map(a => ({...a}));
-                // 1. Aus Zeichnungsdaten (erkannter Raum mit sonstigen Abzügen)
+                // 1. Aus Zeichnungsdaten (erkannter Raum mit sonstigen Abzuegen)
                 if (hasData && raum.abzuege) {
                     const zeichnungsSonstige = raum.abzuege.filter(a => a.typ === 'sonstige');
                     if (zeichnungsSonstige.length > 0) {
@@ -5543,7 +5543,7 @@
                         }));
                     }
                 }
-                // 2. Aus Raum-Objekt (Baugleich) oder Vorraum übernehmen
+                // 2. Aus Raum-Objekt (Baugleich) oder Vorraum uebernehmen
                 const sonstDef = (raum && raum.sonstigeDefaults) || (lastRaumData && lastRaumData.sonstigeDefaults);
                 if (sonstDef && sonstDef.length > 0) {
                     return sonstDef.map((a, i) => ({
@@ -5553,7 +5553,7 @@
                 return [];
             });
 
-            // ── Türen (eigener State, aufklappbar, editierbar) ──
+            // ── Tueren (eigener State, aufklappbar, editierbar) ──
             // Defaults: 1. Raum-Objekt (via handleCopyToRecognized) → 2. lastRaumData → 3. Standard
             const tuerDef = (raum && raum.tuerDefaults) || (lastRaumData && lastRaumData.tuerDefaults) || {
                 breite: '', hoehe: '', tiefe: '', hatLaibung: false,
@@ -5561,9 +5561,9 @@
                 sturzGefliest: false, leibungWandAbgedichtet: false, leibungBodenAbgedichtet: true, sturzAbgedichtet: false
             };
             const [tueren, setTueren] = useState(() => {
-                // ═══ RE-EDIT: Gespeicherte Daten direkt übernehmen ═══
+                // ═══ RE-EDIT: Gespeicherte Daten direkt uebernehmen ═══
                 if (reEdit && reEdit.tueren) return reEdit.tueren.map(t => ({...t}));
-                // 1. Aus Zeichnungsdaten (erkannter Raum mit Abzügen)
+                // 1. Aus Zeichnungsdaten (erkannter Raum mit Abzuegen)
                 if (hasData && raum.abzuege) {
                     const zeichnungsTueren = raum.abzuege.filter(a => a.typ === 'tuer');
                     if (zeichnungsTueren.length > 0) {
@@ -5582,7 +5582,7 @@
                         }));
                     }
                 }
-                // 2. Aus Vorraum-Entries (komplette Tür-Einträge übernehmen)
+                // 2. Aus Vorraum-Entries (komplette Tuer-Eintraege uebernehmen)
                 const entries = (raum && raum.tuerenEntries) || (lastRaumData && lastRaumData.tuerenEntries);
                 if (entries && entries.length > 0) {
                     return entries.map((t, i) => ({
@@ -5600,9 +5600,9 @@
                 leibungWandAbgedichtet: true, fensterbankAbgedichtet: true, sturzAbgedichtet: false
             };
             const [fenster, setFenster] = useState(() => {
-                // ═══ RE-EDIT: Gespeicherte Daten direkt übernehmen ═══
+                // ═══ RE-EDIT: Gespeicherte Daten direkt uebernehmen ═══
                 if (reEdit && reEdit.fenster) return reEdit.fenster.map(f => ({...f}));
-                // 1. Aus Zeichnungsdaten (erkannter Raum mit Fenster-Abzügen)
+                // 1. Aus Zeichnungsdaten (erkannter Raum mit Fenster-Abzuegen)
                 if (hasData && raum.abzuege) {
                     const zeichnungsFenster = raum.abzuege.filter(a => a.typ === 'fenster');
                     if (zeichnungsFenster.length > 0) {
@@ -5621,7 +5621,7 @@
                         }));
                     }
                 }
-                // 2. Aus Vorraum-Entries (komplette Fenster-Einträge übernehmen)
+                // 2. Aus Vorraum-Entries (komplette Fenster-Eintraege uebernehmen)
                 const entries = (raum && raum.fensterEntries) || (lastRaumData && lastRaumData.fensterEntries);
                 if (entries && entries.length > 0) {
                     return entries.map((f, i) => ({
@@ -5663,7 +5663,7 @@
             const [abzugForm, setAbzugForm] = useState({ name: '', breite: '', hoehe: '', tiefe: '', posZuordnung: {}, manualRW: null });
             const [showAbzugRWModal, setShowAbzugRWModal] = useState(false);
             const [abzugRWZeilen, setAbzugRWZeilen] = useState([{ id: Date.now(), text: '', vorzeichen: 'plus' }]);
-            const [abzugPosRWTarget, setAbzugPosRWTarget] = useState(null); // {posNr, vorzeichen} für pos-spezifischen RW
+            const [abzugPosRWTarget, setAbzugPosRWTarget] = useState(null); // {posNr, vorzeichen} fuer pos-spezifischen RW
             const [isDrawMode, setIsDrawMode] = useState(false);
             const canvasRef = React.useRef(null);
 
@@ -5925,14 +5925,14 @@
 
             // Positions-Karten State
             const [posCards, setPosCards] = useState(() => {
-                // ═══ RE-EDIT: Gespeicherte posCards direkt übernehmen ═══
+                // ═══ RE-EDIT: Gespeicherte posCards direkt uebernehmen ═══
                 if (reEdit && reEdit.posCards && reEdit.posCards.length > 0) {
                     return reEdit.posCards.map(p => ({...p, expanded: false}));
                 }
-                // Vorraum-posCards für manuelle Einträge (Stück, manualMenge etc.)
+                // Vorraum-posCards fuer manuelle Eintraege (Stueck, manualMenge etc.)
                 var vorraumPosCards = (lastRaumData && lastRaumData.posCardsData) || [];
                 return (initPositions || []).map(p => {
-                    // Prüfe ob diese Position im Vorraum manuelle Daten hatte
+                    // Pruefe ob diese Position im Vorraum manuelle Daten hatte
                     var vorraum = vorraumPosCards.find(function(vp) { return vp.pos === p.pos; });
                     return {
                         ...p,
@@ -5952,11 +5952,11 @@
             const [rwModalZeilen, setRwModalZeilen] = useState([]);
 
             // ═══ LASER DISTO – Tastatur-Modus ═══
-            // Enter/Tab vom DISTO → Wert formatieren + nächstes Feld
+            // Enter/Tab vom DISTO → Wert formatieren + naechstes Feld
             useEffect(() => {
                 if (!laserActive) return;
 
-                // ── Wenn Feld Fokus bekommt: alles markieren → DISTO überschreibt ──
+                // ── Wenn Feld Fokus bekommt: alles markieren → DISTO ueberschreibt ──
                 const focusHandler = (e) => {
                     const el = e.target;
                     if (!el || !el.classList.contains('masse-input')) return;
@@ -6071,7 +6071,7 @@
                 try {
                     // Sicherheit: nur Zahlen, Operatoren, Klammern, Leerzeichen, Punkt
                     if (!/^[0-9+\-*/().eE\s]+$/.test(expr)) return NaN;
-                    // Leere Klammern oder ungültige Ausdrücke abfangen
+                    // Leere Klammern oder ungueltige Ausdruecke abfangen
                     if (/\(\s*\)/.test(expr)) return NaN;
                     const fn = new Function('return (' + expr + ')');
                     const result = fn();
@@ -6079,13 +6079,13 @@
                 } catch(e) { return NaN; }
             };
 
-            // Bereitet Text für die Auswertung vor: Labels entfernen, Komma→Punkt, ×→*
+            // Bereitet Text fuer die Auswertung vor: Labels entfernen, Komma→Punkt, ×→*
             const prepareCalcText = (text) => {
                 if (!text || !text.trim()) return '';
                 let clean = text.trim();
                 // Label vor Doppelpunkt entfernen: "Wand A: 3,45 × 2,10" → "3,45 × 2,10"
                 clean = clean.replace(/^[^0-9(]*:\s*/, '');
-                // Führende Nicht-Zahlen/Klammern entfernen
+                // Fuehrende Nicht-Zahlen/Klammern entfernen
                 clean = clean.replace(/^[^0-9(.\-]+/, '');
                 // Komma → Punkt (Dezimal)
                 clean = clean.replace(/,/g, '.');
@@ -6115,7 +6115,7 @@
                 }, 0);
             };
 
-            // Fertigstellen: Überträgt Rechenweg + Ergebnis in die Position
+            // Fertigstellen: Uebertraegt Rechenweg + Ergebnis in die Position
             const fertigstellenRW = () => {
                 if (!rwModalPos) return;
                 const ergebnis = Math.max(0, calcRWModalSumme());
@@ -6133,7 +6133,7 @@
                 setRwModalZeilen([]);
             };
 
-            // Manuellen RW zurücksetzen → zurück zu Auto
+            // Manuellen RW zuruecksetzen → zurueck zu Auto
             const resetManualRW = (posNr) => {
                 setPosCards(prev => prev.map(p => {
                     if (p.pos !== posNr) return p;
@@ -6144,41 +6144,41 @@
             // ═══════════════════════════════════════════════
             // VOB/C DIN 18352 – Berechnungslogik (KOMPLETT)
             // ═══════════════════════════════════════════════
-            // VOB-konforme Rundung: 2 Dezimalstellen bei Flächen/Längen
+            // VOB-konforme Rundung: 2 Dezimalstellen bei Flaechen/Laengen
             const vobRound = (val) => Math.round(val * 100) / 100;
 
             const L = parseMass((wandMasse[0] && wandMasse[0].l) || masse.laenge);
             const B = parseMass((wandMasse[1] && wandMasse[1].l) || masse.breite);
-            const RH = parseMass(masse.raumhoehe); // Raumhöhe
-            const H = fliesenDeckenhoch ? RH : parseMass(masse.hoehe); // Fliesenhöhe (bei Raumhoch = Raumhöhe)
-            const AH = abdichtungDeckenhoch ? RH : parseMass(masse.abdichtungshoehe); // Abdichtungshöhe (bei Raumhoch = Raumhöhe)
-            const SH = parseMass(masse.sockelhoehe); // Sockelhöhe
-            const BM = parseMass(masse.bodenManual); // Manuell eingegebene Bodenfläche
+            const RH = parseMass(masse.raumhoehe); // Raumhoehe
+            const H = fliesenDeckenhoch ? RH : parseMass(masse.hoehe); // Fliesenhoehe (bei Raumhoch = Raumhoehe)
+            const AH = abdichtungDeckenhoch ? RH : parseMass(masse.abdichtungshoehe); // Abdichtungshoehe (bei Raumhoch = Raumhoehe)
+            const SH = parseMass(masse.sockelhoehe); // Sockelhoehe
+            const BM = parseMass(masse.bodenManual); // Manuell eingegebene Bodenflaeche
             const isMultiWall = hasData && raum.waende.length > 4;
             const perimeter = wandMasse.reduce((s, w) => s + parseMass(w.l), 0);
             const wandflaeche = vobRound(H > 0 ? (isMultiWall ? perimeter * H : 2 * (L + B) * H) : 0);
 
-            // ── Bodenfläche: Manual > Auto ──
-            // Bei Mehrecken MUSS Bodenfläche manuell eingegeben werden
-            // Bei Rechteck: L × B (kann manuell überschrieben werden)
+            // ── Bodenflaeche: Manual > Auto ──
+            // Bei Mehrecken MUSS Bodenflaeche manuell eingegeben werden
+            // Bei Rechteck: L × B (kann manuell ueberschrieben werden)
             const bodenAuto = isMultiWall ? 0 : vobRound(L * B);
             const bodenflaeche = BM > 0 ? vobRound(BM) : bodenAuto;
             const bodenIstManuell = BM > 0;
 
-            // ── Deckenfläche = gleich Bodenfläche (VOB: gleiche Regeln) ──
+            // ── Deckenflaeche = gleich Bodenflaeche (VOB: gleiche Regeln) ──
             const deckenflaeche = bodenflaeche;
 
             // ── Schichten-Regel DIN 18352 ──
-            // Wenn Wandbekleidung > halbe Raumhöhe aber < volle Raumhöhe:
-            // → volle Schichthöhe abrechnen (Ausnahme: Raumhoch oder festgelegtes Maß)
+            // Wenn Wandbekleidung > halbe Raumhoehe aber < volle Raumhoehe:
+            // → volle Schichthoehe abrechnen (Ausnahme: Raumhoch oder festgelegtes Mass)
             const schichtenRegelAktiv = H > 0 && RH > 0 && H < RH && H > (RH / 2);
             // Hinweis: Die Schichten-Regel zeigt nur einen Info-Hinweis im Rechenweg,
-            // die eigentliche Höhe H bleibt wie eingegeben (der Nutzer kann sie manuell anpassen)
+            // die eigentliche Hoehe H bleibt wie eingegeben (der Nutzer kann sie manuell anpassen)
 
-            // Abdichtung Wandfläche (mit Abdichtungshöhe statt Fliesenhöhe)
+            // Abdichtung Wandflaeche (mit Abdichtungshoehe statt Fliesenhoehe)
             const abdichtungWandflaeche = vobRound(AH > 0 ? (isMultiWall ? perimeter * AH : 2 * (L + B) * AH) : 0);
 
-            // Hat eine Abdichtungs-Position? (Abdichtungshöhe anzeigen)
+            // Hat eine Abdichtungs-Position? (Abdichtungshoehe anzeigen)
             const hatWandabdichtung = posCards.some(p => {
                 if (p.kategorie === 'abdichtung') return true;
                 const bezLower = (p.bez || '').toLowerCase();
@@ -6186,56 +6186,56 @@
                 return false;
             });
 
-            // Tür-Bodenlaibungsfläche (Breite × Tiefe pro Tür)
+            // Tuer-Bodenlaibungsflaeche (Breite × Tiefe pro Tuer)
             const tuerBodenLaibung = tueren.reduce((s, t) => {
                 const bVal = parseMass(t.breite); const tVal = parseMass(t.tiefe);
                 return s + (t.hatLaibung && tVal > 0 ? bVal * tVal : 0);
             }, 0);
 
-            // Alle Öffnungen in einheitliche VOB-Struktur bringen
+            // Alle Oeffnungen in einheitliche VOB-Struktur bringen
             const alleOeffnungen = [
                 ...tueren.map(t => {
                     const bVal = parseMass(t.breite); const hVal = parseMass(t.hoehe); const tVal = parseMass(t.tiefe);
                     const tuerHoeherAlsFliese = hVal > H && H > 0;
 
-                    // ── REGEL 1: Tür höher als Fliesenhöhe ──
-                    // Wenn Türhöhe > Fliesenhöhe → nicht volle Fläche abziehen!
-                    // Stattdessen: Türbreite vom Umfang abziehen (Wandfläche = (Umfang - Breite) × Fliesenhöhe)
+                    // ── REGEL 1: Tuer hoeher als Fliesenhoehe ──
+                    // Wenn Tuerhoehe > Fliesenhoehe → nicht volle Flaeche abziehen!
+                    // Stattdessen: Tuerbreite vom Umfang abziehen (Wandflaeche = (Umfang - Breite) × Fliesenhoehe)
                     let flaeche, abzugMethode;
                     if (tuerHoeherAlsFliese) {
-                        // Abzug = Türbreite × Fliesenhöhe (nur gefliester Bereich)
+                        // Abzug = Tuerbreite × Fliesenhoehe (nur gefliester Bereich)
                         flaeche = bVal * H;
-                        abzugMethode = 'umfang'; // Türbreite wird vom Umfang abgezogen
+                        abzugMethode = 'umfang'; // Tuerbreite wird vom Umfang abgezogen
                     } else {
                         flaeche = bVal * hVal;
-                        abzugMethode = 'flaeche'; // Normale Flächenberechnung
+                        abzugMethode = 'flaeche'; // Normale Flaechenberechnung
                     }
 
                     // ── Laibungsberechnung mit Schaltern ──
                     // WICHTIG: laibFlaeche = NUR Wand-bezogene Laibungen (Wand + Sturz)
                     // laibBodenFlaeche = NUR Boden-bezogene Laibungen (Breite × Tiefe)
-                    // Boden-Leibungen werden AUSSCHLIESSLICH zur Bodenfläche gerechnet!
+                    // Boden-Leibungen werden AUSSCHLIESSLICH zur Bodenflaeche gerechnet!
                     let laibFlaeche = 0;
                     let laibBodenFlaeche = 0;
                     if (t.hatLaibung && tVal > 0) {
                         let laibWand = 0, laibBoden = 0, laibSturz = 0;
-                        // Leibung Wand (2 Seiten): Höhe × Tiefe × 2
+                        // Leibung Wand (2 Seiten): Hoehe × Tiefe × 2
                         if (t.leibungWandGefliest) {
-                            // Bei Tür höher als Fliese: Laibungshöhe = Fliesenhöhe (nicht Türhöhe!)
+                            // Bei Tuer hoeher als Fliese: Laibungshoehe = Fliesenhoehe (nicht Tuerhoehe!)
                             const laibH = tuerHoeherAlsFliese ? H : hVal;
                             laibWand = 2 * laibH * tVal;
                         }
-                        // Leibung Boden: Breite × Tiefe → geht NUR zur Bodenfläche!
+                        // Leibung Boden: Breite × Tiefe → geht NUR zur Bodenflaeche!
                         if (t.leibungBodenGefliest) {
                             laibBoden = bVal * tVal;
                         }
-                        // Türsturz: Breite × Tiefe (nur wenn Tür NICHT höher als Fliese)
+                        // Tuersturz: Breite × Tiefe (nur wenn Tuer NICHT hoeher als Fliese)
                         if (t.sturzGefliest && !tuerHoeherAlsFliese) {
                             laibSturz = bVal * tVal;
                         }
-                        // Wandfläche bekommt NUR Wand-Laibung + Sturz (NICHT Boden!)
+                        // Wandflaeche bekommt NUR Wand-Laibung + Sturz (NICHT Boden!)
                         laibFlaeche = laibWand + laibSturz;
-                        // Bodenfläche bekommt NUR Boden-Laibung
+                        // Bodenflaeche bekommt NUR Boden-Laibung
                         laibBodenFlaeche = laibBoden;
                     }
 
@@ -6254,20 +6254,20 @@
                     return { ...t, typ: 'tuer', bVal, hVal, tVal, flaeche, laibFlaeche, laibBodenFlaeche, laibAbdichtung,
                         abzugMethode, tuerHoeherAlsFliese,
                         vobWand: flaeche <= 0.1 ? 'uebermessen' : 'abzug',
-                        vobBoden: 'uebermessen', // VOB: Türen am Boden NIE abziehen
+                        vobBoden: 'uebermessen', // VOB: Tueren am Boden NIE abziehen
                         vobSockel: bVal <= 1.0 ? 'uebermessen' : 'abzug',
-                        vobDecke: 'uebermessen' // Türen berühren Decke nicht
+                        vobDecke: 'uebermessen' // Tueren beruehren Decke nicht
                     };
                 }),
                 ...calcFenster.map(f => {
                     const bVal = parseMass(f.breite); const hVal = parseMass(f.hoehe); const tVal = parseMass(f.tiefe);
                     const brVal = parseMass(f.bruestung);
-                    const gesamtHoehe = brVal + hVal; // Brüstung + Fensterhöhe
+                    const gesamtHoehe = brVal + hVal; // Bruestung + Fensterhoehe
                     const fensterHoeherAlsFliese = gesamtHoehe > H && H > 0;
 
-                    // ── REGEL 2: Fenster-Gesamtmaß höher als Fliesenhöhe ──
-                    // Wenn Brüstung + Fensterhöhe > Fliesenhöhe → reduzierter Abzug
-                    // Effektive Fensterhöhe = Fensterhöhe - (Gesamtmaß - Fliesenhöhe)
+                    // ── REGEL 2: Fenster-Gesamtmass hoeher als Fliesenhoehe ──
+                    // Wenn Bruestung + Fensterhoehe > Fliesenhoehe → reduzierter Abzug
+                    // Effektive Fensterhoehe = Fensterhoehe - (Gesamtmass - Fliesenhoehe)
                     let flaeche, effektiveHoehe;
                     if (fensterHoeherAlsFliese) {
                         effektiveHoehe = Math.max(0, hVal - (gesamtHoehe - H));
@@ -6281,7 +6281,7 @@
                     let laibFlaeche = 0;
                     if (f.hatLaibung && tVal > 0) {
                         let laibWand = 0, laibBank = 0, laibSturz = 0;
-                        // Leibung Wand (2 Seiten): effektive Höhe × Tiefe × 2
+                        // Leibung Wand (2 Seiten): effektive Hoehe × Tiefe × 2
                         if (f.leibungWandGefliest) {
                             const laibH = fensterHoeherAlsFliese ? effektiveHoehe : hVal;
                             laibWand = 2 * laibH * tVal;
@@ -6290,7 +6290,7 @@
                         if (f.fensterbankGefliest) {
                             laibBank = bVal * tVal;
                         }
-                        // Fenstersturz: Breite × Tiefe (nur wenn Fenster NICHT höher als Fliese)
+                        // Fenstersturz: Breite × Tiefe (nur wenn Fenster NICHT hoeher als Fliese)
                         if (f.sturzGefliest && !fensterHoeherAlsFliese) {
                             laibSturz = bVal * tVal;
                         }
@@ -6311,14 +6311,14 @@
                         gesamtHoehe, effektiveHoehe, fensterHoeherAlsFliese,
                         vobWand: flaeche <= 0.1 ? 'uebermessen' : 'abzug',
                         vobBoden: 'uebermessen', // VOB: Fenster am Boden NIE abziehen
-                        vobSockel: 'irrelevant', // Fenster berühren Sockel nicht
-                        vobDecke: 'uebermessen' // Fenster berühren Decke nicht
+                        vobSockel: 'irrelevant', // Fenster beruehren Sockel nicht
+                        vobDecke: 'uebermessen' // Fenster beruehren Decke nicht
                     };
                 })
             ];
 
-            // Sonstige Abzüge/Zurechnungen – NEUE LOGIK: positionsspezifisch
-            // Für die Gesamtberechnung brauchen wir pro Position die relevanten Sonstigen
+            // Sonstige Abzuege/Zurechnungen – NEUE LOGIK: positionsspezifisch
+            // Fuer die Gesamtberechnung brauchen wir pro Position die relevanten Sonstigen
             const getSonstigeForPosition = (posNr) => {
                 return calcAbzuege.map(a => {
                     const zuordnung = a.posZuordnung ? a.posZuordnung[posNr] : null;
@@ -6348,7 +6348,7 @@
                     // Prio 3: B × H × T Standardberechnung
                     const bVal = parseMass(a.breite); const hVal = parseMass(a.hoehe); const tVal = parseMass(a.tiefe || '');
                     flaeche = tVal > 0 ? bVal * hVal * tVal : bVal * hVal;
-                    // VOB: Nischen werden IMMER gesondert gerechnet (unabhängig von Größe)
+                    // VOB: Nischen werden IMMER gesondert gerechnet (unabhaengig von Groesse)
                     const istNische = (a.name || '').toLowerCase().includes('nische');
                     return { ...a, typ: 'sonstige', bVal, hVal, tVal, flaeche, laibFlaeche: 0,
                         hasManualRW: false, istNische,
@@ -6357,11 +6357,11 @@
                 }).filter(Boolean);
             };
 
-            // Legacy-Kompatibilität: sonstigeItems für VOB-Tags-Anzeige (alle mit irgendeiner Zuordnung)
+            // Legacy-Kompatibilitaet: sonstigeItems fuer VOB-Tags-Anzeige (alle mit irgendeiner Zuordnung)
             const sonstigeItems = calcAbzuege.flatMap(a => {
                 const zuordnungen = a.posZuordnung || {};
                 if (Object.keys(zuordnungen).length === 0) return [];
-                // Nimm die erste Zuordnung als Repräsentant
+                // Nimm die erste Zuordnung als Repraesentant
                 const firstKey = Object.keys(zuordnungen)[0];
                 const firstZ = zuordnungen[firstKey];
                 const istPlus = firstZ.vorzeichen === 'plus';
@@ -6381,20 +6381,20 @@
                 }];
             });
 
-            // Alles zusammen für VOB-Tags-Anzeige
+            // Alles zusammen fuer VOB-Tags-Anzeige
             const vobAbzuege = [...alleOeffnungen, ...sonstigeItems];
 
             // ── WAND-Berechnung (VOB) ──
             const wandAbzugItems = alleOeffnungen.filter(a => a.vobWand === 'abzug');
             const wandUebermessen = alleOeffnungen.filter(a => a.vobWand === 'uebermessen');
-            // Tür-Laibungen nur zur Wand rechnen wenn bodenPlusTuerlaibung NICHT aktiv
+            // Tuer-Laibungen nur zur Wand rechnen wenn bodenPlusTuerlaibung NICHT aktiv
             const wandLaibungen = alleOeffnungen.filter(a => {
                 if (a.laibFlaeche <= 0) return false;
-                // Wenn Boden+Türlaibung aktiv: Tür-Laibungen NICHT zur Wand, nur Fenster-Laibungen
+                // Wenn Boden+Tuerlaibung aktiv: Tuer-Laibungen NICHT zur Wand, nur Fenster-Laibungen
                 if (bodenPlusTuerlaibung && a.typ === 'tuer') return false;
                 return true;
             });
-            // Sonstige pro Kategorie dynamisch berechnen (für Standardwerte ohne pos-spezifisch)
+            // Sonstige pro Kategorie dynamisch berechnen (fuer Standardwerte ohne pos-spezifisch)
             const getWandSonstige = (posNr) => {
                 const items = getSonstigeForPosition(posNr);
                 return {
@@ -6402,7 +6402,7 @@
                     zurech: items.filter(a => a.vobVorzeichen === 'zurechnung'),
                 };
             };
-            // Fallback für allgemeine Wand/Boden-Berechnung (erste passende Position)
+            // Fallback fuer allgemeine Wand/Boden-Berechnung (erste passende Position)
             const wandPosNr = (posCards.find(p => p.kategorie === 'wand') && posCards.find(p => p.kategorie === 'wand').pos) || '';
             const wandSonst = getWandSonstige(wandPosNr);
             const wandSonstAbzug = wandSonst.abzug;
@@ -6412,14 +6412,14 @@
             const wandErgebnis = vobRound(Math.max(0, wandflaeche - wandAbzugTotal + wandZurechnungTotal));
 
             // ── BODEN-Berechnung (VOB) ──
-            // VOB/C DIN 18352: Bei Bodenflächen KEIN Abzug für Türen/Fenster!
+            // VOB/C DIN 18352: Bei Bodenflaechen KEIN Abzug fuer Tueren/Fenster!
             const bodenPosNr = (posCards.find(p => p.kategorie === 'boden') && posCards.find(p => p.kategorie === 'boden').pos) || '';
             const bodenSonst = getWandSonstige(bodenPosNr);
             const bodenSonstAbzug = bodenSonst.abzug;
             const bodenSonstZurech = bodenSonst.zurech;
-            // Boden-Laibungsfläche: Wenn Leibung-Boden-Buttons (grün) aktiv → direkt zur Bodenfläche
+            // Boden-Laibungsflaeche: Wenn Leibung-Boden-Buttons (gruen) aktiv → direkt zur Bodenflaeche
             const bodenLaibungTotal = vobRound(alleOeffnungen.reduce((s, a) => s + (a.laibBodenFlaeche || 0), 0));
-            // bodenPlusTuerlaibung-Toggle NUR wenn keine leibungBoden-Buttons aktiv (Legacy-Kompatibilität)
+            // bodenPlusTuerlaibung-Toggle NUR wenn keine leibungBoden-Buttons aktiv (Legacy-Kompatibilitaet)
             const tuerBodenExtra = (bodenPlusTuerlaibung && bodenLaibungTotal === 0) ? tuerBodenLaibung : 0;
             const bodenBasis = vobRound(bodenflaeche + bodenLaibungTotal + tuerBodenExtra);
             const bodenErgebnis = vobRound(Math.max(0, bodenBasis - bodenSonstAbzug.reduce((s, a) => s + a.flaeche, 0) + bodenSonstZurech.reduce((s, a) => s + a.flaeche, 0)));
@@ -6429,20 +6429,20 @@
             const deckeErgebnis = vobRound(Math.max(0, deckeBasis));
 
             // ── SOCKEL-Berechnung (VOB) ──
-            // VOB/C: Unterbrechungen ≤1,0 m übermessen
+            // VOB/C: Unterbrechungen ≤1,0 m uebermessen
             const sockelGesamt = vobRound(isMultiWall ? perimeter : 2 * (L + B));
             const sockelAbzugItems = alleOeffnungen.filter(a => a.vobSockel === 'abzug');
             const sockelUebermessen = alleOeffnungen.filter(a => a.vobSockel === 'uebermessen');
             const sockelAbzugTotal = vobRound(sockelAbzugItems.reduce((s, a) => s + a.bVal, 0));
             const sockelErgebnis = vobRound(Math.max(0, sockelGesamt - sockelAbzugTotal));
 
-            // ── Kategorien-Mapping für VOB-Berechnung ──
-            // Bestimmt welche Grundberechnung für eine Position verwendet wird
+            // ── Kategorien-Mapping fuer VOB-Berechnung ──
+            // Bestimmt welche Grundberechnung fuer eine Position verwendet wird
             const getVobBasis = (pos) => {
                 const kat = pos.kategorie;
                 const bezLow = (pos.bez || '').toLowerCase();
                 const tags = pos.tags || [];
-                // Verfugung: gleiche Regeln wie zugehörige Flächenart
+                // Verfugung: gleiche Regeln wie zugehoerige Flaechenart
                 if (kat === 'verfugung' || bezLow.includes('verfugung')) {
                     if (tags.includes('boden') || bezLow.includes('boden')) return 'boden';
                     if (tags.includes('wand') || bezLow.includes('wand')) return 'wand';
@@ -6526,7 +6526,7 @@
                     const posWandErg = Math.max(0, wandflaeche - posWandAbzug + posWandZurech);
                     steps.push({ label: 'ERGEBNIS', formel: '', ergebnis: fmtDe(posWandErg) + ' m²', type: 'total' });
 
-                // ── ABDICHTUNG WAND (eigene Höhe!) ──
+                // ── ABDICHTUNG WAND (eigene Hoehe!) ──
                 } else if (isAbdWand) {
                     const posSonst = getSonstigeForPosition(pos.pos);
                     const posSonstAbzug = posSonst.filter(a => a.vobVorzeichen === 'abzug');
@@ -6539,11 +6539,11 @@
                     } else {
                         steps.push({ label: 'Abdichtung Wandfläche', formel: `2 × (${fmtDe(L)} + ${fmtDe(B)}) × ${fmtDe(useH)}${AH > 0 ? ' (Abdichtungshöhe)' : ''}`, ergebnis: fmtDe(useFlaeche) + ' m²' });
                     }
-                    // ── Abzüge mit Höhenüberschreitungs-Logik (gleich wie Wand!) ──
+                    // ── Abzuege mit Hoehenueberschreitungs-Logik (gleich wie Wand!) ──
                     let abdAbzugTotal = 0;
                     let abdZurechTotal = 0;
                     wandAbzugItems.forEach(a => {
-                        // Tür: Prüfe ob Türhöhe > Abdichtungshöhe
+                        // Tuer: Pruefe ob Tuerhoehe > Abdichtungshoehe
                         if (a.typ === 'tuer') {
                             const tuerHoeherAlsAbd = a.hVal > useH;
                             const abdFlaeche = tuerHoeherAlsAbd ? a.bVal * useH : a.bVal * a.hVal;
@@ -6553,7 +6553,7 @@
                             } else {
                                 steps.push({ label: `− ${a.name} (${fmtDe(a.bVal)}×${fmtDe(a.hVal)})`, formel: '', ergebnis: '−' + fmtDe(abdFlaeche) + ' m²', type: 'abzug' });
                             }
-                        // Fenster: Prüfe ob Brüstung+Fensterhöhe > Abdichtungshöhe
+                        // Fenster: Pruefe ob Bruestung+Fensterhoehe > Abdichtungshoehe
                         } else if (a.typ === 'fenster') {
                             const brH = a.brVal || 0;
                             const gesamtH = brH + a.hVal;
@@ -6634,7 +6634,7 @@
                     if (tueren.length > 0 || calcFenster.length > 0) {
                         steps.push({ label: '⊘ Türen/Fenster', formel: 'VOB/C: Kein Abzug bei Bodenflächen', ergebnis: '0,000 m²', type: 'vob-info' });
                     }
-                    // Boden-Leibungen aus grünen "Leibung Boden"-Buttons
+                    // Boden-Leibungen aus gruenen "Leibung Boden"-Buttons
                     alleOeffnungen.forEach(a => {
                         if ((a.laibBodenFlaeche || 0) > 0) {
                             steps.push({ label: `+ Leibung Boden ${a.name}`, formel: `${fmtDe(a.bVal)} × ${fmtDe(a.tVal)}`, ergebnis: '+' + fmtDe(a.laibBodenFlaeche) + ' m²', type: 'zurechnung' });
@@ -6673,10 +6673,10 @@
 
                 } else if (kat === 'silikon') {
                     // ── DEHNUNGSFUGEN / DAUERELASTISCHE FUGEN ──
-                    // Umlaufend Boden + senkrechte Innenecken + Fenster/Tür-Anschlussfugen
+                    // Umlaufend Boden + senkrechte Innenecken + Fenster/Tuer-Anschlussfugen
                     const umfang = isMultiWall ? perimeter : 2 * (L + B);
-                    const useH = H > 0 ? H : SH; // Fliesenhöhe, ggf. Sockelhöhe
-                    // Raumecken zählen (NUR Raum-Innenecken, NICHT Fenster!)
+                    const useH = H > 0 ? H : SH; // Fliesenhoehe, ggf. Sockelhoehe
+                    // Raumecken zaehlen (NUR Raum-Innenecken, NICHT Fenster!)
                     const raumEcken = isMultiWall ? wandMasse.length : 4;
 
                     if (isMultiWall) {
@@ -6702,7 +6702,7 @@
                             steps.push({ label: `${f.name} Tiefe ×2`, formel: `${fmtDe(fT)}×2`, ergebnis: fmtDe(fT * 2) + ' m', value: fT * 2, sign: 1 });
                         }
                     });
-                    // Tür-Anschlussfugen (NUR wenn dauerelastisch/Stahlzarge) – JEDE Komponente einzeln
+                    // Tuer-Anschlussfugen (NUR wenn dauerelastisch/Stahlzarge) – JEDE Komponente einzeln
                     tueren.filter(t => t.dauerelastisch).forEach(t => {
                         const tH = parseMass(t.hoehe); const tT = parseMass(t.tiefe);
                         const effH = (tH > useH && useH > 0) ? useH : tH;
@@ -6713,7 +6713,7 @@
                             steps.push({ label: `${t.name} Tiefe ×2 (Stahlzarge)`, formel: `${fmtDe(tT)}×2`, ergebnis: fmtDe(tT * 2) + ' m', value: tT * 2, sign: 1 });
                         }
                     });
-                    // Türen ohne dauerelastisch → Info
+                    // Tueren ohne dauerelastisch → Info
                     tueren.filter(t => !t.dauerelastisch).forEach(t => {
                         steps.push({ label: `⊘ ${t.name}`, formel: 'Keine Stahlzarge → keine Dehnungsfuge', ergebnis: '0,00 m', type: 'vob-info', value: 0, sign: 0 });
                     });
@@ -6723,7 +6723,7 @@
                 } else if (kat === 'dichtband' || kat === 'manschette' || (kat === 'abdichtung' && (pos.tags && pos.tags.includes('dichtband'))) || (kat === 'abdichtung' && (pos.tags && pos.tags.includes('manschette')))) {
                     if (pos.einheit === 'm') {
                         // ── DICHTBAND (m) ──
-                        // Gleiche Struktur wie Dehnungsfugen, aber mit Abdichtungshöhe + ALLE Türen
+                        // Gleiche Struktur wie Dehnungsfugen, aber mit Abdichtungshoehe + ALLE Tueren
                         const umfang = isMultiWall ? perimeter : 2 * (L + B);
                         const useAH = AH > 0 ? AH : H;
                         // NUR Raum-Innenecken (NICHT Fenster!)
@@ -6738,7 +6738,7 @@
                             const eckenWert = raumEcken * useAH;
                             steps.push({ label: `Innenecken`, formel: `${raumEcken}×${fmtDe(useAH)}${AH > 0 ? ' (Abd.höhe)' : ''}`, ergebnis: fmtDe(eckenWert) + ' m', value: eckenWert, sign: 1 });
                         }
-                        // Fenster-Anschlussfugen – NUR Bank + Tiefe×2 (Höhe über Innenecken abgedeckt)
+                        // Fenster-Anschlussfugen – NUR Bank + Tiefe×2 (Hoehe ueber Innenecken abgedeckt)
                         calcFenster.forEach(f => {
                             const fB = parseMass(f.breite); const fT = parseMass(f.tiefe);
                             if (fB > 0) {
@@ -6748,7 +6748,7 @@
                                 steps.push({ label: `${f.name} Tiefe ×2`, formel: `${fmtDe(fT)}×2`, ergebnis: fmtDe(fT * 2) + ' m', value: fT * 2, sign: 1 });
                             }
                         });
-                        // Tür-Anschlussfugen – ALLE Türen – NUR Tiefe×2
+                        // Tuer-Anschlussfugen – ALLE Tueren – NUR Tiefe×2
                         tueren.forEach(t => {
                             const tT = parseMass(t.tiefe);
                             if (tT > 0) {
@@ -6763,7 +6763,7 @@
                         const bezLow = (pos.bez || '').toLowerCase();
                         const istEcke = bezLow.includes('ecke') || bezLow.includes('innenecke') || bezLow.includes('außenecke') || bezLow.includes('aussenecke');
                         if (istEcke || (kat !== 'manschette' && !bezLow.includes('manschette') && !bezLow.includes('durchführung'))) {
-                            // Dichtband Innen-/Außenecken automatisch zählen
+                            // Dichtband Innen-/Aussenecken automatisch zaehlen
                             const raumInnenecken = isMultiWall ? wandMasse.length : 4;
                             steps.push({ label: 'Raum-Innenecken', formel: `${raumInnenecken} Stk (Boden-Wand)`, ergebnis: raumInnenecken + ' Stk', value: raumInnenecken, sign: 1 });
                             tueren.forEach(t => {
@@ -6787,7 +6787,7 @@
 
                 } else if (kat === 'schiene') {
                     // ── ECKSCHUTZSCHIENEN / JOLLY-PROFILE ──
-                    // Alle Außenkanten an gefliesten Laibungen
+                    // Alle Aussenkanten an gefliesten Laibungen
                     calcFenster.forEach(f => {
                         if (f.hatLaibung && parseMass(f.tiefe) > 0) {
                             const fH = parseMass(f.hoehe); const fB = parseMass(f.breite);
@@ -6913,7 +6913,7 @@
                     const posBodenErg = vobRound(Math.max(0, bodenBasis - posSonstAbzug.reduce((s, a) => s + a.flaeche, 0) + posSonstZurech.reduce((s, a) => s + a.flaeche, 0)));
                     steps.push({ label: 'ERGEBNIS', formel: '', ergebnis: fmtDe(posBodenErg) + ' m²', type: 'total' });
 
-                // ── FENSTERBANK (Stück oder m²) ──
+                // ── FENSTERBANK (Stueck oder m²) ──
                 } else if (kat === 'fensterbank' || (pos.bez || '').toLowerCase().includes('fensterbank')) {
                     if (pos.einheit === 'Stk' || pos.einheit === 'St' || pos.einheit === 'Stück') {
                         calcFenster.forEach(f => {
@@ -6939,7 +6939,7 @@
                 return steps;
             };
 
-            // ── Post-Processing: value/sign für Edit-Modus zu jedem Schritt ──
+            // ── Post-Processing: value/sign fuer Edit-Modus zu jedem Schritt ──
             const enrichRechenweg = (steps) => {
                 return steps.map(step => {
                     if (step.value !== undefined) return step; // Already has value
@@ -6992,7 +6992,7 @@
                     case 'decke':
                         return vobRound(Math.max(0, deckeBasis - posSonstAbzugSum + posSonstZurechSum));
                     case 'verfugung': {
-                        // Verfugung folgt gleichen Regeln wie zugehörige Fläche
+                        // Verfugung folgt gleichen Regeln wie zugehoerige Flaeche
                         const vBasis = getVobBasis(pos);
                         if (vBasis === 'boden') return vobRound(Math.max(0, bodenBasis - posSonstAbzugSum + posSonstZurechSum));
                         // Wand-Verfugung
@@ -7002,10 +7002,10 @@
                     }
                     case 'estrich':
                     case 'entkopplung':
-                        // VOB: Gleiche Regeln wie Boden – kein Tür/Fenster-Abzug
+                        // VOB: Gleiche Regeln wie Boden – kein Tuer/Fenster-Abzug
                         return vobRound(Math.max(0, bodenBasis - posSonstAbzugSum + posSonstZurechSum));
                     case 'fensterbank':
-                        // Fensterbänke: Stück = Anzahl Fenster, oder m² = Σ(Breite × Tiefe)
+                        // Fensterbaenke: Stueck = Anzahl Fenster, oder m² = Σ(Breite × Tiefe)
                         if (pos.einheit === 'Stk' || pos.einheit === 'St' || pos.einheit === 'Stück') {
                             return calcFenster.length;
                         }
@@ -7017,7 +7017,7 @@
                         if ((pos.tags && pos.tags.includes('wand'))) {
                             const useH = AH > 0 ? AH : H;
                             const useFlaeche = AH > 0 ? abdichtungWandflaeche : wandflaeche;
-                            // Abzüge mit Höhenüberschreitungs-Logik für Abdichtung
+                            // Abzuege mit Hoehenueberschreitungs-Logik fuer Abdichtung
                             let aAbzug = 0;
                             wandAbzugItems.forEach(a => {
                                 if (a.typ === 'tuer') {
@@ -7091,7 +7091,7 @@
                             });
                             return vobRound(db);
                         }
-                        // Stück (Ecken)
+                        // Stueck (Ecken)
                         const raumEck = isMultiWall ? wandMasse.length : 4;
                         let ecken = raumEck;
                         tueren.forEach(t => { if (t.hatLaibung && parseMass(t.tiefe) > 0) ecken += 2; });
@@ -7466,10 +7466,9 @@
                     var fileName = kundeName.replace(/[^a-zA-Z0-9]/g, '_') + '_Aufmass_' + dateStr + '_' + timeStr + '.xlsx';
                     var kundeOrdnerId = kunde && kunde._driveFolderId;
                     if (kundeOrdnerId) {
-                        var aufmassOrdner = await service.findOrCreateFolder('Aufmass', kundeOrdnerId);
-                        var ordnerId = aufmassOrdner.id || aufmassOrdner;
+                        var ordnerId = await service.findOrCreateFolder(kundeOrdnerId, window.DRIVE_ORDNER.aufmass);
                         var blob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                        await service.uploadFile(blob, fileName, ordnerId);
+                        await service.uploadFile(ordnerId, fileName, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', blob);
                     } else {
                         var blob2 = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                         var url = URL.createObjectURL(blob2);
@@ -7494,17 +7493,24 @@
                         setAkteLoading(false);
                         return;
                     }
-                    var modulOrdner = ['Aufmass', 'Rechnung', 'Schriftverkehr', 'Ausgangsbuch', 'Baustelle'];
+                    // ── Akte-Liste: 4 Drive-Ordner durchsuchen ──
+                    // Ausgangsbuch-Dokumente landen in Aufmass/Rechnung/Schriftverkehr.
+                    var modulOrdner = [
+                        { anzeige: 'Aufmass',        driveName: window.DRIVE_ORDNER.aufmass },
+                        { anzeige: 'Rechnung',       driveName: window.DRIVE_ORDNER.rechnung },
+                        { anzeige: 'Schriftverkehr', driveName: window.DRIVE_ORDNER.schriftverkehr },
+                        { anzeige: 'Baustellen-App', driveName: window.DRIVE_ORDNER.baustellenApp }
+                    ];
                     var ergebnis = [];
                     for (var oi = 0; oi < modulOrdner.length; oi++) {
                         try {
-                            var ordnerName = modulOrdner[oi];
-                            var ordner = await service.findFolder(ordnerName, kunde._driveFolderId);
-                            if (ordner) {
-                                var files = await service.listFiles(ordner.id || ordner, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                            var eintrag = modulOrdner[oi];
+                            var ordnerId = await service.findFolder(kunde._driveFolderId, eintrag.driveName);
+                            if (ordnerId) {
+                                var files = await service.listFiles(ordnerId, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
                                 if (files && files.length > 0) {
                                     ergebnis.push({
-                                        name: ordnerName, id: ordner.id || ordner, modul: ordnerName.toLowerCase(),
+                                        name: eintrag.anzeige, id: ordnerId, modul: eintrag.anzeige.toLowerCase(),
                                         files: files.map(function(f) { return { id: f.id, name: f.name, modifiedTime: f.modifiedTime, size: f.size }; })
                                     });
                                 }
@@ -8085,7 +8091,7 @@
                     setAbzuege(prev => prev.map(a => a.id === editAbzugId ? { ...abzugForm, typ: 'sonstige', id: editAbzugId } : a));
                     setEditAbzugId(null);
                 } else {
-                    // ── NEU-Modus: neuen Eintrag hinzufügen ──
+                    // ── NEU-Modus: neuen Eintrag hinzufuegen ──
                     const newAbzug = { ...abzugForm, typ: 'sonstige', id: Date.now() };
                     setAbzuege(prev => [...prev, newAbzug]);
                 }
@@ -8129,7 +8135,7 @@
                     // Positions-spezifischer Rechenweg
                     const { posNr, vorzeichen } = abzugPosRWTarget;
 
-                    // Flächen-Kategorie bestimmen (boden oder wand)
+                    // Flaechen-Kategorie bestimmen (boden oder wand)
                     const targetPos = posCards.find(p => p.pos === posNr);
                     const targetTags = (targetPos && targetPos.tags) || [];
                     const istBoden = targetTags.includes('boden');
@@ -8141,11 +8147,11 @@
                         newZuordnung[posNr] = { vorzeichen, manualRW: rwData };
 
                         // Auto-Propagation: gleichen RW auf alle zugeordneten Positionen
-                        // der selben Flächenkategorie übertragen
+                        // der selben Flaechenkategorie uebertragen
                         if (istBoden || istWand) {
                             const tag = istBoden ? 'boden' : 'wand';
                             posCards.forEach(p => {
-                                if (p.pos === posNr) return; // Ziel überspringen
+                                if (p.pos === posNr) return; // Ziel ueberspringen
                                 const pTags = p.tags || [];
                                 if (!pTags.includes(tag)) return; // andere Kategorie
                                 // Nur wenn diese Position bereits zugeordnet ist
@@ -8162,7 +8168,7 @@
                     });
                     setAbzugPosRWTarget(null);
                 } else {
-                    // Globaler Rechenweg für das Bauteil selbst
+                    // Globaler Rechenweg fuer das Bauteil selbst
                     setAbzugForm(prev => ({...prev, manualRW: rwData, breite: '', hoehe: '', tiefe: '' }));
                 }
                 setShowAbzugRWModal(false);
@@ -8172,10 +8178,10 @@
                 setAbzuege(prev => prev.filter(a => a.id !== id));
             };
 
-            // ── Türen-Management ──
+            // ── Tueren-Management ──
             const addTuer = () => {
                 const newId = Date.now();
-                // Vorlage: erste Tür im aktuellen Raum (falls vorhanden), sonst tuerDef vom Vorraum
+                // Vorlage: erste Tuer im aktuellen Raum (falls vorhanden), sonst tuerDef vom Vorraum
                 const vorlage = tueren.length > 0 ? tueren[0] : tuerDef;
                 setTueren(prev => [...prev, {
                     id: newId, name: `Tür ${prev.length + 1}`,
@@ -8222,7 +8228,7 @@
                 setFenster(prev => prev.map(f => {
                     if (f.id !== id) return f;
                     const updated = { ...f, [field]: value };
-                    // Bodengleich → Brüstungshöhe automatisch auf 0
+                    // Bodengleich → Bruestungshoehe automatisch auf 0
                     if (field === 'bodengleich' && value === true) {
                         updated.bruestung = '0,00';
                     }
@@ -8260,7 +8266,7 @@
             };
 
             // Canvas drawing
-            // ── Auto-Sync: Wenn Fenster/Türen/Raummaße sich ändern, aktive Edits aktualisieren ──
+            // ── Auto-Sync: Wenn Fenster/Tueren/Raummasse sich aendern, aktive Edits aktualisieren ──
             const getFingerprint = () => {
                 const f = fenster.map(f => `${f.id}|${f.breite}|${f.hoehe}|${f.tiefe}|${f.hatLaibung}|${f.leibungWandGefliest}|${f.fensterbankGefliest}`).join(',');
                 const t = tueren.map(t => `${t.id}|${t.breite}|${t.hoehe}|${t.tiefe}|${t.hatLaibung}|${t.dauerelastisch}|${t.leibungWandGefliest}`).join(',');
@@ -8287,7 +8293,7 @@
                         const pos = posCards.find(p => p.pos === posNr);
                         if (!pos) return;
                         const kat = pos.kategorie;
-                        // Alle Kategorien die von Raummaßen/Öffnungen abhängen
+                        // Alle Kategorien die von Raummassen/Oeffnungen abhaengen
                         if (!['wand','boden','sockel','silikon','dichtband','schiene','abdichtung','decke','verfugung','estrich','entkopplung','fensterbank'].includes(kat)) return;
 
                         // Auto-Steps komplett neu generieren
@@ -8295,7 +8301,7 @@
                             .filter(st => st.type !== 'total' && st.sign !== 0);
                         const currentEdits = prev[posNr] || [];
 
-                        // Neu aufbauen: Auto-Steps als Basis, User-Änderungen beibehalten wo möglich
+                        // Neu aufbauen: Auto-Steps als Basis, User-Aenderungen beibehalten wo moeglich
                         const autoLabels = new Set(autoSteps.map(st => st.label));
                         const editByLabel = {};
                         currentEdits.forEach(e => { editByLabel[e.label] = e; });
@@ -8305,11 +8311,11 @@
                         autoSteps.forEach((st, i) => {
                             const existing = editByLabel[st.label];
                             if (existing) {
-                                // Step existiert in Edits → Formel beibehalten wenn User sie geändert hat
+                                // Step existiert in Edits → Formel beibehalten wenn User sie geaendert hat
                                 merged.push(existing);
                                 delete editByLabel[st.label]; // verbraucht
                             } else {
-                                // Neuer Auto-Step → hinzufügen
+                                // Neuer Auto-Step → hinzufuegen
                                 merged.push({
                                     id: 'sync_' + Date.now() + '_' + i,
                                     label: st.label,
@@ -8318,12 +8324,12 @@
                                 });
                             }
                         });
-                        // 2) Manuelle Zeilen (User-hinzugefügt) beibehalten
+                        // 2) Manuelle Zeilen (User-hinzugefuegt) beibehalten
                         Object.values(editByLabel).forEach(e => {
                             if (e.label && !autoLabels.has(e.label)) {
                                 merged.push(e); // User-eigene Zeile
                             }
-                            // Else: Zeile gehört zu gelöschtem Fenster/Tür → wird entfernt
+                            // Else: Zeile gehoert zu geloeschtem Fenster/Tuer → wird entfernt
                         });
 
                         if (JSON.stringify(merged) !== JSON.stringify(currentEdits)) {
@@ -9365,7 +9371,7 @@
                         </div>
                     </div>
 
-                    {/* Maßeingabe */}
+                    {/* Masseingabe */}
                     <div className="masse-section">
                         <div className="masse-section-title">📏 Raummaße</div>
                         {!isMultiWall ? (
@@ -9383,7 +9389,7 @@
                                     </div>
                                 </div>
 
-                                {/* Fliesenhöhe + Raumhoch + Umlaufend */}
+                                {/* Fliesenhoehe + Raumhoch + Umlaufend */}
                                 <div className="masse-hoehe-row">
                                     <div className="masse-field" style={{flex:1}}>
                                         <span className="masse-label">Fliesenhöhe</span>
@@ -9475,7 +9481,7 @@
                                     </div>
                                 )}
 
-                                {/* Sockelhöhe */}
+                                {/* Sockelhoehe */}
                                 {posCards.some(p => p.kategorie === 'sockel' || p.kategorie === 'silikon') && (
                                     <div className="masse-hoehe-row" style={{marginTop:'10px'}}>
                                         <div className="masse-field" style={{flex:1}}>
@@ -9492,7 +9498,7 @@
                                     </div>
                                 )}
 
-                                {/* Bodenfläche + Türlaibung */}
+                                {/* Bodenflaeche + Tuerlaibung */}
                                 {tueren.some(t => t.hatLaibung && parseMass(t.tiefe) > 0) && (
                                     <div style={{marginTop:'10px'}}>
                                         <button className={`bodengleich-btn ${bodenPlusTuerlaibung ? 'active' : ''}`}
@@ -9505,7 +9511,7 @@
                                         </button>
                                     </div>
                                 )}
-                                {/* Bodenfläche manuell überschreiben (optional bei Rechteckraum) */}
+                                {/* Bodenflaeche manuell ueberschreiben (optional bei Rechteckraum) */}
                                 {posCards.some(p => ['boden','estrich','entkopplung','decke'].includes(p.kategorie) || (p.tags || []).includes('boden')) && (
                                     <div style={{marginTop:'8px'}}>
                                         <div className="masse-field" style={{flex:1}}>
@@ -9570,7 +9576,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                {/* Fliesenhöhe + Raumhoch + Umlaufend */}
+                                {/* Fliesenhoehe + Raumhoch + Umlaufend */}
                                 <div className="masse-hoehe-row">
                                     <div className="masse-field" style={{flex:1}}>
                                         <span className="masse-label">Fliesenhöhe</span>
@@ -9655,7 +9661,7 @@
                                 {hatWandabdichtung && !abdichtungUmlaufend && (
                                     <div className="umlaufend-hint">⚠ Nicht umlaufend → manuellen Rechenweg verwenden</div>
                                 )}
-                                {/* Sockelhöhe (Multi-Wand) */}
+                                {/* Sockelhoehe (Multi-Wand) */}
                                 {posCards.some(p => p.kategorie === 'sockel' || p.kategorie === 'silikon') && (
                                     <div className="masse-hoehe-row" style={{marginTop:'10px'}}>
                                         <div className="masse-field" style={{flex:1}}>
@@ -9671,7 +9677,7 @@
                                         </div>
                                     </div>
                                 )}
-                                {/* Bodenfläche manuell (Multi-Wand - PFLICHT!) */}
+                                {/* Bodenflaeche manuell (Multi-Wand - PFLICHT!) */}
                                 {posCards.some(p => ['boden','abdichtung','estrich','entkopplung','decke','verfugung'].includes(p.kategorie) || (p.tags || []).includes('boden')) && (
                                     <div className="masse-hoehe-row" style={{marginTop:'10px'}}>
                                         <div className="masse-field" style={{flex:1}}>
@@ -10896,7 +10902,7 @@
                                                     <span className="masse-unit">Stk</span>
                                                 </div>
                                             </div>
-                                            {/* DIN Tür-Größen Button */}
+                                            {/* DIN Tuer-Groessen Button */}
                                             <div style={{marginBottom:'10px'}}>
                                                 <button className="din-tuer-btn" onClick={() => setDinTuerOpen(dinTuerOpen === t.id ? null : t.id)}>
                                                     📐 DIN Tür-Größen
@@ -11124,7 +11130,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            {/* Brüstungshöhe + Bodengleich */}
+                                            {/* Bruestungshoehe + Bodengleich */}
                                             <div className="masse-grid" style={{marginTop:'8px'}}>
                                                 <div className="masse-field">
                                                     <span className="masse-label">Brüstungshöhe (m)</span>
@@ -11279,7 +11285,7 @@
                         )}
                     </div>
 
-                    {/* ═══ SONSTIGE ABZÜGE/ZURECHNUNGEN ═══ */}
+                    {/* ═══ SONSTIGE ABZUeGE/ZURECHNUNGEN ═══ */}
                     <div className="masse-section">
                         <div className="masse-section-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                             <span>➖➕ Sonstige Bauteile ({abzuege.length})</span>
@@ -11486,7 +11492,7 @@
                                                                             newSteps[idx] = {...step, label: e.target.value};
                                                                             setPosRechenwegEdits(p => ({...p, [pos.pos]: newSteps}));
                                                                         }} />
-                                                                    {/* Löschen */}
+                                                                    {/* Loeschen */}
                                                                     <button style={{width:'26px', height:'26px', borderRadius:'4px', border:'1px solid var(--border-color)',
                                                                         background:'rgba(231,76,60,0.08)', color:'var(--accent-red)', cursor:'pointer', fontSize:'14px',
                                                                         display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}
@@ -11515,7 +11521,7 @@
                                                             </div>
                                                             );
                                                         })}
-                                                        {/* Zeile hinzufügen */}
+                                                        {/* Zeile hinzufuegen */}
                                                         <button style={{
                                                             width:'100%', padding:'8px', marginTop:'6px', border:'1px dashed var(--accent-orange)',
                                                             borderRadius:'6px', background:'rgba(230,126,34,0.05)', color:'var(--accent-orange)',
@@ -11651,7 +11657,7 @@
                         })}
                     </div>
 
-                    {/* Gesamtübersicht */}
+                    {/* Gesamtuebersicht */}
                     {posCards.length > 0 && (
                         <div className="berechnung-card">
                             <div className="masse-section-title">🧮 Raum-Zusammenfassung</div>
@@ -12054,7 +12060,7 @@
                                             value={abzugForm.name} onChange={e => setAbzugForm(p => ({...p, name: e.target.value}))} autoFocus />
                                     </div>
 
-                                    {/* Globale Maße (Standard für alle Positionen) */}
+                                    {/* Globale Masse (Standard fuer alle Positionen) */}
                                     {!abzugForm.manualRW ? (
                                         <React.Fragment>
                                             <div className="abzug-modal-field" style={{marginTop:'4px'}}>
@@ -12187,8 +12193,8 @@
                         </div>
                     )}
 
-                    {/* ── Modal: Manueller Rechenweg für Sonstige ── */}
-                    {/* ═══ DIN TÜR-GRÖSSEN MODAL ═══ */}
+                    {/* ── Modal: Manueller Rechenweg fuer Sonstige ── */}
+                    {/* ═══ DIN TUeR-GROeSSEN MODAL ═══ */}
                     {dinTuerOpen && (() => {
                         const targetTuer = tueren.find(t => t.id === dinTuerOpen);
                         if (!targetTuer) return null;
@@ -12266,10 +12272,10 @@
            MAIN APP
            ═══════════════════════════════════════════ */
         /* ═══════════════════════════════════════════
-           GESAMTLISTE – Übersicht aller Räume
+           GESAMTLISTE – Uebersicht aller Raeume
            ═══════════════════════════════════════════ */
         function Gesamtliste({ gesamtliste, setGesamtliste, kunde, onClose, onOpenRaumblatt, onAufmassEndgueltig, aufmassGespeichert, isDriveMode }) {
-            const [expandedRooms, setExpandedRooms] = useState(() => gesamtliste.map((_, i) => i)); // Alle Räume offen
+            const [expandedRooms, setExpandedRooms] = useState(() => gesamtliste.map((_, i) => i)); // Alle Raeume offen
             const [expandedPos, setExpandedPos] = useState({}); // {roomIdx-posIdx: true}
             const [editingPos, setEditingPos] = useState(null); // 'ri-pi' string
             const [editValue, setEditValue] = useState('');
@@ -12358,7 +12364,7 @@
             };
             const cancelRWEdit = () => { setEditingRW(null); };
 
-            // ═══ GESAMTMASSEN pro Position über alle Räume ═══
+            // ═══ GESAMTMASSEN pro Position ueber alle Raeume ═══
             const positionsSummary = {};
             gesamtliste.forEach((room, ri) => {
                 (room.positionen || []).forEach(pos => {
@@ -12421,7 +12427,7 @@
                             XLSX.utils.book_append_sheet(wb, wsR, sn);
                         });
                         XLSX.writeFile(wb, 'Aufmass_' + datumFile + '_' + safeName + '.xlsx');
-                        // Excel-Blob für Drive-Upload erzeugen
+                        // Excel-Blob fuer Drive-Upload erzeugen
                         var xlsxData = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
                         var excelBlob = new Blob([xlsxData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
                     }
@@ -12637,7 +12643,7 @@
                                         pdf.setFont('courier','normal'); pdf.setFontSize(7); pdf.setTextColor(100,100,100);
                                         pdf.text(fitText(formel, 73), 92, ry);
                                     }
-                                    // Ergebnis: rechtsbündig x=194, max 28mm
+                                    // Ergebnis: rechtsbuendig x=194, max 28mm
                                     if (ergebnis) {
                                         pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5);
                                         pdf.setTextColor(isAbzug ? 180 : 50, isAbzug ? 40 : 50, isAbzug ? 40 : 50);
@@ -12779,7 +12785,7 @@
                     {gesamtliste.length === 0 ? (
                         <div className="gl-empty">Noch keine Räume fertiggestellt.</div>
                     ) : (<React.Fragment>
-                        {/* ═══ RÄUME MIT POSITIONEN UND RECHENWEGEN ═══ */}
+                        {/* ═══ RAeUME MIT POSITIONEN UND RECHENWEGEN ═══ */}
                         {gesamtliste.map((room, ri) => {
                             const isExpanded = expandedRooms.includes(ri);
                             const posWithErg = (room.positionen || []).filter(p => p.ergebnis > 0);
@@ -12981,7 +12987,7 @@
                             </div>
                         )}
 
-                        {/* Zurück zur Bearbeitung */}
+                        {/* Zurueck zur Bearbeitung */}
                         <button className="gl-back-btn" onClick={onClose}>
                             ◀ Zurück zur Bearbeitung
                             <div style={{fontSize:'11px', fontWeight:400, marginTop:'2px'}}>
@@ -12989,7 +12995,7 @@
                             </div>
                         </button>
 
-                        {/* Zurück zur Modulwahl (nach Fertigstellung) */}
+                        {/* Zurueck zur Modulwahl (nach Fertigstellung) */}
                         {aufmassGespeichert && (
                             <button className="gl-back-btn" onClick={function() { if (onClose) onClose(); setTimeout(function() { window._navigateToModulwahl && window._navigateToModulwahl(); }, 100); }}
                                 style={{background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'white', border:'none', marginTop:'8px'}}>
