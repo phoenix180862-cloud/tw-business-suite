@@ -32,6 +32,40 @@
     };
     window.DRIVE_ORDNER = DRIVE_ORDNER;
 
+    // ═══════════════════════════════════════════════════════
+    // BAUSTELLEN-APP STAGING-KONFIGURATION
+    // ═══════════════════════════════════════════════════════
+    // Das Staging-Prinzip (Ein-Tuer-Prinzip):
+    // Mitarbeiter-Handys kommen NIEMALS direkt an Original-Kundenordner.
+    // Stattdessen gibt es einen separaten Root-Ordner "Baustellen-App-Staging",
+    // in den Thomas manuell Dateien aus den Originalen hineinkopiert.
+    // Nur dieser Staging-Bereich ist fuer Mitarbeiter sichtbar.
+    //
+    // Pro Baustelle werden im Staging 4 Unterordner angelegt:
+    //  - Zeichnungen    (read-only fuer Mitarbeiter)
+    //  - Baustellen-App (read-only fuer Mitarbeiter)
+    //  - Bilder         (Mitarbeiter duerfen hochladen)
+    //  - Stunden        (Mitarbeiter duerfen hochladen)
+    //
+    // Der SERVICE_ACCOUNT_EMAIL wird von Thomas nach Einrichtung
+    // (siehe PDF-Anleitung "Service-Account-Einrichtung.pdf") eingetragen
+    // und sorgt dafuer, dass das Mitarbeiter-Geraet NUR den Staging-Ordner
+    // sehen kann — ohne Zugriff auf die Original-Kundenakten.
+    const STAGING_CONFIG = {
+        ROOT_FOLDER_NAME: 'Baustellen-App-Staging',
+        ROOT_FOLDER_ID: localStorage.getItem('staging_root_folder_id') || '',
+        SUBFOLDERS: ['Zeichnungen', 'Baustellen-App', 'Bilder', 'Stunden'],
+        SUBFOLDER_PERMISSIONS: {
+            'Zeichnungen':    'readonly',
+            'Baustellen-App': 'readonly',
+            'Bilder':         'upload',
+            'Stunden':        'upload'
+        },
+        SERVICE_ACCOUNT_EMAIL: localStorage.getItem('staging_service_account_email') || '',
+        WARN_COPY_SIZE_MB: 50
+    };
+    window.STAGING_CONFIG = STAGING_CONFIG;
+
     // ── Gmail-Konfiguration ──
     const GMAIL_CONFIG = {
         ABSENDER_EMAIL: localStorage.getItem('gmail_absender') || 'phoenix180862@gmail.com',
