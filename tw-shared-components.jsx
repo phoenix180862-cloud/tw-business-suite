@@ -292,186 +292,693 @@
         }
 
         /* ═══════════════════════════════════════════
-           BAUTEAM ANIMATION - IVAN & MICHAL
-           Wiederverwendbare animierte Figur fuer alle Startseiten
+           BAUTEAM ANIMATION — 3 GRUPPEN, 7 FIGUREN
+           Gruppe 1: Ivan, Michal, Iurii
+           Gruppe 2: Peter, Luca (AM s.r.o.)
+           Gruppe 3: Luca, Silke (BIG BOSS)
+           Zyklus 45s total, je 15s pro Gruppe
            ═══════════════════════════════════════════ */
-        function BauarbeiterFigur({ name, jacke, hose, helm, schuh, mirror }) {
-            // Realistischer Gehzyklus: 0.6s pro Schritt
-            // Beine pendeln gegenphasig (-22 / +22)
-            // Arme pendeln entgegengesetzt zum gleichseitigen Bein
-            // Koerper wippt leicht (Bounce alle 0.3s)
-            var dur = '0.6s';
-            var bounceDur = '0.3s';
-            var skin = '#fad7a0';
-            var skinShadow = '#e8c292';
-            var jackeDunkel = jacke === '#27ae60' ? '#1e8449' :
-                              jacke === '#d35400' ? '#a04000' : '#1a5276';
-            var sx = mirror ? -1 : 1;
+
+        /* ---- Figur 1: IVAN (blau) ---- */
+        function FigurIvan() {
             return (
-                <svg width="90" height="125" viewBox="0 0 90 125" xmlns="http://www.w3.org/2000/svg"
-                     style={{overflow:'visible', filter:'drop-shadow(2px 4px 6px rgba(0,0,0,0.45))', transform:'scaleX(' + sx + ')'}}>
-                    {/* === GANZER KOERPER WIPPT === */}
-                    <g>
-                        <animateTransform attributeName="transform" type="translate" values="0,0;0,-2.5;0,0" dur={bounceDur} repeatCount="indefinite" />
-
-                        {/* === HELM === */}
-                        <ellipse cx="45" cy="14" rx="16" ry="10" fill={helm} />
-                        <ellipse cx="45" cy="11" rx="13" ry="6" fill={helm} opacity="0.6" />
-                        <rect x="29" y="13" width="32" height="3.5" rx="1.75" fill={helm} opacity="0.4" />
-                        {/* Helm-Schild vorn */}
-                        <ellipse cx="45" cy="20" rx="13" ry="2.5" fill={helm} opacity="0.7" />
-                        {/* Helm-Glanz */}
-                        <ellipse cx="40" cy="9" rx="4" ry="2" fill="#ffffff" opacity="0.5" />
-
-                        {/* === KOPF === */}
-                        <ellipse cx="45" cy="28" rx="9" ry="10" fill={skin} />
-                        {/* Ohren */}
-                        <ellipse cx="36" cy="29" rx="1.5" ry="2.5" fill={skinShadow} />
-                        <ellipse cx="54" cy="29" rx="1.5" ry="2.5" fill={skinShadow} />
-                        {/* Augen */}
-                        <ellipse cx="41" cy="27" rx="1.4" ry="1.8" fill="#2c3e50" />
-                        <ellipse cx="49" cy="27" rx="1.4" ry="1.8" fill="#2c3e50" />
-                        <circle cx="41.4" cy="26.4" r="0.5" fill="#ffffff" />
-                        <circle cx="49.4" cy="26.4" r="0.5" fill="#ffffff" />
-                        {/* Augenbrauen */}
-                        <path d="M38 24 Q41 23 44 24" stroke="#5d4037" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-                        <path d="M46 24 Q49 23 52 24" stroke="#5d4037" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-                        {/* Nase */}
-                        <path d="M45 28 Q44 31 45.5 32 Q47 31 45 28" fill={skinShadow} opacity="0.7" />
-                        {/* Mund - freundliches Laecheln */}
-                        <path d="M41 34 Q45 37 49 34" stroke="#a93226" strokeWidth="1.3" fill="none" strokeLinecap="round" />
-                        {/* Wangen */}
-                        <ellipse cx="38" cy="32" rx="2" ry="1.2" fill="#f1948a" opacity="0.4" />
-                        <ellipse cx="52" cy="32" rx="2" ry="1.2" fill="#f1948a" opacity="0.4" />
-
-                        {/* === HALS === */}
-                        <rect x="42" y="36" width="6" height="4" fill={skinShadow} />
-
-                        {/* === KOERPER / WARNJACKE === */}
-                        {/* Hauptjacke */}
-                        <path d="M28 40 L62 40 L64 70 L26 70 Z" fill={jacke} />
-                        {/* Schulterhighlights */}
-                        <path d="M28 40 L34 40 L33 50 L27 50 Z" fill={jackeDunkel} opacity="0.3" />
-                        <path d="M56 40 L62 40 L63 50 L57 50 Z" fill={jackeDunkel} opacity="0.3" />
-                        {/* Warnstreifen oben */}
-                        <rect x="27" y="44" width="36" height="3.5" fill="#f39c12" opacity="0.85" />
-                        {/* Warnstreifen unten */}
-                        <rect x="26" y="61" width="38" height="3.5" fill="#f39c12" opacity="0.85" />
-                        {/* Reissverschluss */}
-                        <line x1="45" y1="40" x2="45" y2="70" stroke={jackeDunkel} strokeWidth="0.7" />
-                        {/* Namensschild auf der Brust - weisses Feld */}
-                        <rect x="33" y="50" width="24" height="9" rx="1.5" fill="#ffffff" stroke={jackeDunkel} strokeWidth="0.5" />
-                        <text x="45" y="56.5" textAnchor="middle" fill="#1a2332" fontSize="6.2"
-                              fontWeight="700" fontFamily="Oswald, Arial, sans-serif"
-                              transform={mirror ? 'scale(-1,1) translate(-90,0)' : ''}
-                              style={{letterSpacing:'0.5px'}}>
-                            {name}
-                        </text>
-
-                        {/* === LINKER ARM (mit Pendel) === */}
-                        <g>
-                            <animateTransform attributeName="transform" type="rotate"
-                                values="22,32,42;-22,32,42;22,32,42" dur={dur} repeatCount="indefinite" />
-                            {/* Oberarm in Jackenfarbe */}
-                            <rect x="22" y="40" width="11" height="18" rx="4" fill={jacke} />
-                            {/* Warnstreifen am Aermel */}
-                            <rect x="22" y="55" width="11" height="2" fill="#f39c12" opacity="0.85" />
-                            {/* Unterarm - Hautfarbe */}
-                            <rect x="23" y="56" width="9" height="11" rx="3.5" fill={skin} />
-                            {/* Hand */}
-                            <circle cx="27.5" cy="68" r="3.2" fill={skinShadow} />
+                <div className="tw-figure" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeIvan" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#3498db"/>
+                                <stop offset="1" stopColor="#1a5276"/>
+                            </linearGradient>
+                            <linearGradient id="hoseIvan" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmIvan" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#f7dc6f"/>
+                                <stop offset="1" stopColor="#b7950b"/>
+                            </radialGradient>
+                            <radialGradient id="hautIvan" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#dc7633"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseIvan)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
                         </g>
-
-                        {/* === RECHTER ARM (mit Pendel, gegenphasig) === */}
-                        <g>
-                            <animateTransform attributeName="transform" type="rotate"
-                                values="-22,58,42;22,58,42;-22,58,42" dur={dur} repeatCount="indefinite" />
-                            {/* Oberarm */}
-                            <rect x="57" y="40" width="11" height="18" rx="4" fill={jacke} />
-                            {/* Warnstreifen */}
-                            <rect x="57" y="55" width="11" height="2" fill="#f39c12" opacity="0.85" />
-                            {/* Unterarm */}
-                            <rect x="58" y="56" width="9" height="11" rx="3.5" fill={skin} />
-                            {/* Hand */}
-                            <circle cx="62.5" cy="68" r="3.2" fill={skinShadow} />
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseIvan)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
                         </g>
-
-                        {/* === LINKES BEIN (gegenphasig zum linken Arm) === */}
                         <g>
-                            <animateTransform attributeName="transform" type="rotate"
-                                values="-22,40,70;22,40,70;-22,40,70" dur={dur} repeatCount="indefinite" />
-                            {/* Hose Oberschenkel */}
-                            <rect x="34" y="69" width="10" height="20" rx="3" fill={hose} />
-                            {/* Hose Unterschenkel */}
-                            <rect x="34" y="87" width="10" height="20" rx="3" fill={hose} />
-                            {/* Knie-Highlight */}
-                            <ellipse cx="39" cy="89" rx="4" ry="2" fill="#000000" opacity="0.15" />
-                            {/* Schuh */}
-                            <ellipse cx="39" cy="111" rx="8" ry="4" fill={schuh} />
-                            <ellipse cx="39" cy="113" rx="8.5" ry="2" fill="#1a1a1a" />
-                            {/* Schuh-Highlight */}
-                            <ellipse cx="37" cy="109" rx="3" ry="1.5" fill="#ffffff" opacity="0.2" />
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeIvan)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#1a5276" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#1a5276" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">IVAN</text>
                         </g>
-
-                        {/* === RECHTES BEIN === */}
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeIvan)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautIvan)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeIvan)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautIvan)"/>
+                            <g transform="translate(71,100)">
+                                <path d="M -8,0 L -6,14 L 6,14 L 8,0 Z" fill="#e67e22" stroke="#a04000" strokeWidth="0.8"/>
+                                <ellipse cx="0" cy="0" rx="8" ry="2" fill="#d35400" stroke="#a04000" strokeWidth="0.5"/>
+                                <path d="M -8,0 Q 0,-10 8,0" fill="none" stroke="#2c3e50" strokeWidth="1"/>
+                            </g>
+                        </g>
                         <g>
-                            <animateTransform attributeName="transform" type="rotate"
-                                values="22,50,70;-22,50,70;22,50,70" dur={dur} repeatCount="indefinite" />
-                            <rect x="46" y="69" width="10" height="20" rx="3" fill={hose} />
-                            <rect x="46" y="87" width="10" height="20" rx="3" fill={hose} />
-                            <ellipse cx="51" cy="89" rx="4" ry="2" fill="#000000" opacity="0.15" />
-                            <ellipse cx="51" cy="111" rx="8" ry="4" fill={schuh} />
-                            <ellipse cx="51" cy="113" rx="8.5" ry="2" fill="#1a1a1a" />
-                            <ellipse cx="49" cy="109" rx="3" ry="1.5" fill="#ffffff" opacity="0.2" />
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautIvan)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautIvan)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#8b4513" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmIvan)" stroke="#8b6914" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#f4d03f"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#fef9e7" strokeWidth="1.5" fill="none" opacity="0.7"/>
                         </g>
-                    </g>
-                </svg>
+                    </svg>
+                </div>
             );
         }
 
+        /* ---- Figur 2: MICHAL (gruen) ---- */
+        function FigurMichal() {
+            return (
+                <div className="tw-figure tw-phase-2" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeMichal" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#27ae60"/>
+                                <stop offset="1" stopColor="#145a32"/>
+                            </linearGradient>
+                            <linearGradient id="hoseMichal" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmMichal" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#ff7675"/>
+                                <stop offset="1" stopColor="#a93226"/>
+                            </radialGradient>
+                            <radialGradient id="hautMichal" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#cd853f"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseMichal)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseMichal)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeMichal)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#145a32" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#145a32" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="32" y="61" width="36" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">MICHAL</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeMichal)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautMichal)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeMichal)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautMichal)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-3" y="-1" width="20" height="4" fill="#f1c40f" stroke="#b7950b" strokeWidth="0.5"/>
+                                <rect x="4" y="0" width="6" height="2.5" fill="#2c3e50"/>
+                                <circle cx="7" cy="1.2" r="0.8" fill="#27ae60"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautMichal)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautMichal)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmMichal)" stroke="#7b241c" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#ec7063"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#fadbd8" strokeWidth="1.5" fill="none" opacity="0.7"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 3: IURII (signalrot) ---- */
+        function FigurIurii() {
+            return (
+                <div className="tw-figure tw-phase-3" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeIurii" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#e74c3c"/>
+                                <stop offset="1" stopColor="#922b21"/>
+                            </linearGradient>
+                            <linearGradient id="hoseIurii" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmIurii" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#ffffff"/>
+                                <stop offset="1" stopColor="#bdc3c7"/>
+                            </radialGradient>
+                            <radialGradient id="hautIurii" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#b9770e"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseIurii)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseIurii)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeIurii)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#922b21" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#922b21" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="33" y="85" width="34" height="2" fill="#f1c40f" opacity="0.9"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">IURII</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeIurii)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautIurii)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeIurii)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautIurii)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-3" y="-2" width="16" height="8" fill="#2c3e50" stroke="#1a1a1a" strokeWidth="0.5" rx="1"/>
+                                <rect x="13" y="0" width="8" height="4" fill="#95a5a6"/>
+                                <rect x="21" y="1" width="3" height="2" fill="#7f8c8d"/>
+                                <rect x="-3" y="6" width="6" height="4" fill="#1a1a1a"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautIurii)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautIurii)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmIurii)" stroke="#7f8c8d" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#ecf0f1"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#ffffff" strokeWidth="1.5" fill="none" opacity="0.9"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 4: PETER (anthrazit/orange) ---- */
+        function FigurPeter() {
+            return (
+                <div className="tw-figure" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackePeter" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#566573"/>
+                                <stop offset="1" stopColor="#212f3c"/>
+                            </linearGradient>
+                            <linearGradient id="hosePeter" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmPeter" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#f5b041"/>
+                                <stop offset="1" stopColor="#ba4a00"/>
+                            </radialGradient>
+                            <radialGradient id="hautPeter" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#cd853f"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hosePeter)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hosePeter)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackePeter)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#212f3c" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#212f3c" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="33" y="75" width="34" height="2" fill="#e67e22" opacity="0.95"/>
+                            <rect x="33" y="88" width="34" height="2" fill="#e67e22" opacity="0.95"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">PETER</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackePeter)"/>
+                            <rect x="27" y="78" width="9" height="1.5" fill="#e67e22" transform="rotate(82 31 79)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautPeter)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackePeter)"/>
+                            <rect x="64" y="78" width="9" height="1.5" fill="#e67e22" transform="rotate(-82 69 79)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautPeter)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-5" y="-2" width="16" height="20" fill="#8b4513" stroke="#5d4037" strokeWidth="0.5"/>
+                                <rect x="-4" y="0" width="14" height="17" fill="#ffffff"/>
+                                <line x1="-2" y1="4" x2="8" y2="4" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-2" y1="8" x2="8" y2="8" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-2" y1="12" x2="8" y2="12" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <rect x="0" y="-3" width="6" height="2" fill="#c0c0c0"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautPeter)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautPeter)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmPeter)" stroke="#873600" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#eb984e"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#fef5e7" strokeWidth="1.5" fill="none" opacity="0.7"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 5: LUCA AM (bordeaux mit AM-Logo) ---- */
+        function FigurLucaAM() {
+            return (
+                <div className="tw-figure tw-phase-2" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeLucaAM" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#922b21"/>
+                                <stop offset="1" stopColor="#4a0e0a"/>
+                            </linearGradient>
+                            <linearGradient id="hoseLucaAM" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmLucaAM" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#5d6d7e"/>
+                                <stop offset="1" stopColor="#17202a"/>
+                            </radialGradient>
+                            <radialGradient id="hautLucaAM" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#b9770e"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseLucaAM)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseLucaAM)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeLucaAM)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="82" width="10" height="7" fill="#4a0e0a" opacity="0.6"/>
+                            <rect x="53" y="82" width="10" height="7" fill="#4a0e0a" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="32" y="58" width="36" height="13" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.5"/>
+                            <text x="50" y="66" textAnchor="middle" fill="#922b21" fontSize="8" fontWeight="900" fontFamily="Arial Black, sans-serif">AM</text>
+                            <text x="50" y="70.5" textAnchor="middle" fill="#1a1a1a" fontSize="4" fontWeight="bold" fontFamily="Arial, sans-serif">s.r.o.</text>
+                            <rect x="36" y="72" width="28" height="8" fill="#f1c40f" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="78.5" textAnchor="middle" fill="#1a1a1a" fontSize="6.5" fontWeight="900" fontFamily="Arial Black, sans-serif">LUCA</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeLucaAM)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautLucaAM)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeLucaAM)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautLucaAM)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-10" y="-2" width="20" height="14" fill="#bdc3c7" stroke="#7f8c8d" strokeWidth="0.5"/>
+                                <rect x="-10" y="-2" width="20" height="3" fill="#ecf0f1"/>
+                                <rect x="-9" y="2" width="18" height="1" fill="#85929e"/>
+                                <rect x="-9" y="6" width="18" height="1" fill="#85929e"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautLucaAM)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautLucaAM)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmLucaAM)" stroke="#0b0b0b" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#34495e"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#95a5a6" strokeWidth="1.5" fill="none" opacity="0.6"/>
+                            <text x="50" y="31" textAnchor="middle" fill="#f1c40f" fontSize="4" fontWeight="900" fontFamily="Arial Black, sans-serif">AM</text>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 6: LUCA (oliv-braun) ---- */
+        function FigurLuca2() {
+            return (
+                <div className="tw-figure" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeLuca2" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#7d6608"/>
+                                <stop offset="1" stopColor="#3d3004"/>
+                            </linearGradient>
+                            <linearGradient id="hoseLuca2" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmLuca2" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#5dade2"/>
+                                <stop offset="1" stopColor="#1b4f72"/>
+                            </radialGradient>
+                            <radialGradient id="hautLuca2" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#ca6f1e"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseLuca2)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseLuca2)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeLuca2)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#3d3004" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#3d3004" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">LUCA</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeLuca2)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautLuca2)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeLuca2)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautLuca2)"/>
+                            <g transform="translate(71,100)">
+                                <path d="M -8,0 L -6,14 L 6,14 L 8,0 Z" fill="#34495e" stroke="#1a1a1a" strokeWidth="0.8"/>
+                                <ellipse cx="0" cy="0" rx="8" ry="2" fill="#7f8c8d"/>
+                                <ellipse cx="0" cy="0" rx="6.5" ry="1.2" fill="#bdc3c7"/>
+                                <path d="M -8,0 Q 0,-10 8,0" fill="none" stroke="#1a1a1a" strokeWidth="1"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautLuca2)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautLuca2)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmLuca2)" stroke="#154360" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#2e86c1"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#d6eaf8" strokeWidth="1.5" fill="none" opacity="0.8"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 7: SILKE (BIG BOSS, Frau, pink) ---- */
+        function FigurSilke() {
+            return (
+                <div className="tw-figure tw-figure-silke tw-phase-2" style={{position:'relative', width:'90px', height:'170px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 90 170" width="90" height="170">
+                        <defs>
+                            <linearGradient id="jackeSilke" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#e91e63"/>
+                                <stop offset="1" stopColor="#880e4f"/>
+                            </linearGradient>
+                            <linearGradient id="hoseSilke" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmSilke" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#f8bbd0"/>
+                                <stop offset="1" stopColor="#c2185b"/>
+                            </radialGradient>
+                            <radialGradient id="hautSilke" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fff3e0"/>
+                                <stop offset="1" stopColor="#e0a971"/>
+                            </radialGradient>
+                            <linearGradient id="haareSilke" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#d4a017"/>
+                                <stop offset="0.5" stopColor="#b7950b"/>
+                                <stop offset="1" stopColor="#7d6608"/>
+                            </linearGradient>
+                            <linearGradient id="schaerpeSilke" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0" stopColor="#f1c40f"/>
+                                <stop offset="0.5" stopColor="#f39c12"/>
+                                <stop offset="1" stopColor="#b7950b"/>
+                            </linearGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 39,98 Q 38,130 37,155 L 43,155 Q 44,130 44,98 Z" fill="url(#hoseSilke)"/>
+                            <ellipse cx="40" cy="157" rx="6" ry="3.5" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 47,98 Q 48,130 49,155 L 55,155 Q 54,130 51,98 Z" fill="url(#hoseSilke)"/>
+                            <ellipse cx="51" cy="157" rx="6" ry="3.5" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 32,55 Q 30,65 31,78 Q 29,85 31,98 L 59,98 Q 61,85 59,78 Q 60,65 58,55 Z" fill="url(#jackeSilke)"/>
+                            <line x1="45" y1="58" x2="45" y2="95" stroke="#5d4037" strokeWidth="0.6"/>
+                            <rect x="31" y="92" width="28" height="4" fill="#5d4037"/>
+                            <rect x="43" y="91" width="4" height="6" fill="#f1c40f"/>
+                            <g>
+                                <path d="M 27,56 L 34,55 L 64,95 L 60,100 Z" fill="url(#schaerpeSilke)" stroke="#7d6608" strokeWidth="0.5"/>
+                                <path d="M 27,56 L 34,55" stroke="#ffd700" strokeWidth="1"/>
+                                <text x="45" y="74" textAnchor="middle" fill="#4a0e0a" fontSize="7" fontWeight="900" fontFamily="Arial Black, sans-serif" transform="rotate(52 45 74)">BIG BOSS</text>
+                                <circle cx="60" cy="100" r="2.5" fill="#f1c40f" stroke="#7d6608" strokeWidth="0.3"/>
+                                <line x1="60" y1="102" x2="59" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                                <line x1="61" y1="102" x2="61" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                                <line x1="62" y1="102" x2="63" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                            </g>
+                            <rect x="30" y="84" width="30" height="8" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="45" y="90.5" textAnchor="middle" fill="#1a1a1a" fontSize="6.5" fontWeight="900" fontFamily="Arial Black, sans-serif">SILKE</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 30,58 Q 26,73 24,92 L 29,93 Q 32,73 34,58 Z" fill="url(#jackeSilke)"/>
+                            <circle cx="27" cy="93" r="4.5" fill="url(#hautSilke)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 60,58 Q 64,73 66,92 L 61,93 Q 58,73 56,58 Z" fill="url(#jackeSilke)"/>
+                            <circle cx="63" cy="93" r="4.5" fill="url(#hautSilke)"/>
+                            <g transform="translate(63,97)">
+                                <rect x="-6" y="-3" width="16" height="20" fill="#8b4513" stroke="#5d4037" strokeWidth="0.5"/>
+                                <rect x="-5" y="-1" width="14" height="17" fill="#ffffff"/>
+                                <line x1="-3" y1="3" x2="7" y2="3" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-3" y1="7" x2="7" y2="7" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-3" y1="11" x2="7" y2="11" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <rect x="-1" y="-4" width="6" height="2" fill="#c0c0c0"/>
+                                <rect x="-3" y="12" width="12" height="4.5" fill="none" stroke="#c0392b" strokeWidth="0.7"/>
+                                <text x="3" y="15.5" textAnchor="middle" fill="#c0392b" fontSize="3.5" fontWeight="900" fontFamily="Arial Black, sans-serif">BOSS</text>
+                            </g>
+                        </g>
+                        <g>
+                            <path d="M 35,33 Q 22,45 20,62 Q 19,78 22,90 Q 24,95 27,92 Q 25,78 26,62 Q 28,48 38,38 Z" fill="url(#haareSilke)" stroke="#7d6608" strokeWidth="0.3"/>
+                            <path d="M 28,45 Q 26,60 27,75" stroke="#f4d03f" strokeWidth="0.8" fill="none" opacity="0.7"/>
+                            <path d="M 32,42 Q 30,55 31,70" stroke="#f4d03f" strokeWidth="0.6" fill="none" opacity="0.5"/>
+                            <ellipse cx="30" cy="35" rx="3" ry="2" fill="#c2185b"/>
+                        </g>
+                        <g>
+                            <rect x="41" y="48" width="8" height="7" fill="url(#hautSilke)"/>
+                            <ellipse cx="45" cy="40" rx="10" ry="12" fill="url(#hautSilke)"/>
+                            <path d="M 36,35 Q 34,42 36,50 L 38,50 Q 37,42 38,35 Z" fill="url(#haareSilke)"/>
+                            <path d="M 54,35 Q 56,42 54,50 L 52,50 Q 53,42 52,35 Z" fill="url(#haareSilke)"/>
+                            <path d="M 37,34 Q 45,30 53,34 L 53,37 L 37,37 Z" fill="url(#haareSilke)"/>
+                            <circle cx="38" cy="42" r="2.5" fill="#e91e63" opacity="0.25"/>
+                            <circle cx="52" cy="42" r="2.5" fill="#e91e63" opacity="0.25"/>
+                            <ellipse cx="41" cy="39" rx="1.2" ry="1.4" fill="#1a1a1a"/>
+                            <ellipse cx="49" cy="39" rx="1.2" ry="1.4" fill="#1a1a1a"/>
+                            <circle cx="41.3" cy="38.5" r="0.4" fill="#ffffff"/>
+                            <circle cx="49.3" cy="38.5" r="0.4" fill="#ffffff"/>
+                            <line x1="40" y1="37.8" x2="39" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="41" y1="37.5" x2="41" y2="36.2" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="42" y1="37.8" x2="43" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="48" y1="37.8" x2="47" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="49" y1="37.5" x2="49" y2="36.2" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="50" y1="37.8" x2="51" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <path d="M 39,36 Q 41,35.3 43,36" stroke="#7d6608" strokeWidth="0.8" fill="none"/>
+                            <path d="M 47,36 Q 49,35.3 51,36" stroke="#7d6608" strokeWidth="0.8" fill="none"/>
+                            <path d="M 45,40 L 44,44 L 46,44" fill="none" stroke="#d4a470" strokeWidth="0.5"/>
+                            <path d="M 42,48 Q 45,49.5 48,48 Q 45,50 42,48 Z" fill="#c0392b"/>
+                            <path d="M 42,48 Q 45,47 48,48" stroke="#922b21" strokeWidth="0.3" fill="none"/>
+                            <path d="M 34,32 Q 45,20 56,32 L 56,34 L 34,34 Z" fill="url(#helmSilke)" stroke="#880e4f" strokeWidth="0.5"/>
+                            <ellipse cx="45" cy="31" rx="11" ry="2.5" fill="#ec407a"/>
+                            <path d="M 37,28 Q 41,24 45,23" stroke="#fce4ec" strokeWidth="1.5" fill="none" opacity="0.8"/>
+                            <circle cx="35.5" cy="43" r="0.8" fill="#f1c40f"/>
+                            <circle cx="54.5" cy="43" r="0.8" fill="#f1c40f"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- HAUPT-KOMPONENTE: BauteamAnimation mit 3 Gruppen ---- */
         function BauteamAnimation() {
-            // Container fuer beide Figuren - laufen gemeinsam ueber den Bildschirm
-            // Container 200px hoch - genug Platz fuer Figur (125px) + 72px Abstand vom unteren Rand
-            // Figuren und Boden sitzen auf gleicher Basislinie
+            // Gesamtzyklus 45s, je 15s pro Gruppe
+            // Jede Gruppe laeuft von links (-400px) nach rechts (100%) in 15s,
+            // dann 30s unsichtbar (waehrend andere Gruppen laufen)
             return (
                 <div style={{position:'relative', height:'200px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
                     {/* Fliesenstreifen als Boden */}
                     <div style={{position:'absolute', bottom:'72px', left:0, right:0, height:'2px',
                                  background:'linear-gradient(90deg, transparent 3%, rgba(149,165,166,0.4) 15%, rgba(149,165,166,0.5) 50%, rgba(149,165,166,0.4) 85%, transparent 97%)'}} />
 
-                    {/* Bauteam laeuft */}
-                    <div className="tw-bauteam-walker" style={{position:'absolute', bottom:'72px', display:'flex', gap:'14px', alignItems:'flex-end'}}>
-                        {/* Ivan - blaue Jacke */}
-                        <BauarbeiterFigur
-                            name="IVAN"
-                            jacke="#2471a3"
-                            hose="#2c3e50"
-                            helm="#f1c40f"
-                            schuh="#5d4037"
-                            mirror={false}
-                        />
-                        {/* Michal - gruene Jacke */}
-                        <BauarbeiterFigur
-                            name="MICHAL"
-                            jacke="#27ae60"
-                            hose="#34495e"
-                            helm="#e67e22"
-                            schuh="#5d4037"
-                            mirror={false}
-                        />
+                    {/* Gruppe 1: Ivan, Michal, Iurii */}
+                    <div className="tw-group tw-group-1" style={{position:'absolute', bottom:'72px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <FigurIvan />
+                        <FigurMichal />
+                        <FigurIurii />
                     </div>
 
-                    {/* Frisch verlegte Fliesen hinter dem Team */}
-                    <div className="tw-bauteam-tiles" style={{position:'absolute', bottom:'72px', display:'flex', gap:'2px', alignItems:'flex-end'}}>
-                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.45)', border:'1px solid rgba(77,166,255,0.3)', borderRadius:'2px'}} />
-                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.38)', border:'1px solid rgba(77,166,255,0.25)', borderRadius:'2px'}} />
-                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.30)', border:'1px solid rgba(77,166,255,0.20)', borderRadius:'2px'}} />
-                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.22)', border:'1px solid rgba(77,166,255,0.15)', borderRadius:'2px'}} />
-                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.15)', border:'1px solid rgba(77,166,255,0.10)', borderRadius:'2px'}} />
-                        <span style={{display:'inline-block', width:'14px', height:'14px', background:'rgba(77,166,255,0.08)', border:'1px solid rgba(77,166,255,0.05)', borderRadius:'2px'}} />
+                    {/* Gruppe 2: Peter, Luca (AM s.r.o.) */}
+                    <div className="tw-group tw-group-2" style={{position:'absolute', bottom:'72px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <FigurPeter />
+                        <FigurLucaAM />
                     </div>
 
-                    <style dangerouslySetInnerHTML={{__html: '\n.tw-bauteam-walker { animation: twTeamWalk 18s linear infinite; }\n@keyframes twTeamWalk { 0% { left: -220px; } 100% { left: calc(100% + 30px); } }\n.tw-bauteam-tiles { animation: twTeamTiles 18s linear infinite; }\n@keyframes twTeamTiles { 0% { left: -310px; } 100% { left: calc(100% - 60px); } }\n'}} />
+                    {/* Gruppe 3: Luca, Silke (BIG BOSS) */}
+                    <div className="tw-group tw-group-3" style={{position:'absolute', bottom:'72px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <FigurLuca2 />
+                        <FigurSilke />
+                    </div>
+
+                    {/* CSS-Animationen fuer Gruppenwechsel und Gehzyklus */}
+                    <style dangerouslySetInnerHTML={{__html: `
+.tw-figure { animation: twBodyBob 0.5s ease-in-out infinite; }
+@keyframes twBodyBob {
+    0%, 100% { transform: translateY(0); }
+    25% { transform: translateY(-3px); }
+    50% { transform: translateY(-1px); }
+    75% { transform: translateY(-3px); }
+}
+.tw-leg-l { animation: twLegLeft 1s ease-in-out infinite; transform-origin: top center; }
+.tw-leg-r { animation: twLegRight 1s ease-in-out infinite; transform-origin: top center; }
+.tw-arm-l { animation: twArmLeft 1s ease-in-out infinite; transform-origin: top center; }
+.tw-arm-r { animation: twArmRight 1s ease-in-out infinite; transform-origin: top center; }
+@keyframes twLegLeft {
+    0%,100% { transform: rotate(25deg); }
+    25%     { transform: rotate(0deg); }
+    50%     { transform: rotate(-25deg); }
+    75%     { transform: rotate(0deg); }
+}
+@keyframes twLegRight {
+    0%,100% { transform: rotate(-25deg); }
+    25%     { transform: rotate(0deg); }
+    50%     { transform: rotate(25deg); }
+    75%     { transform: rotate(0deg); }
+}
+@keyframes twArmLeft {
+    0%,100% { transform: rotate(-20deg); }
+    50%     { transform: rotate(20deg); }
+}
+@keyframes twArmRight {
+    0%,100% { transform: rotate(20deg); }
+    50%     { transform: rotate(-20deg); }
+}
+.tw-phase-2 { animation-delay: -0.25s; }
+.tw-phase-3 { animation-delay: -0.5s; }
+.tw-phase-2.tw-leg-l, .tw-phase-2 .tw-leg-l, .tw-phase-2 .tw-leg-r, .tw-phase-2 .tw-arm-l, .tw-phase-2 .tw-arm-r { animation-delay: -0.25s; }
+.tw-phase-3 .tw-leg-l, .tw-phase-3 .tw-leg-r, .tw-phase-3 .tw-arm-l, .tw-phase-3 .tw-arm-r { animation-delay: -0.5s; }
+.tw-shadow {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 14px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 70%);
+    filter: blur(3px);
+}
+.tw-group {
+    left: -400px;
+    opacity: 0;
+    animation: twGroupWalk 45s linear infinite;
+}
+.tw-group-1 { animation-delay: 0s; }
+.tw-group-2 { animation-delay: 15s; }
+.tw-group-3 { animation-delay: 30s; }
+@keyframes twGroupWalk {
+    0%    { left: -400px; opacity: 1; }
+    33.3% { left: 100%; opacity: 1; }
+    33.4% { left: 100%; opacity: 0; }
+    100%  { left: 100%; opacity: 0; }
+}
+`}} />
                 </div>
             );
         }
