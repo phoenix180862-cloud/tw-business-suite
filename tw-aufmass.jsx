@@ -8515,14 +8515,191 @@
                 });
             };
 
-            const generateSvgFromKiResult = (result) => {
+            // ═══════════════════════════════════════════════════════════════
+            // KI-HANDSKIZZE: BEGRADIGEN UND ERKENNEN (Skill: ki-handskizze-begradigen)
+            // Implementierung 18.04.2026 gemaesz SKILL-ki-handskizze-begradigen.md
+            // ═══════════════════════════════════════════════════════════════
+            // 3 Datenquellen verschmelzen:
+            //   1. Canvas-Bild (Handskizze)
+            //   2. wandMasse-State (exakte Laengen)
+            //   3. tueren + fenster State von Seite 3 (exakte Oeffnungsmasze)
+            // Ausschlieszlich Gemini Pro (gemini-2.5-pro), kein Flash-Fallback
+            // Ausgabe: maszstabsgetreuer SVG-Grundriss mit Bemassung, Tuerboegen und Fenstersymbolen
+            // ═══════════════════════════════════════════════════════════════
+
+            // ── Maszstabsgetreuer SVG-Grundriss (aus grundrissPolygon_mm) ──
+            const generateMaszstabsgetreuenSvg = (result, hatMasze) => {
+                const polygon = result.grundrissPolygon_mm || [];
+                if (polygon.length < 3) return generateFallbackSvg(result);
+
+                // Bounding Box in mm
+                const xs = polygon.map(p => p.x);
+                const ys = polygon.map(p => p.y);
+                const minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+                const minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+                const raumW = maxX - minX;
+                const raumH = maxY - minY;
+                if (raumW <= 0 || raumH <= 0) return generateFallbackSvg(result);
+
+                // SVG-Dimensionen
+                const sW = 500, sH = 400;
+                const pad = 55;
+                const drawW = sW - 2 * pad;
+                const drawH = sH - 2 * pad;
+                const scaleX = drawW / raumW;
+                const scaleY = drawH / raumH;
+                const scale = Math.min(scaleX, scaleY);
+                const offX = pad + (drawW - raumW * scale) / 2;
+                const offY = pad + (drawH - raumH * scale) / 2;
+
+                // mm -> SVG (Y-Achse spiegeln fuer Bildschirm)
+                const toSvg = (xMm, yMm) => ({
+                    x: Math.round((offX + (xMm - minX) * scale) * 10) / 10,
+                    y: Math.round((offY + (raumH - (yMm - minY)) * scale) * 10) / 10
+                });
+
+                let svg = '<svg viewBox="0 0 ' + sW + ' ' + sH + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">';
+                svg += '<rect width="' + sW + '" height="' + sH + '" fill="#1a2332" rx="12"/>';
+
+                // Bodenflaeche (leicht gefuellt)
+                const polyPts = polygon.map(p => { const s = toSvg(p.x, p.y); return s.x + ',' + s.y; }).join(' ');
+                svg += '<polygon points="' + polyPts + '" fill="rgba(230,126,34,0.06)" stroke="none"/>';
+
+                // Waende zeichnen
+                for (let i = 0; i < polygon.length; i++) {
+                    const p1 = toSvg(polygon[i].x, polygon[i].y);
+                    const p2 = toSvg(polygon[(i + 1) % polygon.length].x, polygon[(i + 1) % polygon.length].y);
+                    svg += '<line x1="' + p1.x + '" y1="' + p1.y + '" x2="' + p2.x + '" y2="' + p2.y + '" stroke="#b8c4d4" stroke-width="4" stroke-linecap="round"/>';
+                }
+
+                // Wand-Labels (Buchstaben in orangem Kreis)
+                if (result.waende) {
+                    result.waende.forEach((wand, i) => {
+                        if (i >= polygon.length) return;
+                        const p1 = toSvg(polygon[i].x, polygon[i].y);
+                        const p2 = toSvg(polygon[(i + 1) % polygon.length].x, polygon[(i + 1) % polygon.length].y);
+                        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+                        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const nx = -dy / len * 22, ny = dx / len * 22;
+                        svg += '<circle cx="' + (mx + nx) + '" cy="' + (my + ny) + '" r="11" fill="#e67e22"/>';
+                        svg += '<text x="' + (mx + nx) + '" y="' + (my + ny + 4) + '" text-anchor="middle" fill="#fff" font-size="12" font-weight="700" font-family="Oswald">' + wand.id + '</text>';
+                    });
+                }
+
+                // Bemassung (nur wenn Masze vorhanden)
+                if (hatMasze && result.waende) {
+                    result.waende.forEach((wand, i) => {
+                        if (i >= polygon.length || !wand.laenge_m) return;
+                        const p1 = toSvg(polygon[i].x, polygon[i].y);
+                        const p2 = toSvg(polygon[(i + 1) % polygon.length].x, polygon[(i + 1) % polygon.length].y);
+                        const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+                        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+                        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const nx = dy / len * 16, ny = -dx / len * 16;
+                        const maszText = Number(wand.laenge_m).toFixed(3).replace('.', ',') + ' m';
+                        svg += '<text x="' + (mx + nx) + '" y="' + (my + ny + 3) + '" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="10" font-family="Inter" font-weight="500">' + maszText + '</text>';
+                        svg += '<line x1="' + (p1.x + nx) + '" y1="' + (p1.y + ny) + '" x2="' + (p2.x + nx) + '" y2="' + (p2.y + ny) + '" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="3,3"/>';
+                    });
+                }
+
+                // Tueren: Luecke + Oeffnungsbogen + DIN-Richtung
+                if (result.tueren) {
+                    result.tueren.forEach(tuer => {
+                        const wandIdx = result.waende ? result.waende.findIndex(w => w.id === tuer.wandId) : -1;
+                        if (wandIdx < 0 || wandIdx >= polygon.length) return;
+                        const p1 = polygon[wandIdx];
+                        const p2 = polygon[(wandIdx + 1) % polygon.length];
+                        const posRatio = (tuer.position_prozent != null ? tuer.position_prozent : 50) / 100;
+                        const tuerMitteX = p1.x + (p2.x - p1.x) * posRatio;
+                        const tuerMitteY = p1.y + (p2.y - p1.y) * posRatio;
+                        const tuerBreite_mm = (tuer.breite_m || 0.885) * 1000;
+                        const wandDx = p2.x - p1.x, wandDy = p2.y - p1.y;
+                        const wandLen = Math.sqrt(wandDx * wandDx + wandDy * wandDy) || 1;
+                        const wandNx = wandDx / wandLen, wandNy = wandDy / wandLen;
+                        const tuerStart = toSvg(tuerMitteX - wandNx * tuerBreite_mm / 2, tuerMitteY - wandNy * tuerBreite_mm / 2);
+                        const tuerEnd = toSvg(tuerMitteX + wandNx * tuerBreite_mm / 2, tuerMitteY + wandNy * tuerBreite_mm / 2);
+                        // Luecke (Wand ausmaskieren)
+                        svg += '<line x1="' + tuerStart.x + '" y1="' + tuerStart.y + '" x2="' + tuerEnd.x + '" y2="' + tuerEnd.y + '" stroke="#1a2332" stroke-width="6"/>';
+                        // Oeffnungsbogen
+                        const radius = (tuerBreite_mm * scale);
+                        const isLinks = ((tuer.din || '') + '').toLowerCase().indexOf('links') >= 0 || ((tuer.oeffnungsrichtung || '') + '').toLowerCase().indexOf('links') >= 0;
+                        const scharnier = isLinks ? tuerStart : tuerEnd;
+                        // Bogenende: rechter Winkel zur Wand, nach innen (positive Normale)
+                        const normX = -wandNy, normY = wandNx;
+                        const bogenMitteMm = {
+                            x: (isLinks ? (tuerMitteX - wandNx * tuerBreite_mm / 2) : (tuerMitteX + wandNx * tuerBreite_mm / 2)) + normX * tuerBreite_mm,
+                            y: (isLinks ? (tuerMitteY - wandNy * tuerBreite_mm / 2) : (tuerMitteY + wandNy * tuerBreite_mm / 2)) + normY * tuerBreite_mm
+                        };
+                        const bogenEnd = toSvg(bogenMitteMm.x, bogenMitteMm.y);
+                        svg += '<path d="M ' + scharnier.x + ' ' + scharnier.y + ' A ' + radius + ' ' + radius + ' 0 0 1 ' + bogenEnd.x + ' ' + bogenEnd.y + '" fill="none" stroke="#e63535" stroke-width="1.5" stroke-dasharray="4,3"/>';
+                        // Tuerblatt
+                        svg += '<line x1="' + scharnier.x + '" y1="' + scharnier.y + '" x2="' + bogenEnd.x + '" y2="' + bogenEnd.y + '" stroke="#e63535" stroke-width="1.5"/>';
+                    });
+                }
+
+                // Fenster: Doppellinie mit Rahmen
+                if (result.fenster) {
+                    result.fenster.forEach(fen => {
+                        const wandIdx = result.waende ? result.waende.findIndex(w => w.id === fen.wandId) : -1;
+                        if (wandIdx < 0 || wandIdx >= polygon.length) return;
+                        const p1 = polygon[wandIdx];
+                        const p2 = polygon[(wandIdx + 1) % polygon.length];
+                        const posRatio = (fen.position_prozent != null ? fen.position_prozent : 50) / 100;
+                        const fenMitteX = p1.x + (p2.x - p1.x) * posRatio;
+                        const fenMitteY = p1.y + (p2.y - p1.y) * posRatio;
+                        const fenBreite_mm = (fen.breite_m || 1.0) * 1000;
+                        const wandDx = p2.x - p1.x, wandDy = p2.y - p1.y;
+                        const wandLen = Math.sqrt(wandDx * wandDx + wandDy * wandDy) || 1;
+                        const wandNx = wandDx / wandLen, wandNy = wandDy / wandLen;
+                        const fenStart = toSvg(fenMitteX - wandNx * fenBreite_mm / 2, fenMitteY - wandNy * fenBreite_mm / 2);
+                        const fenEnd = toSvg(fenMitteX + wandNx * fenBreite_mm / 2, fenMitteY + wandNy * fenBreite_mm / 2);
+                        // Luecke
+                        svg += '<line x1="' + fenStart.x + '" y1="' + fenStart.y + '" x2="' + fenEnd.x + '" y2="' + fenEnd.y + '" stroke="#1a2332" stroke-width="6"/>';
+                        // Doppellinie (4px versetzt in beide Normalen-Richtungen)
+                        const nX = -wandNy * 4, nY = wandNx * 4;
+                        svg += '<line x1="' + (fenStart.x + nX) + '" y1="' + (fenStart.y + nY) + '" x2="' + (fenEnd.x + nX) + '" y2="' + (fenEnd.y + nY) + '" stroke="#3498db" stroke-width="2"/>';
+                        svg += '<line x1="' + (fenStart.x - nX) + '" y1="' + (fenStart.y - nY) + '" x2="' + (fenEnd.x - nX) + '" y2="' + (fenEnd.y - nY) + '" stroke="#3498db" stroke-width="2"/>';
+                        // Rahmen links/rechts
+                        svg += '<line x1="' + (fenStart.x + nX) + '" y1="' + (fenStart.y + nY) + '" x2="' + (fenStart.x - nX) + '" y2="' + (fenStart.y - nY) + '" stroke="#3498db" stroke-width="1.5"/>';
+                        svg += '<line x1="' + (fenEnd.x + nX) + '" y1="' + (fenEnd.y + nY) + '" x2="' + (fenEnd.x - nX) + '" y2="' + (fenEnd.y - nY) + '" stroke="#3498db" stroke-width="1.5"/>';
+                    });
+                }
+
+                // Maszstabsleiste unten rechts
+                if (hatMasze) {
+                    const barLen_mm = raumW > 5000 ? 2000 : (raumW > 2000 ? 1000 : 500);
+                    const barLen_svg = barLen_mm * scale;
+                    const barY = sH - 15;
+                    const barX = sW - pad - barLen_svg;
+                    svg += '<line x1="' + barX + '" y1="' + barY + '" x2="' + (barX + barLen_svg) + '" y2="' + barY + '" stroke="rgba(255,255,255,0.4)" stroke-width="2"/>';
+                    svg += '<line x1="' + barX + '" y1="' + (barY - 4) + '" x2="' + barX + '" y2="' + (barY + 4) + '" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>';
+                    svg += '<line x1="' + (barX + barLen_svg) + '" y1="' + (barY - 4) + '" x2="' + (barX + barLen_svg) + '" y2="' + (barY + 4) + '" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"/>';
+                    svg += '<text x="' + (barX + barLen_svg / 2) + '" y="' + (barY - 6) + '" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="9" font-family="Inter">' + (barLen_mm / 1000).toFixed(1).replace('.', ',') + ' m</text>';
+                }
+
+                // KI-Badge
+                svg += '<text x="' + (sW - 10) + '" y="15" text-anchor="end" fill="rgba(255,255,255,0.2)" font-size="8" font-family="Inter">KI-Grundriss (Gemini Pro)</text>';
+                svg += '</svg>';
+                return svg;
+            };
+
+            // ── Fallback: wenn Polygon_mm fehlt, alte Prozent-Darstellung ──
+            const generateFallbackSvg = (result) => {
                 const sW = 500, sH = 400, pad = 50;
                 const dW = sW - 2*pad, dH = sH - 2*pad;
-                const pts = result.waende.map(w => ({
-                    x1: pad + (w.startPunkt.x_prozent/100)*dW, y1: pad + (w.startPunkt.y_prozent/100)*dH,
-                    x2: pad + (w.endPunkt.x_prozent/100)*dW, y2: pad + (w.endPunkt.y_prozent/100)*dH, id: w.id
-                }));
+                const waende = result.waende || [];
+                // Unterstuetze sowohl alte (Prozent) als auch neue (mm) Struktur
+                const pts = waende.map(w => {
+                    if (w.startPunkt && w.startPunkt.x_prozent != null) {
+                        return { x1: pad + (w.startPunkt.x_prozent/100)*dW, y1: pad + (w.startPunkt.y_prozent/100)*dH,
+                                 x2: pad + (w.endPunkt.x_prozent/100)*dW,   y2: pad + (w.endPunkt.y_prozent/100)*dH, id: w.id };
+                    }
+                    // Gleichmaessig verteilt wenn keine Positionsangaben da sind
+                    return { x1: 0, y1: 0, x2: 0, y2: 0, id: w.id };
+                });
                 let svg = '<svg viewBox="0 0 '+sW+' '+sH+'" xmlns="http://www.w3.org/2000/svg">';
+                svg += '<rect width="' + sW + '" height="' + sH + '" fill="#1a2332" rx="12"/>';
                 pts.forEach(p => {
                     svg += '<line x1="'+p.x1+'" y1="'+p.y1+'" x2="'+p.x2+'" y2="'+p.y2+'" stroke="#b8c4d4" stroke-width="3" stroke-linecap="round"/>';
                     const mx = (p.x1+p.x2)/2, my = (p.y1+p.y2)/2;
@@ -8530,119 +8707,317 @@
                     const nx = -dy/len*15, ny = dx/len*15;
                     svg += '<text x="'+(mx+nx)+'" y="'+(my+ny)+'" text-anchor="middle" fill="#e67e22" font-size="14" font-weight="700" font-family="Oswald">'+p.id+'</text>';
                 });
-                if (result.tueren) result.tueren.forEach(t => {
-                    const w = pts.find(p => p.id === t.wandId); if(!w) return;
-                    const pos = t.position_prozent/100;
-                    const tx = w.x1+(w.x2-w.x1)*pos, ty = w.y1+(w.y2-w.y1)*pos;
-                    svg += '<circle cx="'+tx+'" cy="'+ty+'" r="6" fill="none" stroke="#e63535" stroke-width="2"/>';
-                });
-                if (result.fenster) result.fenster.forEach(f => {
-                    const w = pts.find(p => p.id === f.wandId); if(!w) return;
-                    const pos = f.position_prozent/100;
-                    const fx = w.x1+(w.x2-w.x1)*pos, fy = w.y1+(w.y2-w.y1)*pos;
-                    svg += '<line x1="'+(fx-8)+'" y1="'+fy+'" x2="'+(fx+8)+'" y2="'+fy+'" stroke="#3498db" stroke-width="3"/>';
-                });
+                svg += '<text x="' + (sW - 10) + '" y="15" text-anchor="end" fill="rgba(255,255,255,0.2)" font-size="8" font-family="Inter">KI-Grundriss (Fallback)</text>';
                 svg += '</svg>';
                 return svg;
             };
 
-            const applySkizzeToState = (result) => {
-                const isRect = result.raumForm === 'rechteck' && result.waende.length <= 4;
-                if (!isRect) {
-                    setWandMasse(result.waende.map(w => ({ id: w.id, l: '' })));
-                }
-                if (result.tueren && result.tueren.length > 0) {
-                    setTueren(prev => [...prev, ...result.tueren.map((t,i) => ({
-                        id: Date.now()+100+i, name: 'Tuer '+(i+1)+' (Wand '+t.wandId+')',
-                        breite:'', hoehe:'', tiefe:'', expanded:false, hatLaibung:true,
-                        sturzGefliest:false, sturzAbgedichtet:false, quelle:'skizze'
-                    }))]);
-                }
-                if (result.fenster && result.fenster.length > 0) {
-                    setFenster(prev => [...prev, ...result.fenster.map((f,i) => ({
-                        id: Date.now()+200+i, name: 'Fenster '+(i+1)+' (Wand '+f.wandId+')',
-                        breite:'', hoehe:'', tiefe:'', leibungWandGefliest:true, fensterbankGefliest:true,
-                        sturzGefliest:false, expanded:false, quelle:'skizze'
-                    }))]);
-                }
-            };
+            // ── Ergebnis ins Raumblatt-State uebernehmen ──
+            const applyBegradigenToState = (result) => {
+                const isPolygon = result.raumForm !== 'rechteck' || (result.anzahl_waende && result.anzahl_waende > 4);
 
-            const handleSkizzeVerarbeiten = async () => {
-                setSkizze(p => ({...p, mode:'processing'}));
-                const canvas = skizzeCanvasRef.current;
-                if (!canvas) { setSkizze(p => ({...p, mode:'draw'})); return; }
-                const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
-                var skizzeApiKey = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.API_KEY) || localStorage.getItem('gemini_api_key') || '';
-                if (!skizzeApiKey) {
-                    alert('Gemini API-Key nicht konfiguriert.'); setSkizze(p => ({...p, mode:'draw'})); return;
-                }
-                const prompt = 'Du bist ein Experte fuer Grundriss-Erkennung aus Handskizzen. AUFGABE: Analysiere diese handgezeichnete Raumskizze auf Millimeterpapier. 1. BEGRADIGE die Linien: Erkenne die gezeichneten Waende als gerade Linien. 2. ERKENNE DIE BESCHRIFTUNG: Waende sind handschriftlich beschriftet in ROT (A,B,C,D bei 4 Waenden oder 1,2,3,4... bei mehr). Waende sind in GRAU gezeichnet. 3. ERKENNE DETAILS: Tueren, Fenster falls gezeichnet. ANTWORTE NUR als JSON: {"waende_erkannt":true,"anzahl_waende":4,"beschriftungstyp":"buchstaben","waende":[{"id":"A","startPunkt":{"x_prozent":0,"y_prozent":0},"endPunkt":{"x_prozent":100,"y_prozent":0},"laenge_relativ":1.0,"richtung":"horizontal"}],"tueren":[{"wandId":"A","position_prozent":50,"breite_relativ":0.3}],"fenster":[{"wandId":"B","position_prozent":40,"breite_relativ":0.4}],"raumForm":"rechteck","hinweise":[]}';
-                var skizzeBaseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
+                // 1. Wandmasze aktualisieren — NUR wenn noch leer oder KI bessere Daten hat
+                if (result.waende && result.waende.length > 0) {
+                    const neueWandMasse = result.waende.map(w => ({
+                        id: w.id,
+                        l: (w.laenge_m && w.laenge_m > 0) ? formatMass(String(w.laenge_m)) : ''
+                    }));
+                    const wandMasseLeer = wandMasse.length === 0 || wandMasse.every(w => !w.l || parseMass(w.l) === 0);
+                    if (wandMasseLeer) {
+                        setWandMasse(neueWandMasse);
+                    } else if (neueWandMasse.length > wandMasse.length) {
+                        // KI hat mehr Waende erkannt als bisher im State - Struktur erweitern
+                        const merged = neueWandMasse.map((nw, i) => wandMasse[i] ? { id: nw.id, l: wandMasse[i].l } : nw);
+                        setWandMasse(merged);
+                    }
 
-                // Modelle: Pro zuerst, dann Flash als Fallback bei 429
-                var modelsToTry = [
-                    (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro',
-                    (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['flash']) ? GEMINI_CONFIG.MODELS['flash'].id : 'gemini-2.5-flash'
-                ];
-
-                var lastError = null;
-                for (var mi = 0; mi < modelsToTry.length; mi++) {
-                    var currentModel = modelsToTry[mi];
-                    // Bis zu 2 Versuche pro Modell (mit Wartezeit bei 429)
-                    for (var attempt = 0; attempt < 2; attempt++) {
-                        try {
-                            console.log('[TW Skizze] Versuch ' + (attempt+1) + ' mit Modell: ' + currentModel);
-                            const res = await fetch(skizzeBaseUrl + '/models/' + currentModel + ':generateContent?key=' + skizzeApiKey, {
-                                method:'POST', headers:{'Content-Type':'application/json'},
-                                body: JSON.stringify({ contents: [{ parts: [
-                                    { inlineData: { mimeType:'image/png', data: imageBase64 } },
-                                    { text: prompt }
-                                ]}],
-                                generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
-                                })
-                            });
-
-                            if (res.status === 429) {
-                                console.warn('[TW Skizze] Rate-Limit (429) bei ' + currentModel);
-                                lastError = new Error('Rate-Limit bei ' + currentModel);
-                                if (attempt === 0) {
-                                    // Erster 429: 3 Sekunden warten und nochmal versuchen
-                                    await new Promise(function(r) { setTimeout(r, 3000); });
-                                    continue;
-                                }
-                                // Zweiter 429: zum naechsten Modell wechseln
-                                break;
-                            }
-
-                            if (!res.ok) throw new Error('API Fehler: ' + res.status);
-
-                            const data = await res.json();
-                            const text = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
-                            const result = JSON.parse(text.replace(/```json|```/g, '').trim());
-                            if (result.waende_erkannt && result.waende && result.waende.length > 0) {
-                                const svg = generateSvgFromKiResult(result);
-                                setSkizze(p => ({...p, mode:'done', processedSvg: svg,
-                                    erkannteWaende: result.waende,
-                                    erkannteLabels: result.waende.map(w => ({ text: w.id, zuordnung: 'wand_' + result.waende.indexOf(w) }))
-                                }));
-                                applySkizzeToState(result);
-                                console.log('[TW Skizze] Erfolg mit Modell: ' + currentModel);
-                                return; // Erfolg!
-                            } else {
-                                setSkizze(p => ({...p, mode:'draw'}));
-                                alert('Grundriss konnte nicht erkannt werden. Bitte deutlicher zeichnen und Waende beschriften.');
-                                return;
-                            }
-                        } catch(err) {
-                            lastError = err;
-                            console.warn('[TW Skizze] Fehler bei ' + currentModel + ' Versuch ' + (attempt+1) + ':', err.message);
+                    // Bei Rechteck: masse.laenge/breite ebenfalls setzen
+                    if (!isPolygon && result.waende.length >= 2) {
+                        const sortiert = result.waende.slice().sort((a, b) => (b.laenge_m || 0) - (a.laenge_m || 0));
+                        if (sortiert[0] && sortiert[0].laenge_m > 0 && sortiert[1] && sortiert[1].laenge_m > 0) {
+                            setMasse(prev => Object.assign({}, prev, {
+                                laenge: formatMass(String(sortiert[0].laenge_m)),
+                                breite: formatMass(String(sortiert[1].laenge_m))
+                            }));
                         }
                     }
                 }
-                // Alle Versuche fehlgeschlagen
-                console.error('Skizze KI Fehler (alle Modelle):', lastError);
-                setSkizze(p => ({...p, mode:'draw'}));
-                alert('KI-Verarbeitung fehlgeschlagen: ' + (lastError ? lastError.message : 'Unbekannter Fehler') + '\n\nTipp: Warte 30 Sekunden und versuche es erneut (Gemini Rate-Limit).');
+
+                // 2. Tueren: Wandzuordnung + Position aus KI ergaenzen (Masze bleiben)
+                if (result.tueren && result.tueren.length > 0 && tueren.length > 0) {
+                    setTueren(prev => prev.map((t, i) => {
+                        const kiT = result.tueren[i];
+                        if (!kiT) return t;
+                        return Object.assign({}, t, {
+                            wandId: kiT.wandId || t.wandId || '',
+                            positionProzent: kiT.position_prozent != null ? kiT.position_prozent : (t.positionProzent || 50),
+                            din: t.din || kiT.din || ''
+                        });
+                    }));
+                }
+
+                // 3. Neue Tueren aus KI (wenn Seite 3 noch leer)
+                if (result.tueren && result.tueren.length > 0 && tueren.length === 0) {
+                    setTueren(result.tueren.map((t, i) => ({
+                        id: Date.now() + 100 + i,
+                        name: t.name || 'Tuer ' + (i + 1) + ' (Wand ' + (t.wandId || '?') + ')',
+                        breite: (t.breite_m && t.breite_m > 0) ? formatMass(String(t.breite_m)) : '',
+                        hoehe: (t.hoehe_m && t.hoehe_m > 0) ? formatMass(String(t.hoehe_m)) : '',
+                        tiefe: '',
+                        hatLaibung: true,
+                        dauerelastisch: false,
+                        leibungWandGefliest: false,
+                        leibungBodenGefliest: false,
+                        sturzGefliest: false,
+                        leibungWandAbgedichtet: false,
+                        leibungBodenAbgedichtet: false,
+                        sturzAbgedichtet: false,
+                        din: t.din || '',
+                        wandId: t.wandId || '',
+                        positionProzent: t.position_prozent != null ? t.position_prozent : 50,
+                        expanded: false,
+                        quelle: 'skizze'
+                    })));
+                }
+
+                // 4. Fenster: Wandzuordnung + Position ergaenzen
+                if (result.fenster && result.fenster.length > 0 && fenster.length > 0) {
+                    setFenster(prev => prev.map((f, i) => {
+                        const kiF = result.fenster[i];
+                        if (!kiF) return f;
+                        return Object.assign({}, f, {
+                            wandId: kiF.wandId || f.wandId || '',
+                            positionProzent: kiF.position_prozent != null ? kiF.position_prozent : (f.positionProzent || 50)
+                        });
+                    }));
+                }
+
+                // 5. Neue Fenster aus KI (wenn Seite 3 noch leer)
+                if (result.fenster && result.fenster.length > 0 && fenster.length === 0) {
+                    setFenster(result.fenster.map((f, i) => ({
+                        id: Date.now() + 200 + i,
+                        name: f.name || 'Fenster ' + (i + 1) + ' (Wand ' + (f.wandId || '?') + ')',
+                        breite: (f.breite_m && f.breite_m > 0) ? formatMass(String(f.breite_m)) : '',
+                        hoehe: (f.hoehe_m && f.hoehe_m > 0) ? formatMass(String(f.hoehe_m)) : '',
+                        tiefe: '',
+                        bruestung: (f.bruestung_m && f.bruestung_m > 0) ? formatMass(String(f.bruestung_m)) : '',
+                        hatLaibung: false,
+                        bodengleich: false,
+                        leibungWandGefliest: true,
+                        fensterbankGefliest: true,
+                        sturzGefliest: false,
+                        leibungWandAbgedichtet: true,
+                        fensterbankAbgedichtet: true,
+                        sturzAbgedichtet: false,
+                        wandId: f.wandId || '',
+                        positionProzent: f.position_prozent != null ? f.position_prozent : 50,
+                        expanded: false,
+                        quelle: 'skizze'
+                    })));
+                }
+
+                if (result.zuordnungReport) {
+                    console.log('[TW Skizze] Zuordnungs-Report:', result.zuordnungReport);
+                }
+                if (result.hinweise) {
+                    console.log('[TW Skizze] Hinweise:', result.hinweise);
+                }
+            };
+
+            // ── HAUPTFUNKTION: Skizze verarbeiten (Gemini Pro + 3 Datenquellen) ──
+            const handleSkizzeVerarbeiten = async () => {
+                setSkizze(p => ({...p, mode: 'processing'}));
+
+                const canvas = skizzeCanvasRef.current;
+                if (!canvas) { setSkizze(p => ({...p, mode: 'draw'})); return; }
+
+                // QUELLE 1: Canvas-Bild
+                const imageBase64 = canvas.toDataURL('image/png').split(',')[1];
+
+                // QUELLE 2: Wandmasze
+                const wandDaten = wandMasse.map(w => ({
+                    id: w.id,
+                    laenge_m: parseMass(w.l)
+                })).filter(w => w.laenge_m > 0);
+                const hatMasze = wandDaten.length > 0;
+
+                // QUELLE 3: Oeffnungen von Seite 3
+                const tuerenDaten = tueren.map(t => {
+                    const nameMatch = (t.name || '').match(/Wand\s*(\w+)/i);
+                    return {
+                        name: t.name || 'Tuer',
+                        breite_m: parseMass(t.breite),
+                        hoehe_m: parseMass(t.hoehe),
+                        tiefe_m: parseMass(t.tiefe),
+                        din: t.din || '',
+                        wandHinweis: t.wandId || (nameMatch ? nameMatch[1] : '')
+                    };
+                }).filter(t => t.breite_m > 0 || t.hoehe_m > 0);
+
+                const fensterDaten = fenster.map(f => {
+                    const nameMatch = (f.name || '').match(/Wand\s*(\w+)/i);
+                    return {
+                        name: f.name || 'Fenster',
+                        breite_m: parseMass(f.breite),
+                        hoehe_m: parseMass(f.hoehe),
+                        bruestung_m: parseMass(f.bruestung),
+                        wandHinweis: f.wandId || (nameMatch ? nameMatch[1] : '')
+                    };
+                }).filter(f => f.breite_m > 0 || f.hoehe_m > 0);
+
+                // API-Key
+                const apiKey = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.API_KEY) || localStorage.getItem('gemini_api_key') || '';
+                if (!apiKey) {
+                    alert('Gemini API-Key nicht konfiguriert.');
+                    setSkizze(p => ({...p, mode: 'draw'}));
+                    return;
+                }
+
+                // Modell: IMMER Gemini Pro
+                const modelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
+                const baseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
+
+                // ── PROMPT mit allen 3 Datenquellen ──
+                const maszeBlock = hatMasze ? JSON.stringify(wandDaten, null, 2) : '   KEINE WANDMASZE EINGEGEBEN — nur begradigen, nicht bemaszen!';
+                const tuerenBlock = tuerenDaten.length > 0 ? JSON.stringify(tuerenDaten, null, 2) : 'Keine Tueren definiert';
+                const fensterBlock = fensterDaten.length > 0 ? JSON.stringify(fensterDaten, null, 2) : 'Keine Fenster definiert';
+
+                const prompt = 'Du bist ein Experte fuer Grundriss-Erkennung und Bauzeichnungen.\n\n' +
+                    '=== DEINE AUFGABE: HANDSKIZZE BEGRADIGEN UND ERKENNEN ===\n\n' +
+                    'Du erhaeltst DREI Informationsquellen die du ZUSAMMEN verarbeiten musst:\n\n' +
+                    '1. BILD: Eine Handskizze auf Millimeterpapier (dunkler Hintergrund, Raster)\n' +
+                    '   - GRAUE Linien = Waende des Raums\n' +
+                    '   - ROTE handschriftliche Buchstaben/Zahlen = Wand-Beschriftungen (A, B, C, ... oder 1, 2, 3, ...)\n' +
+                    '   - Luecken oder Symbole an Waenden = Tueren und Fenster\n\n' +
+                    '2. WANDMASZE (bereits gemessen, EXAKT):\n' + maszeBlock + '\n\n' +
+                    '3. OEFFNUNGEN (Tueren und Fenster mit exakten Maszen):\n' +
+                    '   Tueren: ' + tuerenBlock + '\n' +
+                    '   Fenster: ' + fensterBlock + '\n\n' +
+                    '=== SCHRITT-FUER-SCHRITT ANLEITUNG ===\n\n' +
+                    'SCHRITT 1 - SKIZZE ANALYSIEREN:\n' +
+                    '- Erkenne alle gezeichneten Waende (graue Linien)\n' +
+                    '- Erkenne die handschriftlichen Labels (rote Buchstaben/Zahlen)\n' +
+                    '- Erkenne angedeutete Tueren (Luecke + Oeffnungsbogen) und Fenster (Doppelstrich/Luecke)\n' +
+                    '- Bestimme die Raumform (Rechteck, L-Form, Polygon)\n\n' +
+                    'SCHRITT 2 - LABELS DEN WAENDEN ZUORDNEN:\n' +
+                    '- Ordne jeden handschriftlichen Buchstaben (A, B, C, ...) der naechstliegenden Wand zu\n' +
+                    '- Die Reihenfolge der Buchstaben entspricht normalerweise dem Uhrzeigersinn\n' +
+                    '- KRITISCH: Diese Zuordnung verbindet die Skizze mit den eingegebenen Maszen!\n\n' +
+                    'SCHRITT 3 - WANDMASZE ZUWEISEN:\n' +
+                    (hatMasze ? '- Jede Wand bekommt die exakte Laenge aus den Wandmaszen oben (per ID A, B, C, ...)\n- Die EXAKTEN Wandlaengen bestimmen die Proportionen des Grundrisses!' :
+                                '- KEINE Masze vorhanden — verwende die RELATIVEN Proportionen aus der Skizze') + '\n\n' +
+                    'SCHRITT 4 - OEFFNUNGEN POSITIONIEREN:\n' +
+                    '- Erkenne in der Skizze WO Tueren und Fenster angedeutet sind\n' +
+                    '- Ordne jede Tuer/jedes Fenster der entsprechenden Wand zu\n' +
+                    '- Die POSITION (wo auf der Wand) kommt aus der Skizze\n' +
+                    '- Die MASZE (wie breit, wie hoch) kommen aus den Oeffnungsdaten oben!\n\n' +
+                    'SCHRITT 5 - GRUNDRISS-GEOMETRIE BERECHNEN:\n' +
+                    '- Erstelle einen Grundriss der MASZSTABSGETREU ist\n' +
+                    '- Startpunkt (0,0) = linke untere Ecke des Raums\n' +
+                    '- Jede Wand als Vektor mit Richtung und exakter Laenge\n' +
+                    '- Das Polygon MUSS sich schliessen!\n' +
+                    '- Bei Rechteck: Wand A = unten, B = rechts, C = oben, D = links (Uhrzeigersinn)\n\n' +
+                    '=== ANTWORT-FORMAT (NUR JSON, keine Markdown, keine Backticks) ===\n\n' +
+                    '{\n' +
+                    '  "erkannt": true,\n' +
+                    '  "raumForm": "rechteck",\n' +
+                    '  "beschriftungstyp": "buchstaben",\n' +
+                    '  "anzahl_waende": 4,\n' +
+                    '  "waende": [\n' +
+                    '    { "id": "A", "laenge_m": 3.450, "richtung_grad": 0, "startPunkt": {"x_mm":0,"y_mm":0}, "endPunkt": {"x_mm":3450,"y_mm":0}, "typ": "aussenwand" }\n' +
+                    '  ],\n' +
+                    '  "grundrissPolygon_mm": [\n' +
+                    '    {"x":0,"y":0},{"x":3450,"y":0},{"x":3450,"y":2100},{"x":0,"y":2100}\n' +
+                    '  ],\n' +
+                    '  "tueren": [\n' +
+                    '    { "name":"Tuer 1", "wandId":"A", "breite_m":0.885, "hoehe_m":2.010, "position_mm_von_wandstart":1200, "position_prozent":35, "din":"DIN links" }\n' +
+                    '  ],\n' +
+                    '  "fenster": [\n' +
+                    '    { "name":"Fenster 1", "wandId":"C", "breite_m":1.200, "hoehe_m":1.400, "bruestung_m":0.600, "position_mm_von_wandstart":800, "position_prozent":25 }\n' +
+                    '  ],\n' +
+                    '  "zuordnungReport": ["Label A -> Wand unten (3,450m)", "Tuer erkannt an Wand A bei ca. 35%"],\n' +
+                    '  "hinweise": ["4 Waende, 1 Tuer, 1 Fenster zugeordnet"]\n' +
+                    '}\n\n' +
+                    'Wenn die Skizze NICHT erkennbar ist:\n' +
+                    '{"erkannt": false, "hinweise": ["Waende nicht klar erkennbar", "Bitte deutlicher zeichnen"]}\n\n' +
+                    'REGELN:\n' +
+                    '- grundrissPolygon_mm MUSS in Millimetern angegeben werden\n' +
+                    '- Das Polygon MUSS sich schliessen (letzter Punkt + erster Punkt verbinden sich)\n' +
+                    (hatMasze ? '- Verwende die EXAKTEN Wandmasze oben — NICHT aus der Skizze schaetzen!\n' : '- Ohne Wandmasze: schaetze die Proportionen aus der Skizze\n') +
+                    '- Tuer-/Fenster-Masze aus den Oeffnungsdaten verwenden, Position aus der Skizze\n' +
+                    '- Bei Widerspruch zwischen Skizze und Maszen: die EINGEGEBENEN MASZE haben Vorrang!';
+
+                try {
+                    console.log('[TW Skizze] Gemini Pro Request — hatMasze:', hatMasze, '| Tueren:', tuerenDaten.length, '| Fenster:', fensterDaten.length);
+                    const res = await fetch(baseUrl + '/models/' + modelId + ':generateContent?key=' + apiKey, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            contents: [{ parts: [
+                                { inline_data: { mime_type: 'image/png', data: imageBase64 } },
+                                { text: prompt }
+                            ]}],
+                            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
+                        })
+                    });
+
+                    if (res.status === 429) {
+                        setSkizze(p => ({...p, mode: 'draw'}));
+                        alert('Gemini Pro ist gerade ueberlastet (Rate-Limit). Bitte 30 Sekunden warten und erneut versuchen.');
+                        return;
+                    }
+                    if (!res.ok) throw new Error('Gemini Pro Fehler: ' + res.status);
+
+                    const data = await res.json();
+                    const textRaw = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
+                    // Robustes JSON-Parsing (Markdown-Fences entfernen)
+                    let cleaned = textRaw.replace(/```json|```/g, '').trim();
+                    // Falls Text um JSON drumherum steht: ersten { bis letzten } extrahieren
+                    const firstBrace = cleaned.indexOf('{');
+                    const lastBrace = cleaned.lastIndexOf('}');
+                    if (firstBrace >= 0 && lastBrace > firstBrace) {
+                        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+                    }
+                    const result = JSON.parse(cleaned);
+
+                    if (result.erkannt === false) {
+                        setSkizze(p => ({...p, mode: 'draw'}));
+                        const tipps = (result.hinweise && result.hinweise.length > 0) ? result.hinweise.join('\n') : '';
+                        alert('Die Skizze konnte nicht verarbeitet werden.\n\nTipps:\n' +
+                              '- Waende deutlich als durchgehende Linien zeichnen\n' +
+                              '- Buchstaben (A, B, C...) rot in die Wandmitte schreiben\n' +
+                              '- Tueren als Luecke mit kleinem Bogen andeuten\n' +
+                              '- Fenster als Doppelstrich andeuten\n' +
+                              (tipps ? '\nKI-Hinweise:\n' + tipps : ''));
+                        return;
+                    }
+
+                    if (result.waende && result.waende.length > 0) {
+                        const svg = generateMaszstabsgetreuenSvg(result, hatMasze);
+                        setSkizze(p => ({...p,
+                            mode: 'done',
+                            processedSvg: svg,
+                            erkannteWaende: result.waende,
+                            erkannteLabels: result.waende.map(w => ({ text: w.id, zuordnung: 'wand_' + w.id }))
+                        }));
+                        applyBegradigenToState(result);
+                        console.log('[TW Skizze] Begradigung erfolgreich: ' + result.waende.length + ' Waende, ' +
+                                    (result.tueren ? result.tueren.length : 0) + ' Tueren, ' +
+                                    (result.fenster ? result.fenster.length : 0) + ' Fenster');
+                        if (!hatMasze) {
+                            setTimeout(() => {
+                                alert('Hinweis: Bitte Wandmasze eingeben und "Begradigen" nochmal druecken, um einen maszstabsgetreuen Grundriss zu erhalten.');
+                            }, 200);
+                        }
+                    } else {
+                        setSkizze(p => ({...p, mode: 'draw'}));
+                        alert('Grundriss konnte nicht erkannt werden. Bitte Waende deutlicher zeichnen und mit A, B, C... beschriften.');
+                    }
+                } catch(err) {
+                    console.error('[TW Skizze] KI-Fehler:', err);
+                    setSkizze(p => ({...p, mode: 'draw'}));
+                    alert('KI-Verarbeitung fehlgeschlagen: ' + err.message + '\n\nTipp: 30 Sekunden warten und erneut versuchen (Gemini Pro Rate-Limit).');
+                }
             };
 
             // SVG Grundriss
