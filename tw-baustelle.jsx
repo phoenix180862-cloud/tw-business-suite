@@ -459,7 +459,7 @@
 
             // ── EBENE 3: Ordner-Browser ──
             if (view === 'browser' && activeBaustelle && activeUnterordner) {
-                return <OrdnerBrowser
+                return <StagingOrdnerBrowser
                     baustelle={activeBaustelle}
                     unterordner={activeUnterordner}
                     onBack={function(){
@@ -969,7 +969,7 @@
         // Breadcrumbs-Navigation, Dateiliste mit Typ/Groesse,
         // Klick auf Datei = Vorschau im Drive-Tab
         // ═══════════════════════════════════════════════════════
-        function OrdnerBrowser({ baustelle, unterordner, onBack }) {
+        function StagingOrdnerBrowser({ baustelle, unterordner, onBack }) {
             // ── Navigations-Stack (Breadcrumbs) ──
             const [pfad, setPfad] = useState([{ id: unterordner.daten.id, name: unterordner.name }]);
             const [inhalt, setInhalt] = useState({ folders: [], files: [] });
