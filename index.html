@@ -21301,7 +21301,7 @@
                                         {(typeof MicInput !== 'undefined') ? (
                                             <MicInput
                                                 value={neuName}
-                                                onChange={function(v){ setNeuName(v); }}
+                                                onChange={function(e){ setNeuName(e && e.target ? e.target.value : ''); }}
                                                 placeholder="z. B. Mehmet"
                                                 style={{
                                                     width:'100%', padding:'9px 12px',
@@ -21357,18 +21357,18 @@
                                     {/* Anlegen-Button */}
                                     <button
                                         onClick={handleNeuAnlegen}
-                                        disabled={neuBusy || !neuName.trim()}
+                                        disabled={neuBusy || !(typeof neuName === 'string' && neuName.trim())}
                                         style={{
                                             width:'100%', padding:'10px',
-                                            background: (neuBusy || !neuName.trim())
+                                            background: (neuBusy || !(typeof neuName === 'string' && neuName.trim()))
                                                 ? 'var(--bg-secondary)'
                                                 : 'linear-gradient(135deg, #1E88E5, #1565C0)',
                                             color:'#fff',
                                             border:'none', borderRadius:'var(--radius-sm)',
                                             fontFamily:"'Oswald', sans-serif", fontSize:'13px',
                                             fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
-                                            cursor: (neuBusy || !neuName.trim()) ? 'default' : 'pointer',
-                                            opacity: (neuBusy || !neuName.trim()) ? 0.5 : 1,
+                                            cursor: (neuBusy || !(typeof neuName === 'string' && neuName.trim())) ? 'default' : 'pointer',
+                                            opacity: (neuBusy || !(typeof neuName === 'string' && neuName.trim())) ? 0.5 : 1,
                                             touchAction:'manipulation'
                                         }}>
                                         {neuBusy ? 'Wird angelegt...' : 'Anlegen & uebernehmen'}
