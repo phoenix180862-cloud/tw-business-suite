@@ -2679,12 +2679,58 @@
         async removeDevice(uid) {
             if(!this.db) throw new Error('Firebase nicht initialisiert');
             await this.db.ref('users/'+uid).remove();
+        },
+
+        // ── Mitarbeiter-Stammdaten in Firebase ──
+        // Ergaenzung zu window.MITARBEITER_LISTE (lokaler Grundstock).
+        // Neu angelegte Mitarbeiter werden hier abgelegt und live auf alle
+        // Geraete verteilt. Offline-Faehigkeit bleibt durch den lokalen
+        // Grundstock erhalten.
+        async addMitarbeiter(name, rolle) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!name || !name.trim()) throw new Error('Name darf nicht leer sein');
+            if(!rolle) throw new Error('Rolle muss angegeben sein');
+            var id = name.trim().toLowerCase()
+                .replace(/[aeiou]/g, function(m){ return {'a':'a','e':'e','i':'i','o':'o','u':'u'}[m] || m; })
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '');
+            if(!id) id = 'mitarbeiter_' + Date.now();
+            var payload = {
+                id: id,
+                name: name.trim(),
+                rolle: rolle,
+                createdAt: Date.now()
+            };
+            await this.db.ref('mitarbeiter/'+id).set(payload);
+            return payload;
+        },
+        async loadMitarbeiter() {
+            if(!this.db) return [];
+            var snap = await this.db.ref('mitarbeiter').once('value');
+            var val = snap.val() || {};
+            var arr = [];
+            for(var k in val) { if(val.hasOwnProperty(k)) arr.push(val[k]); }
+            return arr;
+        },
+        subscribeMitarbeiter(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('mitarbeiter');
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var arr = [];
+                for(var k in val) { if(val.hasOwnProperty(k)) arr.push(val[k]); }
+                callback(arr);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
         }
     };
 
-    // ── Etappe 6: Stammliste der Mitarbeiter (Bauteam) ──
-    // Wird in der Master-App im "Neue Einladung"-Dialog als Dropdown gezeigt.
-    // Diese Liste ist LOKAL (kein Firebase), damit Chef auch offline einladen kann.
+    // ── Etappe 6: Stammliste der Mitarbeiter (Bauteam) — Grundstock ──
+    // Diese Liste ist der LOKALE GRUNDSTOCK (Offline-Faehigkeit). Neu angelegte
+    // Mitarbeiter werden in Firebase unter 'mitarbeiter/{id}' abgelegt und zur
+    // Laufzeit im "Neue Einladung"-Dialog mit dieser Liste gemerged.
+    // Siehe FirebaseService.addMitarbeiter / subscribeMitarbeiter.
     window.MITARBEITER_LISTE = [
         { id: 'ivan',    name: 'Ivan',     rolle: 'Fliesenleger' },
         { id: 'michal',  name: 'Michal',   rolle: 'Fliesenleger' },

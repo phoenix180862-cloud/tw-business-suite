@@ -3033,10 +3033,42 @@
         // DIALOG: Neue Einladung erstellen (Etappe 6)
         // ═══════════════════════════════════════════════════════
         function NeueEinladungDialog({ onSchliessen, onErstellen }) {
-            var mitarbeiter = window.MITARBEITER_LISTE || [];
-            const [gewaehlt, setGewaehlt] = useState(mitarbeiter[0] ? mitarbeiter[0].name : '');
+            // Grundstock (lokal) + Firebase-Mitarbeiter werden gemerged
+            const [mitarbeiter, setMitarbeiter] = useState(function(){
+                return window.MITARBEITER_LISTE ? window.MITARBEITER_LISTE.slice() : [];
+            });
+            const [gewaehlt, setGewaehlt] = useState(function(){
+                var initial = window.MITARBEITER_LISTE && window.MITARBEITER_LISTE[0];
+                return initial ? initial.name : '';
+            });
             const [gueltigTage, setGueltigTage] = useState('7');
             const [busy, setBusy] = useState(false);
+
+            // ── Neu-Anlegen-Bereich ──
+            const [neuOffen, setNeuOffen] = useState(false);
+            const [neuName, setNeuName] = useState('');
+            const [neuRolle, setNeuRolle] = useState('Fliesenleger');
+            const [neuBusy, setNeuBusy] = useState(false);
+
+            // Firebase-Mitarbeiter live dazumergen
+            useEffect(function(){
+                if (!window.FirebaseService || !window.FirebaseService.subscribeMitarbeiter) return;
+                var unsubscribe = window.FirebaseService.subscribeMitarbeiter(function(fbArr){
+                    var grundstock = window.MITARBEITER_LISTE || [];
+                    var merged = grundstock.slice();
+                    var seen = {};
+                    grundstock.forEach(function(m){ seen[m.id] = true; });
+                    fbArr.forEach(function(m){
+                        if (!seen[m.id]) { merged.push(m); seen[m.id] = true; }
+                    });
+                    // Alphabetisch sortieren fuer Uebersichtlichkeit
+                    merged.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+                    setMitarbeiter(merged);
+                });
+                return function(){
+                    try { if (typeof unsubscribe === 'function') unsubscribe(); } catch(e) {}
+                };
+            }, []);
 
             // PIN wird beim Oeffnen des Dialogs einmal erzeugt und bleibt bis zum Erstellen
             const [pin] = useState(function() {
@@ -3059,6 +3091,30 @@
                 } catch(e) {
                     alert('Fehler: ' + (e.message || e));
                     setBusy(false);
+                }
+            }
+
+            async function handleNeuAnlegen() {
+                var name = (neuName || '').trim();
+                if (!name) { alert('Bitte Name eingeben.'); return; }
+                if (!neuRolle) { alert('Bitte Rolle waehlen.'); return; }
+                if (!window.FirebaseService || !window.FirebaseService.addMitarbeiter) {
+                    alert('Firebase nicht verbunden. Mitarbeiter kann nicht angelegt werden.');
+                    return;
+                }
+                setNeuBusy(true);
+                try {
+                    var ergebnis = await window.FirebaseService.addMitarbeiter(name, neuRolle);
+                    // Neu angelegten Mitarbeiter direkt auswaehlen.
+                    // Der subscribeMitarbeiter-Listener aktualisiert die Liste von selbst.
+                    setGewaehlt(ergebnis.name);
+                    setNeuName('');
+                    setNeuRolle('Fliesenleger');
+                    setNeuOffen(false);
+                } catch(e) {
+                    alert('Fehler beim Anlegen: ' + (e.message || e));
+                } finally {
+                    setNeuBusy(false);
                 }
             }
 
@@ -3114,6 +3170,142 @@
                                     return <option key={m.id} value={m.name}>{m.name} ({m.rolle})</option>;
                                 })}
                             </select>
+
+                            {/* Neu-Anlegen-Toggle */}
+                            {!neuOffen && (
+                                <button
+                                    onClick={function(){ setNeuOffen(true); }}
+                                    style={{
+                                        marginTop:'8px',
+                                        width:'100%',
+                                        padding:'8px 12px',
+                                        background:'transparent',
+                                        color:'var(--accent-blue)',
+                                        border:'1px dashed rgba(30,136,229,0.45)',
+                                        borderRadius:'var(--radius-sm)',
+                                        fontSize:'13px',
+                                        fontFamily:"'Source Sans 3', sans-serif",
+                                        fontWeight:600,
+                                        cursor:'pointer',
+                                        touchAction:'manipulation'
+                                    }}>
+                                    ➕ Neuer Mitarbeiter anlegen
+                                </button>
+                            )}
+
+                            {/* Neu-Anlegen-Bereich (eingeklappt) */}
+                            {neuOffen && (
+                                <div style={{
+                                    marginTop:'10px',
+                                    padding:'12px',
+                                    background:'rgba(30,136,229,0.08)',
+                                    border:'1px solid rgba(30,136,229,0.25)',
+                                    borderRadius:'var(--radius-sm)'
+                                }}>
+                                    <div style={{
+                                        fontSize:'11px', fontFamily:"'Oswald', sans-serif",
+                                        fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                        color:'var(--accent-blue)', marginBottom:'10px',
+                                        display:'flex', alignItems:'center', justifyContent:'space-between'
+                                    }}>
+                                        <span>Neuer Mitarbeiter</span>
+                                        <button
+                                            onClick={function(){
+                                                setNeuOffen(false);
+                                                setNeuName('');
+                                                setNeuRolle('Fliesenleger');
+                                            }}
+                                            style={{
+                                                background:'transparent', border:'none', cursor:'pointer',
+                                                color:'var(--text-muted)', fontSize:'16px', padding:'0 4px'
+                                            }}
+                                            title="Abbrechen">✗</button>
+                                    </div>
+
+                                    {/* Name */}
+                                    <div style={{ marginBottom:'10px' }}>
+                                        <label style={{
+                                            display:'block', fontSize:'10px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                            color:'var(--text-muted)', marginBottom:'4px'
+                                        }}>Name</label>
+                                        {(typeof MicInput !== 'undefined') ? (
+                                            <MicInput
+                                                value={neuName}
+                                                onChange={function(v){ setNeuName(v); }}
+                                                placeholder="z. B. Mehmet"
+                                                style={{
+                                                    width:'100%', padding:'9px 12px',
+                                                    background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                                    border:'1px solid var(--border-color)', borderRadius:'var(--radius-sm)',
+                                                    fontSize:'14px', fontFamily:"'Source Sans 3', sans-serif"
+                                                }}
+                                            />
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={neuName}
+                                                onChange={function(e){ setNeuName(e.target.value); }}
+                                                placeholder="z. B. Mehmet"
+                                                style={{
+                                                    width:'100%', padding:'9px 12px', boxSizing:'border-box',
+                                                    background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                                    border:'1px solid var(--border-color)', borderRadius:'var(--radius-sm)',
+                                                    fontSize:'14px', fontFamily:"'Source Sans 3', sans-serif"
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Rolle */}
+                                    <div style={{ marginBottom:'10px' }}>
+                                        <label style={{
+                                            display:'block', fontSize:'10px', fontFamily:"'Oswald', sans-serif",
+                                            fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                            color:'var(--text-muted)', marginBottom:'4px'
+                                        }}>Rolle</label>
+                                        <div style={{ display:'flex', gap:'6px' }}>
+                                            {['Fliesenleger','Helfer','Azubi'].map(function(r){
+                                                var aktiv = neuRolle === r;
+                                                return (
+                                                    <button
+                                                        key={r}
+                                                        onClick={function(){ setNeuRolle(r); }}
+                                                        style={{
+                                                            flex:1, padding:'8px 0',
+                                                            background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
+                                                            color: aktiv ? '#fff' : 'var(--text-primary)',
+                                                            border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
+                                                            borderRadius:'var(--radius-sm)',
+                                                            fontSize:'12px', fontWeight: aktiv ? 600 : 400,
+                                                            cursor:'pointer', touchAction:'manipulation'
+                                                        }}>{r}</button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Anlegen-Button */}
+                                    <button
+                                        onClick={handleNeuAnlegen}
+                                        disabled={neuBusy || !neuName.trim()}
+                                        style={{
+                                            width:'100%', padding:'10px',
+                                            background: (neuBusy || !neuName.trim())
+                                                ? 'var(--bg-secondary)'
+                                                : 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                            color:'#fff',
+                                            border:'none', borderRadius:'var(--radius-sm)',
+                                            fontFamily:"'Oswald', sans-serif", fontSize:'13px',
+                                            fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
+                                            cursor: (neuBusy || !neuName.trim()) ? 'default' : 'pointer',
+                                            opacity: (neuBusy || !neuName.trim()) ? 0.5 : 1,
+                                            touchAction:'manipulation'
+                                        }}>
+                                        {neuBusy ? 'Wird angelegt...' : 'Anlegen & uebernehmen'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Gueltigkeits-Dauer */}
