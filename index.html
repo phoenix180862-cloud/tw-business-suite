@@ -18644,9 +18644,27 @@
 
             // ── EBENE 2: Detail-Ansicht einer Baustelle (2 Ordner-Kacheln, Etappe 4.1) ──
             if (view === 'detail' && activeBaustelle) {
+                // Hotfix 20.04.2026: Callback-basierter Status-Reload
+                // Ruft isStagingBereitgestellt erneut auf und aktualisiert die Prop,
+                // die StagingDetail erhaelt. Damit verschwinden der orangene Banner
+                // (fehlendeUnterordner) und ggf. der lila Banner (Migration) direkt
+                // nach "Vervollstaendigen"/"Drive-Ordner umbenennen" ohne Zurueck-Klick.
+                var statusReloadHandler = function() {
+                    if (!window.TWStaging) return Promise.resolve();
+                    return window.TWStaging.isStagingBereitgestellt(activeBaustelle.name)
+                        .then(function(s) {
+                            setStagingStatus(function(prev) {
+                                var n = Object.assign({}, prev);
+                                n[activeBaustelle.name] = s || false;
+                                return n;
+                            });
+                        })
+                        .catch(function(e){ console.warn('statusReloadHandler:', e); });
+                };
                 return <StagingDetail
                     baustelle={activeBaustelle}
                     stagingStatus={stagingStatus[activeBaustelle.name]}
+                    onStatusReload={statusReloadHandler}
                     onBack={function(){
                         setActiveBaustelle(null);
                         setView('liste');
@@ -18958,7 +18976,7 @@
         //   * NACHRICHTEN       (Kalender, Chat -- 2 Sub-Kacheln in EBENE 3)
         // Sub-Kacheln werden in StagingOrdnerEbene gerendert.
         // ═══════════════════════════════════════════════════════
-        function StagingDetail({ baustelle, stagingStatus, onBack, onOpenOrdner }) {
+        function StagingDetail({ baustelle, stagingStatus, onStatusReload, onBack, onOpenOrdner }) {
             const [info, setInfo] = useState(null);
             const [laedt, setLaedt] = useState(false);
             const [fehler, setFehler] = useState(null);
@@ -19009,6 +19027,11 @@
                     await window.TWStaging.createStagingBaustelle(baustelle.name);
                     await ladeInfo();
                     await pruefeMigration();
+                    // Hotfix 20.04.2026: Parent-Status (Prop) neu laden, damit
+                    // der orangene "Einige Unterordner fehlen"-Banner verschwindet
+                    if (typeof onStatusReload === 'function') {
+                        await onStatusReload();
+                    }
                     alert('Staging-Bereich fuer "' + baustelle.name + '" erfolgreich angelegt.');
                 } catch (e) {
                     alert('Fehler beim Anlegen:\n\n' + (e.message || String(e)));
@@ -19054,6 +19077,10 @@
                     // Frisch laden
                     await ladeInfo();
                     await pruefeMigration();
+                    // Hotfix 20.04.2026: auch Parent-Status nachziehen
+                    if (typeof onStatusReload === 'function') {
+                        await onStatusReload();
+                    }
                 } catch(e) {
                     alert('Migration fehlgeschlagen:\n\n' + (e.message || e));
                 } finally {
