@@ -4046,7 +4046,7 @@
                                             {raum.bez}
                                         </div>
                                         <div className="raum-list-meta">
-                                            <span className="raum-list-tag">📐 {raum.waende.length} Wände</span>
+                                            <span className="raum-list-tag">📐 {(raum.waende || []).length} Wände</span>
                                             {raum.material && <span className="raum-list-tag">🧱 {raum.material.split('+')[0].trim()}</span>}
                                             <span className="raum-list-tag">📄 {raum.quelle}</span>
                                         </div>
