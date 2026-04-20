@@ -51,15 +51,34 @@
     // (siehe PDF-Anleitung "Service-Account-Einrichtung.pdf") eingetragen
     // und sorgt dafuer, dass das Mitarbeiter-Geraet NUR den Staging-Ordner
     // sehen kann — ohne Zugriff auf die Original-Kundenakten.
+    // ── Staging-Konfiguration (Etappe 4.1: 5 Sub-Ordner + Alias-System) ──
+    // Die SUBFOLDERS-Liste sind die OFFIZIELLEN Namen, die fuer NEU angelegte
+    // Staging-Bereiche verwendet werden.
+    // Die SUBFOLDER_ALIASES bilden alte Drive-Ordner-Namen auf die neuen Namen ab,
+    // damit BESTEHENDE Staging-Bereiche (mit "Bilder", "Baustellen-App") weiterhin
+    // funktionieren, ohne dass die Ordner physisch umbenannt werden muessen.
+    // Die echte Drive-Migration (physisches Rename) erfolgt in Baustein 8.
     const STAGING_CONFIG = {
         ROOT_FOLDER_NAME: 'Baustellen-App-Staging',
         ROOT_FOLDER_ID: localStorage.getItem('staging_root_folder_id') || '',
-        SUBFOLDERS: ['Zeichnungen', 'Baustellen-App', 'Bilder', 'Stunden'],
+        // 5 offizielle Sub-Ordner (Reihenfolge = Anzeige-Reihenfolge in der UI)
+        SUBFOLDERS: ['Zeichnungen', 'Anweisungen', 'Baustellendaten', 'Fotos', 'Stunden'],
+        // Mapping: offizieller Name -> Liste alter Namen, die als Alias akzeptiert werden
+        // Wenn ein Drive-Ordner unter einem dieser Aliase existiert, wird er als
+        // gueltiger Sub-Ordner anerkannt und NICHT doppelt angelegt.
+        SUBFOLDER_ALIASES: {
+            'Anweisungen':     ['Baustellen-App'],
+            'Fotos':           ['Bilder'],
+            'Baustellendaten': [],
+            'Zeichnungen':     [],
+            'Stunden':         []
+        },
         SUBFOLDER_PERMISSIONS: {
-            'Zeichnungen':    'readonly',
-            'Baustellen-App': 'readonly',
-            'Bilder':         'upload',
-            'Stunden':        'upload'
+            'Zeichnungen':     'readonly',
+            'Anweisungen':     'readonly',
+            'Baustellendaten': 'readonly',
+            'Fotos':           'upload',
+            'Stunden':         'upload'
         },
         SERVICE_ACCOUNT_EMAIL: localStorage.getItem('staging_service_account_email') || '',
         WARN_COPY_SIZE_MB: 50
@@ -2686,22 +2705,32 @@
         // Neu angelegte Mitarbeiter werden hier abgelegt und live auf alle
         // Geraete verteilt. Offline-Faehigkeit bleibt durch den lokalen
         // Grundstock erhalten.
-        async addMitarbeiter(name, rolle) {
+        //
+        // ─ Etappe 4.1, Baustein 3 ─
+        // addMitarbeiter wurde um den optionalen Parameter `sprache` erweitert
+        // (Default: 'de'). Beim Anlegen werden zusaetzlich automatisch leere
+        // Firebase-Knoten /kalender/{id}/ und /chats/{id}/ angelegt -- damit die
+        // kommenden Bausteine 4-6 (Nachrichten-Modul) sofort andocken koennen.
+        async addMitarbeiter(name, rolle, sprache) {
             if(!this.db) throw new Error('Firebase nicht initialisiert');
             if(!name || !name.trim()) throw new Error('Name darf nicht leer sein');
             if(!rolle) throw new Error('Rolle muss angegeben sein');
-            var id = name.trim().toLowerCase()
-                .replace(/[aeiou]/g, function(m){ return {'a':'a','e':'e','i':'i','o':'o','u':'u'}[m] || m; })
-                .replace(/[^a-z0-9]+/g, '_')
-                .replace(/^_+|_+$/g, '');
+            var id = this._makeMaSlug(name);
             if(!id) id = 'mitarbeiter_' + Date.now();
+            var jetzt = Date.now();
             var payload = {
                 id: id,
                 name: name.trim(),
                 rolle: rolle,
-                createdAt: Date.now()
+                sprache: sprache || 'de',
+                status: 'aktiv',
+                geraete_uuids: [],
+                createdAt: jetzt,
+                erstellt_am: jetzt
             };
             await this.db.ref('mitarbeiter/'+id).set(payload);
+            // Auto-Anlage der zugehoerigen leeren Knoten (idempotent: set ueberschreibt nicht)
+            await this._ensureMaUnterknoten(id, jetzt);
             return payload;
         },
         async loadMitarbeiter() {
@@ -2720,6 +2749,402 @@
                 var arr = [];
                 for(var k in val) { if(val.hasOwnProperty(k)) arr.push(val[k]); }
                 callback(arr);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1, BAUSTEIN 3 — Schema-Erweiterungen
+        // ═══════════════════════════════════════════════════════
+        // Diese Methoden bilden die Datenschicht fuer die kommenden Module
+        // Nachrichten (Baustein 4), Kalender (Baustein 5), Chat (Baustein 6),
+        // Hauptkalender (Baustein 7). Die UI-Komponenten andocken hieran.
+        //
+        // Firebase-Knoten-Schema (siehe Skill 4.1 Abschnitt 6.2):
+        //   /mitarbeiter/{ma-id}/                ─ Stammdaten + Sprache + Status
+        //   /kalender/{ma-id}/{jahr}/{datum}/    ─ Anwesenheit pro Tag
+        //   /baustellen_planung/{baustelle-id}/  ─ Geplante Zeitraeume
+        //   /chats/{ma-id}/{nachricht-id}/       ─ Echtzeit-Chat Buero <-> MA
+        // ═══════════════════════════════════════════════════════
+
+        // ── Helper: Slug aus Mitarbeiter-Name (z.B. "Ivan Petrov" -> "ivan_petrov") ──
+        _makeMaSlug(name) {
+            if(!name) return '';
+            return name.trim().toLowerCase()
+                .replace(/[aeiou]/g, function(m){ return {'a':'a','e':'e','i':'i','o':'o','u':'u'}[m] || m; })
+                .replace(/[^a-z0-9]+/g, '_')
+                .replace(/^_+|_+$/g, '');
+        },
+
+        // ── Helper: Idempotente Auto-Anlage der MA-Unterknoten ──
+        // Legt nur an, wenn nicht vorhanden -- ueberschreibt keine bestehenden Daten.
+        async _ensureMaUnterknoten(maId, timestamp) {
+            if(!this.db || !maId) return;
+            var ts = timestamp || Date.now();
+            try {
+                // /kalender/{ma-id}/_meta -- als Marker, dass der Knoten existiert
+                var kSnap = await this.db.ref('kalender/'+maId+'/_meta/angelegt').once('value');
+                if (!kSnap.exists()) {
+                    await this.db.ref('kalender/'+maId+'/_meta/angelegt').set(ts);
+                }
+                // /chats/{ma-id}/_meta -- analog
+                var cSnap = await this.db.ref('chats/'+maId+'/_meta/angelegt').once('value');
+                if (!cSnap.exists()) {
+                    await this.db.ref('chats/'+maId+'/_meta/angelegt').set(ts);
+                }
+            } catch(e) {
+                console.warn('_ensureMaUnterknoten Fehler:', e);
+            }
+        },
+
+        // ── Migration / Idempotente Stammdaten-Pflege ──
+        // Sorgt dafuer, dass alle Mitarbeiter aus window.MITARBEITER_LISTE als
+        // Firebase-Stammdaten existieren. Macht NICHTS, wenn ein MA bereits in
+        // /mitarbeiter/ vorhanden ist -- ueberschreibt also keine Sprach- oder
+        // Status-Aenderungen, die spaeter direkt in Firebase gemacht wurden.
+        // Wird aus dem Nachrichten-Modul (Baustein 4) beim ersten Oeffnen aufgerufen.
+        async ensureMitarbeiterStammdaten(grundstock) {
+            if(!this.db) return { angelegt: 0, vorhanden: 0 };
+            var liste = grundstock || (typeof window !== 'undefined' && window.MITARBEITER_LISTE) || [];
+            var snap = await this.db.ref('mitarbeiter').once('value');
+            var bereits = snap.val() || {};
+            var angelegt = 0, vorhanden = 0;
+            for (var i = 0; i < liste.length; i++) {
+                var m = liste[i];
+                if (!m || !m.name) continue;
+                var id = m.id || this._makeMaSlug(m.name);
+                if (bereits[id]) {
+                    vorhanden++;
+                    // Auch fuer bereits vorhandene MAs sicherstellen, dass
+                    // die Unterknoten existieren (idempotent).
+                    await this._ensureMaUnterknoten(id, bereits[id].erstellt_am || Date.now());
+                    continue;
+                }
+                var jetzt = Date.now();
+                await this.db.ref('mitarbeiter/'+id).set({
+                    id: id,
+                    name: m.name,
+                    rolle: m.rolle || 'Fliesenleger',
+                    sprache: m.sprache || 'de',
+                    status: 'aktiv',
+                    geraete_uuids: [],
+                    createdAt: jetzt,
+                    erstellt_am: jetzt,
+                    aus_grundstock: true
+                });
+                await this._ensureMaUnterknoten(id, jetzt);
+                angelegt++;
+            }
+            return { angelegt: angelegt, vorhanden: vorhanden };
+        },
+
+        // ── Mitarbeiter-Updates (Sprache, Status, etc.) ──
+        async updateMitarbeiter(maId, updates) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId) throw new Error('maId fehlt');
+            if(!updates || typeof updates !== 'object') throw new Error('updates fehlen');
+            // Erlaubte Felder als Allowlist (Schutz vor unbeabsichtigtem Ueberschreiben)
+            var erlaubt = ['name','rolle','sprache','status','geraete_uuids'];
+            var clean = {};
+            erlaubt.forEach(function(k){
+                if (updates.hasOwnProperty(k)) clean[k] = updates[k];
+            });
+            clean.geaendert_am = Date.now();
+            await this.db.ref('mitarbeiter/'+maId).update(clean);
+            return clean;
+        },
+        async setMitarbeiterStatus(maId, status) {
+            // status: 'aktiv' | 'ausgeschieden'
+            if (status !== 'aktiv' && status !== 'ausgeschieden') {
+                throw new Error('Ungueltiger Status: ' + status);
+            }
+            return this.updateMitarbeiter(maId, { status: status });
+        },
+        async setMitarbeiterSprache(maId, sprache) {
+            if (!sprache || typeof sprache !== 'string') {
+                throw new Error('Ungueltige Sprache: ' + sprache);
+            }
+            return this.updateMitarbeiter(maId, { sprache: sprache.toLowerCase() });
+        },
+
+        // ═══════════════════════════════════════════════════════
+        // KALENDER-API (pro Mitarbeiter pro Tag)
+        // ═══════════════════════════════════════════════════════
+        // Datum-Format ueberall: 'YYYY-MM-DD' (z.B. '2026-05-12')
+        // Eintrag: { status, stunden, baustelle_id, sonderheiten, audio_pfad,
+        //            eingetragen_von, eingetragen_am, geaendert_am }
+
+        async getKalenderEintrag(maId, datum) {
+            if(!this.db) return null;
+            if(!maId || !datum) return null;
+            var jahr = datum.substring(0,4);
+            var snap = await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).once('value');
+            return snap.val();
+        },
+        async setKalenderEintrag(maId, datum, eintrag) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId || !datum) throw new Error('maId oder datum fehlt');
+            if(!eintrag || typeof eintrag !== 'object') throw new Error('eintrag fehlt');
+            // Datum validieren (YYYY-MM-DD)
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
+                throw new Error('Datum muss YYYY-MM-DD sein, war: ' + datum);
+            }
+            var jahr = datum.substring(0,4);
+            var jetzt = Date.now();
+            // Allowlist + Audit-Felder
+            var erlaubt = ['status','stunden','baustelle_id','sonderheiten','audio_pfad','eingetragen_von'];
+            var payload = { datum: datum, geaendert_am: jetzt };
+            erlaubt.forEach(function(k){
+                if (eintrag.hasOwnProperty(k)) payload[k] = eintrag[k];
+            });
+            // eingetragen_am NUR setzen, wenn der Knoten noch leer war
+            var bestand = await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).once('value');
+            if (!bestand.exists()) {
+                payload.eingetragen_am = jetzt;
+            }
+            // Default-Defaults
+            if (!payload.eingetragen_von) payload.eingetragen_von = 'ma';
+            await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).update(payload);
+            return payload;
+        },
+        async deleteKalenderEintrag(maId, datum) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId || !datum) throw new Error('maId oder datum fehlt');
+            var jahr = datum.substring(0,4);
+            await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).remove();
+        },
+        async loadKalenderJahr(maId, jahr) {
+            // Liefert Map { 'YYYY-MM-DD': eintrag, ... } -- Meta-Knoten gefiltert
+            if(!this.db) return {};
+            if(!maId || !jahr) return {};
+            var snap = await this.db.ref('kalender/'+maId+'/'+jahr).once('value');
+            var val = snap.val() || {};
+            // _meta-Knoten herausfiltern
+            var clean = {};
+            for (var k in val) {
+                if (val.hasOwnProperty(k) && k !== '_meta') clean[k] = val[k];
+            }
+            return clean;
+        },
+        subscribeKalenderJahr(maId, jahr, callback) {
+            if(!this.db || !maId || !jahr) return function(){};
+            var ref = this.db.ref('kalender/'+maId+'/'+jahr);
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var clean = {};
+                for (var k in val) {
+                    if (val.hasOwnProperty(k) && k !== '_meta') clean[k] = val[k];
+                }
+                callback(clean);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        subscribeAlleKalender(callback) {
+            // Fuer den Buero-Hauptkalender (Baustein 7): liefert die komplette
+            // /kalender/-Struktur als Live-Listener.
+            if(!this.db) return function(){};
+            var ref = this.db.ref('kalender');
+            var handler = function(snap) {
+                callback(snap.val() || {});
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+
+        // ═══════════════════════════════════════════════════════
+        // BAUSTELLEN-PLANUNG-API (Buero plant Zeitraeume pro Baustelle)
+        // ═══════════════════════════════════════════════════════
+        // Eintrag: { von, bis, farbe, beschreibung, mitarbeiter:{maId:true,...},
+        //            erstellt_am }
+
+        async addBaustellenPlanung(baustelleId, daten) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId) throw new Error('baustelleId fehlt');
+            if(!daten || !daten.von || !daten.bis) throw new Error('von/bis fehlen');
+            // Mitarbeiter-Map normalisieren (Array -> Map)
+            var maMap = {};
+            if (Array.isArray(daten.mitarbeiter)) {
+                daten.mitarbeiter.forEach(function(id){ if(id) maMap[id] = true; });
+            } else if (daten.mitarbeiter && typeof daten.mitarbeiter === 'object') {
+                maMap = daten.mitarbeiter;
+            }
+            var ref = this.db.ref('baustellen_planung/'+baustelleId).push();
+            var payload = {
+                id: ref.key,
+                von: daten.von,
+                bis: daten.bis,
+                farbe: daten.farbe || '#1E88E5',
+                beschreibung: daten.beschreibung || '',
+                mitarbeiter: maMap,
+                erstellt_am: Date.now()
+            };
+            await ref.set(payload);
+            return payload;
+        },
+        async updateBaustellenPlanung(baustelleId, zeitraumId, updates) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !zeitraumId) throw new Error('IDs fehlen');
+            var erlaubt = ['von','bis','farbe','beschreibung','mitarbeiter'];
+            var clean = { geaendert_am: Date.now() };
+            erlaubt.forEach(function(k){
+                if (updates.hasOwnProperty(k)) clean[k] = updates[k];
+            });
+            await this.db.ref('baustellen_planung/'+baustelleId+'/'+zeitraumId).update(clean);
+            return clean;
+        },
+        async deleteBaustellenPlanung(baustelleId, zeitraumId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !zeitraumId) throw new Error('IDs fehlen');
+            await this.db.ref('baustellen_planung/'+baustelleId+'/'+zeitraumId).remove();
+        },
+        async loadBaustellenPlanungen() {
+            if(!this.db) return [];
+            var snap = await this.db.ref('baustellen_planung').once('value');
+            var val = snap.val() || {};
+            var flach = [];
+            for (var bId in val) {
+                if (!val.hasOwnProperty(bId)) continue;
+                var zeitraeume = val[bId] || {};
+                for (var zId in zeitraeume) {
+                    if (!zeitraeume.hasOwnProperty(zId)) continue;
+                    var z = zeitraeume[zId];
+                    flach.push(Object.assign({ baustelle_id: bId, zeitraum_id: zId }, z));
+                }
+            }
+            return flach;
+        },
+        subscribeBaustellenPlanungen(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('baustellen_planung');
+            var self = this;
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var flach = [];
+                for (var bId in val) {
+                    if (!val.hasOwnProperty(bId)) continue;
+                    var zeitraeume = val[bId] || {};
+                    for (var zId in zeitraeume) {
+                        if (!zeitraeume.hasOwnProperty(zId)) continue;
+                        flach.push(Object.assign({ baustelle_id: bId, zeitraum_id: zId }, zeitraeume[zId]));
+                    }
+                }
+                callback(flach);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+
+        // ═══════════════════════════════════════════════════════
+        // CHAT-API (Echtzeit Buero <-> MA, mit Uebersetzungs-Stub)
+        // ═══════════════════════════════════════════════════════
+        // Nachricht: { von:'buero'|'ma', absender_name, text_original,
+        //              sprache_original, text_uebersetzt:{de,en,...},
+        //              timestamp, gelesen, gelesen_am, dringend }
+        // text_uebersetzt wird VON DER CLOUD FUNCTION asynchron befuellt --
+        // hier wird nur das Original geschrieben.
+
+        async sendChatNachricht(maId, daten) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId) throw new Error('maId fehlt');
+            if(!daten || !daten.text_original) throw new Error('text_original fehlt');
+            var von = daten.von === 'buero' ? 'buero' : 'ma';
+            var ref = this.db.ref('chats/'+maId).push();
+            var payload = {
+                id: ref.key,
+                von: von,
+                absender_name: daten.absender_name || (von === 'buero' ? 'Buero' : 'Mitarbeiter'),
+                text_original: daten.text_original,
+                sprache_original: daten.sprache_original || (von === 'buero' ? 'de' : ''),
+                timestamp: Date.now(),
+                gelesen: false,
+                dringend: !!daten.dringend
+            };
+            await ref.set(payload);
+            return payload;
+        },
+        async markiereChatAlsGelesen(maId, nachrichtId) {
+            if(!this.db) return;
+            if(!maId || !nachrichtId) return;
+            await this.db.ref('chats/'+maId+'/'+nachrichtId).update({
+                gelesen: true,
+                gelesen_am: Date.now()
+            });
+        },
+        async setChatUebersetzung(maId, nachrichtId, uebersetzungenMap) {
+            // Stub fuer manuelle/Cloud-Function-Befuellung der Uebersetzungen
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId || !nachrichtId) throw new Error('IDs fehlen');
+            await this.db.ref('chats/'+maId+'/'+nachrichtId+'/text_uebersetzt').set(uebersetzungenMap || {});
+        },
+        async loadChat(maId, limit) {
+            if(!this.db) return [];
+            if(!maId) return [];
+            limit = limit || 200;
+            var snap = await this.db.ref('chats/'+maId).orderByChild('timestamp').limitToLast(limit).once('value');
+            var liste = [];
+            snap.forEach(function(c) {
+                if (c.key === '_meta') return;  // Meta-Knoten ueberspringen
+                liste.push(Object.assign({ id: c.key }, c.val()));
+            });
+            liste.sort(function(a,b){ return (a.timestamp||0) - (b.timestamp||0); });
+            return liste;
+        },
+        subscribeChat(maId, callback, limit) {
+            if(!this.db || !maId) return function(){};
+            limit = limit || 200;
+            var ref = this.db.ref('chats/'+maId).orderByChild('timestamp').limitToLast(limit);
+            var handler = function(snap) {
+                var liste = [];
+                snap.forEach(function(c) {
+                    if (c.key === '_meta') return;
+                    liste.push(Object.assign({ id: c.key }, c.val()));
+                });
+                liste.sort(function(a,b){ return (a.timestamp||0) - (b.timestamp||0); });
+                callback(liste);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        subscribeChatDringendCount(maId, callback) {
+            // Liefert Anzahl ungelesener dringender Nachrichten -- fuer Badges
+            if(!this.db || !maId) return function(){};
+            var ref = this.db.ref('chats/'+maId);
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var count = 0;
+                for (var k in val) {
+                    if (k === '_meta' || !val.hasOwnProperty(k)) continue;
+                    var n = val[k];
+                    if (n && n.dringend && !n.gelesen && n.von === 'buero') count++;
+                }
+                callback(count);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        subscribeAlleChatsDringendCount(callback) {
+            // Liefert Map { maId: count } fuer das Master-Hauptmenue-Badge
+            if(!this.db) return function(){};
+            var ref = this.db.ref('chats');
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var result = {};
+                for (var maId in val) {
+                    if (!val.hasOwnProperty(maId)) continue;
+                    var nachrichten = val[maId] || {};
+                    var c = 0;
+                    for (var nId in nachrichten) {
+                        if (nId === '_meta' || !nachrichten.hasOwnProperty(nId)) continue;
+                        var n = nachrichten[nId];
+                        // "Dringend ungelesen vom Buero" zaehlt aus MA-Sicht;
+                        // analog zaehlt das Buero "ungelesen vom MA" als To-Do.
+                        if (n && !n.gelesen) c++;
+                    }
+                    if (c > 0) result[maId] = c;
+                }
+                callback(result);
             };
             ref.on('value', handler);
             return function(){ ref.off('value', handler); };

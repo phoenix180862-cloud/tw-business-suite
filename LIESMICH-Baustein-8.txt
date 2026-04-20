@@ -1,0 +1,115 @@
+═══════════════════════════════════════════════════════════════════
+  TW BUSINESS SUITE — Etappe 4.1, BAUSTEIN 8 (FINAL!)
+  Drive-Migrations-Skript: alte Ordnernamen physisch umbenennen
+  ───────────────────────────────────────────────────────────
+  Datum: 20.04.2026
+═══════════════════════════════════════════════════════════════════
+
+WAS IST NEU?
+────────────
+Die letzte fehlende Brücke zwischen UI-Welt (offizielle Namen) und
+Drive-Welt (alte physische Ordnernamen). Damit ist Etappe 4.1 vollständig
+abgeschlossen.
+
+Auf der Detail-Seite einer Baustelle (BAUSTELLEN -> Baustelle waehlen)
+erscheint jetzt -- WENN noetig -- ein lila Migrations-Banner:
+
+  🔄 Drive-Migration verfuegbar
+  Diese Baustelle hat noch alte Drive-Ordnernamen, die seit Etappe 4.1
+  umbenannt werden sollten:
+     • Bilder         ➜ Fotos
+     • Baustellen-App ➜ Anweisungen
+
+  [🔄 Drive-Ordner umbenennen]
+
+Klick darauf öffnet einen Bestätigungsdialog mit der Liste der geplanten
+Umbenennungen. Nach Bestätigung läuft die Migration sequenziell ab
+(Drive-API files.update mit dem neuen Namen), mit Live-Status-Anzeige:
+
+  [1/2] Bilder ➜ Fotos ✓
+  [2/2] Baustellen-App ➜ Anweisungen ⏳
+
+Nach Abschluss: Erfolgs-Dialog mit Zaehlung umbenannt/Fehler/Konflikte.
+
+INTELLIGENTES VERHALTEN:
+────────────────────────
+• Banner erscheint NUR, wenn noch alte Ordner vorhanden sind (idempotent)
+• Nach erfolgreicher Migration: Banner verschwindet automatisch
+• Konflikte (alt UND neu existieren parallel) werden erkannt:
+   - Banner zeigt "⚠ Konflikt: Bilder UND Fotos existieren -- manuell in
+     Drive aufloesen"
+   - Migrations-Button bleibt aktiv, wenn andere Eintraege geplant sind
+   - Konflikt-Eintraege werden bewusst NICHT angetastet (User entscheidet)
+• Nach der Migration: pruefeStagingMigration laeuft erneut, Banner wird
+  ausgeblendet, Sub-Kacheln in StagingOrdnerEbene laden frisch
+
+NEUE TWStaging-METHODEN:
+────────────────────────
+  TWStaging.pruefeStagingMigration(baustelleName)
+    -> { migrationNoetig, geplant: [{altName, neuName, folderId}],
+         konflikte: [{altName, neuName, altFolderId, neuFolderId}] }
+
+  TWStaging.fuehreStagingMigrationAus(baustelleName, { onProgress })
+    -> { umbenannt, fehler, uebersprungen, konflikte, ergebnisse }
+
+DATEN-SAFETY:
+─────────────
+• Es werden NUR Ordner umbenannt, die in STAGING_CONFIG.SUBFOLDER_ALIASES
+  hinterlegt sind (Allowlist) -- "Zeichnungen", "Stunden" usw. sind sicher
+• Pro Baustelle einzeln ausführbar (KEIN globaler "Alle migrieren"-Button)
+• Bestätigungsdialog vor jeder Migration (mit voller Liste der Umbenennungen)
+• Drive-API files.update mit { name: 'NeuerName' } -- Drive-IDs bleiben gleich,
+  daher KEIN Bruch fuer existierende Verknuepfungen
+
+GEAENDERTE DATEIEN
+──────────────────
+  • tw-staging.js        -- ~120 neue Zeilen (Migrations-API + Helfer)
+  • tw-baustelle.jsx     -- ~150 neue Zeilen (Migrations-Banner + Handler)
+  • tw-infrastructure.js -- unveraendert seit Baustein 3 (im ZIP fuer Vollstaendigkeit)
+  • index.html           -- frisch gebaut
+
+ALLE 4 DATEIEN ZUSAMMEN INSTALLIEREN -- niemals nur eine!
+
+ZUM TESTEN:
+───────────
+1. Auf BAUSTELLEN klicken -> Kunden-Liste
+2. Eine Baustelle waehlen, die noch alte Ordnernamen hat
+   (z.B. eine, die schon laenger existiert)
+3. Lila Banner erscheint mit Liste der geplanten Umbenennungen
+4. "🔄 Drive-Ordner umbenennen" klicken
+5. Bestaetigungsdialog -> OK
+6. Status laeuft durch: [1/2] Bilder ➜ Fotos ✓, [2/2] ...
+7. Erfolgs-Dialog
+8. Banner verschwindet
+9. Im Google-Drive-Webinterface: Ordner sind jetzt physisch umbenannt
+10. Sub-Kacheln zeigen die korrekten Daten unter den neuen Namen
+
+═══════════════════════════════════════════════════════════════════
+  ETAPPE 4.1 IST VOLLSTAENDIG ABGESCHLOSSEN!
+═══════════════════════════════════════════════════════════════════
+
+Stand nach allen 8 Bausteinen:
+  ✅ Baustein 1: 4→2 Ordner-Kacheln pro Baustelle
+  ✅ Baustein 2: 5 Sub-Ordner + Alias-System
+  ✅ Baustein 3: Firebase-Schema (kalender, chats, planung)
+  ✅ Baustein 4: Mitarbeiter-Liste + Auto-Migration
+  ✅ Baustein 5: Kalender-UI mit Tages-Modal (3-Jahres-Sicht)
+  ✅ Baustein 6: Chat-UI mit Dringend-Senden
+  ✅ Baustein 7: Hauptkalender (Buero-Aggregat) + Baustellen-Planung
+  ✅ Baustein 8: Drive-Migrations-Skript
+
+Was AUSSERHALB dieser Master-App-Etappe lebt (Skill 4.1 Abschnitte 6.4/6.5):
+  ⏳ Cloud Function: Uebersetzungs-Pipeline (Gemini Flash)
+  ⏳ Cloud Function: FCM Push fuer dringende Chat-Nachrichten
+  ⏳ Baustellen-App (Mitarbeiter-Handy-PWA -- separates Repo)
+
+Diese 3 Punkte sind Themen fuer eigene Repos / Cloud-Functions-Setups
+und gehoeren NICHT in die Master-App-JSX-Bundle.
+
+NAECHSTE GROSSE ETAPPE:
+────────────────────────
+Damit ist die Master-App-Seite von Etappe 4.1 fertig. Naechster Schritt
+laut User-Memory: "anschliessend uns nur noch um die Baustellen App
+kuemmern". Das ist die TW Baustellen-Mitarbeiter-App (separates Repo,
+laeuft auf MA-Handys via PWA, dockt an die hier gebauten Firebase-Knoten
+und Drive-Staging-Ordner an).

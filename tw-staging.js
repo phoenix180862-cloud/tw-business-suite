@@ -6,7 +6,7 @@
     //
     // Oeffentliche API:
     //   TWStaging.ensureRootFolder()            → Ordner-ID des Staging-Roots (legt bei Bedarf an)
-    //   TWStaging.createStagingBaustelle(name)  → legt Baustellen-Staging + 4 Unterordner an
+    //   TWStaging.createStagingBaustelle(name)  → legt Baustellen-Staging + 5 Unterordner an
     //   TWStaging.listStagingBaustellen()       → listet alle vorhandenen Staging-Baustellen
     //   TWStaging.isStagingBereitgestellt(name) → prueft, ob ein Staging-Baustellenordner existiert
     //   TWStaging.getStagingSubfolder(name,sub) → liefert die Drive-ID eines Unterordners
@@ -65,6 +65,37 @@
         // ── Hilfsfunktion: Ordner finden ODER neu anlegen ──
         async function findOrCreateFolder(name, parentId) {
             var existing = await findFolderByName(name, parentId);
+            if (existing) return existing;
+            return await createFolder(name, parentId);
+        }
+
+        // ── Hilfsfunktion: Ordner unter offiziellem Namen ODER unter Aliasen finden ──
+        // ─ Etappe 4.1, Baustein 2 ─
+        // Sucht zuerst unter dem offiziellen Namen. Wenn nicht gefunden, werden
+        // alle in STAGING_CONFIG.SUBFOLDER_ALIASES[name] hinterlegten alten
+        // Drive-Namen durchprobiert. Liefert das gefundene Ordner-Objekt oder null.
+        // Verhindert, dass beim Anlegen / Vervollstaendigen doppelte Ordner
+        // entstehen, solange die Drive-Migration (Baustein 8) noch nicht lief.
+        async function findFolderByNameOrAlias(name, parentId) {
+            // 1. Zuerst nach dem offiziellen Namen suchen
+            var direct = await findFolderByName(name, parentId);
+            if (direct) return direct;
+            // 2. Wenn nicht gefunden: Alias-Liste durchgehen
+            var cfg = window.STAGING_CONFIG;
+            var aliases = (cfg && cfg.SUBFOLDER_ALIASES && cfg.SUBFOLDER_ALIASES[name]) || [];
+            for (var i = 0; i < aliases.length; i++) {
+                var hit = await findFolderByName(aliases[i], parentId);
+                if (hit) return hit;
+            }
+            return null;
+        }
+
+        // ── Hilfsfunktion: Ordner finden (offiziell+Alias), sonst neu anlegen ──
+        // ─ Etappe 4.1, Baustein 2 ─
+        // Wenn weder offizieller Name noch Alias existiert, wird der Ordner
+        // unter dem OFFIZIELLEN Namen neu angelegt.
+        async function findOrCreateFolderWithAlias(name, parentId) {
+            var existing = await findFolderByNameOrAlias(name, parentId);
             if (existing) return existing;
             return await createFolder(name, parentId);
         }
@@ -157,7 +188,12 @@
             return created.id;
         }
 
-        // ── Staging-Baustelle anlegen (inkl. 4 Unterordner) ──
+        // ── Staging-Baustelle anlegen (inkl. 5 Unterordner, Etappe 4.1) ──
+        // Etappe 4.1, Baustein 2:
+        // Verwendet findOrCreateFolderWithAlias, damit BESTEHENDE Drive-Ordner
+        // unter alten Namen (z.B. "Bilder", "Baustellen-App") als gueltig anerkannt
+        // werden und NICHT doppelt angelegt werden. Neue Ordner entstehen unter
+        // den OFFIZIELLEN Namen aus STAGING_CONFIG.SUBFOLDERS.
         async function createStagingBaustelle(baustelleName) {
             assertDriveReady();
             if (!baustelleName || typeof baustelleName !== 'string') {
@@ -172,11 +208,11 @@
             // 2. Baustellen-Ordner finden oder anlegen
             var baustelleOrdner = await findOrCreateFolder(baustelleName, rootId);
 
-            // 3. 4 Unterordner finden oder anlegen
+            // 3. Sub-Ordner finden (offiziell ODER unter Alias) oder anlegen
             var subIds = {};
             for (var i = 0; i < cfg.SUBFOLDERS.length; i++) {
                 var subName = cfg.SUBFOLDERS[i];
-                var sub = await findOrCreateFolder(subName, baustelleOrdner.id);
+                var sub = await findOrCreateFolderWithAlias(subName, baustelleOrdner.id);
                 subIds[subName] = sub.id;
             }
 
@@ -209,6 +245,8 @@
         }
 
         // ── Pruefen, ob eine Baustelle schon ein Staging hat ──
+        // Etappe 4.1, Baustein 2: Aliase werden bei der Vollstaendigkeitspruefung
+        // mit beruecksichtigt -- bestehende "Bilder"-Ordner gelten als "Fotos" usw.
         async function isStagingBereitgestellt(baustelleName) {
             assertDriveReady();
             if (!baustelleName) return false;
@@ -221,12 +259,18 @@
             var found = await findFolderByName(baustelleName, rootId);
             if (!found) return false;
 
-            // Zusaetzliche Qualitaetspruefung: alle 4 Unterordner vorhanden?
+            // Vollstaendigkeitspruefung: alle Sub-Ordner vorhanden (offizielle Namen ODER Aliase)?
             var cfg = window.STAGING_CONFIG;
             var children = await listChildFolders(found.id);
             var childNames = children.map(function(c){ return c.name; });
             var fehlende = (cfg.SUBFOLDERS || []).filter(function(s) {
-                return childNames.indexOf(s) === -1;
+                if (childNames.indexOf(s) !== -1) return false;
+                // Alias-Toleranz: existiert ein alter Name, der diesem Sub zugeordnet ist?
+                var aliases = (cfg.SUBFOLDER_ALIASES && cfg.SUBFOLDER_ALIASES[s]) || [];
+                for (var i = 0; i < aliases.length; i++) {
+                    if (childNames.indexOf(aliases[i]) !== -1) return false;
+                }
+                return true;
             });
             return {
                 vorhanden: true,
@@ -237,16 +281,21 @@
         }
 
         // ── Drive-ID eines Staging-Unterordners liefern ──
+        // Etappe 4.1, Baustein 2: Suchstring kann offiziell ODER Alias sein --
+        // wenn der Aufrufer nach "Fotos" fragt, findet die Funktion auch "Bilder".
         async function getStagingSubfolder(baustelleName, subfolderName) {
             assertDriveReady();
             var rootId = await ensureRootFolder();
             var bst = await findFolderByName(baustelleName, rootId);
             if (!bst) return null;
-            var sub = await findFolderByName(subfolderName, bst.id);
+            var sub = await findFolderByNameOrAlias(subfolderName, bst.id);
             return sub ? sub.id : null;
         }
 
         // ── Reichhaltige Info-Daten fuer UI-Anzeige ──
+        // Etappe 4.1, Baustein 2: Lookup pro Sub-Ordner geht ueber Aliase. Die
+        // info.unterordner-Map verwendet die OFFIZIELLEN Namen als Keys, auch
+        // wenn die Daten physisch unter einem alten Namen liegen.
         async function getStagingInfo(baustelleName) {
             assertDriveReady();
             var rootId = await ensureRootFolder();
@@ -263,11 +312,12 @@
 
             for (var i = 0; i < cfg.SUBFOLDERS.length; i++) {
                 var subName = cfg.SUBFOLDERS[i];
-                var sub = await findFolderByName(subName, bst.id);
+                var sub = await findFolderByNameOrAlias(subName, bst.id);
                 if (sub) {
                     var stats = await getFolderStats(sub.id);
                     info.unterordner[subName] = {
                         id: sub.id,
+                        driveName: sub.name,                  // tatsaechlicher Drive-Name (kann Alias sein)
                         anzahlDateien: stats.anzahlDateien,
                         letzteAenderung: stats.letzteAenderung,
                         groesseBytes: stats.groesseBytes,
@@ -278,6 +328,156 @@
                 }
             }
             return info;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1, BAUSTEIN 8 — Drive-Migrations-API
+        // ────────────────────────────────────────────────────────
+        // Benennt physisch die alten Drive-Ordnernamen um, damit die UI-
+        // Wahrheit (offizielle Namen aus STAGING_CONFIG.SUBFOLDERS) und die
+        // Drive-Wahrheit endgueltig zusammenfallen. Bis Baustein 8 lebt die
+        // App in der Alias-Welt -- ab jetzt ist alles physisch sauber.
+        //
+        // Mapping (aus STAGING_CONFIG.SUBFOLDER_ALIASES abgeleitet):
+        //   "Bilder"         -> "Fotos"
+        //   "Baustellen-App" -> "Anweisungen"
+        //
+        // Vorgehen pro Baustelle:
+        //   1. listChildFolders -> aktuelle Sub-Ordner ermitteln
+        //   2. Pro Alias pruefen: Existiert der alte Ordner UND der neue Ordner
+        //      noch nicht? -> Umbenennen via files.update({name: 'NeuerName'})
+        //   3. Existiert sowohl alt als auch neu (Konflikt)? -> Skip mit
+        //      Warnung -- Thomas muss manuell entscheiden
+        //
+        // Idempotent: laeuft beliebig oft ohne Schaden (skipt bereits
+        // umbenannte Ordner).
+        // ═══════════════════════════════════════════════════════
+
+        // ── Hilfsfunktion: Drive-Ordner umbenennen ──
+        async function renameFolder(folderId, neuerName) {
+            assertDriveReady();
+            await gapi.client.drive.files.update({
+                fileId: folderId,
+                resource: { name: neuerName }
+            });
+        }
+
+        // ── Hilfsfunktion: Liste der zu migrierenden Aliase berechnen ──
+        // Geht durch SUBFOLDER_ALIASES aus STAGING_CONFIG und liefert eine flache
+        // Liste { altName, neuName } -- ungerichtetes Mapping.
+        function getMigrationsRegeln() {
+            var cfg = window.STAGING_CONFIG;
+            if (!cfg || !cfg.SUBFOLDER_ALIASES) return [];
+            var regeln = [];
+            for (var neuName in cfg.SUBFOLDER_ALIASES) {
+                if (!cfg.SUBFOLDER_ALIASES.hasOwnProperty(neuName)) continue;
+                var aliases = cfg.SUBFOLDER_ALIASES[neuName] || [];
+                aliases.forEach(function(alt) {
+                    regeln.push({ altName: alt, neuName: neuName });
+                });
+            }
+            return regeln;
+        }
+
+        // ── PUBLIC: Pruefen, ob Migration fuer eine Baustelle noetig ist ──
+        // Liefert: { migrationNoetig: bool, geplant: [{altName, neuName, folderId}],
+        //            konflikte: [{altName, neuName}] }
+        async function pruefeStagingMigration(baustelleName) {
+            assertDriveReady();
+            if (!baustelleName) return { migrationNoetig: false, geplant: [], konflikte: [] };
+            var rootId;
+            try { rootId = await ensureRootFolder(); }
+            catch(e) { return { migrationNoetig: false, geplant: [], konflikte: [], fehler: e.message }; }
+            var bst = await findFolderByName(baustelleName, rootId);
+            if (!bst) return { migrationNoetig: false, geplant: [], konflikte: [] };
+
+            var children = await listChildFolders(bst.id);
+            var nachName = {};
+            children.forEach(function(c){ nachName[c.name] = c; });
+
+            var regeln = getMigrationsRegeln();
+            var geplant = [];
+            var konflikte = [];
+            regeln.forEach(function(r) {
+                var alt = nachName[r.altName];
+                var neu = nachName[r.neuName];
+                if (alt && !neu) {
+                    geplant.push({ altName: r.altName, neuName: r.neuName, folderId: alt.id });
+                } else if (alt && neu) {
+                    konflikte.push({
+                        altName: r.altName,
+                        neuName: r.neuName,
+                        altFolderId: alt.id,
+                        neuFolderId: neu.id
+                    });
+                }
+                // Fall: alt fehlt, neu vorhanden = bereits migriert (kein Eintrag)
+                // Fall: beide fehlen = nichts zu tun (kein Eintrag)
+            });
+
+            return {
+                migrationNoetig: geplant.length > 0 || konflikte.length > 0,
+                geplant: geplant,
+                konflikte: konflikte,
+                baustelleOrdnerId: bst.id
+            };
+        }
+
+        // ── PUBLIC: Migration ausfuehren ──
+        // Benennt die im Plan stehenden Ordner physisch um. Konflikte werden
+        // NICHT angetastet -- der Aufrufer muss vorher pruefen und ggf. eine
+        // Konflikt-Aufloesung anbieten (z.B. manuelles Verschieben in Drive).
+        // onProgress(stand) wird nach jedem Rename aufgerufen mit:
+        //   { aktuell: 1, gesamt: 3, name: 'Bilder', neu: 'Fotos', ok: true }
+        async function fuehreStagingMigrationAus(baustelleName, options) {
+            assertDriveReady();
+            options = options || {};
+            var onProgress = options.onProgress || function(){};
+            var plan = await pruefeStagingMigration(baustelleName);
+            if (!plan.migrationNoetig) {
+                return { umbenannt: 0, fehler: [], uebersprungen: 0, konflikte: plan.konflikte };
+            }
+
+            var ergebnisse = [];
+            var fehler = [];
+            for (var i = 0; i < plan.geplant.length; i++) {
+                var r = plan.geplant[i];
+                onProgress({
+                    aktuell: i + 1,
+                    gesamt: plan.geplant.length,
+                    name: r.altName,
+                    neu: r.neuName,
+                    status: 'aktiv'
+                });
+                try {
+                    await renameFolder(r.folderId, r.neuName);
+                    ergebnisse.push(r);
+                    onProgress({
+                        aktuell: i + 1,
+                        gesamt: plan.geplant.length,
+                        name: r.altName,
+                        neu: r.neuName,
+                        status: 'ok'
+                    });
+                } catch(e) {
+                    fehler.push({ altName: r.altName, neuName: r.neuName, fehler: e.message || String(e) });
+                    onProgress({
+                        aktuell: i + 1,
+                        gesamt: plan.geplant.length,
+                        name: r.altName,
+                        neu: r.neuName,
+                        status: 'fehler',
+                        fehler: e.message
+                    });
+                }
+            }
+            return {
+                umbenannt: ergebnisse.length,
+                fehler: fehler,
+                uebersprungen: plan.konflikte.length,
+                konflikte: plan.konflikte,
+                ergebnisse: ergebnisse
+            };
         }
 
         // ═══════════════════════════════════════════════════════
@@ -583,7 +783,7 @@
         // ═══════════════════════════════════════════════════════════
 
         // ── Eine einzelne Baustelle vom Drive-Staging nach Firebase replizieren ──
-        // Liest alle 4 Unterordner und schreibt pro Datei einen Metadaten-Eintrag
+        // Liest alle 5 Unterordner und schreibt pro Datei einen Metadaten-Eintrag
         // nach projects/{projectId}/staging/{unterordner}/{fileId}
         // baustelleName: z.B. 'Mueller, Max'
         // projectId:     Firebase-Projekt-Schluessel (kann abweichen vom Drive-Name)
@@ -598,7 +798,7 @@
 
             onProgress('start', { baustelle: baustelleName });
 
-            // 1. Staging-Info holen (4 Unterordner mit Drive-IDs)
+            // 1. Staging-Info holen (5 Unterordner mit Drive-IDs)
             var info = await getStagingInfo(baustelleName);
             if (!info || !info.unterordner) {
                 throw new Error('Staging nicht vorhanden fuer ' + baustelleName);
@@ -613,8 +813,9 @@
                 fehler: []
             };
 
-            // 2. Fuer jeden der 4 Unterordner Dateien listen und nach Firebase schreiben
-            var subfolderNames = window.STAGING_CONFIG.SUBFOLDERS || ['Zeichnungen','Baustellen-App','Bilder','Stunden'];
+            // 2. Fuer jeden der 5 Unterordner Dateien listen und nach Firebase schreiben
+            var subfolderNames = window.STAGING_CONFIG.SUBFOLDERS
+                || ['Zeichnungen','Anweisungen','Baustellendaten','Fotos','Stunden'];
             var permissions = window.STAGING_CONFIG.SUBFOLDER_PERMISSIONS || {};
 
             for (var i = 0; i < subfolderNames.length; i++) {
@@ -734,7 +935,10 @@
             deleteDateiAusStaging: deleteDateiAusStaging,
             // Etappe 7: Firebase-Sync
             syncStagingNachFirebase: syncStagingNachFirebase,
-            syncAlleStagings: syncAlleStagings
+            syncAlleStagings: syncAlleStagings,
+            // Etappe 4.1, Baustein 8: Drive-Migration (alte Ordnernamen umbenennen)
+            pruefeStagingMigration: pruefeStagingMigration,
+            fuehreStagingMigrationAus: fuehreStagingMigrationAus
         };
 
     })();
