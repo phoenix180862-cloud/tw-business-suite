@@ -49,6 +49,14 @@
         }
     };
 
+    // ---- SHADOW-SYNC-STORES (Multi-Geraete-Sync fuer Rohdaten) ----
+    // Diese Stores erhalten bei jedem Save einen JSON-Snapshot im
+    // Drive-Ordner "Kunden-Daten" unter _sync_<storeName>.json.
+    // Beim Kunden-Oeffnen auf einem anderen Geraet wird der Snapshot
+    // heruntergeladen und der lokale Store rehydriert.
+    var SHADOW_STORES = ['kunden', 'raeume', 'aufmass', 'positionen', 'positionsListen'];
+    var _shadowDebounce = {};  // Key: kundeId__storeName -> setTimeout handle
+
     // ---- Store-Definitionen ----
     var STORES = {
         kunden:         { keyPath: 'id', indices: ['name', 'updatedAt'] },
@@ -127,7 +135,15 @@
                 var store = tx.objectStore(storeName);
                 if (!item.updatedAt) item.updatedAt = new Date().toISOString();
                 var request = store.put(item);
-                request.onsuccess = function() { resolve(item); };
+                request.onsuccess = function() {
+                    // Post-Save-Hook: Shadow-Sync triggern wenn Store in der Liste
+                    try {
+                        if (SHADOW_STORES.indexOf(storeName) >= 0 && item && item.kundeId) {
+                            scheduleShadowSync(item.kundeId, storeName);
+                        }
+                    } catch(e) { /* Shadow-Sync ist best-effort */ }
+                    resolve(item);
+                };
                 request.onerror = function(e) { reject(e.target.error); };
             } catch(e) { reject(e); }
         });
@@ -204,7 +220,21 @@
                     if (!item.updatedAt) item.updatedAt = now;
                     store.put(item);
                 });
-                tx.oncomplete = function() { resolve(items.length); };
+                tx.oncomplete = function() {
+                    // Post-Save-Hook: Shadow-Sync triggern fuer alle betroffenen Kunden
+                    try {
+                        if (SHADOW_STORES.indexOf(storeName) >= 0) {
+                            var kundenIds = {};
+                            items.forEach(function(it) {
+                                if (it && it.kundeId) kundenIds[it.kundeId] = true;
+                            });
+                            Object.keys(kundenIds).forEach(function(kid) {
+                                scheduleShadowSync(kid, storeName);
+                            });
+                        }
+                    } catch(e) { /* Shadow-Sync ist best-effort */ }
+                    resolve(items.length);
+                };
                 tx.onerror = function(e) { reject(e.target.error); };
             } catch(e) { reject(e); }
         });
@@ -1589,6 +1619,249 @@
 
 
     // ================================================================
+    // SHADOW-SYNC-ENGINE — Multi-Geraete-Sync fuer Rohdaten-Stores
+    // ================================================================
+    // Prinzip:
+    // 1. Jeder SAVE in SHADOW_STORES triggert debounced (2.5s) einen
+    //    JSON-Snapshot des Store-Inhalts fuer diesen Kunden. Der Snapshot
+    //    wird als appDatei mit syncStatus='pending' lokal abgelegt.
+    // 2. Der bestehende Sync-Button laedt die pending appDateien nach
+    //    Drive hoch (inkl. Snapshots).
+    // 3. Am anderen Geraet zieht hydrateAllShadowsForKunde() die neuen
+    //    Snapshots direkt aus Drive und rehydriert die lokalen Stores.
+    // 4. Konfliktvermeidung: lokale pending-Snapshots werden NICHT
+    //    ueberschrieben, und es wird pro Store + Kunde ein
+    //    lastShadowLoad-Timestamp in appState gepflegt.
+    // ================================================================
+
+    function _shadowFileName(storeName) {
+        return '_sync_' + storeName + '.json';
+    }
+
+    function _shadowAppDateiId(kundeId, storeName) {
+        // Muss mit saveAppDatei-Schema uebereinstimmen
+        var fileName = _shadowFileName(storeName);
+        return 'app_' + kundeId + '_Kunden-Daten_' + fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    }
+
+    // Liest alle Records eines Stores fuer einen Kunden, baut JSON und
+    // legt ihn als pending appDatei ab.
+    function _writeShadowLocal(kundeId, storeName) {
+        if (!kundeId || !storeName) return Promise.resolve(null);
+        var fetcher;
+        if (storeName === 'kunden') {
+            fetcher = getItem('kunden', kundeId).then(function(r) { return r ? [r] : []; });
+        } else {
+            fetcher = getByIndex(storeName, 'kundeId', kundeId);
+        }
+        return fetcher.then(function(records) {
+            var payload = {
+                schemaVersion: 1,
+                storeName: storeName,
+                kundeId: kundeId,
+                snapshotAt: new Date().toISOString(),
+                deviceId: _deviceId,
+                recordCount: records.length,
+                records: records
+            };
+            var json = JSON.stringify(payload);
+            var blob = new Blob([json], { type: 'application/json' });
+            var fileName = _shadowFileName(storeName);
+            return saveAppDatei(kundeId, 'Kunden-Daten', fileName, 'application/json', blob, 'sync_snapshot');
+        }).catch(function(err) {
+            console.warn('[ShadowSync] _writeShadowLocal Fehler (' + storeName + '):', err);
+            return null;
+        });
+    }
+
+    // Debounced: sammelt viele Aenderungen in 2.5s-Fenstern
+    function scheduleShadowSync(kundeId, storeName, delayMs) {
+        if (!kundeId || !storeName) return;
+        if (SHADOW_STORES.indexOf(storeName) < 0) return;
+        var key = kundeId + '__' + storeName;
+        if (_shadowDebounce[key]) clearTimeout(_shadowDebounce[key]);
+        _shadowDebounce[key] = setTimeout(function() {
+            delete _shadowDebounce[key];
+            _writeShadowLocal(kundeId, storeName);
+        }, typeof delayMs === 'number' ? delayMs : 2500);
+    }
+
+    // Sofort-Variante (fuer Shutdown oder manuellen Flush)
+    function flushShadowSync(kundeId, storeName) {
+        var key = kundeId + '__' + storeName;
+        if (_shadowDebounce[key]) {
+            clearTimeout(_shadowDebounce[key]);
+            delete _shadowDebounce[key];
+        }
+        return _writeShadowLocal(kundeId, storeName);
+    }
+
+    // Alle pendingen Shadow-Debounces sofort flushen (z.B. vor Sync-Button)
+    function flushAllPendingShadows() {
+        var promises = [];
+        Object.keys(_shadowDebounce).forEach(function(key) {
+            var parts = key.split('__');
+            var kundeId = parts[0];
+            var storeName = parts[1];
+            clearTimeout(_shadowDebounce[key]);
+            delete _shadowDebounce[key];
+            promises.push(_writeShadowLocal(kundeId, storeName));
+        });
+        return Promise.all(promises);
+    }
+
+    // Laedt EIN Shadow-File aus Drive und rehydriert den lokalen Store.
+    // Rueckgabe: { hydrated, reason, count?, snapshotAt? }
+    async function _hydrateOneShadow(kundeId, driveFolderId, storeName) {
+        var service = global.GoogleDriveService;
+        if (!service || !service.accessToken) {
+            return { hydrated: false, reason: 'drive_offline' };
+        }
+        var fileName = _shadowFileName(storeName);
+        try {
+            // Kunden-Daten-Unterordner suchen/anlegen
+            var kundenDatenId = await service.findOrCreateFolder(driveFolderId, 'Kunden-Daten');
+            // Nach _sync_<store>.json im Kunden-Daten-Ordner suchen
+            var q = "'" + kundenDatenId + "' in parents and name='" + fileName + "' and trashed=false";
+            var res = await service._fetchJSON(
+                'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
+                '&fields=files(id,name,modifiedTime)&pageSize=5'
+            );
+            var files = (res && res.files) || [];
+            if (files.length === 0) return { hydrated: false, reason: 'no_remote' };
+            var remote = files[0];
+
+            // Schutz 1: Ist der Drive-Snapshot neuer als unser letzter Hydrate?
+            var lastKey = 'shadowLoaded_' + kundeId + '_' + storeName;
+            var lastLoadedAt = await loadAppState(lastKey);
+            if (lastLoadedAt && remote.modifiedTime && remote.modifiedTime <= lastLoadedAt) {
+                return { hydrated: false, reason: 'up_to_date' };
+            }
+
+            // Schutz 2: Haben wir lokal pendinge Aenderungen die noch nicht auf Drive sind?
+            // Dann NICHT hydraten, sonst wuerden wir ungesynchte Aenderungen verlieren.
+            var localShadowId = _shadowAppDateiId(kundeId, storeName);
+            var localShadow = await getItem('appDateien', localShadowId);
+            if (localShadow && localShadow.syncStatus === 'pending') {
+                return { hydrated: false, reason: 'local_pending' };
+            }
+
+            // Download + Parse
+            var blob = await service.downloadFile(remote.id);
+            var text;
+            if (blob && typeof blob.text === 'function') {
+                text = await blob.text();
+            } else {
+                text = await new Promise(function(resolve, reject) {
+                    var fr = new FileReader();
+                    fr.onload = function() { resolve(fr.result); };
+                    fr.onerror = function() { reject(fr.error); };
+                    fr.readAsText(blob);
+                });
+            }
+            var payload = JSON.parse(text);
+            if (!payload || !Array.isArray(payload.records)) {
+                return { hydrated: false, reason: 'bad_payload' };
+            }
+
+            // Rehydrate: alten Kunde-Ausschnitt loeschen, neuen schreiben
+            // WICHTIG: Wir rufen deleteItem/putBatch so auf, dass der Shadow-Hook
+            // NICHT rekursiv triggert (sonst Endlosschleife).
+            // Trick: Wir schreiben direkt ueber eine Transaktion ohne Hook.
+            await _rehydrateStore(storeName, kundeId, payload.records);
+
+            // Timestamp merken (als Drive-ModifiedTime, nicht als lokale Zeit!)
+            await saveAppState(lastKey, remote.modifiedTime || new Date().toISOString());
+
+            return {
+                hydrated: true,
+                count: payload.records.length,
+                snapshotAt: payload.snapshotAt,
+                remoteModifiedTime: remote.modifiedTime
+            };
+        } catch(err) {
+            console.warn('[ShadowHydrate] Fehler ' + storeName + ':', err);
+            return { hydrated: false, reason: 'error', error: err.message };
+        }
+    }
+
+    // Schreibt Records in Store OHNE Shadow-Hook auszuloesen (sonst Loop)
+    function _rehydrateStore(storeName, kundeId, records) {
+        return new Promise(function(resolve, reject) {
+            try {
+                var tx = getTransaction(storeName, 'readwrite');
+                var store = tx.objectStore(storeName);
+                // 1. Alte Records fuer diesen Kunden loeschen
+                if (storeName === 'kunden') {
+                    // Single-Record: ueberschreiben reicht
+                } else {
+                    try {
+                        var idx = store.index('kundeId');
+                        var cursorReq = idx.openCursor(IDBKeyRange.only(kundeId));
+                        cursorReq.onsuccess = function(e) {
+                            var cursor = e.target.result;
+                            if (cursor) {
+                                cursor.delete();
+                                cursor.continue();
+                            }
+                        };
+                    } catch(e) { /* Index existiert nicht -> kein Cleanup */ }
+                }
+                // 2. Neue Records schreiben (nach Cleanup in gleicher Transaktion)
+                var now = new Date().toISOString();
+                records.forEach(function(item) {
+                    if (item && typeof item === 'object') {
+                        if (!item.updatedAt) item.updatedAt = now;
+                        try { store.put(item); } catch(e) { /* skip malformed */ }
+                    }
+                });
+                tx.oncomplete = function() { resolve(records.length); };
+                tx.onerror = function(e) { reject(e.target.error); };
+            } catch(e) { reject(e); }
+        });
+    }
+
+    // Haupt-Einstiegspunkt: Hydrate ALLE Shadow-Stores fuer einen Kunden
+    async function hydrateAllShadowsForKunde(kundeId, driveFolderId, onProgress) {
+        if (!kundeId || !driveFolderId) {
+            return { ok: false, reason: 'missing_ids', results: [] };
+        }
+        var service = global.GoogleDriveService;
+        if (!service || !service.accessToken) {
+            return { ok: false, reason: 'drive_offline', results: [] };
+        }
+        var results = [];
+        for (var i = 0; i < SHADOW_STORES.length; i++) {
+            var storeName = SHADOW_STORES[i];
+            if (onProgress) {
+                try {
+                    onProgress({
+                        store: storeName,
+                        current: i + 1,
+                        total: SHADOW_STORES.length,
+                        phase: 'hydrate'
+                    });
+                } catch(e) {}
+            }
+            var res = await _hydrateOneShadow(kundeId, driveFolderId, storeName);
+            results.push({ store: storeName, result: res });
+        }
+        var hydratedCount = results.filter(function(r) { return r.result && r.result.hydrated; }).length;
+        return { ok: true, results: results, hydratedStores: hydratedCount };
+    }
+
+    // Public ShadowSync-API
+    var ShadowSync = {
+        STORES: SHADOW_STORES,
+        schedule: scheduleShadowSync,
+        flush: flushShadowSync,
+        flushAll: flushAllPendingShadows,
+        hydrateForKunde: hydrateAllShadowsForKunde,
+        hydrateOne: _hydrateOneShadow
+    };
+
+
+    // ================================================================
     // EVENT-BUS INTEGRATION
     // ================================================================
     function setupEventListeners() {
@@ -1708,6 +1981,12 @@
         loadPositionsListenByRaum: loadPositionsListenByRaum,
         deletePositionsListe: deletePositionsListe,
         getRaeumeMitVorbereiteterListe: getRaeumeMitVorbereiteterListe,
+        // Shadow-Sync (Multi-Geraete-Sync fuer Rohdaten-Stores)
+        ShadowSync: ShadowSync,
+        scheduleShadowSync: scheduleShadowSync,
+        flushShadowSync: flushShadowSync,
+        flushAllPendingShadows: flushAllPendingShadows,
+        hydrateAllShadowsForKunde: hydrateAllShadowsForKunde,
         setupEventListeners: setupEventListeners,
         CONFIG: CONFIG, DB_NAME: DB_NAME, DB_VERSION: DB_VERSION, STORES: STORES
     };

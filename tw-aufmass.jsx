@@ -100,6 +100,8 @@
             };
 
             // Manueller Sync zu Drive: Vor-Sync-Check + Upload aller pending appDateien
+            // ERWEITERT: Flush aller debounced Shadow-Snapshots vor dem Upload,
+            // danach Hydrate der Shadow-Snapshots anderer Geraete aus Drive zurueck.
             var handleManualSync = async function() {
                 if (!driveConnected) {
                     alert('Bitte zuerst Google Drive verbinden!');
@@ -110,12 +112,16 @@
                     return;
                 }
                 try {
+                    // 0. NEU: Debounced Shadow-Snapshots sofort materialisieren
+                    //    (Raeume/Aufmass/Positionen/Kunden/PositionsListen)
+                    if (typeof window.TWStorage.flushAllPendingShadows === 'function') {
+                        try { await window.TWStorage.flushAllPendingShadows(); }
+                        catch(e) { console.warn('[Sync] Shadow-Flush:', e); }
+                    }
+
                     // 1. Pruefen ob ueberhaupt etwas zu syncen ist
                     var globalStatus = await window.TWStorage.DriveUploadSync.hasAnyUnsyncedChanges();
-                    if (!globalStatus.has) {
-                        alert('\u2705 Alles synchron!\n\nKeine offenen Aenderungen vorhanden.\n\nDie automatische Synchronisation alle 4-6 Stunden bleibt unveraendert aktiv.');
-                        return;
-                    }
+                    var hasUploads = !!globalStatus.has;
 
                     // 2. Welche Kunden haben pending Aenderungen?
                     var alleAppDateien = await window.TWStorage.getAll ? window.TWStorage.getAll('appDateien') : [];
@@ -127,18 +133,18 @@
                         }
                     });
                     var kundenIds = Object.keys(pendByKunde);
-                    if (kundenIds.length === 0) {
-                        alert('\u2705 Alles synchron!');
-                        return;
-                    }
 
-                    var bestaetigung = confirm(
-                        'Es liegen Aenderungen fuer ' + kundenIds.length + ' Kunde(n) vor.\n' +
-                        'Insgesamt ' + globalStatus.count + ' Datei(en) noch nicht auf Drive.\n\n' +
-                        'Jetzt synchronisieren?\n\n' +
-                        '(Vor dem Hochladen wird geprueft, ob auf Drive zwischenzeitlich neuere Versionen liegen.)'
-                    );
-                    if (!bestaetigung) return;
+                    // NEU: Wenn nichts hochzuladen ist, gehen wir trotzdem in den
+                    // Hydrate-Pfad (z.B. Handy, das nur Daten vom Tablet abholen will).
+                    if (kundenIds.length > 0) {
+                        var bestaetigung = confirm(
+                            'Es liegen Aenderungen fuer ' + kundenIds.length + ' Kunde(n) vor.\n' +
+                            'Insgesamt ' + globalStatus.count + ' Datei(en) noch nicht auf Drive.\n\n' +
+                            'Jetzt synchronisieren?\n\n' +
+                            '(Vor dem Hochladen wird geprueft, ob auf Drive zwischenzeitlich neuere Versionen liegen.)'
+                        );
+                        if (!bestaetigung) return;
+                    }
 
                     // 3. Pro Kunde syncen mit Vor-Sync-Check
                     var service = window.GoogleDriveService;
@@ -189,22 +195,67 @@
                         }
                     }
 
-                    // 4. Ergebnis anzeigen
+                    // 4. NEU: Hydrate-Phase — Shadow-Snapshots anderer Geraete einsammeln
+                    //    Laeuft fuer ALLE bekannten Kunden mit driveFolderId.
+                    //    Das ist der Pfad, der dein "Tablet -> Handy" Problem loest.
+                    var hydrateErgebnisse = [];
+                    try {
+                        var alleKunden = await window.TWStorage.listKunden();
+                        for (var hi = 0; hi < alleKunden.length; hi++) {
+                            var k = alleKunden[hi];
+                            var fid = k.driveFolderId || k.folderId || k._driveFolderId;
+                            if (!fid) continue;
+                            try {
+                                var hres = await window.TWStorage.hydrateAllShadowsForKunde(k.id, fid);
+                                if (hres && hres.results) {
+                                    var hydrated = hres.results.filter(function(r) {
+                                        return r.result && r.result.hydrated;
+                                    });
+                                    if (hydrated.length > 0) {
+                                        hydrateErgebnisse.push({
+                                            name: k.name || k.id,
+                                            stores: hydrated.map(function(r) {
+                                                return r.store + ' (' + (r.result.count || 0) + ')';
+                                            })
+                                        });
+                                    }
+                                }
+                            } catch(hydErr) {
+                                console.warn('[Sync] Hydrate-Fehler Kunde ' + (k.name || k.id) + ':', hydErr);
+                            }
+                        }
+                    } catch(hydOuterErr) {
+                        console.warn('[Sync] Hydrate-Phase Fehler:', hydOuterErr);
+                    }
+
+                    // 5. Ergebnis anzeigen (Upload + Hydrate zusammen)
                     var ok = ergebnisse.filter(function(r){ return r.status==='ok'; });
                     var fehler = ergebnisse.filter(function(r){ return r.status==='fehler'; });
                     var skip = ergebnisse.filter(function(r){ return r.status==='skip'; });
-                    var msg = '\u2705 Synchronisation abgeschlossen.\n\n';
-                    if (ok.length > 0) {
-                        msg += 'Erfolgreich: ' + ok.length + ' Kunde(n)\n';
-                        ok.forEach(function(r) { msg += '  \u2713 ' + (r.name || r.kundeId) + ': ' + r.uploaded + ' Datei(en)\n'; });
-                    }
-                    if (skip.length > 0) {
-                        msg += '\nUebersprungen: ' + skip.length + '\n';
-                        skip.forEach(function(r) { msg += '  - ' + (r.name || r.kundeId) + ': ' + r.grund + '\n'; });
-                    }
-                    if (fehler.length > 0) {
-                        msg += '\nFehler: ' + fehler.length + '\n';
-                        fehler.forEach(function(r) { msg += '  \u2717 ' + (r.name || r.kundeId) + ': ' + r.grund + '\n'; });
+                    var msg = '';
+                    if (!hasUploads && hydrateErgebnisse.length === 0) {
+                        msg = '\u2705 Alles synchron!\n\nKeine offenen Aenderungen und nichts Neues von anderen Geraeten.';
+                    } else {
+                        msg = '\u2705 Synchronisation abgeschlossen.\n\n';
+                        if (ok.length > 0) {
+                            msg += 'Hochgeladen: ' + ok.length + ' Kunde(n)\n';
+                            ok.forEach(function(r) { msg += '  \u2713 ' + (r.name || r.kundeId) + ': ' + r.uploaded + ' Datei(en)\n'; });
+                        }
+                        if (hydrateErgebnisse.length > 0) {
+                            msg += '\nNeue Daten von anderen Geraeten geladen:\n';
+                            hydrateErgebnisse.forEach(function(h) {
+                                msg += '  \u21E3 ' + h.name + ': ' + h.stores.join(', ') + '\n';
+                            });
+                            msg += '\nHinweis: Bitte den Kunden neu oeffnen, damit die Daten im Aufmass sichtbar werden.';
+                        }
+                        if (skip.length > 0) {
+                            msg += '\nUebersprungen: ' + skip.length + '\n';
+                            skip.forEach(function(r) { msg += '  - ' + (r.name || r.kundeId) + ': ' + r.grund + '\n'; });
+                        }
+                        if (fehler.length > 0) {
+                            msg += '\nFehler: ' + fehler.length + '\n';
+                            fehler.forEach(function(r) { msg += '  \u2717 ' + (r.name || r.kundeId) + ': ' + r.grund + '\n'; });
+                        }
                     }
                     alert(msg);
                 } catch(err) {
@@ -4046,7 +4097,7 @@
                                             {raum.bez}
                                         </div>
                                         <div className="raum-list-meta">
-                                            <span className="raum-list-tag">📐 {(raum.waende || []).length} Wände</span>
+                                            <span className="raum-list-tag">📐 {raum.waende.length} Wände</span>
                                             {raum.material && <span className="raum-list-tag">🧱 {raum.material.split('+')[0].trim()}</span>}
                                             <span className="raum-list-tag">📄 {raum.quelle}</span>
                                         </div>
