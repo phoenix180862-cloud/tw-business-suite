@@ -2057,5 +2057,441 @@
         }
 
         /* ═══════════════════════════════════════════
+           NAV DROPDOWN -- Top-Navigation (ersetzt die
+           breite Button-Leiste durch einen einzigen
+           Button, der den aktuellen Modus anzeigt und
+           beim Klick alle anderen Ziele als Dropdown
+           einblendet.
+           ═══════════════════════════════════════════ */
+        function NavDropdown(props) {
+            // Props:
+            //   currentMode  string   -> Label im Haupt-Button
+            //   targets      array    -> [{ id, label, handler, disabled }]
+            //   style        object   -> optional Container-Styles
+            var currentMode = props.currentMode || 'Navigation';
+            var targets = Array.isArray(props.targets) ? props.targets : [];
+            var containerStyle = props.style || {};
+
+            var [open, setOpen] = useState(false);
+            var wrapperRef = useRef(null);
+
+            // Klick ausserhalb schliesst das Dropdown
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+                        setOpen(false);
+                    }
+                };
+                var keyHandler = function(e) {
+                    if (e.key === 'Escape') setOpen(false);
+                };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open]);
+
+            // Blauer Gradient - einheitlich mit Design-System
+            var mainBtnStyle = {
+                padding: '10px 20px',
+                minHeight: '44px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: '700',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px rgba(30,136,229,0.30)',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+            };
+
+            var panelStyle = {
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px',
+                minWidth: '180px',
+                maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000,
+                animation: 'tw-nav-drop-in 140ms ease-out',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+            };
+
+            var itemStyle = function(disabled) {
+                return {
+                    padding: '10px 14px',
+                    minHeight: '42px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: disabled
+                        ? 'rgba(120,120,120,0.18)'
+                        : 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))',
+                    color: disabled ? 'rgba(255,255,255,0.45)' : '#fff',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    fontFamily: 'Oswald, sans-serif',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.4px',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                    opacity: disabled ? 0.5 : 1,
+                };
+            };
+
+            // Alle Ziele ausser dem aktuellen zeigen (Skill Regel 1.1)
+            var shownTargets = targets.filter(function(t) {
+                return t && t.label !== currentMode;
+            });
+
+            var handleSelect = function(target) {
+                if (target.disabled) return;
+                setOpen(false);
+                if (typeof target.handler === 'function') {
+                    try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); }
+                }
+            };
+
+            return (
+                <div
+                    ref={wrapperRef}
+                    style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}
+                >
+                    <button
+                        type="button"
+                        style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
+                        aria-haspopup="true"
+                        aria-expanded={open}
+                        title={'Navigation -- aktuell: ' + currentMode}
+                    >
+                        <span>{currentMode}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && shownTargets.length > 0 && (
+                        <div style={panelStyle} role="menu">
+                            {shownTargets.map(function(t) {
+                                return (
+                                    <button
+                                        key={t.id || t.label}
+                                        type="button"
+                                        role="menuitem"
+                                        disabled={!!t.disabled}
+                                        style={itemStyle(t.disabled)}
+                                        onClick={function() { handleSelect(t); }}
+                                    >
+                                        {t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
+           AKTION DROPDOWN -- "Bearbeiten"-Menue
+           Bundelt alle Funktions-Buttons einer Seite
+           unter einem einzigen Dropdown. Einheitlich
+           gestylt wie NavDropdown.
+           Unterstuetzt: Icons (Emoji-String), Deaktivieren,
+           Sub-Dropdowns (fuer "Akten"), destruktive
+           Aktionen (rot markiert).
+           ═══════════════════════════════════════════ */
+        function AktionDropdown(props) {
+            // Props:
+            //   label      string   -> Button-Beschriftung, default "Bearbeiten"
+            //   actions    array    -> [{ id, label, icon, handler, disabled, destructive, subItems }]
+            //   align      'left'|'right'  -> Ausrichtung des Panels, default 'right'
+            //   style      object   -> optional Container-Styles
+            var label = props.label || 'Bearbeiten';
+            var actions = Array.isArray(props.actions) ? props.actions : [];
+            var align = props.align || 'right';
+            var containerStyle = props.style || {};
+
+            var [open, setOpen] = useState(false);
+            var [openSubId, setOpenSubId] = useState(null);
+            var wrapperRef = useRef(null);
+
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+                        setOpen(false);
+                        setOpenSubId(null);
+                    }
+                };
+                var keyHandler = function(e) {
+                    if (e.key === 'Escape') { setOpen(false); setOpenSubId(null); }
+                };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open]);
+
+            var mainBtnStyle = {
+                padding: '10px 18px',
+                minHeight: '44px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: '700',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px rgba(30,136,229,0.30)',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+            };
+
+            var panelStyle = Object.assign({
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px',
+                minWidth: '220px',
+                maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000,
+                animation: 'tw-nav-drop-in 140ms ease-out',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            }, align === 'left' ? { left: 0 } : { right: 0 });
+
+            var itemStyle = function(disabled, destructive) {
+                return {
+                    padding: '10px 12px',
+                    minHeight: '42px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: disabled
+                        ? 'rgba(120,120,120,0.15)'
+                        : 'transparent',
+                    color: disabled
+                        ? 'rgba(255,255,255,0.4)'
+                        : (destructive ? 'var(--accent-red-light)' : 'var(--text-primary)'),
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    fontFamily: 'Source Sans 3, sans-serif',
+                    textAlign: 'left',
+                    transition: 'background 0.12s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    opacity: disabled ? 0.55 : 1,
+                };
+            };
+
+            var subPanelStyle = {
+                position: 'absolute',
+                top: 0,
+                right: 'calc(100% + 4px)',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.45)',
+                padding: '6px',
+                minWidth: '200px',
+                maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1001,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            };
+
+            var handleAction = function(a) {
+                if (a.disabled) return;
+                if (a.subItems && a.subItems.length > 0) {
+                    // Sub-Dropdown auf/zu-klappen
+                    setOpenSubId(function(cur) { return cur === a.id ? null : a.id; });
+                    return;
+                }
+                // Normale Aktion ausfuehren
+                setOpen(false);
+                setOpenSubId(null);
+                if (typeof a.handler === 'function') {
+                    try { a.handler(); } catch(err) { console.error('AktionDropdown handler:', err); }
+                }
+            };
+
+            var handleSubItem = function(parentId, item) {
+                if (item.disabled) return;
+                setOpen(false);
+                setOpenSubId(null);
+                if (typeof item.handler === 'function') {
+                    try { item.handler(); } catch(err) { console.error('AktionDropdown sub:', err); }
+                }
+            };
+
+            return (
+                <div
+                    ref={wrapperRef}
+                    style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}
+                >
+                    <button
+                        type="button"
+                        style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); setOpenSubId(null); }}
+                        aria-haspopup="true"
+                        aria-expanded={open}
+                        title={label}
+                    >
+                        <span style={{fontSize:'14px'}}>{'\u270E'}</span>
+                        <span>{label}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && actions.length > 0 && (
+                        <div style={panelStyle} role="menu">
+                            {actions.map(function(a) {
+                                var hasSub = a.subItems && a.subItems.length > 0;
+                                var isSubOpen = openSubId === a.id;
+                                return (
+                                    <div key={a.id || a.label} style={{position:'relative'}}>
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            disabled={!!a.disabled}
+                                            style={itemStyle(a.disabled, a.destructive)}
+                                            onClick={function() { handleAction(a); }}
+                                            onMouseOver={function(e) {
+                                                if (!a.disabled) e.currentTarget.style.background = 'var(--bg-hover)';
+                                            }}
+                                            onMouseOut={function(e) {
+                                                if (!a.disabled) e.currentTarget.style.background = 'transparent';
+                                            }}
+                                        >
+                                            {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
+                                            <span style={{flex:1}}>{a.label}</span>
+                                            {hasSub && <span style={{fontSize:'10px', opacity:0.7}}>{'\u25B6'}</span>}
+                                        </button>
+                                        {hasSub && isSubOpen && (
+                                            <div style={subPanelStyle} role="menu">
+                                                {a.subItems.map(function(si) {
+                                                    return (
+                                                        <button
+                                                            key={si.id || si.label}
+                                                            type="button"
+                                                            role="menuitem"
+                                                            disabled={!!si.disabled}
+                                                            style={itemStyle(si.disabled, si.destructive)}
+                                                            onClick={function() { handleSubItem(a.id, si); }}
+                                                            onMouseOver={function(e) {
+                                                                if (!si.disabled) e.currentTarget.style.background = 'var(--bg-hover)';
+                                                            }}
+                                                            onMouseOut={function(e) {
+                                                                if (!si.disabled) e.currentTarget.style.background = 'transparent';
+                                                            }}
+                                                        >
+                                                            {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
+                                                            <span style={{flex:1}}>{si.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* CSS Keyframes fuer Dropdown-Animation - einmalig ins Dokument injizieren */
+        (function() {
+            if (typeof document === 'undefined') return;
+            if (document.getElementById('tw-dropdown-anim-style')) return;
+            var s = document.createElement('style');
+            s.id = 'tw-dropdown-anim-style';
+            s.textContent = '@keyframes tw-nav-drop-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }' +
+                ' @keyframes tw-toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
+                ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }';
+            document.head.appendChild(s);
+        })();
+
+        /* ═══════════════════════════════════════════
+           TOAST HELPER -- dezente Benachrichtigung
+           unten rechts, verschwindet nach ~3.5s.
+           Mehrfachaufrufe werden gestapelt.
+           Global verfuegbar als window._showToast(msg, type?)
+           type: 'success' (default) | 'info' | 'error'
+           ═══════════════════════════════════════════ */
+        (function() {
+            if (typeof window === 'undefined') return;
+            if (window._showToast) return;
+            var containerId = 'tw-toast-container';
+            var getContainer = function() {
+                var c = document.getElementById(containerId);
+                if (!c) {
+                    c = document.createElement('div');
+                    c.id = containerId;
+                    c.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:calc(100vw - 32px);pointer-events:none;';
+                    document.body.appendChild(c);
+                }
+                return c;
+            };
+            window._showToast = function(msg, type) {
+                try {
+                    var t = type || 'success';
+                    var bg = t === 'error' ? 'linear-gradient(135deg, #c0392b, #962d22)'
+                           : t === 'info'  ? 'linear-gradient(135deg, #2c3e50, #1e2a38)'
+                                           : 'linear-gradient(135deg, #1E88E5, #1565C0)';
+                    var shadow = t === 'error' ? 'rgba(196,30,30,0.35)' : 'rgba(30,136,229,0.35)';
+                    var el = document.createElement('div');
+                    el.style.cssText = 'pointer-events:auto;padding:12px 18px;border-radius:10px;background:' + bg +
+                        ';color:#fff;font-family:Oswald, sans-serif;font-size:13px;font-weight:600;letter-spacing:0.3px;' +
+                        'box-shadow:0 6px 18px ' + shadow + ';animation:tw-toast-in 180ms ease-out;max-width:400px;' +
+                        'word-wrap:break-word;line-height:1.35;';
+                    el.textContent = msg;
+                    getContainer().appendChild(el);
+                    setTimeout(function() {
+                        el.style.animation = 'tw-toast-out 220ms ease-in forwards';
+                        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
+                    }, 3200);
+                } catch(e) {
+                    // Im Zweifel keinen Absturz riskieren
+                    try { console.log('[Toast]', msg); } catch(_) {}
+                }
+            };
+        })();
+
+        /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
