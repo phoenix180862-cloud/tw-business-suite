@@ -860,22 +860,27 @@
                 setAnlegeBusy(false);
             }
 
-            // ── Die 4 Standard-Unterordner (aus STAGING_CONFIG) ──
+            // ── Die 5 Standard-Unterordner (aus STAGING_CONFIG, Etappe 4.1 B2) ──
+            // Anweisungen ersetzt "Baustellen-App", Fotos ersetzt "Bilder",
+            // Baustellendaten ist neu. Alias-Logik in tw-staging.js — Legacy-Ordner
+            // werden automatisch unter dem neuen Namen angezeigt.
             var cfg = window.STAGING_CONFIG || {};
-            var unterordnerListe = (cfg.SUBFOLDERS || ['Zeichnungen', 'Baustellen-App', 'Bilder', 'Stunden']).map(function(name) {
+            var unterordnerListe = (cfg.SUBFOLDERS || ['Zeichnungen', 'Anweisungen', 'Baustellendaten', 'Fotos', 'Stunden']).map(function(name) {
                 var icon = '📁';
                 var farbe = '#1E88E5';
-                if (name === 'Zeichnungen')    { icon = '📐'; farbe = '#2ecc71'; }
-                if (name === 'Baustellen-App') { icon = '📱'; farbe = '#3498db'; }
-                if (name === 'Bilder')         { icon = '📸'; farbe = '#9b59b6'; }
-                if (name === 'Stunden')        { icon = '⏱️'; farbe = '#e67e22'; }
+                if (name === 'Zeichnungen')     { icon = '📐'; farbe = '#2ecc71'; }
+                if (name === 'Anweisungen')     { icon = '📋'; farbe = '#3498db'; }
+                if (name === 'Baustellendaten') { icon = '📊'; farbe = '#1E88E5'; }
+                if (name === 'Fotos')           { icon = '📸'; farbe = '#e91e63'; }
+                if (name === 'Stunden')         { icon = '⏱️'; farbe = '#e67e22'; }
                 var daten = info && info.unterordner ? info.unterordner[name] : null;
                 return {
                     name: name,
                     icon: icon,
                     farbe: farbe,
                     daten: daten,
-                    permission: (cfg.SUBFOLDER_PERMISSIONS || {})[name] || 'readonly'
+                    permission: (cfg.SUBFOLDER_PERMISSIONS || {})[name] || 'readonly',
+                    legacyName: daten && daten.legacyName ? daten.legacyName : null
                 };
             });
 
@@ -925,7 +930,7 @@
                                 marginBottom: '18px'
                             }}>
                                 Legt einen neuen Ordner <strong>Baustellen-App-Staging/{baustelle.name}</strong> an
-                                mit den vier Unterordnern.
+                                mit den fuenf Unterordnern.
                                 Der Original-Kundenordner bleibt dabei unveraendert.
                             </div>
                             <button
@@ -1222,6 +1227,24 @@
                                         }}>
                                             {u.permission === 'upload' ? 'MA: Upload' : 'MA: nur lesen'}
                                         </div>
+                                        {/* ETAPPE 4.1 B2: Legacy-Alias-Hinweis */}
+                                        {u.legacyName && (
+                                            <div
+                                                title={'Auf Drive noch als "' + u.legacyName + '" benannt. Drive-Migration folgt in Baustein 8.'}
+                                                style={{
+                                                    marginTop: '3px',
+                                                    fontSize: '8px',
+                                                    padding: '1px 6px',
+                                                    background: 'rgba(230,126,34,0.15)',
+                                                    color: 'var(--accent-orange)',
+                                                    borderRadius: '3px',
+                                                    fontFamily: "'Oswald', sans-serif",
+                                                    fontWeight: 600,
+                                                    letterSpacing: '0.3px'
+                                                }}>
+                                                ⚠ Drive: "{u.legacyName}"
+                                            </div>
+                                        )}
                                     </button>
                                 );
                             })}
