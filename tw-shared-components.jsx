@@ -2068,9 +2068,24 @@
             //   currentMode  string   -> Label im Haupt-Button
             //   targets      array    -> [{ id, label, handler, disabled }]
             //   style        object   -> optional Container-Styles
+            //   color        'blue'|'red'  -> Farbschema, default 'red' (alle NavDropdowns sind rot)
             var currentMode = props.currentMode || 'Navigation';
             var targets = Array.isArray(props.targets) ? props.targets : [];
             var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+
+            // Farb-Palette je nach color-Prop
+            var palette = color === 'red'
+                ? {
+                    mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
+                    mainShadow: 'rgba(196,30,30,0.30)',
+                    itemGrad: 'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))'
+                }
+                : {
+                    mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    mainShadow: 'rgba(30,136,229,0.30)',
+                    itemGrad: 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))'
+                };
 
             var [open, setOpen] = useState(false);
             var [focusIdx, setFocusIdx] = useState(-1);
@@ -2118,21 +2133,21 @@
                 }
             }, [focusIdx, open]);
 
-            // Blauer Gradient - einheitlich mit Design-System
+            // Blauer/Roter Gradient - Farbe via color-Prop steuerbar
             var mainBtnStyle = {
                 padding: '10px 20px',
                 minHeight: '44px',
                 borderRadius: '8px',
                 border: 'none',
                 cursor: 'pointer',
-                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                background: palette.mainGrad,
                 color: '#fff',
                 fontSize: '13px',
                 fontWeight: '700',
                 fontFamily: 'Oswald, sans-serif',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                boxShadow: '0 3px 10px rgba(30,136,229,0.30)',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
                 transition: 'all 0.2s ease',
                 whiteSpace: 'nowrap',
                 display: 'inline-flex',
@@ -2143,8 +2158,7 @@
             var panelStyle = {
                 position: 'absolute',
                 top: 'calc(100% + 6px)',
-                left: '50%',
-                transform: 'translateX(-50%)',
+                left: '0',
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '10px',
@@ -2153,7 +2167,7 @@
                 minWidth: '180px',
                 maxWidth: 'calc(100vw - 16px)',
                 zIndex: 1000,
-                animation: 'tw-nav-drop-in 140ms ease-out',
+                animation: 'tw-nav-drop-in-left 140ms ease-out',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px',
@@ -2168,7 +2182,7 @@
                     cursor: disabled ? 'not-allowed' : 'pointer',
                     background: disabled
                         ? 'rgba(120,120,120,0.18)'
-                        : 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))',
+                        : palette.itemGrad,
                     color: disabled ? 'rgba(255,255,255,0.45)' : '#fff',
                     fontSize: '12px',
                     fontWeight: '700',
@@ -2244,10 +2258,22 @@
             //   actions    array    -> [{ id, label, icon, handler, disabled, destructive, subItems }]
             //   align      'left'|'right'  -> Ausrichtung des Panels, default 'right'
             //   style      object   -> optional Container-Styles
+            //   color      'blue'|'red' -> Farbschema des Haupt-Buttons, default 'red' (alle Bearbeiten-Dropdowns sind rot)
             var label = props.label || 'Bearbeiten';
             var actions = Array.isArray(props.actions) ? props.actions : [];
             var align = props.align || 'right';
             var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+
+            var palette = color === 'red'
+                ? {
+                    mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
+                    mainShadow: 'rgba(196,30,30,0.30)'
+                }
+                : {
+                    mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    mainShadow: 'rgba(30,136,229,0.30)'
+                };
 
             var [open, setOpen] = useState(false);
             var [openSubId, setOpenSubId] = useState(null);
@@ -2280,14 +2306,14 @@
                 borderRadius: '8px',
                 border: 'none',
                 cursor: 'pointer',
-                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                background: palette.mainGrad,
                 color: '#fff',
                 fontSize: '13px',
                 fontWeight: '700',
                 fontFamily: 'Oswald, sans-serif',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
-                boxShadow: '0 3px 10px rgba(30,136,229,0.30)',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
                 transition: 'all 0.2s ease',
                 whiteSpace: 'nowrap',
                 display: 'inline-flex',
@@ -2312,24 +2338,38 @@
                 gap: '3px',
             }, align === 'left' ? { left: 0 } : { right: 0 });
 
-            var itemStyle = function(disabled, destructive) {
+            var itemStyle = function(disabled, destructive, variant) {
+                // variant 'red' = roter Akzent-Hintergrund fuer besonders markierte Eintraege
+                // (z.B. Aufmass-Vorlage-Eintraege laut User-Wunsch)
+                var bg, col;
+                if (disabled) {
+                    bg = 'rgba(120,120,120,0.15)';
+                    col = 'rgba(255,255,255,0.4)';
+                } else if (destructive) {
+                    bg = 'transparent';
+                    col = 'var(--accent-red-light)';
+                } else if (variant === 'red') {
+                    bg = 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
+                    col = '#fff';
+                } else {
+                    bg = 'transparent';
+                    col = 'var(--text-primary)';
+                }
                 return {
                     padding: '10px 12px',
                     minHeight: '42px',
                     borderRadius: '7px',
                     border: 'none',
                     cursor: disabled ? 'not-allowed' : 'pointer',
-                    background: disabled
-                        ? 'rgba(120,120,120,0.15)'
-                        : 'transparent',
-                    color: disabled
-                        ? 'rgba(255,255,255,0.4)'
-                        : (destructive ? 'var(--accent-red-light)' : 'var(--text-primary)'),
+                    background: bg,
+                    color: col,
                     fontSize: '13px',
-                    fontWeight: '600',
-                    fontFamily: 'Source Sans 3, sans-serif',
+                    fontWeight: variant === 'red' ? '700' : '600',
+                    fontFamily: 'Oswald, sans-serif',
+                    textTransform: variant === 'red' ? 'uppercase' : 'none',
+                    letterSpacing: variant === 'red' ? '0.4px' : '0',
                     textAlign: 'left',
-                    transition: 'background 0.12s ease',
+                    transition: 'background 0.12s ease, filter 0.12s ease',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
@@ -2411,13 +2451,23 @@
                                             role="menuitem"
                                             className="tw-aktion-dropdown-item"
                                             disabled={!!a.disabled}
-                                            style={itemStyle(a.disabled, a.destructive)}
+                                            style={itemStyle(a.disabled, a.destructive, a.variant)}
                                             onClick={function() { handleAction(a); }}
                                             onMouseOver={function(e) {
-                                                if (!a.disabled) e.currentTarget.style.background = 'var(--bg-hover)';
+                                                if (a.disabled) return;
+                                                if (a.variant === 'red') {
+                                                    e.currentTarget.style.filter = 'brightness(1.15)';
+                                                } else {
+                                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                                }
                                             }}
                                             onMouseOut={function(e) {
-                                                if (!a.disabled) e.currentTarget.style.background = 'transparent';
+                                                if (a.disabled) return;
+                                                if (a.variant === 'red') {
+                                                    e.currentTarget.style.filter = 'none';
+                                                } else {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                }
                                             }}
                                         >
                                             {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
@@ -2434,13 +2484,23 @@
                                                             role="menuitem"
                                                             className="tw-aktion-dropdown-item"
                                                             disabled={!!si.disabled}
-                                                            style={itemStyle(si.disabled, si.destructive)}
+                                                            style={itemStyle(si.disabled, si.destructive, si.variant)}
                                                             onClick={function() { handleSubItem(a.id, si); }}
                                                             onMouseOver={function(e) {
-                                                                if (!si.disabled) e.currentTarget.style.background = 'var(--bg-hover)';
+                                                                if (si.disabled) return;
+                                                                if (si.variant === 'red') {
+                                                                    e.currentTarget.style.filter = 'brightness(1.15)';
+                                                                } else {
+                                                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                                                }
                                                             }}
                                                             onMouseOut={function(e) {
-                                                                if (!si.disabled) e.currentTarget.style.background = 'transparent';
+                                                                if (si.disabled) return;
+                                                                if (si.variant === 'red') {
+                                                                    e.currentTarget.style.filter = 'none';
+                                                                } else {
+                                                                    e.currentTarget.style.background = 'transparent';
+                                                                }
                                                             }}
                                                         >
                                                             {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}

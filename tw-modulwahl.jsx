@@ -56,7 +56,7 @@
                             {kunde ? kunde.name : 'Kunde'}
                         </div>
                         <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px', letterSpacing:'2px', textTransform:'uppercase', fontFamily:'Oswald, sans-serif', fontWeight:'500'}}>
-                            Modul w\u00e4hlen
+                            {'Modul w\u00e4hlen'}
                         </div>
                     </div>
 
@@ -110,7 +110,7 @@
                 <div className="modal-overlay" style={{zIndex:5000, background:'rgba(10,15,25,0.95)', display:'flex', alignItems:'center', justifyContent:'center'}}>
                     <div style={{width:'90%', maxWidth:'400px', textAlign:'center', color:'white'}}>
                         <div style={{fontSize:'48px', marginBottom:'16px'}}>&#129302;</div>
-                        <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px'}}>KI-Analyse l\u00e4uft...</div>
+                        <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'8px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px'}}>{'KI-Analyse l\u00e4uft...'}</div>
 
                         <div style={{width:'100%', height:'8px', background:'rgba(255,255,255,0.1)', borderRadius:'4px', overflow:'hidden', marginBottom:'12px'}}>
                             <div style={{width: pct + '%', height:'100%', background:'linear-gradient(90deg, var(--accent-blue), var(--accent-orange))', borderRadius:'4px', transition:'width 0.5s ease'}}></div>
@@ -147,7 +147,7 @@
                                 Öffne den Kunden über "Kunde NEU" um eine KI-Analyse durchzuführen.
                             </div>
                             <button onClick={onClose} style={{padding:'10px 24px', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', border:'none', borderRadius:'var(--radius-md)', fontSize:'14px', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontWeight:'600', textTransform:'uppercase', letterSpacing:'1px', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', transition:'all 0.25s ease'}}>
-                                Schlie\u00dfen
+                                {'Schlie\u00dfen'}
                             </button>
                         </div>
                     </div>
@@ -319,7 +319,7 @@
                                 {'\uD83D\uDD04'} KI-Analyse neu starten
                             </button>
                             <button onClick={onClose} style={{flex:1, padding:'10px', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', border:'none', borderRadius:'var(--radius-md)', fontSize:'12px', fontWeight:'600', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', transition:'all 0.25s ease'}}>
-                                Schlie\u00dfen
+                                {'Schlie\u00dfen'}
                             </button>
                         </div>
                     </div>
