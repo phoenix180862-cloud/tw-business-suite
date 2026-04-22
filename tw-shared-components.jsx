@@ -2057,170 +2057,184 @@
         }
 
         /* ═══════════════════════════════════════════
-           SEITEN-AKTIONEN REGISTRY (Etappe 8)
-           ═══════════════════════════════════════════
-           Globaler Speicher fuer Aktionen, die Seiten
-           ins zentrale Bearbeiten-Dropdown einschleusen.
-           Module rufen beim Mount window._registerSeitenAktionen auf.
+           NAV DROPDOWN -- Top-Navigation (ersetzt die
+           breite Button-Leiste durch einen einzigen
+           Button, der den aktuellen Modus anzeigt und
+           beim Klick alle anderen Ziele als Dropdown
+           einblendet.
            ═══════════════════════════════════════════ */
-        if (typeof window !== 'undefined' && !window._seitenAktionenInit) {
-            window._seitenAktionenInit = true;
-            window._seitenAktionenRegistry = {};
-            window._primaerAktionRegistry = {};
-            window._seitenAktionenListeners = [];
-            window._registerSeitenAktionen = function(pageKey, aktionen) {
-                window._seitenAktionenRegistry[pageKey] = aktionen || [];
-                (window._seitenAktionenListeners || []).forEach(function(fn){ try { fn(); } catch(e){} });
-            };
-            window._unregisterSeitenAktionen = function(pageKey) {
-                delete window._seitenAktionenRegistry[pageKey];
-                (window._seitenAktionenListeners || []).forEach(function(fn){ try { fn(); } catch(e){} });
-            };
-            window._registerPrimaerAktion = function(pageKey, aktion) {
-                window._primaerAktionRegistry[pageKey] = aktion;
-                (window._seitenAktionenListeners || []).forEach(function(fn){ try { fn(); } catch(e){} });
-            };
-            window._unregisterPrimaerAktion = function(pageKey) {
-                delete window._primaerAktionRegistry[pageKey];
-                (window._seitenAktionenListeners || []).forEach(function(fn){ try { fn(); } catch(e){} });
-            };
-        }
+        function NavDropdown(props) {
+            // Props:
+            //   currentMode  string   -> Label im Haupt-Button
+            //   targets      array    -> [{ id, label, handler, disabled }]
+            //   style        object   -> optional Container-Styles
+            //   color        'blue'|'red'  -> Farbschema, default 'red' (alle NavDropdowns sind rot)
+            var currentMode = props.currentMode || 'Navigation';
+            var targets = Array.isArray(props.targets) ? props.targets : [];
+            var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
 
-        /* Hook: React auf Registry-Aenderungen re-rendern */
-        function useSeitenAktionenTick() {
-            const [, setTick] = useState(0);
-            useEffect(function() {
-                var listener = function() { setTick(function(v){ return v + 1; }); };
-                if (!window._seitenAktionenListeners) window._seitenAktionenListeners = [];
-                window._seitenAktionenListeners.push(listener);
-                return function() {
-                    if (!window._seitenAktionenListeners) return;
-                    var idx = window._seitenAktionenListeners.indexOf(listener);
-                    if (idx >= 0) window._seitenAktionenListeners.splice(idx, 1);
-                };
-            }, []);
-        }
-
-        /* ═══════════════════════════════════════════
-           BEARBEITEN-DROPDOWN (Etappe 8)
-           ═══════════════════════════════════════════
-           Nimmt die fuer die aktuelle Seite registrierten
-           Aktionen und zeigt sie als Popdown-Menue.
-           Item-Formate:
-             { label, icon?, onClick, disabled?, style? }
-             { type: 'divider' }
-             { type: 'submenu', label, items: [...] }
-           Verhalten:
-           - Schliesst NUR per X oder 2. Klick auf Trigger
-             (KEIN Auto-Close bei Aussenklick)
-           - Sub-Menues oeffnen bei Hover ODER Tap
-           ═══════════════════════════════════════════ */
-        function BearbeitenDropdown({ page }) {
-            const [open, setOpen] = useState(false);
-            const [activeSub, setActiveSub] = useState(null);
-            useSeitenAktionenTick();
-
-            var aktionen = (window._seitenAktionenRegistry && window._seitenAktionenRegistry[page]) || [];
-            var hasAktionen = aktionen.length > 0;
-
-            var btnStyle = {
-                flex:1,
-                padding:'10px 12px',
-                borderRadius:'var(--radius-sm)',
-                border: open ? '1px solid rgba(255,255,255,0.35)' : 'none',
-                cursor: hasAktionen ? 'pointer' : 'not-allowed',
-                background: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                color:'#fff',
-                fontSize:'12px',
-                fontWeight:'700',
-                display:'flex',
-                alignItems:'center',
-                justifyContent:'center',
-                gap:'6px',
-                fontFamily:'Oswald, sans-serif',
-                textTransform:'uppercase',
-                letterSpacing:'0.4px',
-                opacity: hasAktionen ? 1 : 0.4,
-                boxShadow: open ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : '0 2px 8px rgba(196,30,30,0.25)',
-                transition:'all 0.2s ease'
-            };
-
-            function handleEntryClick(entry) {
-                if (entry.disabled) return;
-                setOpen(false);
-                setActiveSub(null);
-                if (typeof entry.onClick === 'function') {
-                    setTimeout(entry.onClick, 0);
+            // Farb-Palette je nach color-Prop
+            var palette = color === 'red'
+                ? {
+                    mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
+                    mainShadow: 'rgba(196,30,30,0.30)',
+                    itemGrad: 'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))'
                 }
-            }
+                : {
+                    mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    mainShadow: 'rgba(30,136,229,0.30)',
+                    itemGrad: 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))'
+                };
+
+            var [open, setOpen] = useState(false);
+            var [focusIdx, setFocusIdx] = useState(-1);
+            var wrapperRef = useRef(null);
+
+            // Alle Ziele ausser dem aktuellen zeigen (Skill Regel 1.1)
+            var shownTargets = targets.filter(function(t) {
+                return t && t.label !== currentMode;
+            });
+
+            // Klick ausserhalb schliesst das Dropdown
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+                        setOpen(false);
+                    }
+                };
+                var keyHandler = function(e) {
+                    if (e.key === 'Escape') { setOpen(false); setFocusIdx(-1); }
+                    else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setFocusIdx(function(i) { return Math.min(i + 1, shownTargets.length - 1); });
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setFocusIdx(function(i) { return Math.max(i - 1, 0); });
+                    }
+                };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open, shownTargets.length]);
+
+            // Fokus-Sync: wenn focusIdx sich aendert, fokussiere den Button via DOM-Ref
+            useEffect(function() {
+                if (!open || focusIdx < 0 || !wrapperRef.current) return;
+                var btns = wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');
+                if (btns && btns[focusIdx]) {
+                    try { btns[focusIdx].focus(); } catch(e) {}
+                }
+            }, [focusIdx, open]);
+
+            // Blauer/Roter Gradient - Farbe via color-Prop steuerbar
+            var mainBtnStyle = {
+                padding: '10px 20px',
+                minHeight: '44px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                background: palette.mainGrad,
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: '700',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+            };
+
+            var panelStyle = {
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: '0',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px',
+                minWidth: '180px',
+                maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000,
+                animation: 'tw-nav-drop-in-left 140ms ease-out',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+            };
+
+            var itemStyle = function(disabled) {
+                return {
+                    padding: '10px 14px',
+                    minHeight: '42px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: disabled
+                        ? 'rgba(120,120,120,0.18)'
+                        : palette.itemGrad,
+                    color: disabled ? 'rgba(255,255,255,0.45)' : '#fff',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    fontFamily: 'Oswald, sans-serif',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.4px',
+                    textAlign: 'left',
+                    transition: 'all 0.15s ease',
+                    opacity: disabled ? 0.5 : 1,
+                };
+            };
+
+            var handleSelect = function(target) {
+                if (target.disabled) return;
+                setOpen(false);
+                setFocusIdx(-1);
+                if (typeof target.handler === 'function') {
+                    try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); }
+                }
+            };
 
             return (
-                <div style={{flex:1, position:'relative'}}>
+                <div
+                    ref={wrapperRef}
+                    style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}
+                >
                     <button
-                        onClick={function() { setOpen(function(v){ if (v) setActiveSub(null); return !v; }); }}
-                        disabled={!hasAktionen}
-                        style={btnStyle}>
-                        <span>{'\u270E'}</span>
-                        <span>Bearbeiten</span>
-                        <span style={{fontSize:'10px', marginLeft:'2px'}}>{open ? '\u25B4' : '\u25BE'}</span>
+                        type="button"
+                        style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
+                        aria-haspopup="true"
+                        aria-expanded={open}
+                        title={'Navigation -- aktuell: ' + currentMode}
+                    >
+                        <span>{currentMode}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
                     </button>
-
-                    {open && hasAktionen && (
-                        <div style={{position:'absolute', top:'calc(100% + 4px)', left:0, minWidth:'210px', maxWidth:'260px', background:'#262b3a', border:'1px solid var(--accent-red)', borderRadius:'8px', padding:'4px', zIndex:200, boxShadow:'0 6px 20px rgba(0,0,0,0.55)'}}>
-                            {/* Schliessen-Leiste */}
-                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'2px 4px 4px', borderBottom:'1px solid rgba(255,255,255,0.1)', marginBottom:'4px'}}>
-                                <span style={{fontSize:'10px', color:'var(--text-muted)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>Bearbeiten</span>
-                                <button onClick={function(){ setOpen(false); setActiveSub(null); }}
-                                    style={{width:'22px', height:'22px', background:'rgba(255,255,255,0.08)', border:'none', borderRadius:'4px', color:'#fff', cursor:'pointer', fontSize:'11px', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                    {'\u2715'}
-                                </button>
-                            </div>
-
-                            {aktionen.map(function(a, i) {
-                                if (a.type === 'divider') {
-                                    return <div key={'div' + i} style={{height:'1px', background:'rgba(255,255,255,0.1)', margin:'4px 0'}} />;
-                                }
-                                if (a.type === 'submenu') {
-                                    var isActive = activeSub === i;
-                                    return (
-                                        <div key={'sub' + i}
-                                            onMouseEnter={function(){ setActiveSub(i); }}
-                                            onClick={function(){ setActiveSub(isActive ? null : i); }}
-                                            style={{position:'relative', padding:'9px 10px', color:'#f0f0f0', fontSize:'12px', fontWeight:500, fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', cursor:'pointer', display:'flex', justifyContent:'space-between', alignItems:'center', borderRadius:'3px', background: isActive ? 'rgba(196,30,30,0.18)' : 'transparent'}}>
-                                            <span style={{display:'flex', alignItems:'center', gap:'6px'}}>
-                                                {a.icon && <span>{a.icon}</span>}
-                                                <span>{a.label}</span>
-                                            </span>
-                                            <span style={{fontSize:'10px', color:'var(--accent-red-light)'}}>{'\u25B6'}</span>
-                                            {isActive && (
-                                                <div style={{position:'absolute', top:'-4px', left:'calc(100% + 2px)', minWidth:'190px', maxWidth:'240px', background:'#262b3a', border:'1px solid var(--accent-red)', borderRadius:'8px', padding:'4px', zIndex:201, boxShadow:'0 6px 20px rgba(0,0,0,0.55)'}}
-                                                    onClick={function(e){ e.stopPropagation(); }}>
-                                                    {(a.items || []).map(function(s, si) {
-                                                        if (s.type === 'divider') {
-                                                            return <div key={'sdiv'+si} style={{height:'1px', background:'rgba(255,255,255,0.1)', margin:'4px 0'}} />;
-                                                        }
-                                                        return (
-                                                            <div key={'sitem' + si}
-                                                                onClick={function(e){ e.stopPropagation(); handleEntryClick(s); }}
-                                                                style={{padding:'8px 10px', color: s.disabled ? '#666' : '#f0f0f0', fontSize:'12px', fontWeight:500, fontFamily:'Oswald, sans-serif', letterSpacing:'0.3px', cursor: s.disabled ? 'not-allowed' : 'pointer', borderRadius:'3px', opacity: s.disabled ? 0.5 : 1, display:'flex', alignItems:'center', gap:'6px'}}>
-                                                                {s.icon && <span>{s.icon}</span>}
-                                                                <span>{s.label}</span>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                }
+                    {open && shownTargets.length > 0 && (
+                        <div className="tw-dropdown-panel tw-nav-dropdown-panel-center" style={panelStyle} role="menu">
+                            {shownTargets.map(function(t) {
                                 return (
-                                    <div key={'a' + i}
-                                        onClick={function(){ handleEntryClick(a); }}
-                                        onMouseEnter={function(){ setActiveSub(null); }}
-                                        style={{padding:'9px 10px', color: a.disabled ? '#666' : '#f0f0f0', fontSize:'12px', fontWeight:500, fontFamily:'Oswald, sans-serif', letterSpacing:'0.3px', cursor: a.disabled ? 'not-allowed' : 'pointer', borderRadius:'3px', opacity: a.disabled ? 0.5 : 1, display:'flex', alignItems:'center', gap:'6px'}}>
-                                        {a.icon && <span>{a.icon}</span>}
-                                        <span>{a.label}</span>
-                                    </div>
+                                    <button
+                                        key={t.id || t.label}
+                                        type="button"
+                                        role="menuitem"
+                                        className="tw-nav-dropdown-item"
+                                        disabled={!!t.disabled}
+                                        style={itemStyle(t.disabled)}
+                                        onClick={function() { handleSelect(t); }}
+                                    >
+                                        {t.label}
+                                    </button>
                                 );
                             })}
                         </div>
@@ -2230,33 +2244,370 @@
         }
 
         /* ═══════════════════════════════════════════
-           ACTIONS-BAR (Etappe 8)
-           ═══════════════════════════════════════════
-           Leiste oberhalb der Schnellnavi.
-           Links: Bearbeiten-Dropdown.
-           Rechts: optionale Primaer-Aktion (gruener Button).
-           Nur sichtbar wenn es registrierte Aktionen gibt.
+           AKTION DROPDOWN -- "Bearbeiten"-Menue
+           Bundelt alle Funktions-Buttons einer Seite
+           unter einem einzigen Dropdown. Einheitlich
+           gestylt wie NavDropdown.
+           Unterstuetzt: Icons (Emoji-String), Deaktivieren,
+           Sub-Dropdowns (fuer "Akten"), destruktive
+           Aktionen (rot markiert).
            ═══════════════════════════════════════════ */
-        function ActionsBar({ page }) {
-            useSeitenAktionenTick();
-            var primaer = (window._primaerAktionRegistry && window._primaerAktionRegistry[page]);
-            var aktionen = (window._seitenAktionenRegistry && window._seitenAktionenRegistry[page]) || [];
-            if ((!aktionen || aktionen.length === 0) && !primaer) return null;
+        function AktionDropdown(props) {
+            // Props:
+            //   label      string   -> Button-Beschriftung, default "Bearbeiten"
+            //   actions    array    -> [{ id, label, icon, handler, disabled, destructive, subItems }]
+            //   align      'left'|'right'  -> Ausrichtung des Panels, default 'right'
+            //   style      object   -> optional Container-Styles
+            //   color      'blue'|'red' -> Farbschema des Haupt-Buttons, default 'red' (alle Bearbeiten-Dropdowns sind rot)
+            var label = props.label || 'Bearbeiten';
+            var actions = Array.isArray(props.actions) ? props.actions : [];
+            var align = props.align || 'right';
+            var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+
+            var palette = color === 'red'
+                ? {
+                    mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
+                    mainShadow: 'rgba(196,30,30,0.30)'
+                }
+                : {
+                    mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    mainShadow: 'rgba(30,136,229,0.30)'
+                };
+
+            var [open, setOpen] = useState(false);
+            var [openSubId, setOpenSubId] = useState(null);
+            var wrapperRef = useRef(null);
+
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+                        setOpen(false);
+                        setOpenSubId(null);
+                    }
+                };
+                var keyHandler = function(e) {
+                    if (e.key === 'Escape') { setOpen(false); setOpenSubId(null); }
+                };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open]);
+
+            var mainBtnStyle = {
+                padding: '10px 18px',
+                minHeight: '44px',
+                borderRadius: '8px',
+                border: 'none',
+                cursor: 'pointer',
+                background: palette.mainGrad,
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: '700',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+            };
+
+            var panelStyle = Object.assign({
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                background: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px',
+                minWidth: '220px',
+                maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000,
+                animation: 'tw-nav-drop-in 140ms ease-out',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            }, align === 'left' ? { left: 0 } : { right: 0 });
+
+            var itemStyle = function(disabled, destructive, variant) {
+                // variant 'red' = roter Akzent-Hintergrund fuer besonders markierte Eintraege
+                // (z.B. Aufmass-Vorlage-Eintraege laut User-Wunsch)
+                var bg, col;
+                if (disabled) {
+                    bg = 'rgba(120,120,120,0.15)';
+                    col = 'rgba(255,255,255,0.4)';
+                } else if (destructive) {
+                    bg = 'transparent';
+                    col = 'var(--accent-red-light)';
+                } else if (variant === 'red') {
+                    bg = 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
+                    col = '#fff';
+                } else {
+                    bg = 'transparent';
+                    col = 'var(--text-primary)';
+                }
+                return {
+                    padding: '10px 12px',
+                    minHeight: '42px',
+                    borderRadius: '7px',
+                    border: 'none',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: bg,
+                    color: col,
+                    fontSize: '13px',
+                    fontWeight: variant === 'red' ? '700' : '600',
+                    fontFamily: 'Oswald, sans-serif',
+                    textTransform: variant === 'red' ? 'uppercase' : 'none',
+                    letterSpacing: variant === 'red' ? '0.4px' : '0',
+                    textAlign: 'left',
+                    transition: 'background 0.12s ease, filter 0.12s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    opacity: disabled ? 0.55 : 1,
+                };
+            };
+
+            var subPanelStyle = {
+                position: 'absolute',
+                top: 0,
+                right: 'calc(100% + 4px)',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 16px rgba(0,0,0,0.45)',
+                padding: '6px',
+                minWidth: '200px',
+                maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1001,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            };
+
+            var handleAction = function(a) {
+                if (a.disabled) return;
+                if (a.subItems && a.subItems.length > 0) {
+                    // Sub-Dropdown auf/zu-klappen
+                    setOpenSubId(function(cur) { return cur === a.id ? null : a.id; });
+                    return;
+                }
+                // Normale Aktion ausfuehren
+                setOpen(false);
+                setOpenSubId(null);
+                if (typeof a.handler === 'function') {
+                    try { a.handler(); } catch(err) { console.error('AktionDropdown handler:', err); }
+                }
+            };
+
+            var handleSubItem = function(parentId, item) {
+                if (item.disabled) return;
+                setOpen(false);
+                setOpenSubId(null);
+                if (typeof item.handler === 'function') {
+                    try { item.handler(); } catch(err) { console.error('AktionDropdown sub:', err); }
+                }
+            };
 
             return (
-                <div style={{display:'flex', gap:'6px', padding:'6px 10px 0', background:'var(--bg-primary)', alignItems:'stretch', position:'relative', zIndex:100}}>
-                    <BearbeitenDropdown page={page} />
-                    {primaer && (
-                        <button onClick={function(){ if (!primaer.disabled && primaer.onClick) primaer.onClick(); }}
-                            disabled={primaer.disabled}
-                            style={{padding:'10px 12px', minWidth:'130px', borderRadius:'var(--radius-sm)', border:'none', cursor: primaer.disabled ? 'not-allowed' : 'pointer', background:'linear-gradient(135deg, #4a7a3e, #5d9150)', color:'#fff', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.4px', opacity: primaer.disabled ? 0.5 : 1, boxShadow:'0 2px 8px rgba(74,122,62,0.35)'}}>
-                            {primaer.icon && <span>{primaer.icon}</span>}
-                            <span>{primaer.label}</span>
-                        </button>
+                <div
+                    ref={wrapperRef}
+                    style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}
+                >
+                    <button
+                        type="button"
+                        style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); setOpenSubId(null); }}
+                        aria-haspopup="true"
+                        aria-expanded={open}
+                        title={label}
+                    >
+                        <span style={{fontSize:'14px'}}>{'\u270E'}</span>
+                        <span>{label}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && actions.length > 0 && (
+                        <div
+                            className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
+                            style={panelStyle}
+                            role="menu"
+                        >
+                            {actions.map(function(a) {
+                                var hasSub = a.subItems && a.subItems.length > 0;
+                                var isSubOpen = openSubId === a.id;
+                                return (
+                                    <div key={a.id || a.label} style={{position:'relative'}}>
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            className="tw-aktion-dropdown-item"
+                                            disabled={!!a.disabled}
+                                            style={itemStyle(a.disabled, a.destructive, a.variant)}
+                                            onClick={function() { handleAction(a); }}
+                                            onMouseOver={function(e) {
+                                                if (a.disabled) return;
+                                                if (a.variant === 'red') {
+                                                    e.currentTarget.style.filter = 'brightness(1.15)';
+                                                } else {
+                                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                                }
+                                            }}
+                                            onMouseOut={function(e) {
+                                                if (a.disabled) return;
+                                                if (a.variant === 'red') {
+                                                    e.currentTarget.style.filter = 'none';
+                                                } else {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                }
+                                            }}
+                                        >
+                                            {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
+                                            <span style={{flex:1}}>{a.label}</span>
+                                            {hasSub && <span style={{fontSize:'10px', opacity:0.7}}>{'\u25B6'}</span>}
+                                        </button>
+                                        {hasSub && isSubOpen && (
+                                            <div className="tw-dropdown-panel tw-aktion-sub-panel" style={subPanelStyle} role="menu">
+                                                {a.subItems.map(function(si) {
+                                                    return (
+                                                        <button
+                                                            key={si.id || si.label}
+                                                            type="button"
+                                                            role="menuitem"
+                                                            className="tw-aktion-dropdown-item"
+                                                            disabled={!!si.disabled}
+                                                            style={itemStyle(si.disabled, si.destructive, si.variant)}
+                                                            onClick={function() { handleSubItem(a.id, si); }}
+                                                            onMouseOver={function(e) {
+                                                                if (si.disabled) return;
+                                                                if (si.variant === 'red') {
+                                                                    e.currentTarget.style.filter = 'brightness(1.15)';
+                                                                } else {
+                                                                    e.currentTarget.style.background = 'var(--bg-hover)';
+                                                                }
+                                                            }}
+                                                            onMouseOut={function(e) {
+                                                                if (si.disabled) return;
+                                                                if (si.variant === 'red') {
+                                                                    e.currentTarget.style.filter = 'none';
+                                                                } else {
+                                                                    e.currentTarget.style.background = 'transparent';
+                                                                }
+                                                            }}
+                                                        >
+                                                            {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
+                                                            <span style={{flex:1}}>{si.label}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             );
         }
+
+        /* CSS Keyframes + Etappe-6-Polish (responsive Positionierung, Scroll, Hover/Touch) */
+        (function() {
+            if (typeof document === 'undefined') return;
+            if (document.getElementById('tw-dropdown-anim-style')) return;
+            var s = document.createElement('style');
+            s.id = 'tw-dropdown-anim-style';
+            s.textContent =
+                '@keyframes tw-nav-drop-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }' +
+                ' @keyframes tw-nav-drop-in-left { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }' +
+                ' @keyframes tw-toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
+                ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }' +
+                /* ETAPPE 6: Panel-Scroll bei vielen Eintraegen */
+                ' .tw-dropdown-panel { max-height: calc(100vh - 140px); overflow-y: auto; -webkit-overflow-scrolling: touch; }' +
+                ' .tw-dropdown-panel::-webkit-scrollbar { width: 6px; }' +
+                ' .tw-dropdown-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }' +
+                /* Hover-Feedback fuer NavDropdown-Eintraege (Desktop/Mouse) */
+                ' .tw-nav-dropdown-item:hover:not(:disabled) { filter: brightness(1.15); transform: translateX(2px); }' +
+                /* Active-Feedback fuer Touch (kurzes scale-down beim Tippen) */
+                ' .tw-nav-dropdown-item:active:not(:disabled) { transform: scale(0.97); }' +
+                ' .tw-aktion-dropdown-item:active:not(:disabled) { background: var(--bg-hover) !important; transform: scale(0.98); }' +
+                /* Mobile: Panel linksbuendig am Button statt zentriert -- verhindert Ueberlauf links/rechts */
+                ' @media (max-width: 520px) {' +
+                '   .tw-nav-dropdown-panel-center {' +
+                '     left: 0 !important;' +
+                '     transform: none !important;' +
+                '     animation-name: tw-nav-drop-in-left !important;' +
+                '   }' +
+                '   .tw-aktion-dropdown-panel-right {' +
+                '     right: auto !important;' +
+                '     left: 0 !important;' +
+                '   }' +
+                /* Sub-Dropdown mobile: oeffnet nach unten statt nach links */
+                '   .tw-aktion-sub-panel {' +
+                '     right: auto !important;' +
+                '     left: 0 !important;' +
+                '     top: calc(100% + 4px) !important;' +
+                '     position: absolute !important;' +
+                '   }' +
+                ' }' +
+                /* Smooth transitions fuer alle Dropdown-Eintraege */
+                ' .tw-nav-dropdown-item, .tw-aktion-dropdown-item { transition: background 0.12s ease, transform 0.08s ease, filter 0.12s ease; }';
+            document.head.appendChild(s);
+        })();
+
+        /* ═══════════════════════════════════════════
+           TOAST HELPER -- dezente Benachrichtigung
+           unten rechts, verschwindet nach ~3.5s.
+           Mehrfachaufrufe werden gestapelt.
+           Global verfuegbar als window._showToast(msg, type?)
+           type: 'success' (default) | 'info' | 'error'
+           ═══════════════════════════════════════════ */
+        (function() {
+            if (typeof window === 'undefined') return;
+            if (window._showToast) return;
+            var containerId = 'tw-toast-container';
+            var getContainer = function() {
+                var c = document.getElementById(containerId);
+                if (!c) {
+                    c = document.createElement('div');
+                    c.id = containerId;
+                    c.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:calc(100vw - 32px);pointer-events:none;';
+                    document.body.appendChild(c);
+                }
+                return c;
+            };
+            window._showToast = function(msg, type) {
+                try {
+                    var t = type || 'success';
+                    var bg = t === 'error' ? 'linear-gradient(135deg, #c0392b, #962d22)'
+                           : t === 'info'  ? 'linear-gradient(135deg, #2c3e50, #1e2a38)'
+                                           : 'linear-gradient(135deg, #1E88E5, #1565C0)';
+                    var shadow = t === 'error' ? 'rgba(196,30,30,0.35)' : 'rgba(30,136,229,0.35)';
+                    var el = document.createElement('div');
+                    el.style.cssText = 'pointer-events:auto;padding:12px 18px;border-radius:10px;background:' + bg +
+                        ';color:#fff;font-family:Oswald, sans-serif;font-size:13px;font-weight:600;letter-spacing:0.3px;' +
+                        'box-shadow:0 6px 18px ' + shadow + ';animation:tw-toast-in 180ms ease-out;max-width:400px;' +
+                        'word-wrap:break-word;line-height:1.35;';
+                    el.textContent = msg;
+                    getContainer().appendChild(el);
+                    setTimeout(function() {
+                        el.style.animation = 'tw-toast-out 220ms ease-in forwards';
+                        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
+                    }, 3200);
+                } catch(e) {
+                    // Im Zweifel keinen Absturz riskieren
+                    try { console.log('[Toast]', msg); } catch(_) {}
+                }
+            };
+        })();
 
         /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl

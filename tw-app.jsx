@@ -27,7 +27,7 @@
             }
             return (
                 <div title={tip}
-                    style={{width:'42px', flex:'0 0 42px', padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'8px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.2px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none'}}>
+                    style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'9px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none'}}>
                     {label}
                 </div>
             );
@@ -80,7 +80,7 @@
 
             return (
                 <div title={tip}
-                    style={{width:'42px', flex:'0 0 42px', padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'9px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.2px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none'}}>
+                    style={{flex:'0 0 auto', padding:'6px 10px', minWidth:'52px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none', whiteSpace:'nowrap'}}>
                     {label}
                 </div>
             );
@@ -695,43 +695,6 @@
                 selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)
                 && ['modulwahl', 'raumerkennung', 'raumblatt', 'akte', 'geladen', 'datenUebersicht', 'auswahl', 'lokalOrdnerBrowser', 'ordnerBrowser'].indexOf(page) >= 0
             );
-
-            // ═══ ETAPPE 8: Aufmass-Vorlage Handler ueber window exposen, damit
-            // auch tw-aufmass.jsx sie aus seinen registrierten Dropdown-Eintraegen aufrufen kann.
-            useEffect(function() {
-                window._saveAufmassVorlageHandler = saveAufmassVorlage;
-                window._openVorlagenListeHandler = openVorlagenListe;
-                return function() {
-                    delete window._saveAufmassVorlageHandler;
-                    delete window._openVorlagenListeHandler;
-                };
-            }, [selectedKunde, vorlageBusy]);
-
-            // ═══ ETAPPE 8: Default-Eintraege im Bearbeiten-Dropdown fuer die Daten-Seite.
-            // Die Seiten raumerkennung und raumblatt registrieren selbst (in tw-aufmass.jsx).
-            // Die restlichen frueher durch showVorlageBar abgedeckten Seiten bekommen
-            // bewusst keine ActionsBar mehr (User-Wunsch: entfernen in Modulwahl / Positionsauswahl / etc).
-            useEffect(function() {
-                var datenAktionen = [];
-                if (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) {
-                    datenAktionen = [
-                        { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
-                          disabled: !!vorlageBusy,
-                          onClick: function(){ saveAufmassVorlage(); } },
-                        { label: 'Aufmassvorlage laden', icon: '\uD83D\uDCE5',
-                          disabled: !!vorlageBusy,
-                          onClick: function(){ openVorlagenListe(); } }
-                    ];
-                }
-                if (window._registerSeitenAktionen) {
-                    window._registerSeitenAktionen('datenUebersicht', datenAktionen);
-                }
-                return function() {
-                    if (window._unregisterSeitenAktionen) {
-                        window._unregisterSeitenAktionen('datenUebersicht');
-                    }
-                };
-            }, [selectedKunde, vorlageBusy]);
 
             const handleKundeAnalysiert = () => {
                 setKundeMode('analysiert');
@@ -1960,6 +1923,16 @@
                     };
                 }
 
+                // ETAPPE 4: Manueller Snapshot mit benanntem Label -- ueberschreibt beschreibung/meta
+                if (opts && opts.customLabel) {
+                    stateData.meta = Object.assign({}, stateData.meta, {
+                        beschreibung: opts.customLabel,
+                        autoSaved: false,
+                        manuellGespeichert: true,
+                        manuellTs: Date.now()
+                    });
+                }
+
                 return TWStorage.saveWip(kundeId, modulName, stateData.moduleState, page, stateData.meta);
             };
 
@@ -1989,6 +1962,12 @@
             // andere Module (z.B. Akten-Dialog) verfuegbar. Keine Popups mehr.
             window._akteSpeichernHandler = function() {
                 return _collectAndSaveWip();
+            };
+
+            // ETAPPE 4: Manueller Snapshot-Handler mit benanntem Label
+            // Wird vom globalen "Bearbeiten"-Dropdown (Speichern-Eintrag) aufgerufen.
+            window._manuellSpeichernHandler = function(customLabel) {
+                return _collectAndSaveWip({ customLabel: customLabel });
             };
 
             // ── "Akte"-Button Handler ──
@@ -2122,6 +2101,18 @@
             // ══════════════════════════════════════════════════════════
             const [fotoSyncStatus, setFotoSyncStatus] = useState(null);
 
+            // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
+            // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
+            // Aktionen via window._setModuleActions(arr). Das globale Bearbeiten-
+            // Dropdown nimmt sie mit auf.
+            const [moduleActions, setModuleActions] = useState([]);
+            useEffect(function() {
+                window._setModuleActions = function(arr) {
+                    setModuleActions(Array.isArray(arr) ? arr : []);
+                };
+                return function() { window._setModuleActions = null; };
+            }, []);
+
             var _startFotoSync = React.useCallback(function() {
                 if (!selectedKunde) return;
                 if (!navigator.onLine) return;
@@ -2130,7 +2121,19 @@
                 var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
                 var driveOrdnerId = selectedKunde._driveFolderId;
                 if (!driveOrdnerId) return; // ohne Kundenordner-ID kein Upload
-                window.TWStorage.FotoSync.syncKunde(kundeId, driveOrdnerId).catch(function(e) {
+
+                // ETAPPE 5: Erst einmalig die flache Bilder-Struktur in Raumblatt-Unterordner migrieren,
+                // dann regulaerer Upload-Lauf (der selbst nun in Unterordner uploadet).
+                var migrateFn = window.TWStorage.FotoSync.migrateAltFotos;
+                var runSync = function() {
+                    return window.TWStorage.FotoSync.syncKunde(kundeId, driveOrdnerId);
+                };
+                var pre = migrateFn
+                    ? migrateFn(kundeId, driveOrdnerId).catch(function(e) {
+                        console.warn('[FotoMigration] Lauf uebersprungen:', e.message);
+                    })
+                    : Promise.resolve();
+                pre.then(runSync).catch(function(e) {
                     console.warn('[FotoSync] Lauf abgebrochen:', e.message);
                 });
             }, [selectedKunde]);
@@ -2144,6 +2147,17 @@
                         setFotoSyncStatus('uploading:' + (info.done || 0) + '/' + (info.total || 0));
                     } else if (info.phase === 'downloading') {
                         setFotoSyncStatus('downloading:' + (info.done || 0) + '/' + (info.total || 0));
+                    } else if (info.phase === 'migration-scanning' || info.phase === 'migration-moving') {
+                        // ETAPPE 5: Migrations-Status als eigene Anzeige
+                        setFotoSyncStatus('migration:' + (info.done || 0) + '/' + (info.total || 0));
+                    } else if (info.phase === 'migration-done') {
+                        if ((info.moved || 0) > 0) {
+                            setFotoSyncStatus('migration-done:' + info.moved);
+                            if (window._showToast) window._showToast(info.moved + ' Alt-Fotos in Raumblatt-Ordner migriert', 'success');
+                            setTimeout(function() { setFotoSyncStatus(null); }, 4000);
+                        } else {
+                            setFotoSyncStatus(null);
+                        }
                     } else if (info.phase === 'done') {
                         var r = info.result || {};
                         if (r.uploaded > 0) {
@@ -2159,7 +2173,7 @@
                         } else {
                             setFotoSyncStatus(null);
                         }
-                    } else if (info.phase === 'error') {
+                    } else if (info.phase === 'error' || info.phase === 'migration-error') {
                         setFotoSyncStatus('error');
                         setTimeout(function() { setFotoSyncStatus(null); }, 5000);
                     } else if (info.phase === 'idle') {
@@ -2451,68 +2465,141 @@
                         canForward={historyIdx < history.length - 1}
                     />
 
-                    {/* ═══ ACTIONS-BAR (Etappe 8) ═══
-                        Zeigt das Bearbeiten-Dropdown und eine optionale
-                        Primaer-Aktion. Seiten registrieren ihre Aktionen
-                        via window._registerSeitenAktionen / _registerPrimaerAktion. */}
-                    <ActionsBar page={page} />
-                    {/* GLOBALE SCHNELLNAVIGATION: 8 Buttons in 1 Reihe (ALLE Seiten inkl. Start) */}
+                    {/* ETAPPE 7: Die frueheren roten "Aufmass Vorlage speichern/laden"-Buttons
+                        sind jetzt als Eintraege im Bearbeiten-Dropdown verfuegbar (nur auf
+                        Aufmass-Seiten). Siehe Block direkt darunter. */}
+
+                    {/* ETAPPE 7: Einheitliche Top-Leiste. Aufmass-Vorlage-Buttons sind jetzt
+                        als Eintraege im Bearbeiten-Dropdown (nicht mehr als eigene rote Leiste).
+                        NavDropdown-Farbe (blau/rot) abhaengig von der aktuellen Seite. */}
                     {(true) && (
-                        <div style={{display:'flex', gap:'3px', padding:'6px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99}}>
-                            <button onClick={function(){ navigateTo('start'); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'start' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: page === 'start' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: page === 'start' ? 1 : 0.55, textShadow: page === 'start' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'start' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'start' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'start' ? 2 : 1}}>
-                                Start
-                            </button>
-                            <button onClick={function(){ navigateTo('kundenModus'); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'kundenModus' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: page === 'kundenModus' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: page === 'kundenModus' ? 1 : 0.55, textShadow: page === 'kundenModus' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'kundenModus' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'kundenModus' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'kundenModus' ? 2 : 1}}>
-                                Kunden
-                            </button>
-                            <button onClick={function(){ navigateTo('auswahl'); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'auswahl' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: page === 'auswahl' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: page === 'auswahl' ? 1 : 0.55, textShadow: page === 'auswahl' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'auswahl' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'auswahl' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'auswahl' ? 2 : 1}}>
-                                Baustell.
-                            </button>
-                            <button onClick={function(){ navigateTo('datenUebersicht'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: page === 'datenUebersicht' ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: page === 'datenUebersicht' ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : (page === 'datenUebersicht' ? 1 : 0.55), textShadow: page === 'datenUebersicht' ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: page === 'datenUebersicht' ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: page === 'datenUebersicht' ? 'scale(1.05)' : 'scale(1)', zIndex: page === 'datenUebersicht' ? 2 : 1}}>
-                                Daten
-                            </button>
-                            <button onClick={function(){ navigateTo(isDriveMode ? 'ordnerBrowser' : 'lokalOrdnerBrowser'); }} disabled={!selectedKunde || !(selectedKunde._driveFolderId || selectedKunde.id)}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: (selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 'pointer' : 'not-allowed', background: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !(selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) ? 0.4 : ((page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 1 : 0.55), textShadow: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 'scale(1.05)' : 'scale(1)', zIndex: (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser') ? 2 : 1}}>
-                                Ordner
-                            </button>
-                            <button onClick={function(){ navigateTo('modulwahl'); }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border: (['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background: (['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? 'linear-gradient(135deg, #e84040, #ff5252)' : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', transition:'all 0.2s ease', minWidth:0, opacity: !selectedKunde ? 0.4 : ((['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? 1 : 0.55), textShadow: (['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', boxShadow: (['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? '0 0 10px rgba(255,68,68,0.45), inset 0 1px 0 rgba(255,255,255,0.15)' : 'none', transform: (['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? 'scale(1.05)' : 'scale(1)', zIndex: (['modulwahl','raumerkennung','raumblatt','rechnung','ausgangsbuch','schriftverkehr','baustelle'].indexOf(page) >= 0) ? 2 : 1}}>
-                                Module
-                            </button>
-                            <button onClick={function(){
-                                if (page === 'raumblatt') {
-                                    if (window._fotoTabHandler) window._fotoTabHandler();
-                                } else {
-                                    if (!selectedRaum) {
-                                        var direktRaum = {
-                                            nr: '', geschoss: 'EG', bez: '', quelle: 'Foto-Direktzugriff',
-                                            waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
-                                            hoehe: 0, fliesenhoehe: 0, raumhoehe: 0,
-                                            abdichtungshoehe: 0, sockelhoehe: 0,
-                                            fliesenUmlaufend: true, abdichtungUmlaufend: true, manuell: true
-                                        };
-                                        setSelectedRaum(direktRaum);
-                                        setSelectedPositions([]);
-                                    }
-                                    navigateTo('raumblatt');
-                                    setTimeout(function() { if (window._fotoTabHandler) window._fotoTabHandler(); }, 300);
-                                }
-                            }} disabled={!selectedKunde}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor: selectedKunde ? 'pointer' : 'not-allowed', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'9px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', minWidth:0, opacity: !selectedKunde ? 0.4 : 0.55, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
-                                Foto
-                            </button>
-                            <button onClick={function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); }}
-                                style={{flex:1, padding:'8px 1px', borderRadius:'var(--radius-sm)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'10px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', opacity:0.55, textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>
-                                Akte
-                            </button>
-                            {/* AUTO-SAVE-STATUS-INDIKATOR (ersetzt den frueheren manuellen Speich.-Button) */}
-                            <AutoSaveStatusIndicator />
-                            {/* FOTO-SYNC-INDIKATOR (Phase 2) */}
-                            <FotoSyncIndicator status={fotoSyncStatus} />
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99, flexWrap:'wrap'}}>
+                            {/* Linke Gruppe: NavDropdown + ggf. Bearbeiten-Dropdown */}
+                            <div style={{display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}}>
+                                <NavDropdown
+                                    currentMode={(function() {
+                                        if (page === 'start') return 'Stadtseite';
+                                        if (page === 'kundenModus') return 'Kunden';
+                                        if (page === 'auswahl' || page === 'akte' || page === 'analyseConfig') return 'Baustellen';
+                                        if (page === 'datenUebersicht') return 'Daten';
+                                        if (page === 'ordnerBrowser' || page === 'lokalOrdnerBrowser' || page === 'ordnerAnalyse' || page === 'ordnerAnalyseDetail') return 'Ordner';
+                                        if (page === 'modulwahl') return 'Modulauswahl';
+                                        if (page === 'raumerkennung') return 'Aufmass';
+                                        if (page === 'raumblatt') return 'Raumblatt';
+                                        if (page === 'rechnung') return 'Rechnung';
+                                        if (page === 'ausgangsbuch') return 'Ausgangsbuch';
+                                        if (page === 'schriftverkehr') return 'Schriftverkehr';
+                                        if (page === 'baustelle') return 'Baustellen-App';
+                                        if (page === 'manuellEingabe') return 'Kundendaten';
+                                        if (page === 'lokalKundenListe') return 'Kunden';
+                                        return 'Navigation';
+                                    })()}
+                                    targets={[
+                                        { id:'start',   label:'Stadtseite',    handler: function(){ navigateTo('start'); } },
+                                        { id:'kunden',  label:'Kunden',        handler: function(){ navigateTo('kundenModus'); } },
+                                        { id:'baustell',label:'Baustellen',    handler: function(){ navigateTo('auswahl'); } },
+                                        { id:'daten',   label:'Daten',         handler: function(){ navigateTo('datenUebersicht'); }, disabled: !selectedKunde },
+                                        { id:'ordner',  label:'Ordner',        handler: function(){ navigateTo(isDriveMode ? 'ordnerBrowser' : 'lokalOrdnerBrowser'); }, disabled: !(selectedKunde && (selectedKunde._driveFolderId || selectedKunde.id)) },
+                                        { id:'module',  label:'Module',        handler: function(){ navigateTo('modulwahl'); }, disabled: !selectedKunde },
+                                        { id:'foto',    label:'Foto',          handler: function(){
+                                            if (!selectedKunde) return;
+                                            if (page === 'raumblatt') {
+                                                if (window._fotoTabHandler) window._fotoTabHandler();
+                                            } else {
+                                                if (!selectedRaum) {
+                                                    var direktRaum = {
+                                                        nr: '', geschoss: 'EG', bez: '', quelle: 'Foto-Direktzugriff',
+                                                        waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                                        hoehe: 0, fliesenhoehe: 0, raumhoehe: 0,
+                                                        abdichtungshoehe: 0, sockelhoehe: 0,
+                                                        fliesenUmlaufend: true, abdichtungUmlaufend: true, manuell: true
+                                                    };
+                                                    setSelectedRaum(direktRaum);
+                                                    setSelectedPositions([]);
+                                                }
+                                                navigateTo('raumblatt');
+                                                setTimeout(function() { if (window._fotoTabHandler) window._fotoTabHandler(); }, 300);
+                                            }
+                                        }, disabled: !selectedKunde },
+                                        { id:'akte',    label:'Akte',          handler: function(){ if (window._akteOeffnenHandler) window._akteOeffnenHandler(); } },
+                                    ]}
+                                />
+                                {/* ETAPPE 4+7: Bearbeiten-Dropdown mit Speichern, Akten, (falls Aufmass) Vorlage, (falls vorhanden) Modul-Aktionen */}
+                                {(function() {
+                                    var bearbeitungsSeiten = ['raumblatt','rechnung','schriftverkehr','ausgangsbuch','datenUebersicht','manuellEingabe','baustelle','raumerkennung'];
+                                    if (bearbeitungsSeiten.indexOf(page) < 0) return null;
+                                    var dokumentTyp = (function() {
+                                        if (page === 'raumblatt' || page === 'raumerkennung') return 'Aufmass';
+                                        if (page === 'rechnung') return 'Rechnung';
+                                        if (page === 'schriftverkehr') return 'Schriftverkehr';
+                                        if (page === 'ausgangsbuch') return 'Ausgangsbuch';
+                                        if (page === 'datenUebersicht' || page === 'manuellEingabe') return 'Kundendaten';
+                                        if (page === 'baustelle') return 'Baustellen-App';
+                                        return 'Dokument';
+                                    })();
+                                    var pad = function(n) { return n < 10 ? '0'+n : ''+n; };
+                                    var bauLabel = function() {
+                                        var kurzbez = selectedKunde ? ((selectedKunde.name || selectedKunde.auftraggeber || 'Allgemein').split(' \u2013 ')[0].slice(0, 30)) : 'Allgemein';
+                                        var j = new Date();
+                                        var datumStr = pad(j.getDate()) + '.' + pad(j.getMonth()+1) + '.' + j.getFullYear() + ' ' + pad(j.getHours()) + ':' + pad(j.getMinutes());
+                                        return dokumentTyp + ' \u2014 ' + kurzbez + ' \u2014 ' + datumStr;
+                                    };
+                                    // Aufmass-Seiten bekommen die Vorlage-Eintraege im Bearbeiten-Dropdown
+                                    var istAufmassSeite = (page === 'raumerkennung' || page === 'raumblatt');
+                                    var vorlageEntries = istAufmassSeite ? [
+                                        { id:'vorlage-save', label:'Aufmass-Vorlage speichern', icon:'\uD83D\uDCE4',
+                                            handler: function() { if (typeof saveAufmassVorlage === 'function') saveAufmassVorlage(); },
+                                            disabled: !!vorlageBusy
+                                        },
+                                        { id:'vorlage-load', label:'Aufmass-Vorlage laden', icon:'\uD83D\uDCE5',
+                                            handler: function() { if (typeof openVorlagenListe === 'function') openVorlagenListe(); },
+                                            disabled: !!vorlageBusy
+                                        }
+                                    ] : [];
+                                    // Alle Bearbeiten-Dropdowns sind rot (Thomas-Wunsch, Default seit Etappe 7)
+                                    return (
+                                        <AktionDropdown
+                                            label="Bearbeiten"
+                                            align="left"
+                                            actions={[
+                                                { id:'speichern', label:'Speichern', icon:'\uD83D\uDCBE',
+                                                    handler: function() {
+                                                        if (!window._manuellSpeichernHandler) {
+                                                            if (window._showToast) window._showToast('Manuelles Speichern auf dieser Seite nicht verfuegbar', 'info');
+                                                            return;
+                                                        }
+                                                        var label = bauLabel();
+                                                        try {
+                                                            var p = window._manuellSpeichernHandler(label);
+                                                            if (p && typeof p.then === 'function') {
+                                                                p.then(function(){ if (window._showToast) window._showToast('Gespeichert: ' + label, 'success'); })
+                                                                 .catch(function(err){ if (window._showToast) window._showToast('Speicher-Fehler: ' + (err && err.message || err), 'error'); });
+                                                            } else {
+                                                                if (window._showToast) window._showToast('Gespeichert: ' + label, 'success');
+                                                            }
+                                                        } catch(e) {
+                                                            if (window._showToast) window._showToast('Speicher-Fehler: ' + e.message, 'error');
+                                                        }
+                                                    },
+                                                    disabled: !selectedKunde
+                                                },
+                                                { id:'akten', label:'Akten', icon:'\uD83D\uDCC1',
+                                                    handler: function() {
+                                                        if (window._akteOeffnenHandler) window._akteOeffnenHandler();
+                                                        else if (window._showToast) window._showToast('Akten-Funktion nicht verfuegbar', 'info');
+                                                    },
+                                                    disabled: !selectedKunde
+                                                }
+                                            ].concat(vorlageEntries).concat(moduleActions)}
+                                        />
+                                    );
+                                })()}
+                            </div>
+                            {/* Rechte Gruppe: AutoSave + FotoSync - kompakt in der Ecke */}
+                            <div style={{display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto'}}>
+                                <AutoSaveStatusIndicator />
+                                <FotoSyncIndicator status={fotoSyncStatus} />
+                            </div>
                         </div>
                     )}
 
