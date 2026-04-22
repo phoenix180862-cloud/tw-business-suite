@@ -6203,7 +6203,7 @@
                                             {raum.bez}
                                         </div>
                                         <div className="raum-list-meta">
-                                            <span className="raum-list-tag">📐 {(raum.waende || []).length} Wände</span>
+                                            <span className="raum-list-tag">📐 {raum.waende.length} Wände</span>
                                             {raum.material && <span className="raum-list-tag">🧱 {raum.material.split('+')[0].trim()}</span>}
                                             <span className="raum-list-tag">📄 {raum.quelle}</span>
                                         </div>
@@ -18877,6 +18877,22 @@
             const [fehler, setFehler] = useState(null);
             const [anlegeBusy, setAnlegeBusy] = useState(false);
 
+            // ── Etappe 4.1 Baustein 1: 2-Ordner-Modell ──
+            // subView: 'hauptordner' | 'baustellen-daten' | 'nachrichten'
+            //   hauptordner    = 2 grosse Kacheln (BAUSTELLEN-DATEN + NACHRICHTEN)
+            //   baustellen-daten = die bisherigen 4 Sub-Ordner (Migration auf 5 in B2)
+            //   nachrichten    = Kalender + Chat pro MA (Platzhalter bis B4-B6)
+            const [subView, setSubView] = useState('hauptordner');
+
+            function handleBack() {
+                // Rueckwaerts-Navigation: in Sub-Views erst auf hauptordner, dann raus
+                if (subView !== 'hauptordner') {
+                    setSubView('hauptordner');
+                } else {
+                    onBack();
+                }
+            }
+
             var bereit = !!(stagingStatus && stagingStatus.vorhanden);
 
             async function ladeInfo() {
@@ -18938,10 +18954,15 @@
                     minHeight: '100vh'
                 }}>
                     <UnterseitenHeader
-                        icon="📁"
+                        icon={subView === 'nachrichten' ? '💬' : (subView === 'baustellen-daten' ? '📂' : '📁')}
                         titel={baustelle.name}
-                        untertitel={bereit ? 'Staging-Bereich' : 'Noch nicht bereitgestellt'}
-                        onBack={onBack}
+                        untertitel={
+                            !bereit ? 'Noch nicht bereitgestellt' :
+                            subView === 'baustellen-daten' ? 'Baustellen-Daten' :
+                            subView === 'nachrichten' ? 'Nachrichten (Kalender & Chat)' :
+                            'Staging-Bereich'
+                        }
+                        onBack={handleBack}
                     />
 
                     {/* Nicht bereitgestellt → Anlege-Button */}
@@ -19067,8 +19088,139 @@
                         </div>
                     )}
 
-                    {/* 4 Ordner-Kacheln */}
-                    {bereit && (
+                    {/* ═══════════════════════════════════════════════════════ */}
+                    {/* ETAPPE 4.1 BAUSTEIN 1 — HAUPTORDNER-ANSICHT             */}
+                    {/* Zwei grosse Kacheln: BAUSTELLEN-DATEN + NACHRICHTEN     */}
+                    {/* ═══════════════════════════════════════════════════════ */}
+                    {bereit && subView === 'hauptordner' && (
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '14px',
+                            marginTop: '4px'
+                        }}>
+                            {/* Kachel 1: BAUSTELLEN-DATEN */}
+                            <button
+                                onClick={function(){ setSubView('baustellen-daten'); }}
+                                style={{
+                                    padding: '28px 14px',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1px solid rgba(30,136,229,0.35)',
+                                    background: 'linear-gradient(135deg, rgba(30,136,229,0.15), rgba(21,101,192,0.08))',
+                                    color: 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.2s',
+                                    touchAction: 'manipulation',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    minHeight: '160px',
+                                    boxShadow: '0 4px 12px rgba(30,136,229,0.15)'
+                                }}
+                            >
+                                <span style={{ fontSize: '52px', color: '#1E88E5' }}>📂</span>
+                                <div style={{
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    fontFamily: "'Oswald', sans-serif",
+                                    letterSpacing: '1px',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-primary)'
+                                }}>Baustellen-Daten</div>
+                                <div style={{
+                                    fontSize: '11px',
+                                    color: 'var(--text-muted)',
+                                    lineHeight: 1.45,
+                                    padding: '0 4px'
+                                }}>
+                                    Zeichnungen · Anweisungen · Baustellendaten · Fotos · Stunden
+                                </div>
+                            </button>
+
+                            {/* Kachel 2: NACHRICHTEN */}
+                            <button
+                                onClick={function(){ setSubView('nachrichten'); }}
+                                style={{
+                                    padding: '28px 14px',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: '1px solid rgba(39,174,96,0.35)',
+                                    background: 'linear-gradient(135deg, rgba(39,174,96,0.15), rgba(31,139,76,0.08))',
+                                    color: 'var(--text-primary)',
+                                    cursor: 'pointer',
+                                    textAlign: 'center',
+                                    transition: 'all 0.2s',
+                                    touchAction: 'manipulation',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    minHeight: '160px',
+                                    boxShadow: '0 4px 12px rgba(39,174,96,0.15)'
+                                }}
+                            >
+                                <span style={{ fontSize: '52px', color: '#27ae60' }}>💬</span>
+                                <div style={{
+                                    fontSize: '15px',
+                                    fontWeight: 600,
+                                    fontFamily: "'Oswald', sans-serif",
+                                    letterSpacing: '1px',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-primary)'
+                                }}>Nachrichten</div>
+                                <div style={{
+                                    fontSize: '11px',
+                                    color: 'var(--text-muted)',
+                                    lineHeight: 1.45,
+                                    padding: '0 4px'
+                                }}>
+                                    Kalender & Chat pro Mitarbeiter
+                                </div>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* ═══════════════════════════════════════════════════════ */}
+                    {/* ETAPPE 4.1 BAUSTEIN 1 — NACHRICHTEN PLATZHALTER         */}
+                    {/* Echte UI folgt in Baustein 4-6 (Mitarbeiter-Liste,      */}
+                    {/* Kalender-Jahres-Ansicht, Chat-Thread).                  */}
+                    {/* ═══════════════════════════════════════════════════════ */}
+                    {subView === 'nachrichten' && (
+                        <div style={{
+                            padding: '48px 20px',
+                            textAlign: 'center',
+                            background: 'rgba(39,174,96,0.06)',
+                            border: '1px dashed rgba(39,174,96,0.35)',
+                            borderRadius: 'var(--radius-md)',
+                            marginTop: '12px'
+                        }}>
+                            <div style={{ fontSize: '54px', marginBottom: '14px' }}>🚧</div>
+                            <div style={{
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                letterSpacing: '1.2px',
+                                textTransform: 'uppercase',
+                                color: 'var(--text-primary)',
+                                marginBottom: '8px'
+                            }}>
+                                Nachrichten-Modul wird gebaut
+                            </div>
+                            <div style={{
+                                fontSize: '13px',
+                                color: 'var(--text-muted)',
+                                lineHeight: 1.6,
+                                maxWidth: '320px',
+                                margin: '0 auto'
+                            }}>
+                                In diesem Ordner sitzt demnaechst die Mitarbeiter-Liste mit Kalender-Jahres-Ansicht (3 Jahre) und Chat-Thread pro MA. Kommt in Baustein 4-6.
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 4 Ordner-Kacheln (nur in subView='baustellen-daten' sichtbar) */}
+                    {bereit && subView === 'baustellen-daten' && (
                         <div style={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr',
@@ -21377,29 +21529,37 @@
                             )}
                         </div>
 
-                        {/* Gueltigkeits-Dauer */}
+                        {/* Gueltigkeits-Dauer — 22.04.2026: erweitert um 6/12 Monate */}
                         <div style={{ marginBottom:'14px' }}>
                             <label style={{
                                 display:'block', fontSize:'11px', fontFamily:"'Oswald', sans-serif",
                                 fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
                                 color:'var(--text-muted)', marginBottom:'6px'
-                            }}>Gueltig fuer (Tage)</label>
-                            <div style={{ display:'flex', gap:'6px' }}>
-                                {['1','3','7','14','30'].map(function(n) {
-                                    var aktiv = gueltigTage === n;
+                            }}>Gueltig fuer (Tage / Monate)</label>
+                            <div style={{ display:'flex', gap:'4px' }}>
+                                {[
+                                    { wert:'1',   label:'1' },
+                                    { wert:'3',   label:'3' },
+                                    { wert:'7',   label:'7' },
+                                    { wert:'14',  label:'14' },
+                                    { wert:'30',  label:'30' },
+                                    { wert:'180', label:'6M' },
+                                    { wert:'365', label:'12M' }
+                                ].map(function(opt) {
+                                    var aktiv = gueltigTage === opt.wert;
                                     return (
                                         <button
-                                            key={n}
-                                            onClick={function(){ setGueltigTage(n); }}
+                                            key={opt.wert}
+                                            onClick={function(){ setGueltigTage(opt.wert); }}
                                             style={{
                                                 flex:1, padding:'8px 0',
                                                 background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
                                                 color: aktiv ? '#fff' : 'var(--text-primary)',
                                                 border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
                                                 borderRadius:'var(--radius-sm)',
-                                                fontSize:'13px', fontWeight: aktiv ? 600 : 400,
+                                                fontSize:'12px', fontWeight: aktiv ? 600 : 400,
                                                 cursor:'pointer', touchAction:'manipulation'
-                                            }}>{n}</button>
+                                            }}>{opt.label}</button>
                                     );
                                 })}
                             </div>
