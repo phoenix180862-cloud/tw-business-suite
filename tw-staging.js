@@ -789,6 +789,291 @@
             return alleErgebnisse;
         }
 
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1 B8: DRIVE-MIGRATION LEGACY-ORDNER
+        // Benennt Legacy-Ordnernamen auf Drive um, sodass das
+        // Alias-System nicht mehr gebraucht wird.
+        // ═══════════════════════════════════════════════════════
+
+        // Low-Level: Einen einzelnen Ordner umbenennen via drive.files.update
+        async function umbenennenOrdner(fileId, neuerName) {
+            if (!fileId || !neuerName) throw new Error('fileId und neuerName erforderlich');
+            assertDriveReady();
+            var res = await gapi.client.drive.files.update({
+                fileId: fileId,
+                resource: { name: neuerName }
+            });
+            return res.result;
+        }
+
+        // High-Level: Scannt eine Staging-Baustelle, findet alle Legacy-Ordner
+        // und benennt sie in die neuen Zielnamen um.
+        // Rueckgabe: {migriert: [...], uebersprungen: [...], fehler: [...]}
+        async function migriereLegacyOrdner(baustelleName, onProgress) {
+            if (!baustelleName) throw new Error('baustelleName erforderlich');
+            onProgress = onProgress || function(){};
+
+            var info = await getStagingInfo(baustelleName);
+            if (!info || !info.unterordner) {
+                return { migriert: [], uebersprungen: [], fehler: [{ reason: 'Staging nicht vorhanden' }] };
+            }
+
+            var migriert = [];
+            var uebersprungen = [];
+            var fehler = [];
+
+            // cfg.SUBFOLDERS sind die Zielnamen, info.unterordner[name].legacyName
+            // enthaelt den aktuellen Drive-Namen wenn er vom Zielnamen abweicht.
+            var cfg = window.STAGING_CONFIG || {};
+            var zielnamen = cfg.SUBFOLDERS || ['Zeichnungen', 'Anweisungen', 'Baustellendaten', 'Fotos', 'Stunden'];
+
+            for (var i = 0; i < zielnamen.length; i++) {
+                var ziel = zielnamen[i];
+                var sub = info.unterordner[ziel];
+                if (!sub) {
+                    uebersprungen.push({ name: ziel, reason: 'Ordner fehlt' });
+                    continue;
+                }
+                if (!sub.legacyName) {
+                    uebersprungen.push({ name: ziel, reason: 'bereits korrekt benannt' });
+                    continue;
+                }
+                onProgress('migriere', { von: sub.legacyName, zu: ziel });
+                try {
+                    await umbenennenOrdner(sub.id, ziel);
+                    migriert.push({ von: sub.legacyName, zu: ziel, id: sub.id });
+                    onProgress('ok', { von: sub.legacyName, zu: ziel });
+                } catch (e) {
+                    fehler.push({ name: ziel, legacy: sub.legacyName, fehler: (e && e.message) || String(e) });
+                    onProgress('fehler', { name: ziel, fehler: (e && e.message) || String(e) });
+                }
+            }
+
+            return { migriert: migriert, uebersprungen: uebersprungen, fehler: fehler };
+        }
+
+        // Batch: Alle Staging-Baustellen durchlaufen und alle Legacy-Ordner umbenennen
+        async function migriereAlleLegacyOrdner(onProgress) {
+            onProgress = onProgress || function(){};
+            var baustellen = await listStagingBaustellen();
+            var gesamt = { baustellenMigriert: 0, ordnerMigriert: 0, fehler: [] };
+            for (var i = 0; i < baustellen.length; i++) {
+                var b = baustellen[i];
+                onProgress('baustelle', { name: b.name, index: i + 1, gesamt: baustellen.length });
+                try {
+                    var erg = await migriereLegacyOrdner(b.name, function(phase, detail) {
+                        onProgress('sub-' + phase, Object.assign({ baustelle: b.name }, detail));
+                    });
+                    if (erg.migriert.length > 0) {
+                        gesamt.baustellenMigriert++;
+                        gesamt.ordnerMigriert += erg.migriert.length;
+                    }
+                    if (erg.fehler.length > 0) {
+                        erg.fehler.forEach(function(f){
+                            gesamt.fehler.push(Object.assign({ baustelle: b.name }, f));
+                        });
+                    }
+                } catch (e) {
+                    gesamt.fehler.push({ baustelle: b.name, fehler: (e && e.message) || String(e) });
+                    onProgress('baustelle-fehler', { baustelle: b.name, fehler: (e && e.message) || String(e) });
+                }
+            }
+            onProgress('fertig', gesamt);
+            return gesamt;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1 B9: FOTO-REVIEW DRIVE-HELFER
+        // Funktionen, um im Buero-Review-Modul Thumbnails zu holen,
+        // den Kunden-Bilder-Ordner aufzufinden und ein Foto aus dem
+        // Staging in den Kunden-Ordner zu kopieren.
+        // ═══════════════════════════════════════════════════════
+
+        // Metadaten eines einzelnen Fotos: Thumbnail-Link + Grundinfos.
+        // Rueckgabe: {id, name, thumbnailLink, webContentLink, size, mimeType, modifiedTime}
+        async function getFotoMetadaten(fileId) {
+            assertDriveReady();
+            if (!fileId) throw new Error('fileId fehlt');
+            var res = await gapi.client.drive.files.get({
+                fileId: fileId,
+                fields: 'id, name, thumbnailLink, webContentLink, webViewLink, size, mimeType, modifiedTime'
+            });
+            return res.result;
+        }
+
+        // Fotos im Staging-Fotos-Ordner einer Baustelle listen.
+        // Liefert alle Bild-Dateien mit Thumbnail-Links.
+        async function listeStagingFotos(baustelleName) {
+            assertDriveReady();
+            var info = await getStagingInfo(baustelleName);
+            if (!info || !info.unterordner) return [];
+            var fotosOrdner = info.unterordner['Fotos'];
+            if (!fotosOrdner) return [];
+            var q = "'" + fotosOrdner.id + "' in parents and trashed=false and mimeType contains 'image/'";
+            var res = await gapi.client.drive.files.list({
+                q: q,
+                fields: 'files(id, name, thumbnailLink, size, mimeType, modifiedTime, createdTime)',
+                pageSize: 200,
+                orderBy: 'modifiedTime desc'
+            });
+            return res.result.files || [];
+        }
+
+        // Kunden-Bilder-Ordner auffinden. Bildet den Standard-Baustellen-Ordner
+        // auf dem Drive ab. Sucht in "Baustellen neu/{kundenname}/Bilder".
+        // Fallback: erster passender "Bilder"-Unterordner im Baustellenverzeichnis.
+        async function findeKundenBilderOrdner(kundenName) {
+            assertDriveReady();
+            if (!kundenName) throw new Error('kundenName fehlt');
+
+            // 1. Baustellen-neu-Wurzel finden
+            var wurzelName = (window.DRIVE_ORDNER && window.DRIVE_ORDNER.BAUSTELLEN_WURZEL) || 'Baustellen neu';
+            var wurzel = await findFolderByName(wurzelName, null);
+            if (!wurzel) throw new Error('Wurzel "' + wurzelName + '" nicht gefunden');
+
+            // 2. Kunden-Ordner in der Wurzel suchen (tolerant: wenn exakter Name nicht trifft,
+            //    dann case-insensitive Teilstring-Match in der Wurzel-Liste)
+            var kundenOrdner = await findFolderByName(kundenName, wurzel.id);
+            if (!kundenOrdner) {
+                // Tolerant: Liste der Kinder holen und per Teilstring
+                var liste = await gapi.client.drive.files.list({
+                    q: "'" + wurzel.id + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                    fields: 'files(id, name)',
+                    pageSize: 1000
+                });
+                var kids = liste.result.files || [];
+                var needle = kundenName.toLowerCase();
+                for (var i = 0; i < kids.length; i++) {
+                    if (kids[i].name.toLowerCase().indexOf(needle) !== -1) {
+                        kundenOrdner = kids[i];
+                        break;
+                    }
+                }
+            }
+            if (!kundenOrdner) throw new Error('Kunden-Ordner "' + kundenName + '" nicht gefunden');
+
+            // 3. Bilder-Unterordner im Kundenordner
+            var bilder = await findFolderByName('Bilder', kundenOrdner.id);
+            if (!bilder) throw new Error('"Bilder"-Unterordner im Kundenordner "' + kundenName + '" nicht gefunden');
+            return bilder;
+        }
+
+        // Foto aus Staging in Kunden-Bilder-Ordner kopieren (gibt neue ID zurueck).
+        // Staging-Original bleibt erhalten bis zum naechsten Cleanup.
+        async function kopiereFotoInKundenOrdner(stagingFileId, kundenOrdnerId, neuerName) {
+            assertDriveReady();
+            if (!stagingFileId || !kundenOrdnerId) throw new Error('stagingFileId und kundenOrdnerId erforderlich');
+            var resource = { parents: [kundenOrdnerId] };
+            if (neuerName) resource.name = neuerName;
+            var res = await gapi.client.drive.files.copy({
+                fileId: stagingFileId,
+                resource: resource,
+                fields: 'id, name, webViewLink'
+            });
+            return res.result;
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1 B10: STUNDEN-REVIEW DRIVE-HELFER
+        // PDFs im Staging-Stunden-Ordner einer Baustelle listen und
+        // bei Freigabe in zwei Ziele kopieren: Kunden-Stundennachweis
+        // und zentraler Lohnbuchhaltungs-Ordner (Monats-Archiv).
+        // ═══════════════════════════════════════════════════════
+
+        // Stunden-PDFs im Staging-Stunden-Ordner einer Baustelle listen
+        async function listeStagingStunden(baustelleName) {
+            assertDriveReady();
+            var info = await getStagingInfo(baustelleName);
+            if (!info || !info.unterordner) return [];
+            var stundenOrdner = info.unterordner['Stunden'];
+            if (!stundenOrdner) return [];
+            var q = "'" + stundenOrdner.id + "' in parents and trashed=false";
+            var res = await gapi.client.drive.files.list({
+                q: q,
+                fields: 'files(id, name, size, mimeType, modifiedTime, createdTime, webViewLink)',
+                pageSize: 200,
+                orderBy: 'modifiedTime desc'
+            });
+            return res.result.files || [];
+        }
+
+        // Kunden-Stundennachweis-Ordner finden (analog zu findeKundenBilderOrdner)
+        async function findeKundenStundenOrdner(kundenName) {
+            assertDriveReady();
+            if (!kundenName) throw new Error('kundenName fehlt');
+            var wurzelName = (window.DRIVE_ORDNER && window.DRIVE_ORDNER.BAUSTELLEN_WURZEL) || 'Baustellen neu';
+            var wurzel = await findFolderByName(wurzelName, null);
+            if (!wurzel) throw new Error('Wurzel "' + wurzelName + '" nicht gefunden');
+            var kundenOrdner = await findFolderByName(kundenName, wurzel.id);
+            if (!kundenOrdner) {
+                var liste = await gapi.client.drive.files.list({
+                    q: "'" + wurzel.id + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                    fields: 'files(id, name)',
+                    pageSize: 1000
+                });
+                var kids = liste.result.files || [];
+                var needle = kundenName.toLowerCase();
+                for (var i = 0; i < kids.length; i++) {
+                    if (kids[i].name.toLowerCase().indexOf(needle) !== -1) {
+                        kundenOrdner = kids[i];
+                        break;
+                    }
+                }
+            }
+            if (!kundenOrdner) throw new Error('Kunden-Ordner "' + kundenName + '" nicht gefunden');
+            var stundenName = (window.DRIVE_ORDNER && window.DRIVE_ORDNER.stundennachweis) || 'Stundennachweis';
+            var stunden = await findFolderByName(stundenName, kundenOrdner.id);
+            if (!stunden) throw new Error('"' + stundenName + '"-Unterordner im Kundenordner "' + kundenName + '" nicht gefunden');
+            return stunden;
+        }
+
+        // Lohn-Monats-Ordner sicherstellen (anlegen falls nicht vorhanden).
+        // Struktur: (Root) / Lohnbuchhaltung / {YYYY-MM}/
+        async function ensureLohnMonatsOrdner(monat) {
+            assertDriveReady();
+            if (!monat || !/^\d{4}-\d{2}$/.test(monat)) throw new Error('monat muss YYYY-MM sein');
+            var lohnName = (window.DRIVE_ORDNER && window.DRIVE_ORDNER.LOHN_WURZEL) || 'Lohnbuchhaltung';
+            var lohnWurzel = await findFolderByName(lohnName, null);
+            if (!lohnWurzel) {
+                // Anlegen im Root
+                var res = await gapi.client.drive.files.create({
+                    resource: {
+                        name: lohnName,
+                        mimeType: 'application/vnd.google-apps.folder'
+                    },
+                    fields: 'id, name'
+                });
+                lohnWurzel = res.result;
+            }
+            var monatsOrdner = await findFolderByName(monat, lohnWurzel.id);
+            if (!monatsOrdner) {
+                var res2 = await gapi.client.drive.files.create({
+                    resource: {
+                        name: monat,
+                        mimeType: 'application/vnd.google-apps.folder',
+                        parents: [lohnWurzel.id]
+                    },
+                    fields: 'id, name'
+                });
+                monatsOrdner = res2.result;
+            }
+            return monatsOrdner;
+        }
+
+        // Generische Copy-in-Zielordner-Funktion (fuer PDFs)
+        async function kopierePdfInOrdner(stagingFileId, zielOrdnerId, neuerName) {
+            assertDriveReady();
+            if (!stagingFileId || !zielOrdnerId) throw new Error('stagingFileId und zielOrdnerId erforderlich');
+            var resource = { parents: [zielOrdnerId] };
+            if (neuerName) resource.name = neuerName;
+            var res = await gapi.client.drive.files.copy({
+                fileId: stagingFileId,
+                resource: resource,
+                fields: 'id, name, webViewLink'
+            });
+            return res.result;
+        }
+
         // ── Exporte ──
         window.TWStaging = {
             ensureRootFolder: ensureRootFolder,
@@ -809,7 +1094,21 @@
             deleteDateiAusStaging: deleteDateiAusStaging,
             // Etappe 7: Firebase-Sync
             syncStagingNachFirebase: syncStagingNachFirebase,
-            syncAlleStagings: syncAlleStagings
+            syncAlleStagings: syncAlleStagings,
+            // Etappe 4.1 B8: Drive-Migration
+            umbenennenOrdner: umbenennenOrdner,
+            migriereLegacyOrdner: migriereLegacyOrdner,
+            migriereAlleLegacyOrdner: migriereAlleLegacyOrdner,
+            // Etappe 4.1 B9: Foto-Review-Drive-Helfer
+            getFotoMetadaten: getFotoMetadaten,
+            listeStagingFotos: listeStagingFotos,
+            findeKundenBilderOrdner: findeKundenBilderOrdner,
+            kopiereFotoInKundenOrdner: kopiereFotoInKundenOrdner,
+            // Etappe 4.1 B10: Stunden-Review-Drive-Helfer
+            listeStagingStunden: listeStagingStunden,
+            findeKundenStundenOrdner: findeKundenStundenOrdner,
+            ensureLohnMonatsOrdner: ensureLohnMonatsOrdner,
+            kopierePdfInOrdner: kopierePdfInOrdner
         };
 
     })();
