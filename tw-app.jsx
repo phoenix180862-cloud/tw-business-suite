@@ -2109,7 +2109,19 @@
                 var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
                 var driveOrdnerId = selectedKunde._driveFolderId;
                 if (!driveOrdnerId) return; // ohne Kundenordner-ID kein Upload
-                window.TWStorage.FotoSync.syncKunde(kundeId, driveOrdnerId).catch(function(e) {
+
+                // ETAPPE 5: Erst einmalig die flache Bilder-Struktur in Raumblatt-Unterordner migrieren,
+                // dann regulaerer Upload-Lauf (der selbst nun in Unterordner uploadet).
+                var migrateFn = window.TWStorage.FotoSync.migrateAltFotos;
+                var runSync = function() {
+                    return window.TWStorage.FotoSync.syncKunde(kundeId, driveOrdnerId);
+                };
+                var pre = migrateFn
+                    ? migrateFn(kundeId, driveOrdnerId).catch(function(e) {
+                        console.warn('[FotoMigration] Lauf uebersprungen:', e.message);
+                    })
+                    : Promise.resolve();
+                pre.then(runSync).catch(function(e) {
                     console.warn('[FotoSync] Lauf abgebrochen:', e.message);
                 });
             }, [selectedKunde]);
@@ -2123,6 +2135,17 @@
                         setFotoSyncStatus('uploading:' + (info.done || 0) + '/' + (info.total || 0));
                     } else if (info.phase === 'downloading') {
                         setFotoSyncStatus('downloading:' + (info.done || 0) + '/' + (info.total || 0));
+                    } else if (info.phase === 'migration-scanning' || info.phase === 'migration-moving') {
+                        // ETAPPE 5: Migrations-Status als eigene Anzeige
+                        setFotoSyncStatus('migration:' + (info.done || 0) + '/' + (info.total || 0));
+                    } else if (info.phase === 'migration-done') {
+                        if ((info.moved || 0) > 0) {
+                            setFotoSyncStatus('migration-done:' + info.moved);
+                            if (window._showToast) window._showToast(info.moved + ' Alt-Fotos in Raumblatt-Ordner migriert', 'success');
+                            setTimeout(function() { setFotoSyncStatus(null); }, 4000);
+                        } else {
+                            setFotoSyncStatus(null);
+                        }
                     } else if (info.phase === 'done') {
                         var r = info.result || {};
                         if (r.uploaded > 0) {
@@ -2138,7 +2161,7 @@
                         } else {
                             setFotoSyncStatus(null);
                         }
-                    } else if (info.phase === 'error') {
+                    } else if (info.phase === 'error' || info.phase === 'migration-error') {
                         setFotoSyncStatus('error');
                         setTimeout(function() { setFotoSyncStatus(null); }, 5000);
                     } else if (info.phase === 'idle') {

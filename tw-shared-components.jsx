@@ -2073,7 +2073,13 @@
             var containerStyle = props.style || {};
 
             var [open, setOpen] = useState(false);
+            var [focusIdx, setFocusIdx] = useState(-1);
             var wrapperRef = useRef(null);
+
+            // Alle Ziele ausser dem aktuellen zeigen (Skill Regel 1.1)
+            var shownTargets = targets.filter(function(t) {
+                return t && t.label !== currentMode;
+            });
 
             // Klick ausserhalb schliesst das Dropdown
             useEffect(function() {
@@ -2084,7 +2090,14 @@
                     }
                 };
                 var keyHandler = function(e) {
-                    if (e.key === 'Escape') setOpen(false);
+                    if (e.key === 'Escape') { setOpen(false); setFocusIdx(-1); }
+                    else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setFocusIdx(function(i) { return Math.min(i + 1, shownTargets.length - 1); });
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setFocusIdx(function(i) { return Math.max(i - 1, 0); });
+                    }
                 };
                 document.addEventListener('mousedown', handler);
                 document.addEventListener('touchstart', handler);
@@ -2094,7 +2107,16 @@
                     document.removeEventListener('touchstart', handler);
                     document.removeEventListener('keydown', keyHandler);
                 };
-            }, [open]);
+            }, [open, shownTargets.length]);
+
+            // Fokus-Sync: wenn focusIdx sich aendert, fokussiere den Button via DOM-Ref
+            useEffect(function() {
+                if (!open || focusIdx < 0 || !wrapperRef.current) return;
+                var btns = wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');
+                if (btns && btns[focusIdx]) {
+                    try { btns[focusIdx].focus(); } catch(e) {}
+                }
+            }, [focusIdx, open]);
 
             // Blauer Gradient - einheitlich mit Design-System
             var mainBtnStyle = {
@@ -2159,14 +2181,10 @@
                 };
             };
 
-            // Alle Ziele ausser dem aktuellen zeigen (Skill Regel 1.1)
-            var shownTargets = targets.filter(function(t) {
-                return t && t.label !== currentMode;
-            });
-
             var handleSelect = function(target) {
                 if (target.disabled) return;
                 setOpen(false);
+                setFocusIdx(-1);
                 if (typeof target.handler === 'function') {
                     try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); }
                 }
@@ -2189,13 +2207,14 @@
                         <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
                     </button>
                     {open && shownTargets.length > 0 && (
-                        <div style={panelStyle} role="menu">
+                        <div className="tw-dropdown-panel tw-nav-dropdown-panel-center" style={panelStyle} role="menu">
                             {shownTargets.map(function(t) {
                                 return (
                                     <button
                                         key={t.id || t.label}
                                         type="button"
                                         role="menuitem"
+                                        className="tw-nav-dropdown-item"
                                         disabled={!!t.disabled}
                                         style={itemStyle(t.disabled)}
                                         onClick={function() { handleSelect(t); }}
@@ -2377,7 +2396,11 @@
                         <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
                     </button>
                     {open && actions.length > 0 && (
-                        <div style={panelStyle} role="menu">
+                        <div
+                            className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
+                            style={panelStyle}
+                            role="menu"
+                        >
                             {actions.map(function(a) {
                                 var hasSub = a.subItems && a.subItems.length > 0;
                                 var isSubOpen = openSubId === a.id;
@@ -2386,6 +2409,7 @@
                                         <button
                                             type="button"
                                             role="menuitem"
+                                            className="tw-aktion-dropdown-item"
                                             disabled={!!a.disabled}
                                             style={itemStyle(a.disabled, a.destructive)}
                                             onClick={function() { handleAction(a); }}
@@ -2401,13 +2425,14 @@
                                             {hasSub && <span style={{fontSize:'10px', opacity:0.7}}>{'\u25B6'}</span>}
                                         </button>
                                         {hasSub && isSubOpen && (
-                                            <div style={subPanelStyle} role="menu">
+                                            <div className="tw-dropdown-panel tw-aktion-sub-panel" style={subPanelStyle} role="menu">
                                                 {a.subItems.map(function(si) {
                                                     return (
                                                         <button
                                                             key={si.id || si.label}
                                                             type="button"
                                                             role="menuitem"
+                                                            className="tw-aktion-dropdown-item"
                                                             disabled={!!si.disabled}
                                                             style={itemStyle(si.disabled, si.destructive)}
                                                             onClick={function() { handleSubItem(a.id, si); }}
@@ -2434,15 +2459,47 @@
             );
         }
 
-        /* CSS Keyframes fuer Dropdown-Animation - einmalig ins Dokument injizieren */
+        /* CSS Keyframes + Etappe-6-Polish (responsive Positionierung, Scroll, Hover/Touch) */
         (function() {
             if (typeof document === 'undefined') return;
             if (document.getElementById('tw-dropdown-anim-style')) return;
             var s = document.createElement('style');
             s.id = 'tw-dropdown-anim-style';
-            s.textContent = '@keyframes tw-nav-drop-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }' +
+            s.textContent =
+                '@keyframes tw-nav-drop-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }' +
+                ' @keyframes tw-nav-drop-in-left { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
-                ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }';
+                ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }' +
+                /* ETAPPE 6: Panel-Scroll bei vielen Eintraegen */
+                ' .tw-dropdown-panel { max-height: calc(100vh - 140px); overflow-y: auto; -webkit-overflow-scrolling: touch; }' +
+                ' .tw-dropdown-panel::-webkit-scrollbar { width: 6px; }' +
+                ' .tw-dropdown-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }' +
+                /* Hover-Feedback fuer NavDropdown-Eintraege (Desktop/Mouse) */
+                ' .tw-nav-dropdown-item:hover:not(:disabled) { filter: brightness(1.15); transform: translateX(2px); }' +
+                /* Active-Feedback fuer Touch (kurzes scale-down beim Tippen) */
+                ' .tw-nav-dropdown-item:active:not(:disabled) { transform: scale(0.97); }' +
+                ' .tw-aktion-dropdown-item:active:not(:disabled) { background: var(--bg-hover) !important; transform: scale(0.98); }' +
+                /* Mobile: Panel linksbuendig am Button statt zentriert -- verhindert Ueberlauf links/rechts */
+                ' @media (max-width: 520px) {' +
+                '   .tw-nav-dropdown-panel-center {' +
+                '     left: 0 !important;' +
+                '     transform: none !important;' +
+                '     animation-name: tw-nav-drop-in-left !important;' +
+                '   }' +
+                '   .tw-aktion-dropdown-panel-right {' +
+                '     right: auto !important;' +
+                '     left: 0 !important;' +
+                '   }' +
+                /* Sub-Dropdown mobile: oeffnet nach unten statt nach links */
+                '   .tw-aktion-sub-panel {' +
+                '     right: auto !important;' +
+                '     left: 0 !important;' +
+                '     top: calc(100% + 4px) !important;' +
+                '     position: absolute !important;' +
+                '   }' +
+                ' }' +
+                /* Smooth transitions fuer alle Dropdown-Eintraege */
+                ' .tw-nav-dropdown-item, .tw-aktion-dropdown-item { transition: background 0.12s ease, transform 0.08s ease, filter 0.12s ease; }';
             document.head.appendChild(s);
         })();
 

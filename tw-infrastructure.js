@@ -582,6 +582,49 @@
             return resp.json();
         },
 
+        // ── Datei zwischen Ordnern verschieben (fuer Etappe 5 Foto-Migration) ──
+        // Nutzt files.update mit addParents + removeParents. Keine Datenuebertragung,
+        // nur Metadaten-Umhaengen auf Drive-Seite.
+        async moveFile(fileId, newParentId, oldParentId) {
+            const params = 'addParents=' + encodeURIComponent(newParentId) +
+                           '&removeParents=' + encodeURIComponent(oldParentId) +
+                           '&fields=id,parents';
+            const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?' + params, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': 'Bearer ' + this.accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            });
+            if (!resp.ok) throw new Error('Move fehlgeschlagen: ' + resp.status);
+            return resp.json();
+        },
+
+        // ── Datei loeschen (nur bei Bedarf, z.B. um veraltete Meta-JSON zu ersetzen) ──
+        async deleteFile(fileId) {
+            const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + this.accessToken }
+            });
+            if (!resp.ok && resp.status !== 404) throw new Error('Delete fehlgeschlagen: ' + resp.status);
+            return true;
+        },
+
+        // ── Datei-Inhalte ueberschreiben (Media-Upload auf bestehende fileId) ──
+        async updateFileContent(fileId, mimeType, blob) {
+            const resp = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media&fields=id,name', {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': 'Bearer ' + this.accessToken,
+                    'Content-Type': mimeType
+                },
+                body: blob
+            });
+            if (!resp.ok) throw new Error('UpdateContent fehlgeschlagen: ' + resp.status);
+            return resp.json();
+        },
+
         // ── Aufmaß exportieren (PDF + Excel → Google Drive) ──
         async exportToCustomerFolder(kundeFolderId, pdfBlob, excelBlob, kundenName) {
             const datumFile = new Date().toISOString().split('T')[0];

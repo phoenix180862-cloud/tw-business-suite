@@ -622,15 +622,112 @@
             return safe(rec.kontext) + '_' + safe(rec.raumKey) + '_' + safe(rec.subKey) + '_' + ts + '.jpg';
         }
 
-        // Uploadet ein einzelnes Foto in den Bilder-Ordner
-        function _uploadOne(rec, bilderOrdnerId, driveService) {
+        // ETAPPE 5: Slug fuer Drive-Ordnernamen (Umlaute ersetzt, Leerzeichen -> Bindestrich)
+        function _slugify(s) {
+            if (!s) return '';
+            return String(s)
+                .replace(/\u00e4/g, 'ae').replace(/\u00f6/g, 'oe').replace(/\u00fc/g, 'ue')
+                .replace(/\u00c4/g, 'Ae').replace(/\u00d6/g, 'Oe').replace(/\u00dc/g, 'Ue')
+                .replace(/\u00df/g, 'ss')
+                .replace(/[^a-zA-Z0-9_\- ]/g, '')
+                .trim()
+                .replace(/\s+/g, '-')
+                .substr(0, 60);
+        }
+
+        // ETAPPE 5: Unterordner-Name pro Raumblatt -- "Raumblatt_<Slug(raumKey)>"
+        // Falls raumKey leer/unbekannt: "_unsortiert" als Fallback.
+        function _getUnterordnerName(rec) {
+            if (!rec || !rec.raumKey) return '_unsortiert';
+            var slug = _slugify(rec.raumKey);
+            if (!slug) return '_unsortiert';
+            // rec.meta.raumblattNr kann falls vorhanden fuer Sortierung genutzt werden
+            if (rec && rec.meta && rec.meta.raumblattNr) {
+                var nr = String(rec.meta.raumblattNr).replace(/[^0-9]/g, '');
+                if (nr) {
+                    if (nr.length === 1) nr = '0' + nr;
+                    return 'Raumblatt-' + nr + '_' + slug;
+                }
+            }
+            return 'Raumblatt_' + slug;
+        }
+
+        // ETAPPE 5: Upload eines Fotos in den passenden Raumblatt-Unterordner
+        // Nutzt einen Cache (ordnerCache) fuer die Ordner-IDs, damit nicht pro
+        // Foto eine Drive-API-Abfrage kommt.
+        function _uploadOne(rec, bilderOrdnerId, driveService, ordnerCache) {
             var dateiName = _makeDateiName(rec);
-            return driveService.uploadFile(bilderOrdnerId, dateiName, 'image/jpeg', rec.blob)
-                .then(function(resp) {
-                    return markFotoAsUploaded(rec.id, resp && resp.id).then(function() {
-                        return { id: rec.id, driveFileId: resp && resp.id, name: dateiName };
+            var unterordnerName = _getUnterordnerName(rec);
+            // Cache-Key ist der Unterordnername (eindeutig pro Kunde/Sync)
+            var cached = ordnerCache && ordnerCache[unterordnerName];
+            var ordnerPromise = cached
+                ? Promise.resolve(cached)
+                : driveService.findOrCreateFolder(bilderOrdnerId, unterordnerName).then(function(id) {
+                    if (ordnerCache) ordnerCache[unterordnerName] = id;
+                    return id;
+                });
+            return ordnerPromise.then(function(zielOrdnerId) {
+                return driveService.uploadFile(zielOrdnerId, dateiName, 'image/jpeg', rec.blob)
+                    .then(function(resp) {
+                        return markFotoAsUploaded(rec.id, resp && resp.id).then(function() {
+                            return { id: rec.id, driveFileId: resp && resp.id, name: dateiName, ordner: unterordnerName };
+                        });
+                    });
+            });
+        }
+
+        // ETAPPE 5: Meta-JSON pro Raumblatt-Unterordner schreiben/aktualisieren.
+        // Enthaelt Rekonstruktions-Info (Phasen, Wand-Zuordnung, Markierungen usw.)
+        // aus den IndexedDB-Records -- kein neues Datenmodell, nur Export des
+        // bestehenden meta-Feldes.
+        function _writeMetaJson(kundeId, bilderOrdnerId, unterordnerName, unterordnerId, driveService) {
+            var raumKey = unterordnerName.replace(/^Raumblatt[-_]?\d*_?/, '') || unterordnerName;
+            return getByIndex('fotos', 'kundeId', String(kundeId)).then(function(allRecs) {
+                if (!allRecs || allRecs.length === 0) return null;
+                // Nur Fotos dieses Raumblatts filtern
+                var myRecs = allRecs.filter(function(r) { return _getUnterordnerName(r) === unterordnerName; });
+                if (myRecs.length === 0) return null;
+                var metaObj = {
+                    raumblattUnterordner: unterordnerName,
+                    raumKey: myRecs[0].raumKey || raumKey,
+                    lastSaved: new Date().toISOString(),
+                    fotoCount: myRecs.length,
+                    fotos: myRecs.map(function(r) {
+                        return {
+                            id: r.id,
+                            filename: _makeDateiName(r),
+                            kontext: r.kontext,
+                            subKey: r.subKey,
+                            phase: (r.meta && r.meta.phase) || null,
+                            wandId: (r.meta && r.meta.wandId) || null,
+                            marked: (r.meta && r.meta.marked) || false,
+                            crop: (r.meta && r.meta.crop) || null,
+                            markierungen: (r.meta && r.meta.markierungen) || null,
+                            tileParams: (r.meta && r.meta.tileParams) || null,
+                            analyseErgebnis: (r.meta && r.meta.analyseErgebnis) || null,
+                            aufgenommen: (r.meta && r.meta.aufgenommen) || r.createdAt,
+                            size: r.size,
+                            driveFileId: r.driveFileId || null
+                        };
+                    })
+                };
+                var jsonBlob = new Blob([JSON.stringify(metaObj, null, 2)], { type: 'application/json' });
+                // Alte Meta loeschen (falls existiert), dann neue hochladen -- "Last-Write-Wins"
+                return driveService.listFiles(unterordnerId).then(function(files) {
+                    var alteMeta = (files || []).filter(function(f) { return f.name === 'raumblatt-meta.json'; });
+                    var delChain = Promise.resolve();
+                    alteMeta.forEach(function(f) {
+                        delChain = delChain.then(function() {
+                            return driveService.deleteFile(f.id).catch(function(e) {
+                                console.warn('[FotoSync Meta] Alte meta.json konnte nicht geloescht werden:', e.message);
+                            });
+                        });
+                    });
+                    return delChain.then(function() {
+                        return driveService.uploadFile(unterordnerId, 'raumblatt-meta.json', 'application/json', jsonBlob);
                     });
                 });
+            });
         }
 
         // Haupt-Funktion: Alle nicht hochgeladenen Fotos eines Kunden
@@ -655,19 +752,21 @@
             // 1) Bilder-Ordner finden oder erstellen
             return drv.findOrCreateFolder(kundeDriveOrdnerId, bilderOrdnerName).then(function(bo) {
                 var bilderOrdnerId = (bo && (bo.id || bo)) || bo;
+                // ETAPPE 5: Cache fuer Unterordner-IDs -- wird waehrend des Uploads gefuellt
+                var ordnerCache = {};
                 // 2) Nicht hochgeladene Fotos holen
                 return getUnuploadedFotos(kundeId).then(function(fotos) {
                     if (!fotos || fotos.length === 0) {
                         _broadcast({ phase: 'idle', kundeId: kundeId, total: 0 });
-                        return { uploaded: 0, total: 0 };
+                        return { uploaded: 0, total: 0, ordnerCache: ordnerCache, bilderOrdnerId: bilderOrdnerId };
                     }
                     _broadcast({ phase: 'uploading', kundeId: kundeId, total: fotos.length, done: 0 });
-                    // 3) Sequenziell hochladen
+                    // 3) Sequenziell in Raumblatt-Unterordner hochladen
                     var done = 0, errors = 0;
                     var chain = Promise.resolve();
                     fotos.forEach(function(rec, idx) {
                         chain = chain.then(function() {
-                            return _uploadOne(rec, bilderOrdnerId, drv)
+                            return _uploadOne(rec, bilderOrdnerId, drv, ordnerCache)
                                 .then(function() {
                                     done++;
                                     _broadcast({ phase: 'uploading', kundeId: kundeId, total: fotos.length, done: done, current: rec.id });
@@ -683,9 +782,23 @@
                         });
                     });
                     return chain.then(function() {
-                        return { uploaded: done, errors: errors, total: fotos.length };
+                        return { uploaded: done, errors: errors, total: fotos.length, ordnerCache: ordnerCache, bilderOrdnerId: bilderOrdnerId };
                     });
                 });
+            }).then(function(result) {
+                // ETAPPE 5: Nach erfolgreichem Upload pro Unterordner ein raumblatt-meta.json schreiben
+                var metaChain = Promise.resolve();
+                var cache = result.ordnerCache || {};
+                var bilderOrdnerId = result.bilderOrdnerId;
+                Object.keys(cache).forEach(function(unterordnerName) {
+                    metaChain = metaChain.then(function() {
+                        return _writeMetaJson(kundeId, bilderOrdnerId, unterordnerName, cache[unterordnerName], drv)
+                            .catch(function(err) {
+                                console.warn('[FotoSync Meta] Schreiben fehlgeschlagen fuer', unterordnerName, err.message);
+                            });
+                    });
+                });
+                return metaChain.then(function() { return result; });
             }).then(function(result) {
                 _running = false;
                 _currentKundeId = null;
@@ -695,6 +808,101 @@
                 _running = false;
                 _currentKundeId = null;
                 _broadcast({ phase: 'error', kundeId: kundeId, error: err.message });
+                throw err;
+            });
+        }
+
+        // ETAPPE 5: Einmalige Migration -- verschiebt Fotos, die flach im Bilder-Ordner
+        // liegen, in ihren Raumblatt-Unterordner. Fotos ohne identifizierbares Raumblatt
+        // wandern in "_unsortiert". Nutzt Drive-Move (nur Metadaten, keine Datenuebertragung).
+        //
+        // Trigger: einmalig pro Kunde. Flag in localStorage unter
+        // 'tw_foto_migration_done_' + kundeId. Sollte nach Token-Error trotzdem
+        // fortgesetzt werden koennen -- daher erst nach komplettem Durchlauf das Flag setzen.
+        function migrateAltFotos(kundeId, kundeDriveOrdnerId) {
+            if (!kundeId || !kundeDriveOrdnerId) return Promise.reject(new Error('kundeId/driveOrdnerId fehlt'));
+            if (!window.GoogleDriveService || !window.GoogleDriveService.accessToken) {
+                return Promise.reject(new Error('Google Drive nicht verbunden'));
+            }
+            var flagKey = 'tw_foto_migration_done_' + kundeId;
+            try {
+                if (localStorage.getItem(flagKey) === '1') {
+                    return Promise.resolve({ skipped: true, reason: 'schon-migriert' });
+                }
+            } catch(e) {}
+
+            var drv = window.GoogleDriveService;
+            var bilderOrdnerName = (window.DRIVE_ORDNER && window.DRIVE_ORDNER.bilder) || 'Bilder';
+
+            _broadcast({ phase: 'migration-start', kundeId: kundeId });
+
+            return drv.findFolder(kundeDriveOrdnerId, bilderOrdnerName).then(function(bilderOrdnerId) {
+                if (!bilderOrdnerId) {
+                    // Kein Bilder-Ordner -> nichts zu migrieren
+                    try { localStorage.setItem(flagKey, '1'); } catch(_) {}
+                    _broadcast({ phase: 'migration-done', kundeId: kundeId, moved: 0, total: 0 });
+                    return { moved: 0, total: 0, skipped: true };
+                }
+                // Alle Dateien FLACH im Bilder-Ordner auflisten (nicht in Unterordnern)
+                return drv.listFiles(bilderOrdnerId, 'image/jpeg').then(function(flacheDateien) {
+                    var kandidaten = (flacheDateien || []).filter(function(f) {
+                        // Unterordner ausschliessen (listFiles mit mimeType-Filter gibt nur Bilder,
+                        // aber zur Sicherheit)
+                        return f && f.mimeType !== 'application/vnd.google-apps.folder';
+                    });
+                    if (kandidaten.length === 0) {
+                        try { localStorage.setItem(flagKey, '1'); } catch(_) {}
+                        _broadcast({ phase: 'migration-done', kundeId: kundeId, moved: 0, total: 0 });
+                        return { moved: 0, total: 0 };
+                    }
+                    _broadcast({ phase: 'migration-scanning', kundeId: kundeId, total: kandidaten.length });
+
+                    // Fuer jede flache Datei: raumKey aus Dateiname rekonstruieren,
+                    // Zielordner bestimmen, verschieben.
+                    var ordnerCache = {};
+                    var done = 0, errors = 0;
+                    var chain = Promise.resolve();
+
+                    kandidaten.forEach(function(datei) {
+                        chain = chain.then(function() {
+                            // Dateinamen parsen -> raumKey ermitteln
+                            var parsed = parseFotoDateiName(datei.name);
+                            var fakeRec = {
+                                raumKey: (parsed && parsed.raumKey) || null,
+                                meta: {}
+                            };
+                            var unterordnerName = _getUnterordnerName(fakeRec);
+                            var cached = ordnerCache[unterordnerName];
+                            var ordnerPromise = cached
+                                ? Promise.resolve(cached)
+                                : drv.findOrCreateFolder(bilderOrdnerId, unterordnerName).then(function(id) {
+                                    ordnerCache[unterordnerName] = id;
+                                    return id;
+                                });
+                            return ordnerPromise.then(function(zielOrdnerId) {
+                                return drv.moveFile(datei.id, zielOrdnerId, bilderOrdnerId);
+                            }).then(function() {
+                                done++;
+                                _broadcast({ phase: 'migration-moving', kundeId: kundeId, total: kandidaten.length, done: done, current: datei.name, ziel: unterordnerName });
+                            }).catch(function(err) {
+                                errors++;
+                                console.warn('[FotoSync Migration] Move fehlgeschlagen fuer', datei.name, err.message);
+                                if (err.message && (err.message.indexOf('401') >= 0 || err.message.indexOf('403') >= 0)) {
+                                    throw err;
+                                }
+                            });
+                        });
+                    });
+
+                    return chain.then(function() {
+                        // Nur bei Erfolg ohne Token-Error das Flag setzen
+                        try { localStorage.setItem(flagKey, '1'); } catch(_) {}
+                        _broadcast({ phase: 'migration-done', kundeId: kundeId, moved: done, total: kandidaten.length, errors: errors });
+                        return { moved: done, total: kandidaten.length, errors: errors };
+                    });
+                });
+            }).catch(function(err) {
+                _broadcast({ phase: 'migration-error', kundeId: kundeId, error: err.message });
                 throw err;
             });
         }
@@ -820,7 +1028,11 @@
             parseFotoDateiName: parseFotoDateiName,
             onProgress: onProgress,
             isRunning: isRunning,
-            getCurrentKundeId: getCurrentKundeId
+            getCurrentKundeId: getCurrentKundeId,
+            // ETAPPE 5: Migration und Unterordner-Helpers oeffentlich
+            migrateAltFotos: migrateAltFotos,
+            getUnterordnerName: _getUnterordnerName,
+            slugify: _slugify
         };
     })();
 
