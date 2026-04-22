@@ -1,0 +1,27 @@
+{
+  "name": "tw-cloud-functions",
+  "description": "TW Business Suite · Cloud Functions (B11)",
+  "version": "1.0.0",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "logs:translate": "firebase functions:log --only chatTranslate",
+    "logs:push": "firebase functions:log --only chatPush"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.0.1",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.3.0"
+  },
+  "private": true
+}
