@@ -41,11 +41,16 @@
     // in den Thomas manuell Dateien aus den Originalen hineinkopiert.
     // Nur dieser Staging-Bereich ist fuer Mitarbeiter sichtbar.
     //
-    // Pro Baustelle werden im Staging 4 Unterordner angelegt:
+    // Pro Baustelle werden im Staging 5 Unterordner angelegt (Etappe 4.1 B2):
     //  - Zeichnungen    (read-only fuer Mitarbeiter)
-    //  - Baustellen-App (read-only fuer Mitarbeiter)
-    //  - Bilder         (Mitarbeiter duerfen hochladen)
+    //  - Anweisungen    (read-only; ersetzt "Baustellen-App")
+    //  - Baustellendaten (read-only; neu in B2)
+    //  - Fotos          (Mitarbeiter duerfen hochladen; ersetzt "Bilder")
     //  - Stunden        (Mitarbeiter duerfen hochladen)
+    //
+    // Legacy-Baustellen (vor B2 angelegt) haben noch "Bilder" und "Baustellen-App"
+    // auf Drive. Die SUBFOLDER_ALIASES-Map unten mappt beide auf die neuen Namen,
+    // bis Baustein 8 (Drive-Migration) alles physisch umbenennt.
     //
     // Der SERVICE_ACCOUNT_EMAIL wird von Thomas nach Einrichtung
     // (siehe PDF-Anleitung "Service-Account-Einrichtung.pdf") eingetragen
@@ -54,12 +59,30 @@
     const STAGING_CONFIG = {
         ROOT_FOLDER_NAME: 'Baustellen-App-Staging',
         ROOT_FOLDER_ID: localStorage.getItem('staging_root_folder_id') || '',
-        SUBFOLDERS: ['Zeichnungen', 'Baustellen-App', 'Bilder', 'Stunden'],
+        // ETAPPE 4.1 B2: 5 Unterordner (vorher 4)
+        //   Zeichnungen  = Baustellenpläne (Mitarbeiter nur lesen)
+        //   Anweisungen  = Arbeitsanweisungen/Protokolle (nur lesen)  ← ersetzt "Baustellen-App"
+        //   Baustellendaten = Kundendaten, Adressen, Bauleiter-Kontakte (nur lesen)  ← neu
+        //   Fotos        = Baustellenfotos (Mitarbeiter dürfen hochladen)  ← ersetzt "Bilder"
+        //   Stunden      = Stundenzettel (Mitarbeiter dürfen hochladen)
+        SUBFOLDERS: ['Zeichnungen', 'Anweisungen', 'Baustellendaten', 'Fotos', 'Stunden'],
         SUBFOLDER_PERMISSIONS: {
-            'Zeichnungen':    'readonly',
-            'Baustellen-App': 'readonly',
-            'Bilder':         'upload',
-            'Stunden':        'upload'
+            'Zeichnungen':     'readonly',
+            'Anweisungen':     'readonly',
+            'Baustellendaten': 'readonly',
+            'Fotos':           'upload',
+            'Stunden':         'upload'
+        },
+        // ETAPPE 4.1 B2: Alias-System fuer Legacy-Ordnernamen.
+        // Bestehende Baustellen (vor B2 angelegt) haben noch die alten Namen
+        // "Bilder" und "Baustellen-App" auf Drive. Die App behandelt sie so,
+        // als laegen sie unter den neuen Namen — bis Baustein 8 (Drive-Migration)
+        // alles physisch umbenennt.
+        //   Key   = alter Ordnername auf Drive
+        //   Value = neuer logischer Name in der App
+        SUBFOLDER_ALIASES: {
+            'Bilder':         'Fotos',
+            'Baustellen-App': 'Anweisungen'
         },
         SERVICE_ACCOUNT_EMAIL: localStorage.getItem('staging_service_account_email') || '',
         WARN_COPY_SIZE_MB: 50
@@ -2502,41 +2525,27 @@
             }); return function(){ref.off('value',h);};
         },
         // Freigabe eines wartenden Geraets. maId ist der Mitarbeiter-Slug (z.B. 'ivan'),
-        // der zwingend gesetzt wird, damit die Baustellen-App ihren Chat-Thread findet.
-        // Ohne maId wird das Mapping uebersprungen (markiert) -- z.B. fuer Admin-Geraete,
-        // die keinen Mitarbeiter-Chat brauchen.
+        // der atomar mitgesetzt wird, damit die Baustellen-App ihren Chat-Thread findet.
+        // Ohne maId wird das Geraet als bewusst uebersprungen markiert (z.B. Admin-Geraet).
         async approveUser(uid, maId) {
-            var updates = { approved: true };
+            await this.db.ref('users/'+uid+'/approved').set(true);
             if (maId && typeof maId === 'string' && maId.trim()) {
-                updates.ma_id = maId.trim();
-                updates.ma_id_skipped = null;
+                // setUserMaId setzt ma_id UND spiegelt in mitarbeiter/{maId}/geraete_uuids
+                await this.setUserMaId(uid, maId.trim());
+                await this.db.ref('users/'+uid+'/ma_id_skipped').remove();
             } else {
-                // Kein Mapping -- als bewusst uebersprungen markieren, damit der
-                // Sicherheits-Check (F3-Banner) dieses Geraet nicht wieder anmahnt.
-                updates.ma_id_skipped = true;
+                // Bewusst ohne Mapping -- Sicherheits-Check (F3) ignoriert diese Eintraege.
+                await this.db.ref('users/'+uid+'/ma_id_skipped').set(true);
             }
-            await this.db.ref('users/'+uid).update(updates);
         },
         async rejectUser(uid) { await this.db.ref('users/'+uid).remove(); },
 
-        // Nachtraegliches Setzen der Mitarbeiter-Zuordnung fuer ein bereits
-        // freigegebenes Geraet. Wird vom Migrations-Werkzeug (F1) verwendet,
-        // um die 5 bestehenden Geraete ohne ma_id zu reparieren.
-        async setUserMapping(uid, maId) {
-            if (!maId || !String(maId).trim()) throw new Error('ma_id darf nicht leer sein');
-            await this.db.ref('users/'+uid).update({
-                ma_id: String(maId).trim(),
-                ma_id_skipped: null
-            });
-        },
-
         // Markiert ein freigegebenes Geraet bewusst als "ohne Mitarbeiter-Zuordnung"
-        // (typischer Fall: Admin-Geraet von Thomas). Der Sicherheits-Check blendet
-        // solche Eintraege aus dem Warn-Banner aus.
+        // (typischer Fall: Admin-Geraet von Thomas). Das Migrations-Werkzeug und der
+        // Warn-Banner blenden solche Eintraege aus.
         async skipUserMapping(uid) {
-            await this.db.ref('users/'+uid).update({
-                ma_id_skipped: true
-            });
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('users/'+uid+'/ma_id_skipped').set(true);
         },
         async publishProject(id,data) {
             await this.db.ref('projects/'+id+'/meta').set({
@@ -2721,7 +2730,11 @@
         // Neu angelegte Mitarbeiter werden hier abgelegt und live auf alle
         // Geraete verteilt. Offline-Faehigkeit bleibt durch den lokalen
         // Grundstock erhalten.
-        async addMitarbeiter(name, rolle) {
+        //
+        // Etappe 4.1 B3: Schema erweitert um die Felder, die die Mitarbeiter-App
+        // erwartet (sprache, status, erstellt_am, geraete_uuids). createdAt bleibt
+        // fuer Rueckwaertskompatibilitaet erhalten.
+        async addMitarbeiter(name, rolle, sprache) {
             if(!this.db) throw new Error('Firebase nicht initialisiert');
             if(!name || !name.trim()) throw new Error('Name darf nicht leer sein');
             if(!rolle) throw new Error('Rolle muss angegeben sein');
@@ -2730,11 +2743,16 @@
                 .replace(/[^a-z0-9]+/g, '_')
                 .replace(/^_+|_+$/g, '');
             if(!id) id = 'mitarbeiter_' + Date.now();
+            var jetzt = Date.now();
             var payload = {
                 id: id,
                 name: name.trim(),
                 rolle: rolle,
-                createdAt: Date.now()
+                sprache: sprache || 'de',       // ETAPPE 4.1 B3: Default DE, Buero kann per updateMitarbeiter aendern
+                status: 'aktiv',                 // ETAPPE 4.1 B3: aktiv | inaktiv | urlaub
+                erstellt_am: jetzt,              // ETAPPE 4.1 B3: von MA-App gelesen
+                geraete_uuids: {},               // ETAPPE 4.1 B3: wird durch Geraete-Freigabe gefuellt
+                createdAt: jetzt                 // bisheriges Feld — bleibt fuer Rueckwaertskompatibilitaet
             };
             await this.db.ref('mitarbeiter/'+id).set(payload);
             return payload;
@@ -2758,6 +2776,373 @@
             };
             ref.on('value', handler);
             return function(){ ref.off('value', handler); };
+        },
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ETAPPE 4.1 · BAUSTEIN 3 · API-Layer fuer Master-App ↔ MA-App
+        //
+        // Alle Endpoints unten folgen dem Schema aus LIESMICH-ETAPPE-5-GESAMT.md
+        // der Mitarbeiter-App. Jeder neue Endpoint hier hat auf der MA-App-Seite
+        // ein Gegenstueck. Abweichungen = Inkompatibilitaet = Chaos — daher ist
+        // das Schema hier *ident* zur MA-App-Dokumentation.
+        // ═══════════════════════════════════════════════════════════════════
+
+        // ── 3.1 · ensureMitarbeiterStammdaten() ──
+        // Einmaliger Seed: Traegt alle Eintraege aus window.MITARBEITER_LISTE
+        // in /mitarbeiter/{id}/ ein, *ohne* bestehende Eintraege zu ueberschreiben.
+        // Kann beliebig oft aufgerufen werden (idempotent).
+        async ensureMitarbeiterStammdaten() {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            var grundstock = window.MITARBEITER_LISTE || [];
+            if(grundstock.length === 0) return { geprueft: 0, neu: 0 };
+            var snap = await this.db.ref('mitarbeiter').once('value');
+            var existierend = snap.val() || {};
+            var neu = 0;
+            var jetzt = Date.now();
+            for(var i = 0; i < grundstock.length; i++) {
+                var m = grundstock[i];
+                if(!m.id) continue;
+                if(existierend[m.id]) continue;  // Eintrag existiert schon → ueberspringen
+                var payload = {
+                    id: m.id,
+                    name: m.name || m.id,
+                    rolle: m.rolle || 'Fliesenleger',
+                    sprache: m.sprache || 'de',
+                    status: 'aktiv',
+                    erstellt_am: jetzt,
+                    geraete_uuids: {},
+                    createdAt: jetzt
+                };
+                await this.db.ref('mitarbeiter/'+m.id).set(payload);
+                neu++;
+            }
+            return { geprueft: grundstock.length, neu: neu };
+        },
+
+        // ── 3.2 · updateMitarbeiter(maId, updates) ──
+        // Teil-Update eines Mitarbeiters (z.B. Sprache aendern, status auf urlaub)
+        async updateMitarbeiter(maId, updates) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId) throw new Error('maId fehlt');
+            if(!updates || typeof updates !== 'object') throw new Error('updates muss Objekt sein');
+            await this.db.ref('mitarbeiter/'+maId).update(updates);
+        },
+
+        // ── 3.3 · setUserMaId(uid, maId) ──
+        // Geraete-User (Firebase-UID) wird einem Mitarbeiter-Slug zugeordnet.
+        // Die MA-App liest /users/{uid}/ma_id und nutzt dann /kalender/{maId}/...
+        // statt /kalender/{uid}/...
+        async setUserMaId(uid, maId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!uid) throw new Error('uid fehlt');
+            await this.db.ref('users/'+uid+'/ma_id').set(maId || null);
+
+            // Spiegelung: im Mitarbeiter-Eintrag die geraete_uuids-Map pflegen,
+            // damit die Master-App schnell sieht, welcher MA welches Geraet hat
+            if(maId) {
+                await this.db.ref('mitarbeiter/'+maId+'/geraete_uuids/'+uid).set(true);
+            }
+        },
+        async removeUserMaId(uid, maId) {
+            if(!this.db) return;
+            if(!uid) return;
+            await this.db.ref('users/'+uid+'/ma_id').remove();
+            if(maId) await this.db.ref('mitarbeiter/'+maId+'/geraete_uuids/'+uid).remove();
+        },
+
+        // ── 3.4 · Kalender-API (/kalender/{maId}/{jahr}/{datum}) ──
+        // Live-Listener fuer ein ganzes Jahr: Callback bekommt { 'YYYY-MM-DD': {status, stunden, ...} }
+        subscribeKalenderJahr(maId, jahr, callback) {
+            if(!this.db || !maId || !jahr) return function(){};
+            var ref = this.db.ref('kalender/'+maId+'/'+jahr);
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        // Live-Listener fuer alle Jahre (fuer Hauptkalender-Aggregation)
+        subscribeKalenderAlleJahre(maId, callback) {
+            if(!this.db || !maId) return function(){};
+            var ref = this.db.ref('kalender/'+maId);
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        // ETAPPE 4.1 B7: Live-Listener fuer /kalender/ komplett — aggregiert
+        // alle Mitarbeiter und alle Jahre fuer den Buero-Hauptkalender.
+        // Callback bekommt { maId: { jahr: { datum: eintrag } } }
+        subscribeKalenderAll(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('kalender');
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        // Kalender-Eintrag schreiben/updaten
+        // datum-Format: 'YYYY-MM-DD'
+        // eintrag: { status, stunden?, baustelle_id?, sonderheiten?, ... }
+        async schreibeKalenderEintrag(maId, datum, eintrag) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId) throw new Error('maId fehlt');
+            if(!datum || !/^\d{4}-\d{2}-\d{2}$/.test(datum)) throw new Error('datum muss YYYY-MM-DD sein');
+            if(!eintrag || !eintrag.status) throw new Error('eintrag.status fehlt');
+            var jahr = datum.substring(0, 4);
+            var jetzt = Date.now();
+            var snap = await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).once('value');
+            var bestehend = snap.val();
+            var payload = Object.assign({}, eintrag, {
+                eingetragen_von: eintrag.eingetragen_von || 'buero',
+                eingetragen_am: bestehend ? bestehend.eingetragen_am : jetzt,
+                geaendert_am: jetzt
+            });
+            await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).set(payload);
+            return payload;
+        },
+        async loescheKalenderEintrag(maId, datum) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId || !datum) throw new Error('maId oder datum fehlt');
+            var jahr = datum.substring(0, 4);
+            await this.db.ref('kalender/'+maId+'/'+jahr+'/'+datum).remove();
+        },
+
+        // ── 3.5 · Baustellen-Planung (/baustellen_planung/) ──
+        // Buero plant Baustellen-Zeitraeume, die im Hauptkalender als Balken
+        // ueber Mitarbeiter-Zeilen erscheinen. Jeder Zeitraum hat eine
+        // mitarbeiter-Map: { ma_id: true, ... }
+        subscribeBaustellenPlanungen(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('baustellen_planung');
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        async schreibeBaustellenPlanung(baustelleId, zeitraumId, daten) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !zeitraumId) throw new Error('baustelleId und zeitraumId pflicht');
+            if(!daten || !daten.von || !daten.bis) throw new Error('daten.von und daten.bis pflicht (unix-ms)');
+            var payload = {
+                von: daten.von,
+                bis: daten.bis,
+                farbe: daten.farbe || '#1E88E5',
+                beschreibung: daten.beschreibung || '',
+                mitarbeiter: daten.mitarbeiter || {}
+            };
+            await this.db.ref('baustellen_planung/'+baustelleId+'/'+zeitraumId).set(payload);
+            return payload;
+        },
+        async loescheBaustellenPlanung(baustelleId, zeitraumId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !zeitraumId) throw new Error('ids pflicht');
+            await this.db.ref('baustellen_planung/'+baustelleId+'/'+zeitraumId).remove();
+        },
+
+        // ── 3.6 · Chat-API (/chats/{maId}/{nachrichtId}) ──
+        // Bidirektionaler Chat Buero ↔ Mitarbeiter. Pro MA ein Thread.
+        // Uebersetzung via Cloud Function (Baustein 11) — Master-App schreibt
+        // nur text_original + sprache_original, Cloud Function befuellt text_uebersetzt.
+        subscribeChat(maId, callback) {
+            if(!this.db || !maId) return function(){};
+            var ref = this.db.ref('chats/'+maId).orderByChild('timestamp');
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var arr = [];
+                for(var k in val) {
+                    if(val.hasOwnProperty(k)) {
+                        var n = val[k];
+                        n._id = k;
+                        arr.push(n);
+                    }
+                }
+                arr.sort(function(a, b){ return (a.timestamp || 0) - (b.timestamp || 0); });
+                callback(arr);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        // Live-Listener fuer ALLE Chat-Threads (fuer Mitarbeiter-Liste in B4)
+        // callback bekommt { maId: [nachrichten] }
+        subscribeAlleChats(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('chats');
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+        // Buero sendet eine Nachricht an MA
+        async sendeChatNachricht(maId, textOriginal, spracheOriginal, absenderName, dringend) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId) throw new Error('maId fehlt');
+            if(!textOriginal || !textOriginal.trim()) throw new Error('Text fehlt');
+            var payload = {
+                von: 'buero',
+                absender_name: absenderName || 'Thomas',
+                text_original: textOriginal.trim(),
+                sprache_original: spracheOriginal || 'de',
+                timestamp: Date.now(),
+                gelesen: false,
+                dringend: !!dringend
+                // text_uebersetzt wird von Cloud Function (B11) gefuellt
+            };
+            var ref = this.db.ref('chats/'+maId).push();
+            await ref.set(payload);
+            payload._id = ref.key;
+            return payload;
+        },
+        // Buero markiert eine MA-Nachricht als gelesen
+        async markiereNachrichtGelesen(maId, nachrichtId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!maId || !nachrichtId) return;
+            await this.db.ref('chats/'+maId+'/'+nachrichtId).update({
+                gelesen: true,
+                gelesen_am: Date.now()
+            });
+        },
+        // Live-Zaehler fuer ungelesene MA-Nachrichten (fuer Badge in B4)
+        // callback bekommt Anzahl (number)
+        zaehleUngeleseneMaNachrichten(maId, callback) {
+            if(!this.db || !maId) return function(){};
+            var ref = this.db.ref('chats/'+maId);
+            var handler = function(snap) {
+                var val = snap.val() || {};
+                var n = 0;
+                for(var k in val) {
+                    if(val.hasOwnProperty(k)) {
+                        var m = val[k];
+                        // Nur MA-Nachrichten zaehlen, die Buero noch nicht gelesen hat
+                        if(m.von === 'ma' && !m.gelesen) n++;
+                    }
+                }
+                callback(n);
+            };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1 B9: FOTO-FREIGABEN (Foto-Review-Gate)
+        // Alle Fotos, die MAs in die Staging-Fotos-Ordner hochladen,
+        // werden unter /freigaben/fotos/{foto-id}/ registriert und
+        // durchlaufen ein Review durch das Buero, bevor sie in den
+        // offiziellen Kunden-Ordner kommen.
+        // ═══════════════════════════════════════════════════════
+
+        // Live-Listener auf alle Foto-Freigaben.
+        // Callback bekommt { fotoId: {baustelle_id, ma_id, staging_file_id,
+        //   dateiname, status, hochgeladen_am, raum?, phase?,
+        //   freigegeben_am?, freigegeben_von?, kunden_file_id?,
+        //   abgelehnt_am?, abgelehnt_von?, abgelehnt_grund?} }
+        subscribeFotoFreigaben(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('freigaben/fotos');
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+
+        // Foto-Freigabe anlegen (wird normalerweise von der MA-App aufgerufen
+        // beim Upload, existiert hier um aus der Buero-App testweise
+        // anlegen zu koennen oder nach Aenderung manuell zu erzeugen).
+        async schreibeFotoFreigabe(fotoId, daten) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!fotoId) throw new Error('fotoId fehlt');
+            if(!daten || !daten.baustelle_id || !daten.staging_file_id) {
+                throw new Error('baustelle_id und staging_file_id erforderlich');
+            }
+            var eintrag = Object.assign({
+                status: 'wartend',
+                hochgeladen_am: Date.now()
+            }, daten);
+            await this.db.ref('freigaben/fotos/'+fotoId).set(eintrag);
+            return eintrag;
+        },
+
+        // Foto freigeben: Status + Metadaten setzen.
+        // kundenFileId = die neu erstellte Drive-ID nach dem Copy-Vorgang
+        async markiereFotoFreigegeben(fotoId, kundenFileId, von) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!fotoId) throw new Error('fotoId fehlt');
+            var updates = {
+                status: 'freigegeben',
+                freigegeben_am: Date.now(),
+                freigegeben_von: von || 'Buero'
+            };
+            if (kundenFileId) updates.kunden_file_id = kundenFileId;
+            await this.db.ref('freigaben/fotos/'+fotoId).update(updates);
+            return updates;
+        },
+
+        // Foto ablehnen: Status + Grund setzen.
+        // Chat-Nachricht an den MA wird separat vom Aufrufer gesendet.
+        async markiereFotoAbgelehnt(fotoId, grund, von) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!fotoId) throw new Error('fotoId fehlt');
+            var updates = {
+                status: 'abgelehnt',
+                abgelehnt_am: Date.now(),
+                abgelehnt_von: von || 'Buero',
+                abgelehnt_grund: grund || ''
+            };
+            await this.db.ref('freigaben/fotos/'+fotoId).update(updates);
+            return updates;
+        },
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE 4.1 B10: STUNDEN-FREIGABEN (Stunden-Review-Gate)
+        // PDF-Stundenzettel aus dem Staging-Stunden-Ordner durchlaufen
+        // ein Review durch das Buero. Bei Freigabe wird das PDF in
+        // zwei Ziele kopiert: Kunden-Stundennachweis-Ordner + zentraler
+        // Lohnbuchhaltungs-Ordner (Monats-Archiv).
+        // ═══════════════════════════════════════════════════════
+
+        subscribeStundenFreigaben(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('freigaben/stunden');
+            var handler = function(snap) { callback(snap.val() || {}); };
+            ref.on('value', handler);
+            return function(){ ref.off('value', handler); };
+        },
+
+        async schreibeStundenFreigabe(pdfId, daten) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!pdfId) throw new Error('pdfId fehlt');
+            if(!daten || !daten.ma_id || !daten.staging_file_id) {
+                throw new Error('ma_id und staging_file_id erforderlich');
+            }
+            var eintrag = Object.assign({
+                status: 'wartend',
+                hochgeladen_am: Date.now()
+            }, daten);
+            await this.db.ref('freigaben/stunden/'+pdfId).set(eintrag);
+            return eintrag;
+        },
+
+        // Stunden-PDF freigeben: Zwei Drive-IDs werden gespeichert
+        // (kunden_file_id und lohn_file_id). anmerkungBuero ist optional.
+        async markiereStundenFreigegeben(pdfId, kundenFileId, lohnFileId, von, anmerkungBuero) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!pdfId) throw new Error('pdfId fehlt');
+            var updates = {
+                status: 'freigegeben',
+                freigegeben_am: Date.now(),
+                freigegeben_von: von || 'Buero'
+            };
+            if (kundenFileId) updates.kunden_file_id = kundenFileId;
+            if (lohnFileId) updates.lohn_file_id = lohnFileId;
+            if (anmerkungBuero) updates.anmerkung_buero = anmerkungBuero;
+            await this.db.ref('freigaben/stunden/'+pdfId).update(updates);
+            return updates;
+        },
+
+        async markiereStundenAbgelehnt(pdfId, grund, von) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!pdfId) throw new Error('pdfId fehlt');
+            var updates = {
+                status: 'abgelehnt',
+                abgelehnt_am: Date.now(),
+                abgelehnt_von: von || 'Buero',
+                abgelehnt_grund: grund || ''
+            };
+            await this.db.ref('freigaben/stunden/'+pdfId).update(updates);
+            return updates;
         }
     };
 
