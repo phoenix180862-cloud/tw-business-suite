@@ -71,23 +71,6 @@
                 return unsub;
             }, [fbOk]);
 
-            // ── ETAPPE 4.1 B3: Einmaliger Stammdaten-Seed ──
-            // Beim ersten Firebase-Login (oder falls neue MA zur MITARBEITER_LISTE
-            // hinzugekommen sind) werden fehlende Stammdaten nach /mitarbeiter/
-            // geschrieben. Funktion ist idempotent — existierende Eintraege bleiben
-            // unveraendert. Kritisch, damit die MA-App ueberhaupt Stammdaten findet.
-            useEffect(function() {
-                if (!fbOk) return;
-                if (typeof window.FirebaseService.ensureMitarbeiterStammdaten !== 'function') return;
-                window.FirebaseService.ensureMitarbeiterStammdaten().then(function(r) {
-                    if (r && r.neu > 0) {
-                        console.log('[B3-Seed] ' + r.neu + ' neue Mitarbeiter-Stammdaten in Firebase angelegt (von ' + r.geprueft + ' geprueft)');
-                    }
-                }).catch(function(e) {
-                    console.warn('[B3-Seed] Stammdaten-Seed fehlgeschlagen:', e && e.message || e);
-                });
-            }, [fbOk]);
-
             // ── Projekte laden ──
             useEffect(function() {
                 if (!fbOk) return;
@@ -121,10 +104,36 @@
                 if (!confirm('Firebase trennen?')) return;
                 localStorage.removeItem('tw_firebase_config'); window.location.reload();
             }
-            async function handleApprove(uid, name) {
-                await window.FirebaseService.approveUser(uid);
-                await window.FirebaseService.logAuditEvent('device_approved', { uid: uid, name: name || '' });
-                addLog('OK Freigegeben: ' + (name||uid.substring(0,8)));
+            async function handleApprove(uid, name, maId) {
+                await window.FirebaseService.approveUser(uid, maId);
+                await window.FirebaseService.logAuditEvent('device_approved', {
+                    uid: uid, name: name || '', ma_id: maId || null
+                });
+                addLog('OK Freigegeben: ' + (name||uid.substring(0,8)) + (maId ? ' (→ '+maId+')' : ''));
+            }
+            // F1: Nachtraegliches Zuordnen eines Geraets zu einem Mitarbeiter-Slug
+            async function handleSetMapping(uid, maId, name) {
+                try {
+                    await window.FirebaseService.setUserMapping(uid, maId);
+                    await window.FirebaseService.logAuditEvent('device_mapped', {
+                        uid: uid, name: name || '', ma_id: maId
+                    });
+                    addLog('Zugeordnet: ' + (name || uid.substring(0,8)) + ' → ' + maId);
+                } catch(e) {
+                    alert('Zuordnung fehlgeschlagen: ' + e.message);
+                }
+            }
+            // F1: Ein Geraet bewusst ohne Mapping markieren (z.B. Admin-Geraet)
+            async function handleSkipMapping(uid, name) {
+                try {
+                    await window.FirebaseService.skipUserMapping(uid);
+                    await window.FirebaseService.logAuditEvent('device_mapping_skipped', {
+                        uid: uid, name: name || ''
+                    });
+                    addLog('Als Admin/Ohne-Mapping markiert: ' + (name || uid.substring(0,8)));
+                } catch(e) {
+                    alert('Markieren fehlgeschlagen: ' + e.message);
+                }
             }
             async function handleReject(uid, name) {
                 if (!confirm('"' + (name||'') + '" ablehnen?')) return;
@@ -231,7 +240,16 @@
                     onLockDevice={handleLockDevice}
                     onUnlockDevice={handleUnlockDevice}
                     onRemoveDevice={handleRemoveDevice}
+                    onOpenMapping={function(){ setSubpage('mapping'); }}
                     onBack={function(){ setSubpage('start'); }}
+                />;
+            }
+            if (subpage === 'mapping') {
+                return <GeraeteMapping
+                    users={users}
+                    onSetMapping={handleSetMapping}
+                    onSkipMapping={handleSkipMapping}
+                    onBack={function(){ setSubpage('team'); }}
                 />;
             }
             if (subpage === 'sync') {
@@ -250,19 +268,9 @@
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
-            if (subpage === 'hauptkalender') {
-                return <HauptkalenderView
-                    onBack={function(){ setSubpage('start'); }}
-                />;
-            }
-            if (subpage === 'freigaben') {
-                return <FreigabenHub
-                    onBack={function(){ setSubpage('start'); }}
-                />;
-            }
 
             // ════════════════════════════════════════════════════
-            // STARTSEITE: 5 grosse blaue Buttons (Etappe 4.1 B9)
+            // STARTSEITE: 3 grosse blaue Buttons
             // ════════════════════════════════════════════════════
             return <BaustellenAppStartseite
                 kunde={kunde}
@@ -271,41 +279,22 @@
                 onBaustellen={function(){ setSubpage('baustellen'); }}
                 onTeam={function(){ setSubpage('team'); }}
                 onSync={function(){ setSubpage('sync'); }}
-                onHauptkalender={function(){ setSubpage('hauptkalender'); }}
-                onFreigaben={function(){ setSubpage('freigaben'); }}
                 onBack={onBack}
             />;
         }
 
         // ═══════════════════════════════════════════════════════
         // STARTSEITE des Baustellen-App-Moduls
-        // Fuenf blaue Modus-Karten (flex-column):
-        //   BAUSTELLEN - TEAM - SYNC - HAUPTKALENDER - FREIGABEN
-        // HAUPTKALENDER kam in B7 dazu, FREIGABEN in B9.
+        // Drei blaue Modus-Karten: BAUSTELLEN - TEAM - SYNC
+        // Design: identischer Gradient wie Modulwahl-Kacheln
         // ═══════════════════════════════════════════════════════
-        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onBack }) {
-            // Wartende Foto-Freigaben zaehlen (Live-Listener, fuer Badge)
-            const [fotoPending, setFotoPending] = useState(0);
-            useEffect(function(){
-                if (!fbOk || !window.FirebaseService || !window.FirebaseService.subscribeFotoFreigaben) return;
-                var unsub = window.FirebaseService.subscribeFotoFreigaben(function(data){
-                    var n = 0;
-                    for (var k in data) {
-                        if (data.hasOwnProperty(k)) {
-                            if (data[k] && data[k].status === 'wartend') n++;
-                        }
-                    }
-                    setFotoPending(n);
-                });
-                return unsub;
-            }, [fbOk]);
-
+        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onBack }) {
             var cards = [
                 {
                     id: 'baustellen',
                     icon: '🏗️',
                     title: 'Baustellen',
-                    desc: 'Staging-Bereich verwalten: Zeichnungen, Anweisungen, Fotos und Stunden fuer die Mitarbeiter-App bereitstellen.',
+                    desc: 'Staging-Bereich verwalten: Zeichnungen, Bilder und Stunden fuer die Mitarbeiter-App bereitstellen.',
                     onClick: onBaustellen,
                     badge: null
                 },
@@ -324,22 +313,6 @@
                     desc: 'Synchronisation mit dem Firebase-Backend, Projekte verwalten und Live-Protokoll.',
                     onClick: onSync,
                     badge: null
-                },
-                {
-                    id: 'hauptkalender',
-                    icon: '📆',
-                    title: 'Hauptkalender',
-                    desc: 'Uebersicht aller Mitarbeiter-Anwesenheiten und geplanter Baustellen-Zeitraeume auf einen Blick.',
-                    onClick: onHauptkalender,
-                    badge: null
-                },
-                {
-                    id: 'freigaben',
-                    icon: '✅',
-                    title: 'Freigaben',
-                    desc: 'Review-Queue: Fotos der Mitarbeiter pruefen und in die Kunden-Ordner freigeben oder ablehnen.',
-                    onClick: onFreigaben,
-                    badge: fotoPending > 0 ? String(fotoPending) : null
                 }
             ];
 
@@ -870,22 +843,6 @@
             const [fehler, setFehler] = useState(null);
             const [anlegeBusy, setAnlegeBusy] = useState(false);
 
-            // ── Etappe 4.1 Baustein 1: 2-Ordner-Modell ──
-            // subView: 'hauptordner' | 'baustellen-daten' | 'nachrichten'
-            //   hauptordner    = 2 grosse Kacheln (BAUSTELLEN-DATEN + NACHRICHTEN)
-            //   baustellen-daten = die bisherigen 4 Sub-Ordner (Migration auf 5 in B2)
-            //   nachrichten    = Kalender + Chat pro MA (Platzhalter bis B4-B6)
-            const [subView, setSubView] = useState('hauptordner');
-
-            function handleBack() {
-                // Rueckwaerts-Navigation: in Sub-Views erst auf hauptordner, dann raus
-                if (subView !== 'hauptordner') {
-                    setSubView('hauptordner');
-                } else {
-                    onBack();
-                }
-            }
-
             var bereit = !!(stagingStatus && stagingStatus.vorhanden);
 
             async function ladeInfo() {
@@ -922,27 +879,22 @@
                 setAnlegeBusy(false);
             }
 
-            // ── Die 5 Standard-Unterordner (aus STAGING_CONFIG, Etappe 4.1 B2) ──
-            // Anweisungen ersetzt "Baustellen-App", Fotos ersetzt "Bilder",
-            // Baustellendaten ist neu. Alias-Logik in tw-staging.js — Legacy-Ordner
-            // werden automatisch unter dem neuen Namen angezeigt.
+            // ── Die 4 Standard-Unterordner (aus STAGING_CONFIG) ──
             var cfg = window.STAGING_CONFIG || {};
-            var unterordnerListe = (cfg.SUBFOLDERS || ['Zeichnungen', 'Anweisungen', 'Baustellendaten', 'Fotos', 'Stunden']).map(function(name) {
+            var unterordnerListe = (cfg.SUBFOLDERS || ['Zeichnungen', 'Baustellen-App', 'Bilder', 'Stunden']).map(function(name) {
                 var icon = '📁';
                 var farbe = '#1E88E5';
-                if (name === 'Zeichnungen')     { icon = '📐'; farbe = '#2ecc71'; }
-                if (name === 'Anweisungen')     { icon = '📋'; farbe = '#3498db'; }
-                if (name === 'Baustellendaten') { icon = '📊'; farbe = '#1E88E5'; }
-                if (name === 'Fotos')           { icon = '📸'; farbe = '#e91e63'; }
-                if (name === 'Stunden')         { icon = '⏱️'; farbe = '#e67e22'; }
+                if (name === 'Zeichnungen')    { icon = '📐'; farbe = '#2ecc71'; }
+                if (name === 'Baustellen-App') { icon = '📱'; farbe = '#3498db'; }
+                if (name === 'Bilder')         { icon = '📸'; farbe = '#9b59b6'; }
+                if (name === 'Stunden')        { icon = '⏱️'; farbe = '#e67e22'; }
                 var daten = info && info.unterordner ? info.unterordner[name] : null;
                 return {
                     name: name,
                     icon: icon,
                     farbe: farbe,
                     daten: daten,
-                    permission: (cfg.SUBFOLDER_PERMISSIONS || {})[name] || 'readonly',
-                    legacyName: daten && daten.legacyName ? daten.legacyName : null
+                    permission: (cfg.SUBFOLDER_PERMISSIONS || {})[name] || 'readonly'
                 };
             });
 
@@ -952,15 +904,10 @@
                     minHeight: '100vh'
                 }}>
                     <UnterseitenHeader
-                        icon={subView === 'nachrichten' ? '💬' : (subView === 'baustellen-daten' ? '📂' : '📁')}
+                        icon="📁"
                         titel={baustelle.name}
-                        untertitel={
-                            !bereit ? 'Noch nicht bereitgestellt' :
-                            subView === 'baustellen-daten' ? 'Baustellen-Daten' :
-                            subView === 'nachrichten' ? 'Nachrichten (Kalender & Chat)' :
-                            'Staging-Bereich'
-                        }
-                        onBack={handleBack}
+                        untertitel={bereit ? 'Staging-Bereich' : 'Noch nicht bereitgestellt'}
+                        onBack={onBack}
                     />
 
                     {/* Nicht bereitgestellt → Anlege-Button */}
@@ -992,7 +939,7 @@
                                 marginBottom: '18px'
                             }}>
                                 Legt einen neuen Ordner <strong>Baustellen-App-Staging/{baustelle.name}</strong> an
-                                mit den fuenf Unterordnern.
+                                mit den vier Unterordnern.
                                 Der Original-Kundenordner bleibt dabei unveraendert.
                             </div>
                             <button
@@ -1086,193 +1033,8 @@
                         </div>
                     )}
 
-                    {/* ═══════════════════════════════════════════════════════ */}
-                    {/* ETAPPE 4.1 BAUSTEIN 1 — HAUPTORDNER-ANSICHT             */}
-                    {/* ETAPPE 4.1 B8: Massen-Migration-Banner             */}
-                    {/* Nur sichtbar wenn Legacy-Ordner entdeckt wurden.    */}
-                    {bereit && subView === 'hauptordner' && (function(){
-                        var legacyListe = unterordnerListe.filter(function(x){ return !!x.legacyName; });
-                        if (legacyListe.length === 0) return null;
-                        return (
-                            <div style={{
-                                marginBottom: '12px',
-                                padding: '12px 14px',
-                                background: 'rgba(230,126,34,0.10)',
-                                border: '1px solid rgba(230,126,34,0.40)',
-                                borderRadius: 'var(--radius-sm)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '10px',
-                                flexWrap: 'wrap'
-                            }}>
-                                <div style={{ fontSize: '22px' }}>⚠</div>
-                                <div style={{ flex: 1, minWidth: '180px' }}>
-                                    <div style={{
-                                        fontSize: '12px',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontWeight: 600,
-                                        letterSpacing: '0.5px',
-                                        color: 'var(--accent-orange)',
-                                        textTransform: 'uppercase'
-                                    }}>
-                                        {legacyListe.length} Ordner mit Legacy-Namen
-                                    </div>
-                                    <div style={{
-                                        fontSize: '11px',
-                                        color: 'var(--text-muted)',
-                                        marginTop: '2px'
-                                    }}>
-                                        {legacyListe.map(function(x){ return '"' + x.legacyName + '" → "' + x.name + '"'; }).join(', ')}
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={function(){
-                                        var liste = legacyListe.map(function(x){ return '  "' + x.legacyName + '" → "' + x.name + '"'; }).join('\n');
-                                        if (!confirm('Alle Legacy-Ordner auf Drive umbenennen?\n\n' + liste + '\n\nInhalt und Rechte bleiben unveraendert. Danach laedt die Seite automatisch neu.')) return;
-                                        if (!window.TWStaging || !window.TWStaging.migriereLegacyOrdner) {
-                                            alert('Migrations-API nicht verfuegbar. Seite neu laden.');
-                                            return;
-                                        }
-                                        window.TWStaging.migriereLegacyOrdner(baustelle.name, function(phase, detail){
-                                            console.log('[B8-Migrate]', phase, detail);
-                                        })
-                                        .then(function(erg){
-                                            var msg = '✓ Migration abgeschlossen\n\n';
-                                            msg += 'Umbenannt: ' + erg.migriert.length + '\n';
-                                            msg += 'Uebersprungen: ' + erg.uebersprungen.length + '\n';
-                                            msg += 'Fehler: ' + erg.fehler.length;
-                                            if (erg.fehler.length > 0) {
-                                                msg += '\n\nFehler-Details:\n' + erg.fehler.map(function(f){ return '- ' + f.name + ': ' + f.fehler; }).join('\n');
-                                            }
-                                            alert(msg);
-                                            window.location.reload();
-                                        })
-                                        .catch(function(err){
-                                            alert('Fehler waehrend Migration:\n' + (err && err.message || err));
-                                        });
-                                    }}
-                                    style={{
-                                        padding: '8px 14px',
-                                        background: 'linear-gradient(135deg, #e67e22, #d35400)',
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.5px',
-                                        cursor: 'pointer',
-                                        touchAction: 'manipulation',
-                                        boxShadow: '0 2px 8px rgba(230,126,34,0.30)'
-                                    }}
-                                >✓ Alle umbenennen</button>
-                            </div>
-                        );
-                    })()}
-
-                    {/* ═══════════════════════════════════════════════════════ */}
-                    {/* Zwei grosse Kacheln: BAUSTELLEN-DATEN + NACHRICHTEN     */}
-                    {/* ═══════════════════════════════════════════════════════ */}
-                    {bereit && subView === 'hauptordner' && (
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '14px',
-                            marginTop: '4px'
-                        }}>
-                            {/* Kachel 1: BAUSTELLEN-DATEN */}
-                            <button
-                                onClick={function(){ setSubView('baustellen-daten'); }}
-                                style={{
-                                    padding: '28px 14px',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1px solid rgba(30,136,229,0.35)',
-                                    background: 'linear-gradient(135deg, rgba(30,136,229,0.15), rgba(21,101,192,0.08))',
-                                    color: 'var(--text-primary)',
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    transition: 'all 0.2s',
-                                    touchAction: 'manipulation',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    minHeight: '160px',
-                                    boxShadow: '0 4px 12px rgba(30,136,229,0.15)'
-                                }}
-                            >
-                                <span style={{ fontSize: '52px', color: '#1E88E5' }}>📂</span>
-                                <div style={{
-                                    fontSize: '15px',
-                                    fontWeight: 600,
-                                    fontFamily: "'Oswald', sans-serif",
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--text-primary)'
-                                }}>Baustellen-Daten</div>
-                                <div style={{
-                                    fontSize: '11px',
-                                    color: 'var(--text-muted)',
-                                    lineHeight: 1.45,
-                                    padding: '0 4px'
-                                }}>
-                                    Zeichnungen · Anweisungen · Baustellendaten · Fotos · Stunden
-                                </div>
-                            </button>
-
-                            {/* Kachel 2: NACHRICHTEN */}
-                            <button
-                                onClick={function(){ setSubView('nachrichten'); }}
-                                style={{
-                                    padding: '28px 14px',
-                                    borderRadius: 'var(--radius-md)',
-                                    border: '1px solid rgba(39,174,96,0.35)',
-                                    background: 'linear-gradient(135deg, rgba(39,174,96,0.15), rgba(31,139,76,0.08))',
-                                    color: 'var(--text-primary)',
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    transition: 'all 0.2s',
-                                    touchAction: 'manipulation',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '10px',
-                                    minHeight: '160px',
-                                    boxShadow: '0 4px 12px rgba(39,174,96,0.15)'
-                                }}
-                            >
-                                <span style={{ fontSize: '52px', color: '#27ae60' }}>💬</span>
-                                <div style={{
-                                    fontSize: '15px',
-                                    fontWeight: 600,
-                                    fontFamily: "'Oswald', sans-serif",
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--text-primary)'
-                                }}>Nachrichten</div>
-                                <div style={{
-                                    fontSize: '11px',
-                                    color: 'var(--text-muted)',
-                                    lineHeight: 1.45,
-                                    padding: '0 4px'
-                                }}>
-                                    Kalender & Chat pro Mitarbeiter
-                                </div>
-                            </button>
-                        </div>
-                    )}
-
-                    {/* ═══════════════════════════════════════════════════════ */}
-                    {/* ETAPPE 4.1 BAUSTEIN 4 — NACHRICHTEN-BEREICH             */}
-                    {/* Eigener Router (Liste ↔ Detail). Kalender und Chat als  */}
-                    {/* Sub-Tabs, mit Platzhaltern bis B5/B6.                   */}
-                    {/* ═══════════════════════════════════════════════════════ */}
-                    {subView === 'nachrichten' && (
-                        <NachrichtenBereich baustelleName={baustelle.name} />
-                    )}
-
-                    {/* 4 Ordner-Kacheln (nur in subView='baustellen-daten' sichtbar) */}
-                    {bereit && subView === 'baustellen-daten' && (
+                    {/* 4 Ordner-Kacheln */}
+                    {bereit && (
                         <div style={{
                             display: 'grid',
                             gridTemplateColumns: '1fr 1fr',
@@ -1343,43 +1105,6 @@
                                         }}>
                                             {u.permission === 'upload' ? 'MA: Upload' : 'MA: nur lesen'}
                                         </div>
-                                        {/* ETAPPE 4.1 B2/B8: Legacy-Alias-Hinweis + Umbenennen-Button */}
-                                        {u.legacyName && (
-                                            <div
-                                                onClick={function(e){
-                                                    e.stopPropagation();
-                                                    if (!confirm('Drive-Ordner "' + u.legacyName + '" in "' + u.name + '" umbenennen?\n\nDies wirkt sich nur auf den Drive-Ordnernamen aus. Inhalt und Zugriffsrechte bleiben unveraendert.')) return;
-                                                    if (!window.TWStaging || !window.TWStaging.umbenennenOrdner) {
-                                                        alert('Migrations-API nicht verfuegbar. Seite neu laden.');
-                                                        return;
-                                                    }
-                                                    window.TWStaging.umbenennenOrdner(u.daten.id, u.name)
-                                                        .then(function(){
-                                                            alert('✓ Umbenennen erfolgreich:\n"' + u.legacyName + '" → "' + u.name + '"');
-                                                            window.location.reload();
-                                                        })
-                                                        .catch(function(err){
-                                                            alert('Fehler beim Umbenennen:\n' + (err && err.message || err));
-                                                        });
-                                                }}
-                                                title={'Drive-Ordner "' + u.legacyName + '" → "' + u.name + '" umbenennen (Klick)'}
-                                                style={{
-                                                    marginTop: '3px',
-                                                    fontSize: '8px',
-                                                    padding: '2px 6px',
-                                                    background: 'rgba(230,126,34,0.15)',
-                                                    color: 'var(--accent-orange)',
-                                                    border: '1px solid rgba(230,126,34,0.35)',
-                                                    borderRadius: '3px',
-                                                    fontFamily: "'Oswald', sans-serif",
-                                                    fontWeight: 600,
-                                                    letterSpacing: '0.3px',
-                                                    cursor: 'pointer',
-                                                    touchAction: 'manipulation'
-                                                }}>
-                                                ⚠ "{u.legacyName}" → umbenennen
-                                            </div>
-                                        )}
                                     </button>
                                 );
                             })}
@@ -2895,9 +2620,34 @@
         // UNTERSEITE 2: Geraete- und Team-Verwaltung
         // Recycling der bisherigen Team-Logik aus altem teamTab
         // ═══════════════════════════════════════════════════════
-        function TeamVerwaltung({ fbOk, users, invitations, auditLog, onApprove, onReject, onCreateInvitation, onWiderrufeInvitation, onDeleteInvitation, onLockDevice, onUnlockDevice, onRemoveDevice, onBack }) {
+        function TeamVerwaltung({ fbOk, users, invitations, auditLog, onApprove, onReject, onCreateInvitation, onWiderrufeInvitation, onDeleteInvitation, onLockDevice, onUnlockDevice, onRemoveDevice, onOpenMapping, onBack }) {
             const [neueEinladungOffen, setNeueEinladungOffen] = useState(false);
             const [showQRCode, setShowQRCode] = useState(null); // Einladungs-Code, fuer den QR gezeigt wird
+
+            // ── Mitarbeiter-Liste (Grundstock + Firebase) fuer Slug-Dropdowns ──
+            const [alleMitarbeiter, setAlleMitarbeiter] = useState(function(){
+                return window.MITARBEITER_LISTE ? window.MITARBEITER_LISTE.slice() : [];
+            });
+            useEffect(function(){
+                if (!window.FirebaseService || !window.FirebaseService.subscribeMitarbeiter) return;
+                var unsub = window.FirebaseService.subscribeMitarbeiter(function(fbArr){
+                    var grundstock = window.MITARBEITER_LISTE || [];
+                    var merged = grundstock.slice();
+                    var seen = {};
+                    grundstock.forEach(function(m){ seen[m.id] = true; });
+                    fbArr.forEach(function(m){ if (!seen[m.id]) { merged.push(m); seen[m.id] = true; } });
+                    merged.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+                    setAlleMitarbeiter(merged);
+                });
+                return function(){ try { if (typeof unsub === 'function') unsub(); } catch(e){} };
+            }, []);
+
+            // ── F3: Sicherheits-Check -- freigegebene Geraete ohne ma_id (und ohne Skip-Marker) ──
+            var unmappedDevices = (users.approved || []).filter(function(u){
+                if (u.role === 'admin') return false; // Admin-Geraete brauchen keinen Mitarbeiter-Chat
+                if (u.ma_id_skipped === true) return false; // bewusst uebersprungen
+                return !u.ma_id;
+            });
 
             var content;
             if (!fbOk) {
@@ -2925,6 +2675,39 @@
 
                 content = (
                     <div>
+                        {/* ── F3: Warn-Banner bei Geraeten ohne Mitarbeiter-Zuordnung ── */}
+                        {unmappedDevices.length > 0 && (
+                            <div
+                                onClick={onOpenMapping}
+                                style={{
+                                    padding:'12px 14px',
+                                    marginBottom:'12px',
+                                    borderRadius:'var(--radius-md)',
+                                    background:'linear-gradient(135deg, rgba(230,126,34,0.18), rgba(230,126,34,0.08))',
+                                    border:'1px solid rgba(230,126,34,0.45)',
+                                    cursor:'pointer',
+                                    display:'flex',
+                                    alignItems:'center',
+                                    gap:'12px',
+                                    transition:'all 0.2s ease'
+                                }}
+                            >
+                                <div style={{ fontSize:'24px', flexShrink:0 }}>⚠️</div>
+                                <div style={{ flex:1, minWidth:0 }}>
+                                    <div style={{
+                                        fontFamily:"'Oswald', sans-serif", fontSize:'13px',
+                                        fontWeight:600, letterSpacing:'0.5px', color:'var(--accent-orange)',
+                                        textTransform:'uppercase', marginBottom:'2px'
+                                    }}>
+                                        {unmappedDevices.length} {unmappedDevices.length === 1 ? 'Geraet hat' : 'Geraete haben'} keine Mitarbeiter-Zuordnung
+                                    </div>
+                                    <div style={{ fontSize:'12px', color:'var(--text-muted)' }}>
+                                        Diese Geraete finden ihren Chat nicht. Jetzt reparieren →
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* ── Einladungs-Button ── */}
                         <button
                             onClick={function(){ setNeueEinladungOffen(true); }}
@@ -3019,21 +2802,24 @@
                                         fontSize:'11px', fontWeight:700, marginLeft:'6px'
                                     }}>{users.pending.length}</span>
                                 </div>
+                                <div style={{
+                                    fontSize:'11px', color:'var(--text-muted)',
+                                    marginBottom:'10px', padding:'6px 10px',
+                                    background:'rgba(30,136,229,0.08)',
+                                    borderLeft:'2px solid var(--accent-blue)',
+                                    borderRadius:'4px'
+                                }}>
+                                    Bitte vor dem Freigeben den passenden Mitarbeiter auswaehlen,
+                                    damit das Geraet seinen Chat-Thread findet.
+                                </div>
                                 {users.pending.map(function(u) {
-                                    var p = u.profile || {};
-                                    var name = p.name || ((p.vorname||'') + ' ' + (p.nachname||'')).trim() || 'Unbekannt';
-                                    return (
-                                        <div key={u.uid} className="ba-row">
-                                            <div style={{ flex:1 }}>
-                                                <div className="ba-name">{name}</div>
-                                                <div className="ba-detail">{p.telefon||p.tel||''} · {p.email||''} · {u.language||'de'}</div>
-                                            </div>
-                                            <div style={{ display:'flex', gap:'6px' }}>
-                                                <button className="ba-btn grn" onClick={function(){ onApprove(u.uid, name); }}>✓</button>
-                                                <button className="ba-btn red" onClick={function(){ onReject(u.uid, name); }}>✗</button>
-                                            </div>
-                                        </div>
-                                    );
+                                    return <PendingDeviceRow
+                                        key={u.uid}
+                                        user={u}
+                                        mitarbeiterListe={alleMitarbeiter}
+                                        onApprove={onApprove}
+                                        onReject={onReject}
+                                    />;
                                 })}
                             </div>
                         )}
@@ -3200,6 +2986,335 @@
                             einladung={showQRCode}
                             onSchliessen={function(){ setShowQRCode(null); }}
                         />
+                    )}
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // PENDING DEVICE ROW (F2)
+        // Einzelne Zeile in der "Wartende Freigaben"-Liste mit
+        // Slug-Dropdown. Vorauswahl via Namens-Matching gegen
+        // Grundstock + Firebase-Mitarbeiter.
+        // ═══════════════════════════════════════════════════════
+        function PendingDeviceRow({ user, mitarbeiterListe, onApprove, onReject }) {
+            var p = user.profile || {};
+            var name = p.name || ((p.vorname||'') + ' ' + (p.nachname||'')).trim() || 'Unbekannt';
+
+            // Auto-Vorauswahl: finde Slug, dessen Name zum Profil-Namen passt
+            function findeAutoSlug() {
+                if (!mitarbeiterListe || !mitarbeiterListe.length) return '';
+                var nameLower = (name || '').toLowerCase().trim();
+                if (!nameLower || nameLower === 'unbekannt') return '';
+                var treffer = mitarbeiterListe.find(function(m){
+                    return (m.name || '').toLowerCase().trim() === nameLower;
+                });
+                if (treffer) return treffer.id;
+                // Weicher Match: Teilstring
+                treffer = mitarbeiterListe.find(function(m){
+                    var mn = (m.name || '').toLowerCase().trim();
+                    return mn && (nameLower.indexOf(mn) !== -1 || mn.indexOf(nameLower) !== -1);
+                });
+                return treffer ? treffer.id : '';
+            }
+
+            const [gewaehlterSlug, setGewaehlterSlug] = useState(findeAutoSlug);
+
+            return (
+                <div style={{
+                    padding:'10px 12px', marginBottom:'8px',
+                    background:'var(--bg-secondary)', borderRadius:'8px',
+                    border:'1px solid rgba(255,255,255,0.06)'
+                }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'10px', marginBottom:'8px' }}>
+                        <div style={{ flex:1, minWidth:0 }}>
+                            <div className="ba-name">{name}</div>
+                            <div className="ba-detail">
+                                {p.telefon||p.tel||''}{(p.telefon||p.tel) && (p.email||user.language) ? ' · ' : ''}
+                                {p.email||''}{p.email && user.language ? ' · ' : ''}
+                                Sprache: {user.language||'de'}
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ display:'flex', gap:'6px', alignItems:'center' }}>
+                        <select
+                            value={gewaehlterSlug}
+                            onChange={function(e){ setGewaehlterSlug(e.target.value); }}
+                            style={{
+                                flex:1,
+                                padding:'8px 10px',
+                                borderRadius:'6px',
+                                border:'1px solid rgba(255,255,255,0.12)',
+                                background:'var(--bg-primary)',
+                                color:'var(--text-primary)',
+                                fontFamily:"'Source Sans Pro', sans-serif",
+                                fontSize:'13px'
+                            }}
+                        >
+                            <option value="">— Mitarbeiter auswaehlen —</option>
+                            {(mitarbeiterListe || []).map(function(m){
+                                return <option key={m.id} value={m.id}>{m.name} ({m.id})</option>;
+                            })}
+                        </select>
+                        <button
+                            className="ba-btn grn"
+                            disabled={!gewaehlterSlug}
+                            title={gewaehlterSlug ? ('Freigeben als '+gewaehlterSlug) : 'Erst Mitarbeiter waehlen'}
+                            style={{ opacity: gewaehlterSlug ? 1 : 0.4, cursor: gewaehlterSlug ? 'pointer' : 'not-allowed' }}
+                            onClick={function(){
+                                if (!gewaehlterSlug) return;
+                                onApprove(user.uid, name, gewaehlterSlug);
+                            }}
+                        >✓</button>
+                        <button
+                            className="ba-btn red"
+                            title="Ablehnen"
+                            onClick={function(){ onReject(user.uid, name); }}
+                        >✗</button>
+                    </div>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // GERAETE-MAPPING (F1)
+        // Admin-Werkzeug zur nachtraeglichen Zuordnung existierender
+        // Geraete (UIDs) zu Mitarbeiter-Slugs. Loest die 5 bereits
+        // freigegebenen Geraete ohne ma_id-Feld.
+        // ═══════════════════════════════════════════════════════
+        function GeraeteMapping({ users, onSetMapping, onSkipMapping, onBack }) {
+            // Mitarbeiter-Liste live mergen (Grundstock + Firebase)
+            const [mitarbeiterListe, setMitarbeiterListe] = useState(function(){
+                return window.MITARBEITER_LISTE ? window.MITARBEITER_LISTE.slice() : [];
+            });
+            useEffect(function(){
+                if (!window.FirebaseService || !window.FirebaseService.subscribeMitarbeiter) return;
+                var unsub = window.FirebaseService.subscribeMitarbeiter(function(fbArr){
+                    var grund = window.MITARBEITER_LISTE || [];
+                    var merged = grund.slice();
+                    var seen = {};
+                    grund.forEach(function(m){ seen[m.id] = true; });
+                    fbArr.forEach(function(m){ if (!seen[m.id]) { merged.push(m); seen[m.id] = true; } });
+                    merged.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+                    setMitarbeiterListe(merged);
+                });
+                return function(){ try { if (typeof unsub === 'function') unsub(); } catch(e){} };
+            }, []);
+
+            // Lokaler Auswahl-State pro UID (Dropdown-Wert)
+            const [auswahl, setAuswahl] = useState({});
+
+            // Alle freigegebenen Geraete -- aufgeteilt in "zu reparieren" und "OK"
+            var approved = users.approved || [];
+            var zuReparieren = approved.filter(function(u){
+                if (u.role === 'admin') return false;
+                if (u.ma_id_skipped === true) return false;
+                return !u.ma_id;
+            });
+            var bereitsZugeordnet = approved.filter(function(u){
+                return !!u.ma_id || u.ma_id_skipped === true || u.role === 'admin';
+            });
+
+            function labelForUser(u) {
+                var p = u.profile || {};
+                var teile = [];
+                if (p.name) teile.push(p.name);
+                teile.push('Rolle: ' + (u.role || 'mitarbeiter'));
+                if (u.language) teile.push('Sprache: ' + u.language);
+                if (u.lastLogin) {
+                    try { teile.push('Letzter Login: ' + new Date(u.lastLogin).toLocaleString('de-DE')); }
+                    catch(e) {}
+                }
+                return teile.join(' · ');
+            }
+
+            function handleZuordnen(u) {
+                var slug = auswahl[u.uid];
+                if (!slug) {
+                    alert('Bitte erst einen Mitarbeiter aus dem Dropdown waehlen.');
+                    return;
+                }
+                var mName = ((u.profile||{}).name) || u.uid.substring(0,8);
+                onSetMapping(u.uid, slug, mName);
+                alert('Fertig! Geraet wurde ' + slug + ' zugeordnet.');
+            }
+
+            function handleUeberspringen(u) {
+                if (!confirm('Dieses Geraet bewusst ohne Mitarbeiter-Zuordnung lassen?\n\n'+
+                    '(z.B. fuer Admin-Geraete oder ehemalige Zugaenge.\n'+
+                    'Der Warn-Banner wird diesen Eintrag kuenftig ignorieren.)')) return;
+                var mName = ((u.profile||{}).name) || u.uid.substring(0,8);
+                onSkipMapping(u.uid, mName);
+            }
+
+            return (
+                <div className="page-container" style={{ padding:'16px', minHeight:'100vh' }}>
+                    <UnterseitenHeader
+                        icon="🔧"
+                        titel="Geraete-Zuordnung reparieren"
+                        untertitel="Fehlende Mitarbeiter-Slugs nachtraeglich setzen"
+                        onBack={onBack}
+                    />
+
+                    {/* ── Info-Box ── */}
+                    <div style={{
+                        padding:'12px 14px', marginBottom:'14px',
+                        background:'rgba(30,136,229,0.10)',
+                        borderLeft:'3px solid var(--accent-blue)',
+                        borderRadius:'6px', fontSize:'12px', color:'var(--text-primary)'
+                    }}>
+                        <div style={{ fontWeight:600, marginBottom:'4px' }}>Was macht dieses Werkzeug?</div>
+                        <div style={{ color:'var(--text-muted)' }}>
+                            Geraete, die fruehr ohne Mitarbeiter-Zuordnung freigegeben wurden,
+                            finden ihren Chat-Thread nicht. Hier kannst du jedem Geraet
+                            nachtraeglich den passenden Mitarbeiter (Slug) zuweisen.
+                        </div>
+                    </div>
+
+                    {/* ── Zu reparieren ── */}
+                    <div className="ba-card">
+                        <div className="ba-card-title">
+                            ⚠️ Zu reparieren
+                            {zuReparieren.length > 0 && (
+                                <span style={{
+                                    background:'var(--accent-orange)', color:'#fff',
+                                    borderRadius:'10px', padding:'1px 8px',
+                                    fontSize:'11px', fontWeight:700, marginLeft:'6px'
+                                }}>{zuReparieren.length}</span>
+                            )}
+                        </div>
+                        {zuReparieren.length === 0 ? (
+                            <div style={{ textAlign:'center', padding:'20px', color:'#2e9b4a', fontSize:'13px' }}>
+                                ✓ Alle Geraete sind korrekt zugeordnet
+                            </div>
+                        ) : zuReparieren.map(function(u){
+                            return (
+                                <div key={u.uid} style={{
+                                    padding:'12px', marginBottom:'10px',
+                                    background:'var(--bg-secondary)', borderRadius:'8px',
+                                    border:'1px solid rgba(230,126,34,0.25)'
+                                }}>
+                                    <div style={{ marginBottom:'6px' }}>
+                                        <div style={{
+                                            fontFamily:"'Oswald', sans-serif", fontSize:'14px',
+                                            fontWeight:600, color:'var(--text-primary)'
+                                        }}>
+                                            {(u.profile && u.profile.name) || 'Unbekannter Mitarbeiter'}
+                                        </div>
+                                        <div style={{ fontSize:'11px', color:'var(--text-muted)', marginTop:'2px' }}>
+                                            {labelForUser(u)}
+                                        </div>
+                                        <div style={{
+                                            fontSize:'10px', color:'var(--text-muted)',
+                                            fontFamily:"'Courier New', monospace", marginTop:'4px', opacity:0.7
+                                        }}>
+                                            Geraete-ID: {u.uid.substring(0,12)}…
+                                        </div>
+                                    </div>
+                                    <div style={{ display:'flex', gap:'6px', alignItems:'center', marginTop:'8px' }}>
+                                        <select
+                                            value={auswahl[u.uid] || ''}
+                                            onChange={function(e){
+                                                var v = e.target.value;
+                                                setAuswahl(function(prev){
+                                                    var next = Object.assign({}, prev);
+                                                    next[u.uid] = v;
+                                                    return next;
+                                                });
+                                            }}
+                                            style={{
+                                                flex:1, padding:'8px 10px',
+                                                borderRadius:'6px',
+                                                border:'1px solid rgba(255,255,255,0.12)',
+                                                background:'var(--bg-primary)',
+                                                color:'var(--text-primary)',
+                                                fontSize:'13px'
+                                            }}
+                                        >
+                                            <option value="">— Mitarbeiter waehlen —</option>
+                                            {mitarbeiterListe.map(function(m){
+                                                return <option key={m.id} value={m.id}>{m.name} ({m.id})</option>;
+                                            })}
+                                        </select>
+                                    </div>
+                                    <div style={{ display:'flex', gap:'8px', marginTop:'8px' }}>
+                                        <button
+                                            onClick={function(){ handleZuordnen(u); }}
+                                            disabled={!auswahl[u.uid]}
+                                            style={{
+                                                flex:1, padding:'10px 12px',
+                                                borderRadius:'6px', border:'none',
+                                                background: auswahl[u.uid]
+                                                    ? 'linear-gradient(135deg, #1E88E5, #1565C0)'
+                                                    : 'rgba(255,255,255,0.08)',
+                                                color:'#fff',
+                                                fontFamily:"'Oswald', sans-serif",
+                                                fontSize:'13px', fontWeight:600,
+                                                letterSpacing:'1px', textTransform:'uppercase',
+                                                cursor: auswahl[u.uid] ? 'pointer' : 'not-allowed',
+                                                opacity: auswahl[u.uid] ? 1 : 0.5,
+                                                boxShadow: auswahl[u.uid] ? '0 4px 15px rgba(30,136,229,0.30)' : 'none'
+                                            }}
+                                        >Zuordnen</button>
+                                        <button
+                                            onClick={function(){ handleUeberspringen(u); }}
+                                            style={{
+                                                padding:'10px 12px',
+                                                borderRadius:'6px',
+                                                border:'1px solid rgba(255,255,255,0.15)',
+                                                background:'transparent',
+                                                color:'var(--text-muted)',
+                                                fontSize:'12px',
+                                                cursor:'pointer'
+                                            }}
+                                        >Nicht zuordnen</button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* ── Bereits zugeordnet / uebersprungen ── */}
+                    {bereitsZugeordnet.length > 0 && (
+                        <div className="ba-card" style={{ marginTop:'14px' }}>
+                            <div className="ba-card-title">✓ Bereits erledigt ({bereitsZugeordnet.length})</div>
+                            {bereitsZugeordnet.map(function(u){
+                                var p = u.profile || {};
+                                var statusText = '';
+                                var statusColor = '#2e9b4a';
+                                if (u.role === 'admin') {
+                                    statusText = 'ADMIN';
+                                    statusColor = 'var(--accent-blue)';
+                                } else if (u.ma_id) {
+                                    statusText = '→ ' + u.ma_id;
+                                } else if (u.ma_id_skipped) {
+                                    statusText = 'OHNE MAPPING';
+                                    statusColor = 'var(--text-muted)';
+                                }
+                                return (
+                                    <div key={u.uid} style={{
+                                        padding:'8px 10px', marginBottom:'6px',
+                                        background:'var(--bg-secondary)', borderRadius:'6px',
+                                        display:'flex', justifyContent:'space-between', alignItems:'center',
+                                        gap:'10px', opacity:0.85
+                                    }}>
+                                        <div style={{ flex:1, minWidth:0 }}>
+                                            <div style={{ fontSize:'13px', color:'var(--text-primary)' }}>
+                                                {p.name || 'Mitarbeiter'}
+                                            </div>
+                                            <div style={{ fontSize:'10px', color:'var(--text-muted)', fontFamily:"'Courier New', monospace" }}>
+                                                {u.uid.substring(0,12)}…
+                                            </div>
+                                        </div>
+                                        <span style={{
+                                            fontSize:'10px', fontWeight:700,
+                                            color:statusColor, fontFamily:"'Oswald', sans-serif",
+                                            letterSpacing:'0.5px', whiteSpace:'nowrap'
+                                        }}>{statusText}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             );
@@ -3618,37 +3733,29 @@
                             )}
                         </div>
 
-                        {/* Gueltigkeits-Dauer — 22.04.2026: erweitert um 6/12 Monate */}
+                        {/* Gueltigkeits-Dauer */}
                         <div style={{ marginBottom:'14px' }}>
                             <label style={{
                                 display:'block', fontSize:'11px', fontFamily:"'Oswald', sans-serif",
                                 fontWeight:600, letterSpacing:'1px', textTransform:'uppercase',
                                 color:'var(--text-muted)', marginBottom:'6px'
-                            }}>Gueltig fuer (Tage / Monate)</label>
-                            <div style={{ display:'flex', gap:'4px' }}>
-                                {[
-                                    { wert:'1',   label:'1' },
-                                    { wert:'3',   label:'3' },
-                                    { wert:'7',   label:'7' },
-                                    { wert:'14',  label:'14' },
-                                    { wert:'30',  label:'30' },
-                                    { wert:'180', label:'6M' },
-                                    { wert:'365', label:'12M' }
-                                ].map(function(opt) {
-                                    var aktiv = gueltigTage === opt.wert;
+                            }}>Gueltig fuer (Tage)</label>
+                            <div style={{ display:'flex', gap:'6px' }}>
+                                {['1','3','7','14','30'].map(function(n) {
+                                    var aktiv = gueltigTage === n;
                                     return (
                                         <button
-                                            key={opt.wert}
-                                            onClick={function(){ setGueltigTage(opt.wert); }}
+                                            key={n}
+                                            onClick={function(){ setGueltigTage(n); }}
                                             style={{
                                                 flex:1, padding:'8px 0',
                                                 background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
                                                 color: aktiv ? '#fff' : 'var(--text-primary)',
                                                 border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
                                                 borderRadius:'var(--radius-sm)',
-                                                fontSize:'12px', fontWeight: aktiv ? 600 : 400,
+                                                fontSize:'13px', fontWeight: aktiv ? 600 : 400,
                                                 cursor:'pointer', touchAction:'manipulation'
-                                            }}>{opt.label}</button>
+                                            }}>{n}</button>
                                     );
                                 })}
                             </div>
@@ -5047,4060 +5154,6 @@
                     <button onClick={onBack} style={{padding:'12px 32px', background: color, color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:'600', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)'}}>
                         ← Zurueck zur Modulwahl
                     </button>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 4 — NACHRICHTEN-BEREICH
-        // Mini-Router zwischen Mitarbeiter-Liste und MA-Detail.
-        // Wird von StagingDetail in subView='nachrichten' gerendert.
-        // ═══════════════════════════════════════════════════════
-        function NachrichtenBereich({ baustelleName }) {
-            const [view, setView] = useState('liste'); // 'liste' | 'detail'
-            const [aktiverMa, setAktiverMa] = useState(null);
-
-            if (view === 'detail' && aktiverMa) {
-                return <NachrichtenMaDetail
-                    mitarbeiter={aktiverMa}
-                    onBack={function() {
-                        setView('liste');
-                        setAktiverMa(null);
-                    }}
-                />;
-            }
-            return <NachrichtenMitarbeiterListe
-                baustelleName={baustelleName}
-                onSelectMa={function(ma) {
-                    setAktiverMa(ma);
-                    setView('detail');
-                }}
-            />;
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 4 — MITARBEITER-LISTE
-        // Live-Liste aller Mitarbeiter (Merge aus MITARBEITER_LISTE
-        // und /mitarbeiter/ in Firebase), mit:
-        //   - Ungelesen-Badge (MA-Nachrichten mit gelesen=false)
-        //   - Letzte Chat-Vorschau (gekuerzt)
-        //   - Sprachen-Kuerzel
-        //   - Geraete-Indikator (wieviele Geraete hat der MA?)
-        // ═══════════════════════════════════════════════════════
-        function NachrichtenMitarbeiterListe({ baustelleName, onSelectMa }) {
-            const [mitarbeiter, setMitarbeiter] = useState(function(){
-                return window.MITARBEITER_LISTE || [];
-            });
-            const [chatsData, setChatsData] = useState({});
-
-            // Mitarbeiter live: Grundstock + Firebase mergen
-            useEffect(function() {
-                if (!window.FirebaseService || !window.FirebaseService.subscribeMitarbeiter) return;
-                var grundstock = window.MITARBEITER_LISTE || [];
-                var unsub = window.FirebaseService.subscribeMitarbeiter(function(fbArr) {
-                    var merged = {};
-                    grundstock.forEach(function(m){ if (m && m.id) merged[m.id] = m; });
-                    (fbArr || []).forEach(function(m){
-                        if (m && m.id) {
-                            // Firebase-Daten haben Vorrang, aber Grundstock-Daten nachmergen (falls Firebase unvollstaendig)
-                            merged[m.id] = Object.assign({}, merged[m.id] || {}, m);
-                        }
-                    });
-                    var arr = [];
-                    for (var k in merged) { if (merged.hasOwnProperty(k)) arr.push(merged[k]); }
-                    arr.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
-                    setMitarbeiter(arr);
-                });
-                return unsub;
-            }, []);
-
-            // Alle Chats live
-            useEffect(function() {
-                if (!window.FirebaseService || !window.FirebaseService.subscribeAlleChats) return;
-                var unsub = window.FirebaseService.subscribeAlleChats(function(data) {
-                    setChatsData(data || {});
-                });
-                return unsub;
-            }, []);
-
-            // Helper: ungelesene MA-Nachrichten zaehlen
-            function ungeleseneAnzahl(maId) {
-                var thread = chatsData[maId];
-                if (!thread) return 0;
-                var n = 0;
-                for (var k in thread) {
-                    if (thread.hasOwnProperty(k)) {
-                        var m = thread[k];
-                        if (m && m.von === 'ma' && !m.gelesen) n++;
-                    }
-                }
-                return n;
-            }
-
-            // Helper: letzte Nachricht fuer Vorschau
-            function letzteNachricht(maId) {
-                var thread = chatsData[maId];
-                if (!thread) return null;
-                var arr = [];
-                for (var k in thread) {
-                    if (thread.hasOwnProperty(k)) arr.push(thread[k]);
-                }
-                if (arr.length === 0) return null;
-                arr.sort(function(a,b){ return (b.timestamp||0) - (a.timestamp||0); });
-                return arr[0];
-            }
-
-            function formatZeitRelativ(ts) {
-                if (!ts) return '';
-                var diff = Date.now() - ts;
-                var min = Math.floor(diff / 60000);
-                var std = Math.floor(min / 60);
-                var tage = Math.floor(std / 24);
-                if (min < 1) return 'jetzt';
-                if (min < 60) return 'vor ' + min + ' Min';
-                if (std < 24) return 'vor ' + std + ' Std';
-                if (tage < 7) return 'vor ' + tage + ' Tag' + (tage === 1 ? '' : 'en');
-                return new Date(ts).toLocaleDateString('de-DE');
-            }
-
-            function spracheKuerzel(code) {
-                var map = { de:'🇩🇪 DE', en:'🇬🇧 EN', ru:'🇷🇺 RU', tr:'🇹🇷 TR',
-                            cs:'🇨🇿 CS', es:'🇪🇸 ES', pl:'🇵🇱 PL', ro:'🇷🇴 RO', uk:'🇺🇦 UK' };
-                return map[code] || ('🏳 ' + (code || 'de').toUpperCase());
-            }
-
-            var ohneMa = mitarbeiter.length === 0;
-
-            return (
-                <div style={{ marginTop: '12px' }}>
-                    {/* Intro-Zeile */}
-                    <div style={{
-                        padding: '10px 12px',
-                        marginBottom: '14px',
-                        background: 'rgba(39,174,96,0.08)',
-                        border: '1px solid rgba(39,174,96,0.25)',
-                        borderRadius: 'var(--radius-sm)',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                            💬 Chats & Kalender sind <strong>pro Mitarbeiter</strong>, nicht pro Baustelle
-                        </div>
-                        <div style={{
-                            fontSize: '11px',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontWeight: 600,
-                            color: 'var(--success)',
-                            whiteSpace: 'nowrap'
-                        }}>
-                            {mitarbeiter.length} MA
-                        </div>
-                    </div>
-
-                    {ohneMa ? (
-                        <div style={{
-                            padding: '40px 20px',
-                            textAlign: 'center',
-                            color: 'var(--text-muted)',
-                            fontSize: '13px'
-                        }}>
-                            Keine Mitarbeiter in der Stammliste. Ueber TEAM → "Neue Einladung" anlegen.
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {mitarbeiter.map(function(ma) {
-                                var anzUngel = ungeleseneAnzahl(ma.id);
-                                var letzte = letzteNachricht(ma.id);
-                                var geraete = ma.geraete_uuids ? Object.keys(ma.geraete_uuids).length : 0;
-
-                                return (
-                                    <button
-                                        key={ma.id}
-                                        onClick={function(){ onSelectMa(ma); }}
-                                        style={{
-                                            padding: '12px 14px',
-                                            background: anzUngel > 0 ? 'rgba(39,174,96,0.10)' : 'var(--bg-card)',
-                                            border: '1px solid ' + (anzUngel > 0 ? 'rgba(39,174,96,0.35)' : 'var(--border-color)'),
-                                            borderRadius: 'var(--radius-md)',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                            touchAction: 'manipulation',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '4px',
-                                            position: 'relative',
-                                            color: 'var(--text-primary)'
-                                        }}
-                                    >
-                                        {/* Kopfzeile: Name + Ungelesen-Badge */}
-                                        <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
-                                            <span style={{
-                                                fontFamily: "'Oswald', sans-serif",
-                                                fontSize: '15px',
-                                                fontWeight: 600,
-                                                letterSpacing: '0.5px',
-                                                flex: 1
-                                            }}>{ma.name || ma.id}</span>
-                                            {anzUngel > 0 && (
-                                                <span style={{
-                                                    minWidth: '22px',
-                                                    height: '22px',
-                                                    padding: '0 7px',
-                                                    background: 'var(--success)',
-                                                    color: '#fff',
-                                                    borderRadius: '11px',
-                                                    fontSize: '11px',
-                                                    fontWeight: 700,
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center'
-                                                }}>{anzUngel}</span>
-                                            )}
-                                            <span style={{ color:'var(--text-muted)', fontSize:'18px' }}>›</span>
-                                        </div>
-
-                                        {/* Meta-Zeile: Rolle + Sprache + Geraete */}
-                                        <div style={{
-                                            display:'flex',
-                                            alignItems:'center',
-                                            gap:'10px',
-                                            fontSize:'11px',
-                                            color:'var(--text-muted)'
-                                        }}>
-                                            <span>{ma.rolle || 'Fliesenleger'}</span>
-                                            <span style={{ color:'var(--border-color)' }}>·</span>
-                                            <span>{spracheKuerzel(ma.sprache)}</span>
-                                            {geraete > 0 && (
-                                                <React.Fragment>
-                                                    <span style={{ color:'var(--border-color)' }}>·</span>
-                                                    <span>📱 {geraete}</span>
-                                                </React.Fragment>
-                                            )}
-                                            {ma.status && ma.status !== 'aktiv' && (
-                                                <React.Fragment>
-                                                    <span style={{ color:'var(--border-color)' }}>·</span>
-                                                    <span style={{ color: 'var(--accent-orange)' }}>
-                                                        {ma.status === 'urlaub' ? '🏖️ Urlaub' :
-                                                         ma.status === 'inaktiv' ? '⏸️ inaktiv' :
-                                                         ma.status}
-                                                    </span>
-                                                </React.Fragment>
-                                            )}
-                                        </div>
-
-                                        {/* Vorschau letzte Nachricht */}
-                                        {letzte && (
-                                            <div style={{
-                                                marginTop: '2px',
-                                                fontSize: '12px',
-                                                color: 'var(--text-light)',
-                                                display: 'flex',
-                                                alignItems: 'baseline',
-                                                gap: '6px'
-                                            }}>
-                                                <span style={{
-                                                    fontWeight: 600,
-                                                    color: letzte.von === 'ma' ? 'var(--success)' : 'var(--text-muted)',
-                                                    fontSize: '10px',
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    {letzte.von === 'ma' ? '↙' : '↗'}
-                                                </span>
-                                                <span style={{
-                                                    flex: 1,
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    {letzte.dringend ? '🔔 ' : ''}
-                                                    {letzte.text_original || ''}
-                                                </span>
-                                                <span style={{
-                                                    fontSize: '10px',
-                                                    color: 'var(--text-muted)',
-                                                    whiteSpace: 'nowrap'
-                                                }}>
-                                                    {formatZeitRelativ(letzte.timestamp)}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 4 — MA-DETAIL (Dispatcher)
-        // Sub-Header mit Back-Link zur Liste + MA-Info.
-        // Tab-Switcher "Kalender" | "Chat" — jeweils Platzhalter,
-        // echte UI kommt in Baustein 5 (Kalender) und 6 (Chat).
-        // ═══════════════════════════════════════════════════════
-        function NachrichtenMaDetail({ mitarbeiter, onBack }) {
-            const [tab, setTab] = useState('chat'); // 'kalender' | 'chat'
-
-            var ma = mitarbeiter || {};
-            var spracheMap = { de:'Deutsch', en:'Englisch', ru:'Russisch', tr:'Tuerkisch',
-                               cs:'Tschechisch', es:'Spanisch', pl:'Polnisch',
-                               ro:'Rumaenisch', uk:'Ukrainisch' };
-            var spracheName = spracheMap[ma.sprache] || (ma.sprache || 'Deutsch');
-
-            return (
-                <div style={{ marginTop: '12px' }}>
-                    {/* Sub-Header: Back-Link + MA-Info */}
-                    <div style={{
-                        padding: '12px 14px',
-                        marginBottom: '14px',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-md)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px'
-                    }}>
-                        <button
-                            onClick={onBack}
-                            style={{
-                                padding: '6px 12px',
-                                background: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontSize: '12px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                touchAction: 'manipulation',
-                                whiteSpace: 'nowrap'
-                            }}
-                        >← Liste</button>
-                        <div style={{ flex: 1 }}>
-                            <div style={{
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '15px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                color: 'var(--text-primary)'
-                            }}>{ma.name || ma.id || '?'}</div>
-                            <div style={{
-                                fontSize: '11px',
-                                color: 'var(--text-muted)',
-                                marginTop: '2px'
-                            }}>
-                                {(ma.rolle || 'Fliesenleger') + ' · ' + spracheName}
-                                {ma.status && ma.status !== 'aktiv' && ' · ' + ma.status}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Tab-Switcher */}
-                    <div style={{
-                        display: 'flex',
-                        gap: '6px',
-                        marginBottom: '14px'
-                    }}>
-                        <button
-                            onClick={function(){ setTab('kalender'); }}
-                            style={{
-                                flex: 1,
-                                padding: '10px 14px',
-                                background: tab === 'kalender'
-                                    ? 'linear-gradient(135deg, #1E88E5, #1565C0)'
-                                    : 'var(--bg-secondary)',
-                                color: tab === 'kalender' ? '#fff' : 'var(--text-primary)',
-                                border: '1px solid ' + (tab === 'kalender' ? '#1565C0' : 'var(--border-color)'),
-                                borderRadius: 'var(--radius-sm)',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                cursor: 'pointer',
-                                touchAction: 'manipulation',
-                                boxShadow: tab === 'kalender' ? '0 2px 8px rgba(30,136,229,0.30)' : 'none'
-                            }}
-                        >📅 Kalender</button>
-                        <button
-                            onClick={function(){ setTab('chat'); }}
-                            style={{
-                                flex: 1,
-                                padding: '10px 14px',
-                                background: tab === 'chat'
-                                    ? 'linear-gradient(135deg, #1E88E5, #1565C0)'
-                                    : 'var(--bg-secondary)',
-                                color: tab === 'chat' ? '#fff' : 'var(--text-primary)',
-                                border: '1px solid ' + (tab === 'chat' ? '#1565C0' : 'var(--border-color)'),
-                                borderRadius: 'var(--radius-sm)',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                cursor: 'pointer',
-                                touchAction: 'manipulation',
-                                boxShadow: tab === 'chat' ? '0 2px 8px rgba(30,136,229,0.30)' : 'none'
-                            }}
-                        >💬 Chat</button>
-                    </div>
-
-                    {/* Body — Kalender echt (B5), Chat Platzhalter bis B6 */}
-                    {tab === 'kalender' && (
-                        <MaKalenderJahresAnsicht mitarbeiter={ma} />
-                    )}
-
-                    {tab === 'chat' && (
-                        <MaChatThread mitarbeiter={ma} />
-                    )}
-                </div>
-            );
-        }
-
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 5 — KALENDER-JAHRES-ANSICHT
-        // Monatsansicht mit Navigation ueber drei Jahre.
-        // Pro Tag: Status-Glyphe (✓ anwesend, U urlaub, K krank, — frei)
-        // plus Stunden-Zahl wenn anwesend, plus farbiger Hintergrund
-        // wenn der MA an diesem Tag einer Baustellen-Planung zugeordnet ist.
-        // Tap auf Tag oeffnet KalenderTagesModal zum Bearbeiten.
-        // ═══════════════════════════════════════════════════════
-        function MaKalenderJahresAnsicht({ mitarbeiter }) {
-            var heute = new Date();
-            const [jahr, setJahr] = useState(heute.getFullYear());
-            const [monat, setMonat] = useState(heute.getMonth()); // 0-11
-            const [kalenderDaten, setKalenderDaten] = useState({}); // {jahr: {datum: eintrag}}
-            const [planungen, setPlanungen] = useState({}); // {baustelleId: {zeitraumId: {...}}}
-            const [showModal, setShowModal] = useState(false);
-            const [modalDatum, setModalDatum] = useState(null);
-
-            var maId = mitarbeiter ? mitarbeiter.id : null;
-
-            // Live-Listener: alle Kalender-Jahre des MA
-            useEffect(function() {
-                if (!maId) return;
-                if (!window.FirebaseService || !window.FirebaseService.subscribeKalenderAlleJahre) return;
-                var unsub = window.FirebaseService.subscribeKalenderAlleJahre(maId, function(data) {
-                    setKalenderDaten(data || {});
-                });
-                return unsub;
-            }, [maId]);
-
-            // Live-Listener: alle Baustellen-Planungen
-            useEffect(function() {
-                if (!window.FirebaseService || !window.FirebaseService.subscribeBaustellenPlanungen) return;
-                var unsub = window.FirebaseService.subscribeBaustellenPlanungen(function(data) {
-                    setPlanungen(data || {});
-                });
-                return unsub;
-            }, []);
-
-            function getEintrag(datumStr) {
-                var jahrStr = datumStr.substring(0, 4);
-                return (kalenderDaten[jahrStr] && kalenderDaten[jahrStr][datumStr]) || null;
-            }
-
-            // Fuer ein Datum: alle Planungen finden, bei denen der MA dabei ist
-            function getPlanungenAn(datumStr) {
-                if (!maId) return [];
-                var ts = new Date(datumStr + 'T12:00:00').getTime();
-                var result = [];
-                for (var baustelleId in planungen) {
-                    if (!planungen.hasOwnProperty(baustelleId)) continue;
-                    var zeitraeume = planungen[baustelleId] || {};
-                    for (var zId in zeitraeume) {
-                        if (!zeitraeume.hasOwnProperty(zId)) continue;
-                        var z = zeitraeume[zId];
-                        if (!z || !z.mitarbeiter || !z.mitarbeiter[maId]) continue;
-                        if (z.von <= ts && z.bis >= ts) {
-                            result.push({
-                                baustelleId: baustelleId,
-                                farbe: z.farbe || '#1E88E5',
-                                beschreibung: z.beschreibung || ''
-                            });
-                        }
-                    }
-                }
-                return result;
-            }
-
-            // Bekannte Baustellen-IDs sammeln (fuer Autosuggest im Modal)
-            function bekannteBaustellen() {
-                var set = {};
-                // aus Planungen
-                for (var bId in planungen) {
-                    if (planungen.hasOwnProperty(bId)) set[bId] = true;
-                }
-                // aus bestehenden Eintraegen
-                for (var y in kalenderDaten) {
-                    if (!kalenderDaten.hasOwnProperty(y)) continue;
-                    for (var d in kalenderDaten[y]) {
-                        if (!kalenderDaten[y].hasOwnProperty(d)) continue;
-                        var e = kalenderDaten[y][d];
-                        if (e && e.baustelle_id) set[e.baustelle_id] = true;
-                    }
-                }
-                return Object.keys(set);
-            }
-
-            function prevMonat() {
-                if (monat === 0) { setMonat(11); setJahr(jahr - 1); }
-                else setMonat(monat - 1);
-            }
-            function nextMonat() {
-                if (monat === 11) { setMonat(0); setJahr(jahr + 1); }
-                else setMonat(monat + 1);
-            }
-            function goHeute() {
-                setJahr(heute.getFullYear());
-                setMonat(heute.getMonth());
-            }
-
-            function handleTagClick(datumStr) {
-                setModalDatum(datumStr);
-                setShowModal(true);
-            }
-
-            // Grid-Zellen aufbauen — Woche startet am Montag
-            var firstDay = new Date(jahr, monat, 1);
-            var lastDay = new Date(jahr, monat + 1, 0);
-            var daysInMonth = lastDay.getDate();
-            var firstDayWeekday = firstDay.getDay(); // 0=Sonntag
-            var leadingEmpty = firstDayWeekday === 0 ? 6 : firstDayWeekday - 1;
-
-            var cells = [];
-            for (var i = 0; i < leadingEmpty; i++) cells.push({ empty: true });
-            for (var d = 1; d <= daysInMonth; d++) {
-                var mm = String(monat + 1);
-                if (mm.length < 2) mm = '0' + mm;
-                var dd = String(d);
-                if (dd.length < 2) dd = '0' + dd;
-                var datumStr = jahr + '-' + mm + '-' + dd;
-                cells.push({
-                    empty: false,
-                    day: d,
-                    datum: datumStr,
-                    eintrag: getEintrag(datumStr),
-                    planungen: getPlanungenAn(datumStr),
-                    istHeute: (
-                        heute.getFullYear() === jahr &&
-                        heute.getMonth() === monat &&
-                        heute.getDate() === d
-                    )
-                });
-            }
-            while (cells.length % 7 !== 0) cells.push({ empty: true });
-
-            var monatsnamen = [
-                'Januar', 'Februar', 'Maerz', 'April', 'Mai', 'Juni',
-                'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'
-            ];
-
-            function statusGlyphe(status) {
-                if (status === 'anwesend') return '✓';
-                if (status === 'urlaub')   return 'U';
-                if (status === 'krank')    return 'K';
-                if (status === 'frei')     return '—';
-                return '';
-            }
-            function statusFarbe(status) {
-                if (status === 'anwesend') return 'var(--success)';
-                if (status === 'urlaub')   return '#3498db';
-                if (status === 'krank')    return 'var(--accent-red)';
-                if (status === 'frei')     return 'var(--text-muted)';
-                return 'var(--text-muted)';
-            }
-
-            return (
-                <div style={{ marginTop: '6px' }}>
-                    {/* Jahr-Navigation */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '10px'
-                    }}>
-                        <button
-                            onClick={function(){ setJahr(jahr - 1); }}
-                            disabled={jahr <= heute.getFullYear() - 1}
-                            style={{
-                                padding: '6px 10px',
-                                background: 'var(--bg-secondary)',
-                                color: jahr <= heute.getFullYear() - 1 ? 'var(--text-muted)' : 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontSize: '12px',
-                                fontFamily: "'Oswald', sans-serif",
-                                cursor: jahr <= heute.getFullYear() - 1 ? 'not-allowed' : 'pointer',
-                                opacity: jahr <= heute.getFullYear() - 1 ? 0.4 : 1
-                            }}
-                        >◂ {jahr - 1}</button>
-                        <button
-                            onClick={goHeute}
-                            style={{
-                                flex: 1,
-                                padding: '8px 10px',
-                                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 'var(--radius-sm)',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '14px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px rgba(30,136,229,0.30)'
-                            }}
-                        >📅 Heute · {jahr}</button>
-                        <button
-                            onClick={function(){ setJahr(jahr + 1); }}
-                            disabled={jahr >= heute.getFullYear() + 2}
-                            style={{
-                                padding: '6px 10px',
-                                background: 'var(--bg-secondary)',
-                                color: jahr >= heute.getFullYear() + 2 ? 'var(--text-muted)' : 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontSize: '12px',
-                                fontFamily: "'Oswald', sans-serif",
-                                cursor: jahr >= heute.getFullYear() + 2 ? 'not-allowed' : 'pointer',
-                                opacity: jahr >= heute.getFullYear() + 2 ? 0.4 : 1
-                            }}
-                        >{jahr + 1} ▸</button>
-                    </div>
-
-                    {/* Monats-Navigation */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginBottom: '10px',
-                        padding: '8px 10px',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)'
-                    }}>
-                        <button
-                            onClick={prevMonat}
-                            style={{
-                                padding: '4px 10px',
-                                background: 'none',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >◂</button>
-                        <div style={{
-                            flex: 1,
-                            textAlign: 'center',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontSize: '14px',
-                            fontWeight: 600,
-                            letterSpacing: '1px',
-                            textTransform: 'uppercase',
-                            color: 'var(--text-primary)'
-                        }}>{monatsnamen[monat]}</div>
-                        <button
-                            onClick={nextMonat}
-                            style={{
-                                padding: '4px 10px',
-                                background: 'none',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >▸</button>
-                    </div>
-
-                    {/* Wochentag-Header */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(7, 1fr)',
-                        gap: '2px',
-                        marginBottom: '2px'
-                    }}>
-                        {['Mo','Di','Mi','Do','Fr','Sa','So'].map(function(w, idx) {
-                            return (
-                                <div key={w} style={{
-                                    textAlign: 'center',
-                                    padding: '4px 0',
-                                    fontSize: '10px',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontWeight: 600,
-                                    color: (idx >= 5) ? 'var(--accent-red)' : 'var(--text-muted)',
-                                    letterSpacing: '0.5px'
-                                }}>{w}</div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Monats-Grid */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(7, 1fr)',
-                        gap: '2px'
-                    }}>
-                        {cells.map(function(c, idx) {
-                            if (c.empty) {
-                                return <div key={'e-'+idx} style={{ aspectRatio: '1/1.1' }} />;
-                            }
-                            var eintrag = c.eintrag;
-                            var plns = c.planungen || [];
-                            var hatPlanung = plns.length > 0;
-                            var planungsFarbe = hatPlanung ? plns[0].farbe : null;
-                            var wochentag = new Date(c.datum + 'T12:00:00').getDay();
-                            var istWochenende = (wochentag === 0 || wochentag === 6);
-
-                            var bg = 'var(--bg-card)';
-                            if (hatPlanung) {
-                                // Planungs-Farbe als leichter Overlay
-                                bg = planungsFarbe + '22'; // 13% Alpha
-                            } else if (istWochenende) {
-                                bg = 'rgba(196,30,30,0.04)';
-                            }
-
-                            var border = '1px solid var(--border-color)';
-                            if (c.istHeute) {
-                                border = '2px solid #1E88E5';
-                            } else if (hatPlanung) {
-                                border = '1px solid ' + planungsFarbe + '77';
-                            }
-
-                            return (
-                                <button
-                                    key={c.datum}
-                                    onClick={function(){ handleTagClick(c.datum); }}
-                                    title={c.datum + (plns.length > 0 ? ' · ' + plns.map(function(p){ return p.baustelleId; }).join(', ') : '')}
-                                    style={{
-                                        aspectRatio: '1/1.1',
-                                        padding: '3px 2px',
-                                        background: bg,
-                                        border: border,
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        touchAction: 'manipulation',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        color: 'var(--text-primary)',
-                                        position: 'relative',
-                                        minHeight: '38px'
-                                    }}
-                                >
-                                    <span style={{
-                                        fontSize: '10px',
-                                        fontWeight: c.istHeute ? 700 : 500,
-                                        color: c.istHeute ? '#1E88E5' : (istWochenende ? 'var(--accent-red)' : 'var(--text-muted)')
-                                    }}>{c.day}</span>
-
-                                    {eintrag ? (
-                                        <div style={{
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            alignItems: 'center',
-                                            gap: '0px'
-                                        }}>
-                                            <span style={{
-                                                fontSize: '14px',
-                                                fontWeight: 700,
-                                                lineHeight: 1,
-                                                color: statusFarbe(eintrag.status)
-                                            }}>{statusGlyphe(eintrag.status)}</span>
-                                            {eintrag.status === 'anwesend' && eintrag.stunden ? (
-                                                <span style={{
-                                                    fontSize: '8px',
-                                                    color: 'var(--text-muted)',
-                                                    lineHeight: 1,
-                                                    marginTop: '1px'
-                                                }}>{eintrag.stunden}h</span>
-                                            ) : null}
-                                        </div>
-                                    ) : (
-                                        <span style={{ fontSize: '10px', color: 'transparent' }}>·</span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Legende */}
-                    <div style={{
-                        marginTop: '12px',
-                        padding: '8px 10px',
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '10px',
-                        color: 'var(--text-muted)',
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '10px',
-                        justifyContent: 'center'
-                    }}>
-                        <span><strong style={{color:'var(--success)'}}>✓</strong> anwesend</span>
-                        <span><strong style={{color:'#3498db'}}>U</strong> Urlaub</span>
-                        <span><strong style={{color:'var(--accent-red)'}}>K</strong> krank</span>
-                        <span><strong style={{color:'var(--text-muted)'}}>—</strong> frei</span>
-                        <span style={{opacity:0.7}}>· Farbiger Rahmen = Baustellen-Planung</span>
-                    </div>
-
-                    {/* Tages-Modal */}
-                    {showModal && modalDatum && (
-                        <KalenderTagesModal
-                            mitarbeiter={mitarbeiter}
-                            datum={modalDatum}
-                            bestehender={getEintrag(modalDatum)}
-                            aktivePlanungen={getPlanungenAn(modalDatum)}
-                            baustellenVorschlaege={bekannteBaustellen()}
-                            onSpeichern={function(eintrag) {
-                                if (!maId) { setShowModal(false); return; }
-                                window.FirebaseService.schreibeKalenderEintrag(maId, modalDatum, eintrag)
-                                    .then(function(){ setShowModal(false); })
-                                    .catch(function(e){ alert('Fehler beim Speichern:\n' + (e && e.message || e)); });
-                            }}
-                            onLoeschen={function() {
-                                if (!maId) { setShowModal(false); return; }
-                                if (!confirm('Kalender-Eintrag fuer ' + modalDatum + ' loeschen?')) return;
-                                window.FirebaseService.loescheKalenderEintrag(maId, modalDatum)
-                                    .then(function(){ setShowModal(false); })
-                                    .catch(function(e){ alert('Fehler beim Loeschen:\n' + (e && e.message || e)); });
-                            }}
-                            onSchliessen={function(){ setShowModal(false); }}
-                        />
-                    )}
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 5 — TAGES-MODAL (Kalender-Eintrag)
-        // Overlay-Modal zum Anlegen/Editieren/Loeschen eines Eintrags.
-        // Status-Buttons + Stunden-Eingabe (nur bei "anwesend") + Baustelle
-        // mit Datalist-Autosuggest + Sonderheiten-Textarea.
-        // ESC und Klick auf Overlay schliessen das Modal.
-        // ═══════════════════════════════════════════════════════
-        function KalenderTagesModal({ mitarbeiter, datum, bestehender, aktivePlanungen, baustellenVorschlaege, onSpeichern, onLoeschen, onSchliessen }) {
-            const [status, setStatus] = useState(function(){
-                return (bestehender && bestehender.status) || 'anwesend';
-            });
-            const [stunden, setStunden] = useState(function(){
-                if (bestehender && typeof bestehender.stunden === 'number') return String(bestehender.stunden);
-                return '8';
-            });
-            const [baustelleId, setBaustelleId] = useState(function(){
-                if (bestehender && bestehender.baustelle_id) return bestehender.baustelle_id;
-                // Auto-fill wenn es genau eine aktive Planung gibt
-                if (aktivePlanungen && aktivePlanungen.length === 1) return aktivePlanungen[0].baustelleId;
-                return '';
-            });
-            const [sonderheiten, setSonderheiten] = useState(function(){
-                return (bestehender && bestehender.sonderheiten) || '';
-            });
-            const [busy, setBusy] = useState(false);
-
-            // ESC-Handler
-            useEffect(function(){
-                function onKey(e) {
-                    if (e.key === 'Escape') onSchliessen();
-                }
-                window.addEventListener('keydown', onKey);
-                return function(){ window.removeEventListener('keydown', onKey); };
-            }, []);
-
-            function formatDatum(datumStr) {
-                try {
-                    var d = new Date(datumStr + 'T12:00:00');
-                    var wt = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-                    return wt[d.getDay()] + ', ' + d.toLocaleDateString('de-DE');
-                } catch (e) {
-                    return datumStr;
-                }
-            }
-
-            function handleSpeichern() {
-                var eintrag = {
-                    status: status,
-                    eingetragen_von: 'buero'
-                };
-                if (status === 'anwesend') {
-                    var st = parseFloat(String(stunden).replace(',', '.'));
-                    if (!isNaN(st) && st > 0) eintrag.stunden = st;
-                    var bid = baustelleId.trim();
-                    if (bid) eintrag.baustelle_id = bid;
-                }
-                var sh = sonderheiten.trim();
-                if (sh) eintrag.sonderheiten = sh;
-                setBusy(true);
-                onSpeichern(eintrag);
-            }
-
-            var statusButtons = [
-                { id: 'anwesend', label: '✓ Anwesend',  farbe: 'var(--success)',      bg: 'rgba(39,174,96,0.15)' },
-                { id: 'urlaub',   label: '🏖 Urlaub',    farbe: '#3498db',              bg: 'rgba(52,152,219,0.15)' },
-                { id: 'krank',    label: '🤒 Krank',     farbe: 'var(--accent-red)',   bg: 'rgba(196,30,30,0.15)' },
-                { id: 'frei',     label: '— Frei',       farbe: 'var(--text-muted)',   bg: 'rgba(128,128,128,0.15)' }
-            ];
-
-            return (
-                <div
-                    onClick={onSchliessen}
-                    style={{
-                        position: 'fixed',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0,0,0,0.6)',
-                        zIndex: 10000,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'center',
-                        padding: '40px 12px 20px',
-                        overflowY: 'auto'
-                    }}
-                >
-                    <div
-                        onClick={function(e){ e.stopPropagation(); }}
-                        style={{
-                            background: 'var(--bg-primary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            width: '100%',
-                            maxWidth: '440px',
-                            padding: '18px',
-                            boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
-                        }}
-                    >
-                        {/* Kopfzeile */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: '14px',
-                            gap: '10px'
-                        }}>
-                            <div style={{ flex: 1 }}>
-                                <div style={{
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--text-primary)'
-                                }}>
-                                    {formatDatum(datum)}
-                                </div>
-                                <div style={{
-                                    fontSize: '11px',
-                                    color: 'var(--text-muted)',
-                                    marginTop: '3px'
-                                }}>
-                                    {mitarbeiter && mitarbeiter.name ? mitarbeiter.name : 'Mitarbeiter'}
-                                    {bestehender && bestehender.eingetragen_von === 'ma' && (
-                                        <span style={{ marginLeft: '6px', color: '#3498db' }}>· vom MA eingetragen</span>
-                                    )}
-                                </div>
-                            </div>
-                            <button
-                                onClick={onSchliessen}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-muted)',
-                                    fontSize: '22px',
-                                    cursor: 'pointer',
-                                    padding: '0 4px',
-                                    lineHeight: 1
-                                }}
-                            >×</button>
-                        </div>
-
-                        {/* Status-Buttons */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '6px',
-                            marginBottom: '14px'
-                        }}>
-                            {statusButtons.map(function(sb) {
-                                var aktiv = status === sb.id;
-                                return (
-                                    <button
-                                        key={sb.id}
-                                        onClick={function(){ setStatus(sb.id); }}
-                                        style={{
-                                            padding: '10px 8px',
-                                            background: aktiv ? sb.bg : 'var(--bg-secondary)',
-                                            color: aktiv ? sb.farbe : 'var(--text-primary)',
-                                            border: '1px solid ' + (aktiv ? sb.farbe : 'var(--border-color)'),
-                                            borderRadius: 'var(--radius-sm)',
-                                            fontFamily: "'Oswald', sans-serif",
-                                            fontSize: '13px',
-                                            fontWeight: aktiv ? 700 : 500,
-                                            letterSpacing: '0.5px',
-                                            cursor: 'pointer',
-                                            touchAction: 'manipulation'
-                                        }}
-                                    >{sb.label}</button>
-                                );
-                            })}
-                        </div>
-
-                        {/* Stunden + Baustelle nur bei "anwesend" */}
-                        {status === 'anwesend' && (
-                            <React.Fragment>
-                                <div style={{ marginBottom: '12px' }}>
-                                    <label style={{
-                                        display: 'block',
-                                        fontSize: '11px',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontWeight: 600,
-                                        letterSpacing: '1px',
-                                        textTransform: 'uppercase',
-                                        color: 'var(--text-muted)',
-                                        marginBottom: '5px'
-                                    }}>Stunden</label>
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={stunden}
-                                        onChange={function(e){ setStunden(e.target.value); }}
-                                        placeholder="z.B. 8 oder 7,5"
-                                        style={{
-                                            width: '100%',
-                                            padding: '10px 12px',
-                                            background: 'var(--bg-secondary)',
-                                            color: 'var(--text-primary)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: 'var(--radius-sm)',
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                </div>
-
-                                <div style={{ marginBottom: '12px' }}>
-                                    <label style={{
-                                        display: 'block',
-                                        fontSize: '11px',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontWeight: 600,
-                                        letterSpacing: '1px',
-                                        textTransform: 'uppercase',
-                                        color: 'var(--text-muted)',
-                                        marginBottom: '5px'
-                                    }}>Baustelle-ID (optional)</label>
-                                    <input
-                                        type="text"
-                                        list="b5-baustellen-vorschlaege"
-                                        value={baustelleId}
-                                        onChange={function(e){ setBaustelleId(e.target.value); }}
-                                        placeholder="z.B. meyer-bad"
-                                        style={{
-                                            width: '100%',
-                                            padding: '10px 12px',
-                                            background: 'var(--bg-secondary)',
-                                            color: 'var(--text-primary)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: 'var(--radius-sm)',
-                                            fontSize: '14px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    <datalist id="b5-baustellen-vorschlaege">
-                                        {(baustellenVorschlaege || []).map(function(b) {
-                                            return <option key={b} value={b} />;
-                                        })}
-                                    </datalist>
-                                    {aktivePlanungen && aktivePlanungen.length > 0 && (
-                                        <div style={{
-                                            marginTop: '5px',
-                                            fontSize: '10px',
-                                            color: 'var(--text-muted)'
-                                        }}>
-                                            💡 Aktive Planung(en) fuer diesen Tag: {aktivePlanungen.map(function(p){ return p.baustelleId; }).join(', ')}
-                                        </div>
-                                    )}
-                                </div>
-                            </React.Fragment>
-                        )}
-
-                        {/* Sonderheiten — immer sichtbar */}
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '11px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--text-muted)',
-                                marginBottom: '5px'
-                            }}>Sonderheiten / Notiz</label>
-                            <textarea
-                                value={sonderheiten}
-                                onChange={function(e){ setSonderheiten(e.target.value); }}
-                                placeholder="optional — z.B. Estrich noch feucht, vorzeitig Feierabend..."
-                                rows={3}
-                                style={{
-                                    width: '100%',
-                                    padding: '10px 12px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '13px',
-                                    resize: 'vertical',
-                                    boxSizing: 'border-box',
-                                    fontFamily: 'inherit'
-                                }}
-                            />
-                        </div>
-
-                        {/* Aktions-Buttons */}
-                        <div style={{
-                            display: 'flex',
-                            gap: '6px'
-                        }}>
-                            <button
-                                onClick={onSchliessen}
-                                disabled={busy}
-                                style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: busy ? 'not-allowed' : 'pointer',
-                                    opacity: busy ? 0.5 : 1,
-                                    touchAction: 'manipulation'
-                                }}
-                            >Abbrechen</button>
-                            {bestehender && (
-                                <button
-                                    onClick={onLoeschen}
-                                    disabled={busy}
-                                    style={{
-                                        padding: '10px 14px',
-                                        background: 'rgba(196,30,30,0.15)',
-                                        color: 'var(--accent-red)',
-                                        border: '1px solid rgba(196,30,30,0.35)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.5px',
-                                        cursor: busy ? 'not-allowed' : 'pointer',
-                                        opacity: busy ? 0.5 : 1,
-                                        touchAction: 'manipulation'
-                                    }}
-                                >🗑 Loeschen</button>
-                            )}
-                            <button
-                                onClick={handleSpeichern}
-                                disabled={busy}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 14px',
-                                    background: busy ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                    color: busy ? 'var(--text-muted)' : '#fff',
-                                    border: 'none',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: busy ? 'not-allowed' : 'pointer',
-                                    touchAction: 'manipulation',
-                                    boxShadow: busy ? 'none' : '0 2px 8px rgba(30,136,229,0.30)'
-                                }}
-                            >{busy ? '⏳...' : '✓ Speichern'}</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 6 — CHAT-THREAD (Buero-Seite)
-        // Bidirektionaler Chat Buero <-> Mitarbeiter.
-        // Live-Listener auf /chats/{maId}/. Eingabezeile mit
-        // Standard- und Dringend-Senden. Auto-Mark-as-Read fuer
-        // empfangene MA-Nachrichten. Doppel-Check-Anzeige fuer
-        // gesendete Buero-Nachrichten. Datum-Trenner und Zeitstempel.
-        // ═══════════════════════════════════════════════════════
-        function MaChatThread({ mitarbeiter }) {
-            const [nachrichten, setNachrichten] = useState([]);
-            const [text, setText] = useState('');
-            const [dringend, setDringend] = useState(false);
-            const [busy, setBusy] = useState(false);
-            const [sendeFehler, setSendeFehler] = useState(null);
-            const scrollRef = useRef(null);
-            const textareaRef = useRef(null);
-
-            var maId = mitarbeiter ? mitarbeiter.id : null;
-            var maSprache = (mitarbeiter && mitarbeiter.sprache) || 'de';
-
-            // Live-Listener fuer Chat-Thread
-            useEffect(function() {
-                if (!maId) return;
-                if (!window.FirebaseService || !window.FirebaseService.subscribeChat) return;
-                var unsub = window.FirebaseService.subscribeChat(maId, function(arr) {
-                    setNachrichten(arr || []);
-                });
-                return unsub;
-            }, [maId]);
-
-            // Auto-Scroll zu neuester Nachricht
-            useEffect(function() {
-                if (scrollRef.current) {
-                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                }
-            }, [nachrichten.length]);
-
-            // Auto-Mark-as-Read: Wenn der Chat geoeffnet ist, markiere alle
-            // ungelesenen MA-Nachrichten nach 1,2s als gelesen.
-            useEffect(function() {
-                if (!maId || nachrichten.length === 0) return;
-                if (!window.FirebaseService || !window.FirebaseService.markiereNachrichtGelesen) return;
-                var ungeleseneMa = nachrichten.filter(function(n) {
-                    return n && n.von === 'ma' && !n.gelesen;
-                });
-                if (ungeleseneMa.length === 0) return;
-
-                var timer = setTimeout(function() {
-                    ungeleseneMa.forEach(function(n) {
-                        if (n._id) {
-                            window.FirebaseService.markiereNachrichtGelesen(maId, n._id).catch(function(e){
-                                console.warn('[Chat] Mark-as-read fehlgeschlagen:', e);
-                            });
-                        }
-                    });
-                }, 1200);
-                return function(){ clearTimeout(timer); };
-            }, [maId, nachrichten]);
-
-            function handleSenden() {
-                if (!maId) return;
-                var t = (text || '').trim();
-                if (!t) return;
-                if (!window.FirebaseService || !window.FirebaseService.sendeChatNachricht) {
-                    setSendeFehler('Firebase nicht verfuegbar');
-                    return;
-                }
-                setBusy(true);
-                setSendeFehler(null);
-                window.FirebaseService.sendeChatNachricht(maId, t, 'de', 'Thomas', dringend)
-                    .then(function() {
-                        setText('');
-                        setDringend(false);
-                        setBusy(false);
-                        // Fokus zurueck ins Eingabefeld
-                        setTimeout(function(){
-                            if (textareaRef.current) textareaRef.current.focus();
-                        }, 50);
-                    })
-                    .catch(function(e) {
-                        setSendeFehler(e && e.message ? e.message : 'Senden fehlgeschlagen');
-                        setBusy(false);
-                    });
-            }
-
-            function handleKeyDown(e) {
-                // Enter = Senden, Shift+Enter = Zeilenumbruch
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSenden();
-                }
-            }
-
-            // Nachrichten nach Datum gruppieren fuer Datum-Trenner
-            function gruppiereNachDatum(arr) {
-                var groups = [];
-                var letzterTag = null;
-                arr.forEach(function(n) {
-                    if (!n || !n.timestamp) return;
-                    var d = new Date(n.timestamp);
-                    var tagKey = d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-                    if (tagKey !== letzterTag) {
-                        groups.push({ trenner: true, datum: d, key: 'tag-' + tagKey });
-                        letzterTag = tagKey;
-                    }
-                    groups.push({ trenner: false, nachricht: n, key: 'n-' + (n._id || n.timestamp) });
-                });
-                return groups;
-            }
-
-            function formatDatumTrenner(d) {
-                var heute = new Date();
-                if (d.getFullYear() === heute.getFullYear() &&
-                    d.getMonth() === heute.getMonth() &&
-                    d.getDate() === heute.getDate()) return 'Heute';
-                var gestern = new Date(heute.getTime() - 86400000);
-                if (d.getFullYear() === gestern.getFullYear() &&
-                    d.getMonth() === gestern.getMonth() &&
-                    d.getDate() === gestern.getDate()) return 'Gestern';
-                var wt = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-                return wt[d.getDay()] + ', ' + d.toLocaleDateString('de-DE');
-            }
-
-            var gruppiert = gruppiereNachDatum(nachrichten);
-
-            return (
-                <div style={{
-                    marginTop: '6px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    height: 'calc(100vh - 260px)',
-                    minHeight: '360px',
-                    maxHeight: '70vh'
-                }}>
-                    {/* Scrollbarer Nachrichten-Bereich */}
-                    <div
-                        ref={scrollRef}
-                        style={{
-                            flex: 1,
-                            overflowY: 'auto',
-                            padding: '10px 4px',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-sm)',
-                            marginBottom: '10px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '6px'
-                        }}
-                    >
-                        {gruppiert.length === 0 ? (
-                            <div style={{
-                                flex: 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                color: 'var(--text-muted)',
-                                fontSize: '13px',
-                                textAlign: 'center',
-                                padding: '40px 20px'
-                            }}>
-                                <div style={{ fontSize: '38px', opacity: 0.6 }}>💬</div>
-                                <div>Noch keine Nachrichten mit {mitarbeiter && mitarbeiter.name ? mitarbeiter.name : 'diesem Mitarbeiter'}.</div>
-                                <div style={{ fontSize: '11px', opacity: 0.7 }}>
-                                    Schreib die erste unten ins Eingabefeld.
-                                </div>
-                            </div>
-                        ) : gruppiert.map(function(g) {
-                            if (g.trenner) {
-                                return (
-                                    <div key={g.key} style={{
-                                        textAlign: 'center',
-                                        margin: '8px 0 4px'
-                                    }}>
-                                        <span style={{
-                                            display: 'inline-block',
-                                            padding: '3px 10px',
-                                            background: 'var(--bg-card)',
-                                            color: 'var(--text-muted)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '10px',
-                                            fontSize: '10px',
-                                            fontFamily: "'Oswald', sans-serif",
-                                            fontWeight: 600,
-                                            letterSpacing: '0.5px',
-                                            textTransform: 'uppercase'
-                                        }}>{formatDatumTrenner(g.datum)}</span>
-                                    </div>
-                                );
-                            }
-                            return (
-                                <ChatBubble
-                                    key={g.key}
-                                    nachricht={g.nachricht}
-                                    maSprache={maSprache}
-                                />
-                            );
-                        })}
-                    </div>
-
-                    {/* Fehler-Banner */}
-                    {sendeFehler && (
-                        <div style={{
-                            padding: '8px 12px',
-                            marginBottom: '8px',
-                            background: 'rgba(196,30,30,0.10)',
-                            border: '1px solid rgba(196,30,30,0.30)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--accent-red)',
-                            fontSize: '12px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                        }}>
-                            <span>⚠ {sendeFehler}</span>
-                            <button
-                                onClick={function(){ setSendeFehler(null); }}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--accent-red)',
-                                    cursor: 'pointer',
-                                    fontSize: '14px'
-                                }}
-                            >×</button>
-                        </div>
-                    )}
-
-                    {/* Eingabe-Bereich */}
-                    <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '6px'
-                    }}>
-                        {/* Dringend-Toggle */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                onClick={function(){ setDringend(!dringend); }}
-                                style={{
-                                    padding: '5px 10px',
-                                    background: dringend ? 'rgba(196,30,30,0.15)' : 'var(--bg-secondary)',
-                                    color: dringend ? 'var(--accent-red)' : 'var(--text-muted)',
-                                    border: '1px solid ' + (dringend ? 'rgba(196,30,30,0.40)' : 'var(--border-color)'),
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: 'pointer',
-                                    touchAction: 'manipulation'
-                                }}
-                            >
-                                {dringend ? '🔔 Dringend AN' : '🔕 Dringend'}
-                            </button>
-                            {dringend && (
-                                <span style={{
-                                    fontSize: '10px',
-                                    color: 'var(--accent-red)',
-                                    fontStyle: 'italic'
-                                }}>
-                                    loest Push-Benachrichtigung auf dem MA-Handy aus
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Textarea + Senden-Button */}
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
-                            <textarea
-                                ref={textareaRef}
-                                value={text}
-                                onChange={function(e){ setText(e.target.value); }}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Nachricht an Mitarbeiter ... (Enter = Senden)"
-                                rows={2}
-                                disabled={busy}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 12px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid ' + (dringend ? 'rgba(196,30,30,0.40)' : 'var(--border-color)'),
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '14px',
-                                    resize: 'vertical',
-                                    minHeight: '48px',
-                                    maxHeight: '160px',
-                                    boxSizing: 'border-box',
-                                    fontFamily: 'inherit',
-                                    outline: 'none',
-                                    opacity: busy ? 0.6 : 1
-                                }}
-                            />
-                            <button
-                                onClick={handleSenden}
-                                disabled={busy || !(text && text.trim())}
-                                title="Enter = Senden, Shift+Enter = neue Zeile"
-                                style={{
-                                    padding: '0 16px',
-                                    background: busy ? 'var(--bg-secondary)' :
-                                                !(text && text.trim()) ? 'var(--bg-secondary)' :
-                                                dringend ? 'linear-gradient(135deg, #c41e1e, #8b0000)' :
-                                                'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                    color: !(text && text.trim()) || busy ? 'var(--text-muted)' : '#fff',
-                                    border: 'none',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '18px',
-                                    fontWeight: 600,
-                                    cursor: (busy || !(text && text.trim())) ? 'not-allowed' : 'pointer',
-                                    touchAction: 'manipulation',
-                                    boxShadow: (busy || !(text && text.trim())) ? 'none' :
-                                                dringend ? '0 2px 8px rgba(196,30,30,0.30)' :
-                                                '0 2px 8px rgba(30,136,229,0.30)',
-                                    minWidth: '56px'
-                                }}
-                            >
-                                {busy ? '⏳' : dringend ? '🔔' : '➤'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 6 — CHAT-BUBBLE
-        // Einzelne Nachricht als Bubble. Links grau fuer MA-Nachrichten,
-        // rechts blau fuer Buero-Nachrichten. Doppel-Check-Anzeige fuer
-        // gesendete Buero-Nachrichten (grau = gesendet, gruen = vom MA
-        // gelesen). Dringend-Nachrichten mit rotem Rahmen und Glocke.
-        // ═══════════════════════════════════════════════════════
-        function ChatBubble({ nachricht, maSprache }) {
-            const [zeigeOriginal, setZeigeOriginal] = useState(false);
-            var n = nachricht || {};
-            var istBuero = n.von === 'buero';
-            var istDringend = !!n.dringend;
-
-            function zeitFormat(ts) {
-                if (!ts) return '';
-                var d = new Date(ts);
-                var h = String(d.getHours()).padStart(2, '0');
-                var m = String(d.getMinutes()).padStart(2, '0');
-                return h + ':' + m;
-            }
-
-            // Text-Auswahl: Wenn MA kein Deutsch spricht und Uebersetzung vorhanden, zeigen wir Deutsch
-            // Buero-Nachrichten sind immer auf Deutsch (text_original)
-            var zeigeText = n.text_original || '';
-            var hatUebersetzung = false;
-            if (!istBuero && n.sprache_original && n.sprache_original !== 'de' && n.text_uebersetzt) {
-                var deText = n.text_uebersetzt.de;
-                if (deText) {
-                    zeigeText = zeigeOriginal ? (n.text_original || '') : deText;
-                    hatUebersetzung = true;
-                }
-            }
-
-            var bubbleBg, bubbleBorder, textFarbe;
-            if (istBuero) {
-                bubbleBg = istDringend ? 'rgba(196,30,30,0.12)' : 'rgba(30,136,229,0.15)';
-                bubbleBorder = istDringend ? '2px solid rgba(196,30,30,0.55)' : '1px solid rgba(30,136,229,0.30)';
-                textFarbe = 'var(--text-primary)';
-            } else {
-                bubbleBg = istDringend ? 'rgba(196,30,30,0.08)' : 'var(--bg-card)';
-                bubbleBorder = istDringend ? '2px solid rgba(196,30,30,0.55)' : '1px solid var(--border-color)';
-                textFarbe = 'var(--text-primary)';
-            }
-
-            return (
-                <div style={{
-                    display: 'flex',
-                    justifyContent: istBuero ? 'flex-end' : 'flex-start',
-                    padding: '0 4px'
-                }}>
-                    <div style={{
-                        maxWidth: '80%',
-                        minWidth: '60px',
-                        padding: '8px 10px',
-                        background: bubbleBg,
-                        border: bubbleBorder,
-                        borderRadius: istBuero ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                        color: textFarbe,
-                        position: 'relative'
-                    }}>
-                        {/* Dringend-Badge */}
-                        {istDringend && (
-                            <div style={{
-                                fontSize: '10px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 700,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--accent-red)',
-                                marginBottom: '3px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}>🔔 Dringend</div>
-                        )}
-
-                        {/* Absender-Name (nur bei MA — Buero-Nachrichten sind eh rechts) */}
-                        {!istBuero && n.absender_name && (
-                            <div style={{
-                                fontSize: '10px',
-                                fontWeight: 600,
-                                color: 'var(--success)',
-                                marginBottom: '2px'
-                            }}>{n.absender_name}</div>
-                        )}
-
-                        {/* Text */}
-                        <div style={{
-                            fontSize: '13px',
-                            lineHeight: 1.4,
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word'
-                        }}>{zeigeText}</div>
-
-                        {/* Uebersetzungs-Toggle (nur bei MA mit Uebersetzung) */}
-                        {hatUebersetzung && (
-                            <button
-                                onClick={function(){ setZeigeOriginal(!zeigeOriginal); }}
-                                style={{
-                                    marginTop: '3px',
-                                    padding: '0',
-                                    background: 'none',
-                                    color: 'var(--accent-blue)',
-                                    border: 'none',
-                                    fontSize: '10px',
-                                    fontStyle: 'italic',
-                                    cursor: 'pointer',
-                                    textDecoration: 'underline',
-                                    opacity: 0.8
-                                }}
-                            >
-                                {zeigeOriginal ? '← Uebersetzung' : 'Original (' + (n.sprache_original || '?').toUpperCase() + ')'}
-                            </button>
-                        )}
-
-                        {/* Footer: Zeit + Doppel-Check */}
-                        <div style={{
-                            marginTop: '3px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'flex-end',
-                            gap: '4px',
-                            fontSize: '9px',
-                            color: 'var(--text-muted)'
-                        }}>
-                            <span>{zeitFormat(n.timestamp)}</span>
-                            {istBuero && (
-                                <span
-                                    title={n.gelesen ? 'vom Mitarbeiter gelesen' : 'gesendet, noch nicht gelesen'}
-                                    style={{
-                                        color: n.gelesen ? 'var(--success)' : 'var(--text-muted)',
-                                        fontSize: '11px',
-                                        lineHeight: 1
-                                    }}
-                                >
-                                    {n.gelesen ? '✓✓' : '✓'}
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 7 — HAUPTKALENDER (Buero-Aggregation)
-        // Wochenansicht mit Gantt-Balken fuer Baustellen-Planungen
-        // oben und Mitarbeiter-Zeilen mit Status-Glyphen darunter.
-        // Datenquellen: subscribeMitarbeiter, subscribeKalenderAll,
-        // subscribeBaustellenPlanungen.
-        // "Neue Planung" oeffnet BaustellenPlanungDialog.
-        // ═══════════════════════════════════════════════════════
-        function HauptkalenderView({ onBack }) {
-            const heute = new Date();
-            // wochenStart ist immer ein Montag
-            const [wochenStart, setWochenStart] = useState(function(){
-                var d = new Date(heute);
-                d.setHours(0, 0, 0, 0);
-                var wt = d.getDay(); // 0=So, 1=Mo
-                var shift = wt === 0 ? -6 : 1 - wt;
-                d.setDate(d.getDate() + shift);
-                return d;
-            });
-            const [mitarbeiter, setMitarbeiter] = useState(function(){
-                return window.MITARBEITER_LISTE || [];
-            });
-            const [kalenderAll, setKalenderAll] = useState({});
-            const [planungen, setPlanungen] = useState({});
-            const [dialogOffen, setDialogOffen] = useState(false);
-            const [dialogPlanung, setDialogPlanung] = useState(null);
-
-            // MA-Liste: Grundstock + Firebase mergen
-            useEffect(function() {
-                if (!window.FirebaseService || !window.FirebaseService.subscribeMitarbeiter) return;
-                var grundstock = window.MITARBEITER_LISTE || [];
-                var unsub = window.FirebaseService.subscribeMitarbeiter(function(fbArr) {
-                    var merged = {};
-                    grundstock.forEach(function(m){ if (m && m.id) merged[m.id] = m; });
-                    (fbArr || []).forEach(function(m){
-                        if (m && m.id) merged[m.id] = Object.assign({}, merged[m.id] || {}, m);
-                    });
-                    var arr = [];
-                    for (var k in merged) { if (merged.hasOwnProperty(k)) arr.push(merged[k]); }
-                    arr.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
-                    setMitarbeiter(arr);
-                });
-                return unsub;
-            }, []);
-
-            // Kalender-Daten aller MA live
-            useEffect(function() {
-                if (!window.FirebaseService || !window.FirebaseService.subscribeKalenderAll) return;
-                var unsub = window.FirebaseService.subscribeKalenderAll(function(data) {
-                    setKalenderAll(data || {});
-                });
-                return unsub;
-            }, []);
-
-            // Planungen live
-            useEffect(function() {
-                if (!window.FirebaseService || !window.FirebaseService.subscribeBaustellenPlanungen) return;
-                var unsub = window.FirebaseService.subscribeBaustellenPlanungen(function(data) {
-                    setPlanungen(data || {});
-                });
-                return unsub;
-            }, []);
-
-            // 7 Tage der Woche generieren
-            function getWochenTage() {
-                var tage = [];
-                for (var i = 0; i < 7; i++) {
-                    var d = new Date(wochenStart);
-                    d.setDate(d.getDate() + i);
-                    var mm = String(d.getMonth() + 1);
-                    if (mm.length < 2) mm = '0' + mm;
-                    var dd = String(d.getDate());
-                    if (dd.length < 2) dd = '0' + dd;
-                    tage.push({
-                        datum: d.getFullYear() + '-' + mm + '-' + dd,
-                        day: d.getDate(),
-                        weekday: ['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()],
-                        istWochenende: (d.getDay() === 0 || d.getDay() === 6),
-                        istHeute: (
-                            d.getFullYear() === heute.getFullYear() &&
-                            d.getMonth() === heute.getMonth() &&
-                            d.getDate() === heute.getDate()
-                        ),
-                        tsMitternacht: d.getTime()
-                    });
-                }
-                return tage;
-            }
-
-            var tage = getWochenTage();
-            var wochenStartMs = tage[0].tsMitternacht;
-            var wochenEndeMs = tage[6].tsMitternacht + 86400000 - 1; // Ende Sonntag
-
-            // Eintrag fuer MA an einem Datum
-            function getEintrag(maId, datumStr) {
-                var jahrStr = datumStr.substring(0, 4);
-                var kal = kalenderAll[maId];
-                if (!kal || !kal[jahrStr]) return null;
-                return kal[jahrStr][datumStr] || null;
-            }
-
-            // Aktive Planung fuer MA an einem Datum (nur erste Treffer)
-            function getPlanungFuer(maId, datumStr) {
-                if (!maId) return null;
-                var ts = new Date(datumStr + 'T12:00:00').getTime();
-                for (var bId in planungen) {
-                    if (!planungen.hasOwnProperty(bId)) continue;
-                    var zeitraeume = planungen[bId] || {};
-                    for (var zId in zeitraeume) {
-                        if (!zeitraeume.hasOwnProperty(zId)) continue;
-                        var z = zeitraeume[zId];
-                        if (!z || !z.mitarbeiter || !z.mitarbeiter[maId]) continue;
-                        if (z.von <= ts && z.bis >= ts) {
-                            return { baustelleId: bId, zeitraumId: zId, farbe: z.farbe || '#1E88E5' };
-                        }
-                    }
-                }
-                return null;
-            }
-
-            // Alle Planungs-Balken, die in der sichtbaren Woche enthalten sind
-            function getWochenBalken() {
-                var balken = [];
-                for (var bId in planungen) {
-                    if (!planungen.hasOwnProperty(bId)) continue;
-                    var zeitraeume = planungen[bId] || {};
-                    for (var zId in zeitraeume) {
-                        if (!zeitraeume.hasOwnProperty(zId)) continue;
-                        var z = zeitraeume[zId];
-                        if (!z || typeof z.von !== 'number' || typeof z.bis !== 'number') continue;
-                        // Schneidet der Zeitraum die aktuelle Woche?
-                        if (z.bis < wochenStartMs || z.von > wochenEndeMs) continue;
-                        // Spalten-Start und -Ende berechnen (Spalte 2 bis 8, Spalte 1 ist Label)
-                        var startIdx = 0;
-                        for (var i = 0; i < 7; i++) {
-                            if (tage[i].tsMitternacht + 86400000 > z.von) { startIdx = i; break; }
-                            if (i === 6) startIdx = 7;
-                        }
-                        var endeIdx = 6;
-                        for (var j = 6; j >= 0; j--) {
-                            if (tage[j].tsMitternacht <= z.bis) { endeIdx = j; break; }
-                            if (j === 0) endeIdx = -1;
-                        }
-                        if (startIdx > endeIdx) continue;
-                        balken.push({
-                            baustelleId: bId,
-                            zeitraumId: zId,
-                            von: z.von,
-                            bis: z.bis,
-                            farbe: z.farbe || '#1E88E5',
-                            beschreibung: z.beschreibung || '',
-                            mitarbeiter: z.mitarbeiter || {},
-                            startCol: startIdx + 2,  // Grid-Spalte 2-8
-                            endCol: endeIdx + 3       // Grid-Spalte 3-9 (exclusive)
-                        });
-                    }
-                }
-                // nach Baustellen-ID sortieren (stable order)
-                balken.sort(function(a,b){ return a.baustelleId.localeCompare(b.baustelleId); });
-                return balken;
-            }
-
-            function statusGlyphe(s) {
-                if (s === 'anwesend') return '✓';
-                if (s === 'urlaub')   return 'U';
-                if (s === 'krank')    return 'K';
-                if (s === 'frei')     return '—';
-                return '';
-            }
-            function statusFarbe(s) {
-                if (s === 'anwesend') return 'var(--success)';
-                if (s === 'urlaub')   return '#3498db';
-                if (s === 'krank')    return 'var(--accent-red)';
-                if (s === 'frei')     return 'var(--text-muted)';
-                return 'var(--text-muted)';
-            }
-
-            function prevWoche() {
-                var d = new Date(wochenStart);
-                d.setDate(d.getDate() - 7);
-                setWochenStart(d);
-            }
-            function nextWoche() {
-                var d = new Date(wochenStart);
-                d.setDate(d.getDate() + 7);
-                setWochenStart(d);
-            }
-            function goHeute() {
-                var d = new Date();
-                d.setHours(0, 0, 0, 0);
-                var wt = d.getDay();
-                var shift = wt === 0 ? -6 : 1 - wt;
-                d.setDate(d.getDate() + shift);
-                setWochenStart(d);
-            }
-
-            var balken = getWochenBalken();
-
-            function formatDate(d) {
-                return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-            }
-            var wochenEndeDisplay = new Date(tage[6].tsMitternacht);
-
-            return (
-                <div className="page-container" style={{
-                    padding: '16px',
-                    minHeight: '100vh'
-                }}>
-                    <UnterseitenHeader
-                        icon="📆"
-                        titel="Hauptkalender"
-                        untertitel="Alle Mitarbeiter + geplante Baustellen-Zeitraeume"
-                        onBack={onBack}
-                    />
-
-                    {/* Woche-Navigation */}
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '10px',
-                        padding: '8px 10px',
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)'
-                    }}>
-                        <button
-                            onClick={prevWoche}
-                            style={{
-                                padding: '6px 12px',
-                                background: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >◂</button>
-                        <div style={{
-                            flex: 1,
-                            textAlign: 'center',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontSize: '13px',
-                            fontWeight: 600,
-                            letterSpacing: '0.5px',
-                            color: 'var(--text-primary)'
-                        }}>
-                            {formatDate(wochenStart)} – {formatDate(wochenEndeDisplay)}
-                        </div>
-                        <button
-                            onClick={goHeute}
-                            style={{
-                                padding: '6px 12px',
-                                background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                color: '#fff',
-                                border: 'none',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                boxShadow: '0 2px 8px rgba(30,136,229,0.30)'
-                            }}
-                        >Heute</button>
-                        <button
-                            onClick={nextWoche}
-                            style={{
-                                padding: '6px 12px',
-                                background: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                cursor: 'pointer',
-                                fontSize: '14px'
-                            }}
-                        >▸</button>
-                    </div>
-
-                    {/* Neue Planung */}
-                    <div style={{ marginBottom: '10px' }}>
-                        <button
-                            onClick={function(){
-                                setDialogPlanung(null);
-                                setDialogOffen(true);
-                            }}
-                            style={{
-                                width: '100%',
-                                padding: '10px 14px',
-                                background: 'rgba(30,136,229,0.10)',
-                                color: 'var(--accent-blue)',
-                                border: '1px dashed rgba(30,136,229,0.40)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                cursor: 'pointer',
-                                touchAction: 'manipulation'
-                            }}
-                        >➕ Neue Baustellen-Planung anlegen</button>
-                    </div>
-
-                    {/* Gantt-Grid: Tage-Header + Balken-Zeilen + MA-Zeilen */}
-                    <div style={{
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)',
-                        padding: '8px',
-                        overflowX: 'auto'
-                    }}>
-                        {/* Spalten: 1 fuer Label, 7 fuer Tage */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '100px repeat(7, minmax(36px, 1fr))',
-                            gap: '2px',
-                            minWidth: '340px'
-                        }}>
-                            {/* Header-Zeile: Wochentag + Datum */}
-                            <div style={{
-                                gridColumn: '1 / 2',
-                                padding: '4px 6px',
-                                fontSize: '9px',
-                                color: 'var(--text-muted)',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '0.5px'
-                            }}>BAUSTELLEN</div>
-                            {tage.map(function(t) {
-                                return (
-                                    <div key={'hd-'+t.datum} style={{
-                                        textAlign: 'center',
-                                        padding: '3px 0',
-                                        fontSize: '10px',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontWeight: 600,
-                                        letterSpacing: '0.5px',
-                                        color: t.istHeute ? '#1E88E5' : (t.istWochenende ? 'var(--accent-red)' : 'var(--text-muted)'),
-                                        borderRadius: '3px',
-                                        background: t.istHeute ? 'rgba(30,136,229,0.10)' : 'transparent'
-                                    }}>
-                                        <div>{t.weekday}</div>
-                                        <div style={{ fontSize: '9px', fontWeight: 400 }}>{t.day}</div>
-                                    </div>
-                                );
-                            })}
-
-                            {/* Balken-Zeilen */}
-                            {balken.length === 0 ? (
-                                <div style={{
-                                    gridColumn: '1 / 9',
-                                    padding: '8px',
-                                    fontSize: '10px',
-                                    color: 'var(--text-muted)',
-                                    fontStyle: 'italic',
-                                    textAlign: 'center'
-                                }}>keine Baustellen-Planungen in dieser Woche</div>
-                            ) : balken.map(function(b, idx) {
-                                var anzMa = Object.keys(b.mitarbeiter).length;
-                                return (
-                                    <React.Fragment key={'b-'+b.zeitraumId}>
-                                        <div style={{
-                                            gridColumn: '1 / 2',
-                                            padding: '2px 4px',
-                                            fontSize: '10px',
-                                            color: 'var(--text-light)',
-                                            fontFamily: "'Oswald', sans-serif",
-                                            fontWeight: 600,
-                                            letterSpacing: '0.3px',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis'
-                                        }} title={b.baustelleId + (b.beschreibung ? ' · ' + b.beschreibung : '')}>
-                                            {b.baustelleId}
-                                        </div>
-                                        <button
-                                            onClick={function(){
-                                                setDialogPlanung(Object.assign({}, b, {
-                                                    _key: b.baustelleId + '/' + b.zeitraumId
-                                                }));
-                                                setDialogOffen(true);
-                                            }}
-                                            style={{
-                                                gridColumn: b.startCol + ' / ' + b.endCol,
-                                                padding: '3px 6px',
-                                                background: b.farbe,
-                                                border: 'none',
-                                                borderRadius: '3px',
-                                                color: '#fff',
-                                                fontSize: '9px',
-                                                fontWeight: 600,
-                                                cursor: 'pointer',
-                                                touchAction: 'manipulation',
-                                                textAlign: 'left',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                                            }}
-                                            title={b.baustelleId + ' · ' + new Date(b.von).toLocaleDateString('de-DE') + '–' + new Date(b.bis).toLocaleDateString('de-DE') + ' · ' + anzMa + ' MA'}
-                                        >{anzMa} MA</button>
-                                    </React.Fragment>
-                                );
-                            })}
-
-                            {/* Trenner */}
-                            <div style={{
-                                gridColumn: '1 / 9',
-                                height: '1px',
-                                background: 'var(--border-color)',
-                                marginTop: '6px',
-                                marginBottom: '6px'
-                            }} />
-
-                            {/* MA-Zeilen */}
-                            {mitarbeiter.length === 0 ? (
-                                <div style={{
-                                    gridColumn: '1 / 9',
-                                    padding: '8px',
-                                    fontSize: '10px',
-                                    color: 'var(--text-muted)',
-                                    fontStyle: 'italic',
-                                    textAlign: 'center'
-                                }}>keine Mitarbeiter in der Stammliste</div>
-                            ) : mitarbeiter.map(function(ma) {
-                                return (
-                                    <React.Fragment key={'ma-'+ma.id}>
-                                        <div style={{
-                                            gridColumn: '1 / 2',
-                                            padding: '6px 4px',
-                                            fontSize: '11px',
-                                            fontFamily: "'Oswald', sans-serif",
-                                            fontWeight: 600,
-                                            letterSpacing: '0.3px',
-                                            color: 'var(--text-primary)',
-                                            whiteSpace: 'nowrap',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            borderBottom: '1px solid var(--border-color)'
-                                        }} title={ma.name + ' · ' + (ma.rolle || '')}>
-                                            {ma.name || ma.id}
-                                        </div>
-                                        {tage.map(function(t) {
-                                            var eintrag = getEintrag(ma.id, t.datum);
-                                            var planung = getPlanungFuer(ma.id, t.datum);
-                                            var bg = t.istWochenende ? 'rgba(196,30,30,0.04)' : 'transparent';
-                                            if (planung) {
-                                                // Planungs-Farbe als leichter Tint
-                                                bg = planung.farbe + '22';
-                                            }
-                                            return (
-                                                <div key={'z-'+ma.id+'-'+t.datum} style={{
-                                                    padding: '6px 2px',
-                                                    fontSize: '13px',
-                                                    fontWeight: 700,
-                                                    textAlign: 'center',
-                                                    color: eintrag ? statusFarbe(eintrag.status) : 'transparent',
-                                                    background: bg,
-                                                    border: t.istHeute ? '1px solid #1E88E5' : '1px solid transparent',
-                                                    borderRadius: '3px',
-                                                    borderBottom: '1px solid var(--border-color)'
-                                                }} title={t.datum + (eintrag ? ' · ' + eintrag.status + (eintrag.stunden ? ' ' + eintrag.stunden + 'h' : '') : '')}>
-                                                    {eintrag ? statusGlyphe(eintrag.status) : '·'}
-                                                </div>
-                                            );
-                                        })}
-                                    </React.Fragment>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Legende */}
-                    <div style={{
-                        marginTop: '10px',
-                        padding: '8px 10px',
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)',
-                        fontSize: '10px',
-                        color: 'var(--text-muted)',
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: '10px',
-                        justifyContent: 'center'
-                    }}>
-                        <span><strong style={{color:'var(--success)'}}>✓</strong> anwesend</span>
-                        <span><strong style={{color:'#3498db'}}>U</strong> Urlaub</span>
-                        <span><strong style={{color:'var(--accent-red)'}}>K</strong> krank</span>
-                        <span><strong style={{color:'var(--text-muted)'}}>—</strong> frei</span>
-                        <span style={{opacity:0.7}}>· Balken = Baustellen-Planung · Klick auf Balken = bearbeiten</span>
-                    </div>
-
-                    {/* Dialog */}
-                    {dialogOffen && (
-                        <BaustellenPlanungDialog
-                            mitarbeiterListe={mitarbeiter}
-                            bestehend={dialogPlanung}
-                            bekannteIds={Object.keys(planungen)}
-                            onSpeichern={function(data) {
-                                var bId = data.baustelleId;
-                                var zId = (dialogPlanung && dialogPlanung.zeitraumId) || ('zt-' + Date.now());
-                                window.FirebaseService.schreibeBaustellenPlanung(bId, zId, data)
-                                    .then(function(){ setDialogOffen(false); })
-                                    .catch(function(e){ alert('Fehler beim Speichern:\n' + (e && e.message || e)); });
-                            }}
-                            onLoeschen={function() {
-                                if (!dialogPlanung) { setDialogOffen(false); return; }
-                                if (!confirm('Planung "' + dialogPlanung.baustelleId + '" endgueltig loeschen?')) return;
-                                window.FirebaseService.loescheBaustellenPlanung(dialogPlanung.baustelleId, dialogPlanung.zeitraumId)
-                                    .then(function(){ setDialogOffen(false); })
-                                    .catch(function(e){ alert('Fehler beim Loeschen:\n' + (e && e.message || e)); });
-                            }}
-                            onSchliessen={function(){ setDialogOffen(false); }}
-                        />
-                    )}
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 7 — BAUSTELLEN-PLANUNG-DIALOG
-        // Overlay zum Anlegen/Bearbeiten/Loeschen einer Planung.
-        // Felder: Baustelle-ID (Autosuggest), Von, Bis, Farbe-Presets,
-        // Beschreibung, Mitarbeiter-Auswahl als Checkboxen.
-        // ═══════════════════════════════════════════════════════
-        function BaustellenPlanungDialog({ mitarbeiterListe, bestehend, bekannteIds, onSpeichern, onLoeschen, onSchliessen }) {
-            function tsToDateStr(ts) {
-                var d = new Date(ts);
-                var mm = String(d.getMonth() + 1);
-                if (mm.length < 2) mm = '0' + mm;
-                var dd = String(d.getDate());
-                if (dd.length < 2) dd = '0' + dd;
-                return d.getFullYear() + '-' + mm + '-' + dd;
-            }
-
-            const heute = new Date();
-            const [baustelleId, setBaustelleId] = useState(function(){
-                return (bestehend && bestehend.baustelleId) || '';
-            });
-            const [vonStr, setVonStr] = useState(function(){
-                if (bestehend && bestehend.von) return tsToDateStr(bestehend.von);
-                return tsToDateStr(heute.getTime());
-            });
-            const [bisStr, setBisStr] = useState(function(){
-                if (bestehend && bestehend.bis) return tsToDateStr(bestehend.bis);
-                var in7 = new Date(heute.getTime() + 7 * 86400000);
-                return tsToDateStr(in7.getTime());
-            });
-            const [farbe, setFarbe] = useState(function(){
-                return (bestehend && bestehend.farbe) || '#1E88E5';
-            });
-            const [beschreibung, setBeschreibung] = useState(function(){
-                return (bestehend && bestehend.beschreibung) || '';
-            });
-            const [zugeordnet, setZugeordnet] = useState(function(){
-                if (bestehend && bestehend.mitarbeiter) return Object.assign({}, bestehend.mitarbeiter);
-                return {};
-            });
-            const [busy, setBusy] = useState(false);
-
-            useEffect(function(){
-                function onKey(e) { if (e.key === 'Escape') onSchliessen(); }
-                window.addEventListener('keydown', onKey);
-                return function(){ window.removeEventListener('keydown', onKey); };
-            }, []);
-
-            function toggleMa(id) {
-                var next = Object.assign({}, zugeordnet);
-                if (next[id]) delete next[id];
-                else next[id] = true;
-                setZugeordnet(next);
-            }
-
-            function handleSpeichern() {
-                var bId = (baustelleId || '').trim();
-                if (!bId) { alert('Baustellen-ID fehlt.'); return; }
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(vonStr) || !/^\d{4}-\d{2}-\d{2}$/.test(bisStr)) {
-                    alert('Von/Bis-Datum ist ungueltig.'); return;
-                }
-                var von = new Date(vonStr + 'T00:00:00').getTime();
-                var bis = new Date(bisStr + 'T23:59:59').getTime();
-                if (isNaN(von) || isNaN(bis)) { alert('Datum ungueltig.'); return; }
-                if (bis < von) { alert('Bis-Datum liegt vor Von-Datum.'); return; }
-                var anzahlMa = Object.keys(zugeordnet).length;
-                if (anzahlMa === 0) {
-                    if (!confirm('Keine Mitarbeiter zugeordnet. Trotzdem speichern?')) return;
-                }
-                setBusy(true);
-                onSpeichern({
-                    baustelleId: bId,
-                    von: von,
-                    bis: bis,
-                    farbe: farbe,
-                    beschreibung: (beschreibung || '').trim(),
-                    mitarbeiter: zugeordnet
-                });
-            }
-
-            var farbPresets = [
-                { val: '#1E88E5', label: 'Blau' },
-                { val: '#27ae60', label: 'Gruen' },
-                { val: '#e67e22', label: 'Orange' },
-                { val: '#c41e1e', label: 'Rot' },
-                { val: '#9b59b6', label: 'Lila' },
-                { val: '#e91e63', label: 'Pink' },
-                { val: '#16a085', label: 'Teal' },
-                { val: '#7f8c8d', label: 'Grau' }
-            ];
-
-            return (
-                <div
-                    onClick={onSchliessen}
-                    style={{
-                        position: 'fixed',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0,0,0,0.6)',
-                        zIndex: 10000,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'center',
-                        padding: '40px 12px 20px',
-                        overflowY: 'auto'
-                    }}
-                >
-                    <div
-                        onClick={function(e){ e.stopPropagation(); }}
-                        style={{
-                            background: 'var(--bg-primary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            width: '100%',
-                            maxWidth: '500px',
-                            padding: '18px',
-                            boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
-                        }}
-                    >
-                        {/* Kopfzeile */}
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '14px',
-                            gap: '10px'
-                        }}>
-                            <div style={{
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '15px',
-                                fontWeight: 600,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--text-primary)'
-                            }}>
-                                {bestehend ? 'Planung bearbeiten' : 'Neue Planung'}
-                            </div>
-                            <button
-                                onClick={onSchliessen}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-muted)',
-                                    fontSize: '22px',
-                                    cursor: 'pointer',
-                                    padding: '0 4px',
-                                    lineHeight: 1
-                                }}
-                            >×</button>
-                        </div>
-
-                        {/* Baustelle-ID */}
-                        <div style={{ marginBottom: '12px' }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '11px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--text-muted)',
-                                marginBottom: '5px'
-                            }}>Baustelle-ID *</label>
-                            <input
-                                type="text"
-                                list="b7-baustellen-ids"
-                                value={baustelleId}
-                                onChange={function(e){ setBaustelleId(e.target.value); }}
-                                disabled={!!bestehend}
-                                placeholder="z.B. meyer-bad"
-                                style={{
-                                    width: '100%',
-                                    padding: '10px 12px',
-                                    background: bestehend ? 'var(--bg-secondary)' : 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '14px',
-                                    boxSizing: 'border-box',
-                                    opacity: bestehend ? 0.75 : 1
-                                }}
-                            />
-                            <datalist id="b7-baustellen-ids">
-                                {(bekannteIds || []).map(function(b){ return <option key={b} value={b} />; })}
-                            </datalist>
-                            {bestehend && (
-                                <div style={{ marginTop: '3px', fontSize: '10px', color: 'var(--text-muted)' }}>
-                                    ID kann nicht geaendert werden. Fuer andere Baustelle neue Planung anlegen.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Von / Bis */}
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '10px',
-                            marginBottom: '12px'
-                        }}>
-                            <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '11px',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontWeight: 600,
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--text-muted)',
-                                    marginBottom: '5px'
-                                }}>Von *</label>
-                                <input
-                                    type="date"
-                                    value={vonStr}
-                                    onChange={function(e){ setVonStr(e.target.value); }}
-                                    style={{
-                                        width: '100%',
-                                        padding: '9px 10px',
-                                        background: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontSize: '13px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{
-                                    display: 'block',
-                                    fontSize: '11px',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontWeight: 600,
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--text-muted)',
-                                    marginBottom: '5px'
-                                }}>Bis *</label>
-                                <input
-                                    type="date"
-                                    value={bisStr}
-                                    onChange={function(e){ setBisStr(e.target.value); }}
-                                    style={{
-                                        width: '100%',
-                                        padding: '9px 10px',
-                                        background: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontSize: '13px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Farbe-Presets */}
-                        <div style={{ marginBottom: '12px' }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '11px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--text-muted)',
-                                marginBottom: '5px'
-                            }}>Farbe</label>
-                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                                {farbPresets.map(function(f) {
-                                    var aktiv = farbe === f.val;
-                                    return (
-                                        <button
-                                            key={f.val}
-                                            onClick={function(){ setFarbe(f.val); }}
-                                            title={f.label}
-                                            style={{
-                                                width: '36px',
-                                                height: '36px',
-                                                background: f.val,
-                                                border: aktiv ? '3px solid var(--text-primary)' : '1px solid var(--border-color)',
-                                                borderRadius: '50%',
-                                                cursor: 'pointer',
-                                                touchAction: 'manipulation',
-                                                boxShadow: aktiv ? '0 2px 8px ' + f.val + '99' : 'none',
-                                                padding: 0
-                                            }}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Beschreibung */}
-                        <div style={{ marginBottom: '12px' }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '11px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--text-muted)',
-                                marginBottom: '5px'
-                            }}>Beschreibung (optional)</label>
-                            <input
-                                type="text"
-                                value={beschreibung}
-                                onChange={function(e){ setBeschreibung(e.target.value); }}
-                                placeholder="z.B. Fliesenarbeiten Bad EG"
-                                style={{
-                                    width: '100%',
-                                    padding: '9px 10px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '13px',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-                        </div>
-
-                        {/* Mitarbeiter-Multiselect */}
-                        <div style={{ marginBottom: '16px' }}>
-                            <label style={{
-                                display: 'block',
-                                fontSize: '11px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '1px',
-                                textTransform: 'uppercase',
-                                color: 'var(--text-muted)',
-                                marginBottom: '5px'
-                            }}>Mitarbeiter zuordnen ({Object.keys(zugeordnet).length} von {(mitarbeiterListe || []).length})</label>
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '5px',
-                                maxHeight: '180px',
-                                overflowY: 'auto',
-                                padding: '5px',
-                                background: 'var(--bg-secondary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)'
-                            }}>
-                                {(mitarbeiterListe || []).map(function(ma) {
-                                    var aktiv = !!zugeordnet[ma.id];
-                                    return (
-                                        <button
-                                            key={ma.id}
-                                            onClick={function(){ toggleMa(ma.id); }}
-                                            style={{
-                                                padding: '7px 8px',
-                                                background: aktiv ? 'rgba(30,136,229,0.15)' : 'var(--bg-card)',
-                                                color: 'var(--text-primary)',
-                                                border: '1px solid ' + (aktiv ? 'rgba(30,136,229,0.50)' : 'var(--border-color)'),
-                                                borderRadius: 'var(--radius-sm)',
-                                                fontSize: '12px',
-                                                textAlign: 'left',
-                                                cursor: 'pointer',
-                                                touchAction: 'manipulation',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px'
-                                            }}
-                                        >
-                                            <span style={{
-                                                display: 'inline-block',
-                                                width: '14px',
-                                                height: '14px',
-                                                borderRadius: '3px',
-                                                border: '1px solid ' + (aktiv ? '#1E88E5' : 'var(--border-color)'),
-                                                background: aktiv ? '#1E88E5' : 'transparent',
-                                                color: '#fff',
-                                                fontSize: '10px',
-                                                textAlign: 'center',
-                                                lineHeight: '14px'
-                                            }}>{aktiv ? '✓' : ''}</span>
-                                            <span style={{
-                                                flex: 1,
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis'
-                                            }}>{ma.name || ma.id}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Aktions-Buttons */}
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                                onClick={onSchliessen}
-                                disabled={busy}
-                                style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: busy ? 'not-allowed' : 'pointer',
-                                    opacity: busy ? 0.5 : 1,
-                                    touchAction: 'manipulation'
-                                }}
-                            >Abbrechen</button>
-                            {bestehend && (
-                                <button
-                                    onClick={onLoeschen}
-                                    disabled={busy}
-                                    style={{
-                                        padding: '10px 14px',
-                                        background: 'rgba(196,30,30,0.15)',
-                                        color: 'var(--accent-red)',
-                                        border: '1px solid rgba(196,30,30,0.35)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.5px',
-                                        cursor: busy ? 'not-allowed' : 'pointer',
-                                        opacity: busy ? 0.5 : 1,
-                                        touchAction: 'manipulation'
-                                    }}
-                                >🗑 Loeschen</button>
-                            )}
-                            <button
-                                onClick={handleSpeichern}
-                                disabled={busy}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 14px',
-                                    background: busy ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                    color: busy ? 'var(--text-muted)' : '#fff',
-                                    border: 'none',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: busy ? 'not-allowed' : 'pointer',
-                                    touchAction: 'manipulation',
-                                    boxShadow: busy ? 'none' : '0 2px 8px rgba(30,136,229,0.30)'
-                                }}
-                            >{busy ? '⏳...' : '✓ Speichern'}</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 9 — FREIGABEN-HUB
-        // Top-Level-Seite fuer alle Foto-Reviews. Zeigt Queue wartender
-        // Fotos mit Thumbnail, Metadaten, Freigeben/Ablehnen-Buttons.
-        // Filter: Alle/Wartend/Freigegeben/Abgelehnt. Baustellen-Filter.
-        // Spaeter (B10) kommt ein Tab fuer Stunden-Freigaben dazu.
-        // ═══════════════════════════════════════════════════════
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 B9 → B10 REFACTOR
-        // FotoFreigabenTab ist der Foto-Teil innerhalb des FreigabenHub.
-        // Enthaelt keinen UnterseitenHeader mehr — der Header + die
-        // Tab-Auswahl sitzt im uebergeordneten FreigabenHub.
-        // ═══════════════════════════════════════════════════════
-        function FotoFreigabenTab() {
-            const [freigaben, setFreigaben] = useState({});
-            const [filterStatus, setFilterStatus] = useState('wartend');
-            const [filterBaustelle, setFilterBaustelle] = useState('alle');
-            const [ablehnDialog, setAblehnDialog] = useState(null); // {fotoId, eintrag}
-            const [busyIds, setBusyIds] = useState({});
-
-            // Live-Listener auf alle Foto-Freigaben
-            useEffect(function(){
-                if (!window.FirebaseService || !window.FirebaseService.subscribeFotoFreigaben) return;
-                var unsub = window.FirebaseService.subscribeFotoFreigaben(function(data){
-                    setFreigaben(data || {});
-                });
-                return unsub;
-            }, []);
-
-            // Zu Array konvertieren, sortieren
-            var liste = [];
-            for (var id in freigaben) {
-                if (freigaben.hasOwnProperty(id)) {
-                    liste.push(Object.assign({ _id: id }, freigaben[id]));
-                }
-            }
-            // Neueste zuerst
-            liste.sort(function(a, b) {
-                return (b.hochgeladen_am || 0) - (a.hochgeladen_am || 0);
-            });
-
-            // Zaehler
-            var anzahlWartend = 0, anzahlFrei = 0, anzahlAbgl = 0;
-            liste.forEach(function(f){
-                if (f.status === 'wartend') anzahlWartend++;
-                else if (f.status === 'freigegeben') anzahlFrei++;
-                else if (f.status === 'abgelehnt') anzahlAbgl++;
-            });
-
-            // Baustellen aus allen Eintraegen sammeln
-            var baustellenSet = {};
-            liste.forEach(function(f){
-                if (f.baustelle_id) baustellenSet[f.baustelle_id] = true;
-            });
-            var baustellenListe = Object.keys(baustellenSet).sort();
-
-            // Filter anwenden
-            var gefiltert = liste.filter(function(f){
-                if (filterStatus !== 'alle' && f.status !== filterStatus) return false;
-                if (filterBaustelle !== 'alle' && f.baustelle_id !== filterBaustelle) return false;
-                return true;
-            });
-
-            function setBusy(id, val) {
-                setBusyIds(function(prev){
-                    var n = Object.assign({}, prev);
-                    if (val) n[id] = true;
-                    else delete n[id];
-                    return n;
-                });
-            }
-
-            function handleFreigeben(fotoId, eintrag) {
-                if (!window.TWStaging || !window.FirebaseService) return;
-                if (busyIds[fotoId]) return;
-                if (!eintrag.baustelle_id) {
-                    alert('Fehler: baustelle_id fehlt im Eintrag.');
-                    return;
-                }
-                if (!eintrag.staging_file_id) {
-                    alert('Fehler: staging_file_id fehlt im Eintrag.');
-                    return;
-                }
-                setBusy(fotoId, true);
-                // 1) Kunden-Bilder-Ordner finden
-                window.TWStaging.findeKundenBilderOrdner(eintrag.baustelle_id)
-                    .then(function(bilderOrdner){
-                        // 2) Foto in Kunden-Ordner kopieren
-                        return window.TWStaging.kopiereFotoInKundenOrdner(
-                            eintrag.staging_file_id,
-                            bilderOrdner.id,
-                            eintrag.dateiname || null
-                        );
-                    })
-                    .then(function(neueDatei){
-                        // 3) Status in Firebase aktualisieren
-                        return window.FirebaseService.markiereFotoFreigegeben(
-                            fotoId, neueDatei.id, 'Thomas'
-                        );
-                    })
-                    .then(function(){
-                        setBusy(fotoId, false);
-                    })
-                    .catch(function(err){
-                        setBusy(fotoId, false);
-                        alert('Fehler bei Freigabe:\n' + (err && err.message || err));
-                    });
-            }
-
-            function handleAblehnen(fotoId, eintrag) {
-                setAblehnDialog({ fotoId: fotoId, eintrag: eintrag });
-            }
-
-            function handleAblehnBestaetigt(grund) {
-                if (!ablehnDialog) return;
-                var fotoId = ablehnDialog.fotoId;
-                var eintrag = ablehnDialog.eintrag;
-                setBusy(fotoId, true);
-                setAblehnDialog(null);
-
-                // 1) Firebase-Status
-                window.FirebaseService.markiereFotoAbgelehnt(fotoId, grund, 'Thomas')
-                    .then(function(){
-                        // 2) Chat-Nachricht an MA (best effort)
-                        if (eintrag.ma_id && window.FirebaseService.sendeChatNachricht) {
-                            var text = '📸 Foto abgelehnt';
-                            if (eintrag.dateiname) text += ' ("' + eintrag.dateiname + '")';
-                            text += ':\n\n' + grund + '\n\nBitte neues Foto hochladen.';
-                            return window.FirebaseService.sendeChatNachricht(
-                                eintrag.ma_id, text, 'de', 'Thomas', false
-                            ).catch(function(e){
-                                console.warn('Chat-Nachricht fehlgeschlagen:', e);
-                            });
-                        }
-                    })
-                    .then(function(){
-                        setBusy(fotoId, false);
-                    })
-                    .catch(function(err){
-                        setBusy(fotoId, false);
-                        alert('Fehler bei Ablehnung:\n' + (err && err.message || err));
-                    });
-            }
-
-            return (
-                <div>
-                    {/* Status-Filter */}
-                    <div style={{
-                        display: 'flex',
-                        gap: '5px',
-                        marginBottom: '10px',
-                        flexWrap: 'wrap'
-                    }}>
-                        {[
-                            { key: 'wartend',     label: '🕐 Wartend',     count: anzahlWartend },
-                            { key: 'freigegeben', label: '✓ Freigegeben',  count: anzahlFrei },
-                            { key: 'abgelehnt',   label: '✗ Abgelehnt',    count: anzahlAbgl },
-                            { key: 'alle',        label: 'Alle',           count: liste.length }
-                        ].map(function(f){
-                            var aktiv = filterStatus === f.key;
-                            return (
-                                <button
-                                    key={f.key}
-                                    onClick={function(){ setFilterStatus(f.key); }}
-                                    style={{
-                                        padding: '7px 11px',
-                                        background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
-                                        color: aktiv ? '#fff' : 'var(--text-primary)',
-                                        border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '11px',
-                                        fontWeight: aktiv ? 700 : 500,
-                                        letterSpacing: '0.3px',
-                                        cursor: 'pointer',
-                                        touchAction: 'manipulation',
-                                        boxShadow: aktiv ? '0 2px 8px rgba(30,136,229,0.30)' : 'none'
-                                    }}
-                                >{f.label} ({f.count})</button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Baustellen-Filter */}
-                    {baustellenListe.length > 1 && (
-                        <div style={{ marginBottom: '12px' }}>
-                            <select
-                                value={filterBaustelle}
-                                onChange={function(e){ setFilterBaustelle(e.target.value); }}
-                                style={{
-                                    width: '100%',
-                                    padding: '9px 10px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '13px'
-                                }}
-                            >
-                                <option value="alle">Alle Baustellen</option>
-                                {baustellenListe.map(function(b){
-                                    return <option key={b} value={b}>{b}</option>;
-                                })}
-                            </select>
-                        </div>
-                    )}
-
-                    {/* Foto-Queue */}
-                    {gefiltert.length === 0 ? (
-                        <div style={{
-                            padding: '40px 20px',
-                            textAlign: 'center',
-                            background: 'var(--bg-secondary)',
-                            border: '1px dashed var(--border-color)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--text-muted)'
-                        }}>
-                            <div style={{ fontSize: '42px', opacity: 0.5, marginBottom: '8px' }}>📸</div>
-                            <div style={{
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                textTransform: 'uppercase',
-                                marginBottom: '6px'
-                            }}>
-                                {filterStatus === 'wartend' ? 'Keine wartenden Fotos' :
-                                 filterStatus === 'freigegeben' ? 'Keine freigegebenen Fotos' :
-                                 filterStatus === 'abgelehnt' ? 'Keine abgelehnten Fotos' :
-                                 'Keine Eintraege'}
-                            </div>
-                            <div style={{ fontSize: '11px', maxWidth: '340px', margin: '0 auto', lineHeight: 1.5 }}>
-                                Neue Fotos erscheinen hier sobald ein Mitarbeiter welche in der Baustellen-App hochlaedt.
-                            </div>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {gefiltert.map(function(f){
-                                return (
-                                    <FotoReviewKarte
-                                        key={f._id}
-                                        eintrag={f}
-                                        busy={!!busyIds[f._id]}
-                                        onFreigeben={function(){ handleFreigeben(f._id, f); }}
-                                        onAblehnen={function(){ handleAblehnen(f._id, f); }}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* Ablehn-Dialog */}
-                    {ablehnDialog && (
-                        <AblehnDialog
-                            eintrag={ablehnDialog.eintrag}
-                            onBestaetigen={handleAblehnBestaetigt}
-                            onSchliessen={function(){ setAblehnDialog(null); }}
-                        />
-                    )}
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 9 — FOTO-REVIEW-KARTE
-        // Einzelnes Foto als Karte mit Thumbnail, Metadaten und
-        // Aktions-Buttons je nach Status.
-        // ═══════════════════════════════════════════════════════
-        function FotoReviewKarte({ eintrag, busy, onFreigeben, onAblehnen }) {
-            const [thumbUrl, setThumbUrl] = useState(null);
-            const [metaLoaded, setMetaLoaded] = useState(false);
-
-            // Thumbnail nachladen (Drive liefert diesen Link dynamisch)
-            useEffect(function(){
-                if (metaLoaded) return;
-                if (!eintrag.staging_file_id) { setMetaLoaded(true); return; }
-                if (!window.TWStaging || !window.TWStaging.getFotoMetadaten) { setMetaLoaded(true); return; }
-                window.TWStaging.getFotoMetadaten(eintrag.staging_file_id)
-                    .then(function(meta){
-                        if (meta && meta.thumbnailLink) setThumbUrl(meta.thumbnailLink);
-                        setMetaLoaded(true);
-                    })
-                    .catch(function(){ setMetaLoaded(true); });
-            }, [eintrag.staging_file_id]);
-
-            var hochgeladenText = '';
-            if (eintrag.hochgeladen_am) {
-                try {
-                    var d = new Date(eintrag.hochgeladen_am);
-                    hochgeladenText = d.toLocaleDateString('de-DE') + ' ' +
-                        String(d.getHours()).padStart(2,'0') + ':' +
-                        String(d.getMinutes()).padStart(2,'0');
-                } catch (e) { hochgeladenText = String(eintrag.hochgeladen_am); }
-            }
-
-            var statusFarbe = {
-                wartend:     'var(--accent-orange)',
-                freigegeben: 'var(--success)',
-                abgelehnt:   'var(--accent-red)'
-            }[eintrag.status] || 'var(--text-muted)';
-
-            var statusBg = {
-                wartend:     'rgba(230,126,34,0.10)',
-                freigegeben: 'rgba(39,174,96,0.10)',
-                abgelehnt:   'rgba(196,30,30,0.10)'
-            }[eintrag.status] || 'var(--bg-secondary)';
-
-            var statusLabel = {
-                wartend:     '🕐 Wartend',
-                freigegeben: '✓ Freigegeben',
-                abgelehnt:   '✗ Abgelehnt'
-            }[eintrag.status] || eintrag.status;
-
-            return (
-                <div style={{
-                    display: 'flex',
-                    gap: '10px',
-                    padding: '10px',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-sm)',
-                    alignItems: 'stretch'
-                }}>
-                    {/* Thumbnail */}
-                    <div style={{
-                        width: '96px',
-                        minWidth: '96px',
-                        height: '96px',
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden'
-                    }}>
-                        {thumbUrl ? (
-                            <img
-                                src={thumbUrl}
-                                alt={eintrag.dateiname || 'Foto'}
-                                style={{
-                                    width: '100%',
-                                    height: '100%',
-                                    objectFit: 'cover'
-                                }}
-                            />
-                        ) : (
-                            <span style={{
-                                fontSize: '36px',
-                                color: 'var(--text-muted)',
-                                opacity: 0.5
-                            }}>📸</span>
-                        )}
-                    </div>
-
-                    {/* Metadaten + Aktions */}
-                    <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        minWidth: 0
-                    }}>
-                        {/* Status-Badge */}
-                        <div style={{
-                            display: 'inline-flex',
-                            alignSelf: 'flex-start',
-                            fontSize: '9px',
-                            padding: '2px 7px',
-                            background: statusBg,
-                            color: statusFarbe,
-                            border: '1px solid ' + statusFarbe + '55',
-                            borderRadius: '3px',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontWeight: 600,
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase'
-                        }}>{statusLabel}</div>
-
-                        {/* Dateiname */}
-                        <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            fontFamily: "'Oswald', sans-serif",
-                            letterSpacing: '0.3px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}>{eintrag.dateiname || eintrag.staging_file_id || '(ohne Name)'}</div>
-
-                        {/* Metadaten-Zeilen */}
-                        <div style={{
-                            fontSize: '11px',
-                            color: 'var(--text-muted)',
-                            lineHeight: 1.4
-                        }}>
-                            <div>🏗️ {eintrag.baustelle_id || '–'}{eintrag.raum ? ' · ' + eintrag.raum : ''}</div>
-                            <div>👤 {eintrag.ma_id || '–'}{eintrag.phase ? ' · ' + eintrag.phase : ''}</div>
-                            <div>🕐 {hochgeladenText || '–'}</div>
-                            {eintrag.status === 'abgelehnt' && eintrag.abgelehnt_grund && (
-                                <div style={{ color: 'var(--accent-red)', marginTop: '3px', fontStyle: 'italic' }}>
-                                    Grund: {eintrag.abgelehnt_grund}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Aktions nur bei wartend */}
-                        {eintrag.status === 'wartend' && (
-                            <div style={{ display: 'flex', gap: '5px', marginTop: 'auto' }}>
-                                <button
-                                    onClick={onFreigeben}
-                                    disabled={busy}
-                                    style={{
-                                        flex: 1,
-                                        padding: '7px 10px',
-                                        background: busy ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #27ae60, #219a52)',
-                                        color: busy ? 'var(--text-muted)' : '#fff',
-                                        border: 'none',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.3px',
-                                        cursor: busy ? 'not-allowed' : 'pointer',
-                                        touchAction: 'manipulation',
-                                        boxShadow: busy ? 'none' : '0 2px 6px rgba(39,174,96,0.30)'
-                                    }}
-                                >{busy ? '⏳...' : '✓ Freigeben'}</button>
-                                <button
-                                    onClick={onAblehnen}
-                                    disabled={busy}
-                                    style={{
-                                        flex: 1,
-                                        padding: '7px 10px',
-                                        background: busy ? 'var(--bg-secondary)' : 'rgba(196,30,30,0.15)',
-                                        color: busy ? 'var(--text-muted)' : 'var(--accent-red)',
-                                        border: '1px solid ' + (busy ? 'var(--border-color)' : 'rgba(196,30,30,0.40)'),
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.3px',
-                                        cursor: busy ? 'not-allowed' : 'pointer',
-                                        touchAction: 'manipulation'
-                                    }}
-                                >✗ Ablehnen</button>
-                            </div>
-                        )}
-
-                        {/* Info bei freigegeben/abgelehnt */}
-                        {eintrag.status === 'freigegeben' && eintrag.freigegeben_am && (
-                            <div style={{ fontSize: '10px', color: 'var(--success)', marginTop: 'auto', fontStyle: 'italic' }}>
-                                Freigegeben am {new Date(eintrag.freigegeben_am).toLocaleDateString('de-DE')}
-                            </div>
-                        )}
-                        {eintrag.status === 'abgelehnt' && eintrag.abgelehnt_am && (
-                            <div style={{ fontSize: '10px', color: 'var(--accent-red)', marginTop: 'auto', fontStyle: 'italic' }}>
-                                Abgelehnt am {new Date(eintrag.abgelehnt_am).toLocaleDateString('de-DE')}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 9 — ABLEHN-DIALOG
-        // Overlay-Dialog fuer den Ablehnungsgrund. Text wird an den
-        // MA per Chat-Nachricht gesendet.
-        // ═══════════════════════════════════════════════════════
-        function AblehnDialog({ eintrag, onBestaetigen, onSchliessen }) {
-            const [grund, setGrund] = useState('');
-
-            useEffect(function(){
-                function onKey(e) { if (e.key === 'Escape') onSchliessen(); }
-                window.addEventListener('keydown', onKey);
-                return function(){ window.removeEventListener('keydown', onKey); };
-            }, []);
-
-            // Vorschlaege fuer haeufige Grunde
-            var vorschlaege = [
-                'Foto unscharf, bitte neu aufnehmen.',
-                'Falscher Raum — bitte richtigen Raum fotografieren.',
-                'Belichtung zu dunkel, bitte mit mehr Licht nochmal machen.',
-                'Ausschnitt passt nicht — bitte groesseren Bereich zeigen.'
-            ];
-
-            return (
-                <div
-                    onClick={onSchliessen}
-                    style={{
-                        position: 'fixed',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0,0,0,0.6)',
-                        zIndex: 10000,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'center',
-                        padding: '40px 12px 20px',
-                        overflowY: 'auto'
-                    }}
-                >
-                    <div
-                        onClick={function(e){ e.stopPropagation(); }}
-                        style={{
-                            background: 'var(--bg-primary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            width: '100%',
-                            maxWidth: '460px',
-                            padding: '18px',
-                            boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
-                        }}
-                    >
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: '12px',
-                            gap: '10px'
-                        }}>
-                            <div>
-                                <div style={{
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--accent-red)'
-                                }}>Foto ablehnen</div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                                    Der Mitarbeiter bekommt automatisch eine Chat-Nachricht.
-                                </div>
-                            </div>
-                            <button
-                                onClick={onSchliessen}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-muted)',
-                                    fontSize: '22px',
-                                    cursor: 'pointer',
-                                    padding: '0 4px',
-                                    lineHeight: 1
-                                }}
-                            >×</button>
-                        </div>
-
-                        {/* Grund-Textarea */}
-                        <label style={{
-                            display: 'block',
-                            fontSize: '11px',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontWeight: 600,
-                            letterSpacing: '1px',
-                            textTransform: 'uppercase',
-                            color: 'var(--text-muted)',
-                            marginBottom: '5px'
-                        }}>Ablehnungs-Grund *</label>
-                        <textarea
-                            value={grund}
-                            onChange={function(e){ setGrund(e.target.value); }}
-                            placeholder="z.B. Foto unscharf, bitte Wand neu aufnehmen."
-                            rows={3}
-                            autoFocus
-                            style={{
-                                width: '100%',
-                                padding: '10px 12px',
-                                background: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontSize: '13px',
-                                boxSizing: 'border-box',
-                                resize: 'vertical',
-                                fontFamily: 'inherit',
-                                marginBottom: '10px'
-                            }}
-                        />
-
-                        {/* Schnell-Vorschlaege */}
-                        <div style={{ marginBottom: '14px' }}>
-                            <div style={{
-                                fontSize: '10px',
-                                color: 'var(--text-muted)',
-                                marginBottom: '4px',
-                                fontFamily: "'Oswald', sans-serif",
-                                fontWeight: 600,
-                                letterSpacing: '0.5px'
-                            }}>HAEUFIGE GRUENDE (Klick zum Uebernehmen):</div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                {vorschlaege.map(function(v, idx){
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={function(){ setGrund(v); }}
-                                            style={{
-                                                padding: '6px 10px',
-                                                background: 'var(--bg-secondary)',
-                                                color: 'var(--text-primary)',
-                                                border: '1px solid var(--border-color)',
-                                                borderRadius: 'var(--radius-sm)',
-                                                fontSize: '11px',
-                                                textAlign: 'left',
-                                                cursor: 'pointer',
-                                                touchAction: 'manipulation'
-                                            }}
-                                        >{v}</button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Aktions */}
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                                onClick={onSchliessen}
-                                style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: 'pointer',
-                                    touchAction: 'manipulation'
-                                }}
-                            >Abbrechen</button>
-                            <button
-                                onClick={function(){
-                                    var g = (grund || '').trim();
-                                    if (!g) { alert('Bitte Grund eingeben.'); return; }
-                                    onBestaetigen(g);
-                                }}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 14px',
-                                    background: 'linear-gradient(135deg, #c41e1e, #8b0000)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: 'pointer',
-                                    touchAction: 'manipulation',
-                                    boxShadow: '0 2px 8px rgba(196,30,30,0.30)'
-                                }}
-                            >✗ Ablehnen & MA benachrichtigen</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 10 — NEUER FREIGABEN-HUB (Tab-Container)
-        // Enthaelt zwei Tabs: 📸 Fotos (aus B9) und ⏱ Stunden (neu).
-        // Pro Tab wird die Anzahl wartender Eintraege als Badge angezeigt.
-        // ═══════════════════════════════════════════════════════
-        function FreigabenHub({ onBack }) {
-            const [tab, setTab] = useState('fotos');
-            const [fotoPending, setFotoPending] = useState(0);
-            const [stundenPending, setStundenPending] = useState(0);
-
-            // Live-Zaehlung fuer Badges
-            useEffect(function(){
-                if (!window.FirebaseService || !window.FirebaseService.subscribeFotoFreigaben) return;
-                var unsub = window.FirebaseService.subscribeFotoFreigaben(function(data){
-                    var n = 0;
-                    for (var k in data) {
-                        if (data.hasOwnProperty(k) && data[k] && data[k].status === 'wartend') n++;
-                    }
-                    setFotoPending(n);
-                });
-                return unsub;
-            }, []);
-
-            useEffect(function(){
-                if (!window.FirebaseService || !window.FirebaseService.subscribeStundenFreigaben) return;
-                var unsub = window.FirebaseService.subscribeStundenFreigaben(function(data){
-                    var n = 0;
-                    for (var k in data) {
-                        if (data.hasOwnProperty(k) && data[k] && data[k].status === 'wartend') n++;
-                    }
-                    setStundenPending(n);
-                });
-                return unsub;
-            }, []);
-
-            function renderTab(key, icon, label, pending) {
-                var aktiv = tab === key;
-                return (
-                    <button
-                        key={key}
-                        onClick={function(){ setTab(key); }}
-                        style={{
-                            flex: 1,
-                            padding: '12px 10px',
-                            background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
-                            color: aktiv ? '#fff' : 'var(--text-primary)',
-                            border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
-                            borderRadius: 'var(--radius-sm)',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontSize: '13px',
-                            fontWeight: aktiv ? 700 : 500,
-                            letterSpacing: '0.5px',
-                            cursor: 'pointer',
-                            touchAction: 'manipulation',
-                            boxShadow: aktiv ? '0 2px 8px rgba(30,136,229,0.30)' : 'none',
-                            position: 'relative',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px'
-                        }}
-                    >
-                        <span>{icon} {label}</span>
-                        {pending > 0 && (
-                            <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                minWidth: '20px',
-                                height: '20px',
-                                padding: '0 6px',
-                                background: aktiv ? '#fff' : 'var(--accent-orange)',
-                                color: aktiv ? '#1565C0' : '#fff',
-                                borderRadius: '10px',
-                                fontSize: '11px',
-                                fontWeight: 700
-                            }}>{pending}</span>
-                        )}
-                    </button>
-                );
-            }
-
-            return (
-                <div className="page-container" style={{
-                    padding: '16px',
-                    minHeight: '100vh'
-                }}>
-                    <UnterseitenHeader
-                        icon="✅"
-                        titel="Freigaben"
-                        untertitel="Fotos und Stunden pruefen und freigeben"
-                        onBack={onBack}
-                    />
-
-                    {/* Tab-Auswahl */}
-                    <div style={{
-                        display: 'flex',
-                        gap: '6px',
-                        marginBottom: '14px'
-                    }}>
-                        {renderTab('fotos',   '📸', 'Fotos',   fotoPending)}
-                        {renderTab('stunden', '⏱',  'Stunden', stundenPending)}
-                    </div>
-
-                    {tab === 'fotos' && <FotoFreigabenTab />}
-                    {tab === 'stunden' && <StundenFreigabenTab />}
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 10 — STUNDEN-FREIGABEN-TAB
-        // Analog zu FotoFreigabenTab, aber fuer PDF-Stundenzettel.
-        // Freigabe: PDF wird in Kunden-Stundennachweis UND
-        // Lohnbuchhaltung-{YYYY-MM} kopiert (duale Archivierung).
-        // ═══════════════════════════════════════════════════════
-        function StundenFreigabenTab() {
-            const [freigaben, setFreigaben] = useState({});
-            const [filterStatus, setFilterStatus] = useState('wartend');
-            const [filterBaustelle, setFilterBaustelle] = useState('alle');
-            const [filterMa, setFilterMa] = useState('alle');
-            const [freigebenDialog, setFreigebenDialog] = useState(null); // {pdfId, eintrag}
-            const [ablehnDialog, setAblehnDialog] = useState(null); // {pdfId, eintrag}
-            const [busyIds, setBusyIds] = useState({});
-
-            useEffect(function(){
-                if (!window.FirebaseService || !window.FirebaseService.subscribeStundenFreigaben) return;
-                var unsub = window.FirebaseService.subscribeStundenFreigaben(function(data){
-                    setFreigaben(data || {});
-                });
-                return unsub;
-            }, []);
-
-            var liste = [];
-            for (var id in freigaben) {
-                if (freigaben.hasOwnProperty(id)) {
-                    liste.push(Object.assign({ _id: id }, freigaben[id]));
-                }
-            }
-            liste.sort(function(a, b) {
-                return (b.hochgeladen_am || 0) - (a.hochgeladen_am || 0);
-            });
-
-            var anzahlWartend = 0, anzahlFrei = 0, anzahlAbgl = 0;
-            liste.forEach(function(f){
-                if (f.status === 'wartend') anzahlWartend++;
-                else if (f.status === 'freigegeben') anzahlFrei++;
-                else if (f.status === 'abgelehnt') anzahlAbgl++;
-            });
-
-            var baustellenSet = {}, maSet = {};
-            liste.forEach(function(f){
-                if (f.baustelle_id) baustellenSet[f.baustelle_id] = true;
-                if (f.ma_id) maSet[f.ma_id] = true;
-            });
-            var baustellenListe = Object.keys(baustellenSet).sort();
-            var maListe = Object.keys(maSet).sort();
-
-            var gefiltert = liste.filter(function(f){
-                if (filterStatus !== 'alle' && f.status !== filterStatus) return false;
-                if (filterBaustelle !== 'alle' && f.baustelle_id !== filterBaustelle) return false;
-                if (filterMa !== 'alle' && f.ma_id !== filterMa) return false;
-                return true;
-            });
-
-            function setBusy(id, val) {
-                setBusyIds(function(prev){
-                    var n = Object.assign({}, prev);
-                    if (val) n[id] = true;
-                    else delete n[id];
-                    return n;
-                });
-            }
-
-            function handleFreigebenClick(pdfId, eintrag) {
-                setFreigebenDialog({ pdfId: pdfId, eintrag: eintrag });
-            }
-
-            function handleFreigebenBestaetigt(anmerkung) {
-                if (!freigebenDialog) return;
-                var pdfId = freigebenDialog.pdfId;
-                var eintrag = freigebenDialog.eintrag;
-                setFreigebenDialog(null);
-
-                if (!eintrag.baustelle_id) { alert('Fehler: baustelle_id fehlt.'); return; }
-                if (!eintrag.staging_file_id) { alert('Fehler: staging_file_id fehlt.'); return; }
-
-                // Monat bestimmen fuer Lohn-Ordner
-                var monat = eintrag.monat;
-                if (!monat || !/^\d{4}-\d{2}$/.test(monat)) {
-                    var d = new Date(eintrag.hochgeladen_am || Date.now());
-                    var m = String(d.getMonth() + 1); if (m.length < 2) m = '0' + m;
-                    monat = d.getFullYear() + '-' + m;
-                }
-
-                setBusy(pdfId, true);
-
-                // Parallel: Kunden-Stundennachweis-Ordner + Lohn-Monats-Ordner beschaffen
-                var kundenKopie = null;
-                var lohnKopie = null;
-
-                Promise.all([
-                    window.TWStaging.findeKundenStundenOrdner(eintrag.baustelle_id),
-                    window.TWStaging.ensureLohnMonatsOrdner(monat)
-                ])
-                .then(function(result){
-                    var kundenOrdner = result[0];
-                    var lohnOrdner = result[1];
-                    // Sequentiell kopieren
-                    return window.TWStaging.kopierePdfInOrdner(
-                        eintrag.staging_file_id, kundenOrdner.id, eintrag.dateiname || null
-                    ).then(function(k){
-                        kundenKopie = k;
-                        // Lohn-Dateiname: {maId}_{baustelle}_{monat}.pdf (eindeutiger)
-                        var lohnName = null;
-                        if (eintrag.ma_id && eintrag.baustelle_id) {
-                            lohnName = eintrag.ma_id + '_' + eintrag.baustelle_id + '_' + monat + '.pdf';
-                        }
-                        return window.TWStaging.kopierePdfInOrdner(
-                            eintrag.staging_file_id, lohnOrdner.id, lohnName
-                        );
-                    });
-                })
-                .then(function(l){
-                    lohnKopie = l;
-                    return window.FirebaseService.markiereStundenFreigegeben(
-                        pdfId,
-                        kundenKopie ? kundenKopie.id : null,
-                        lohnKopie ? lohnKopie.id : null,
-                        'Thomas',
-                        anmerkung
-                    );
-                })
-                .then(function(){
-                    setBusy(pdfId, false);
-                })
-                .catch(function(err){
-                    setBusy(pdfId, false);
-                    alert('Fehler bei Freigabe:\n' + (err && err.message || err));
-                });
-            }
-
-            function handleAblehnen(pdfId, eintrag) {
-                setAblehnDialog({ pdfId: pdfId, eintrag: eintrag });
-            }
-
-            function handleAblehnBestaetigt(grund) {
-                if (!ablehnDialog) return;
-                var pdfId = ablehnDialog.pdfId;
-                var eintrag = ablehnDialog.eintrag;
-                setBusy(pdfId, true);
-                setAblehnDialog(null);
-                window.FirebaseService.markiereStundenAbgelehnt(pdfId, grund, 'Thomas')
-                    .then(function(){
-                        if (eintrag.ma_id && window.FirebaseService.sendeChatNachricht) {
-                            var text = '⏱ Stundenzettel abgelehnt';
-                            if (eintrag.dateiname) text += ' ("' + eintrag.dateiname + '")';
-                            text += ':\n\n' + grund + '\n\nBitte korrigierten Stundenzettel hochladen.';
-                            return window.FirebaseService.sendeChatNachricht(
-                                eintrag.ma_id, text, 'de', 'Thomas', false
-                            ).catch(function(e){ console.warn('Chat-Nachricht fehlgeschlagen:', e); });
-                        }
-                    })
-                    .then(function(){ setBusy(pdfId, false); })
-                    .catch(function(err){
-                        setBusy(pdfId, false);
-                        alert('Fehler bei Ablehnung:\n' + (err && err.message || err));
-                    });
-            }
-
-            return (
-                <div>
-                    {/* Status-Filter */}
-                    <div style={{
-                        display: 'flex',
-                        gap: '5px',
-                        marginBottom: '10px',
-                        flexWrap: 'wrap'
-                    }}>
-                        {[
-                            { key: 'wartend',     label: '🕐 Wartend',     count: anzahlWartend },
-                            { key: 'freigegeben', label: '✓ Freigegeben',  count: anzahlFrei },
-                            { key: 'abgelehnt',   label: '✗ Abgelehnt',    count: anzahlAbgl },
-                            { key: 'alle',        label: 'Alle',           count: liste.length }
-                        ].map(function(f){
-                            var aktiv = filterStatus === f.key;
-                            return (
-                                <button
-                                    key={f.key}
-                                    onClick={function(){ setFilterStatus(f.key); }}
-                                    style={{
-                                        padding: '7px 11px',
-                                        background: aktiv ? 'linear-gradient(135deg, #1E88E5, #1565C0)' : 'var(--bg-secondary)',
-                                        color: aktiv ? '#fff' : 'var(--text-primary)',
-                                        border: '1px solid ' + (aktiv ? '#1565C0' : 'var(--border-color)'),
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '11px',
-                                        fontWeight: aktiv ? 700 : 500,
-                                        letterSpacing: '0.3px',
-                                        cursor: 'pointer',
-                                        touchAction: 'manipulation',
-                                        boxShadow: aktiv ? '0 2px 8px rgba(30,136,229,0.30)' : 'none'
-                                    }}
-                                >{f.label} ({f.count})</button>
-                            );
-                        })}
-                    </div>
-
-                    {/* Zusatz-Filter: Baustelle + MA */}
-                    {(baustellenListe.length > 1 || maListe.length > 1) && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
-                            {baustellenListe.length > 1 && (
-                                <select
-                                    value={filterBaustelle}
-                                    onChange={function(e){ setFilterBaustelle(e.target.value); }}
-                                    style={{
-                                        padding: '9px 10px',
-                                        background: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontSize: '12px'
-                                    }}
-                                >
-                                    <option value="alle">Alle Baustellen</option>
-                                    {baustellenListe.map(function(b){ return <option key={b} value={b}>{b}</option>; })}
-                                </select>
-                            )}
-                            {maListe.length > 1 && (
-                                <select
-                                    value={filterMa}
-                                    onChange={function(e){ setFilterMa(e.target.value); }}
-                                    style={{
-                                        padding: '9px 10px',
-                                        background: 'var(--bg-secondary)',
-                                        color: 'var(--text-primary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontSize: '12px'
-                                    }}
-                                >
-                                    <option value="alle">Alle Mitarbeiter</option>
-                                    {maListe.map(function(m){ return <option key={m} value={m}>{m}</option>; })}
-                                </select>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Queue */}
-                    {gefiltert.length === 0 ? (
-                        <div style={{
-                            padding: '40px 20px',
-                            textAlign: 'center',
-                            background: 'var(--bg-secondary)',
-                            border: '1px dashed var(--border-color)',
-                            borderRadius: 'var(--radius-sm)',
-                            color: 'var(--text-muted)'
-                        }}>
-                            <div style={{ fontSize: '42px', opacity: 0.5, marginBottom: '8px' }}>⏱</div>
-                            <div style={{
-                                fontFamily: "'Oswald', sans-serif",
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                letterSpacing: '0.5px',
-                                textTransform: 'uppercase',
-                                marginBottom: '6px'
-                            }}>
-                                {filterStatus === 'wartend' ? 'Keine wartenden Stundenzettel' :
-                                 filterStatus === 'freigegeben' ? 'Keine freigegebenen Stundenzettel' :
-                                 filterStatus === 'abgelehnt' ? 'Keine abgelehnten Stundenzettel' :
-                                 'Keine Eintraege'}
-                            </div>
-                            <div style={{ fontSize: '11px', maxWidth: '340px', margin: '0 auto', lineHeight: 1.5 }}>
-                                Stundenzettel erscheinen hier sobald ein Mitarbeiter ein PDF in der Baustellen-App hochlaedt.
-                            </div>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {gefiltert.map(function(f){
-                                return (
-                                    <StundenReviewKarte
-                                        key={f._id}
-                                        eintrag={f}
-                                        busy={!!busyIds[f._id]}
-                                        onFreigeben={function(){ handleFreigebenClick(f._id, f); }}
-                                        onAblehnen={function(){ handleAblehnen(f._id, f); }}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-
-                    {/* Freigeben-Dialog (mit optionaler Anmerkung) */}
-                    {freigebenDialog && (
-                        <StundenFreigebenDialog
-                            eintrag={freigebenDialog.eintrag}
-                            onBestaetigen={handleFreigebenBestaetigt}
-                            onSchliessen={function(){ setFreigebenDialog(null); }}
-                        />
-                    )}
-
-                    {/* Ablehn-Dialog (wiederverwendet AblehnDialog aus B9) */}
-                    {ablehnDialog && (
-                        <AblehnDialog
-                            eintrag={ablehnDialog.eintrag}
-                            onBestaetigen={handleAblehnBestaetigt}
-                            onSchliessen={function(){ setAblehnDialog(null); }}
-                        />
-                    )}
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 10 — STUNDEN-REVIEW-KARTE
-        // Einzelner Stundenzettel mit PDF-Icon, Metadaten (MA, Monat,
-        // Stunden-Summe, Baustelle) und Aktions-Buttons.
-        // ═══════════════════════════════════════════════════════
-        function StundenReviewKarte({ eintrag, busy, onFreigeben, onAblehnen }) {
-            var hochgeladenText = '';
-            if (eintrag.hochgeladen_am) {
-                try {
-                    var d = new Date(eintrag.hochgeladen_am);
-                    hochgeladenText = d.toLocaleDateString('de-DE') + ' ' +
-                        String(d.getHours()).padStart(2,'0') + ':' +
-                        String(d.getMinutes()).padStart(2,'0');
-                } catch (e) { hochgeladenText = String(eintrag.hochgeladen_am); }
-            }
-
-            var statusFarbe = {
-                wartend:     'var(--accent-orange)',
-                freigegeben: 'var(--success)',
-                abgelehnt:   'var(--accent-red)'
-            }[eintrag.status] || 'var(--text-muted)';
-
-            var statusBg = {
-                wartend:     'rgba(230,126,34,0.10)',
-                freigegeben: 'rgba(39,174,96,0.10)',
-                abgelehnt:   'rgba(196,30,30,0.10)'
-            }[eintrag.status] || 'var(--bg-secondary)';
-
-            var statusLabel = {
-                wartend:     '🕐 Wartend',
-                freigegeben: '✓ Freigegeben',
-                abgelehnt:   '✗ Abgelehnt'
-            }[eintrag.status] || eintrag.status;
-
-            return (
-                <div style={{
-                    display: 'flex',
-                    gap: '10px',
-                    padding: '10px',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-sm)',
-                    alignItems: 'stretch'
-                }}>
-                    {/* PDF-Icon-Kachel */}
-                    <div style={{
-                        width: '88px',
-                        minWidth: '88px',
-                        height: '96px',
-                        background: 'linear-gradient(135deg, rgba(230,126,34,0.12), rgba(230,126,34,0.04))',
-                        border: '1px solid rgba(230,126,34,0.35)',
-                        borderRadius: 'var(--radius-sm)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        color: 'var(--accent-orange)'
-                    }}>
-                        <span style={{ fontSize: '32px' }}>📄</span>
-                        <div style={{
-                            fontSize: '9px',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontWeight: 700,
-                            letterSpacing: '1px'
-                        }}>PDF</div>
-                    </div>
-
-                    {/* Metadaten + Aktionen */}
-                    <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        minWidth: 0
-                    }}>
-                        <div style={{
-                            display: 'inline-flex',
-                            alignSelf: 'flex-start',
-                            fontSize: '9px',
-                            padding: '2px 7px',
-                            background: statusBg,
-                            color: statusFarbe,
-                            border: '1px solid ' + statusFarbe + '55',
-                            borderRadius: '3px',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontWeight: 600,
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase'
-                        }}>{statusLabel}</div>
-
-                        <div style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            fontFamily: "'Oswald', sans-serif",
-                            letterSpacing: '0.3px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}>{eintrag.dateiname || eintrag.staging_file_id || '(ohne Name)'}</div>
-
-                        <div style={{
-                            fontSize: '11px',
-                            color: 'var(--text-muted)',
-                            lineHeight: 1.4
-                        }}>
-                            <div>👤 {eintrag.ma_id || '–'}{eintrag.monat ? ' · ' + eintrag.monat : ''}</div>
-                            <div>🏗️ {eintrag.baustelle_id || '–'}</div>
-                            {(typeof eintrag.stunden_summe === 'number') && (
-                                <div style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-                                    ⏱ {eintrag.stunden_summe} Stunden gesamt
-                                </div>
-                            )}
-                            {eintrag.zeitraum_von && eintrag.zeitraum_bis && (
-                                <div>📅 {eintrag.zeitraum_von} – {eintrag.zeitraum_bis}</div>
-                            )}
-                            {eintrag.material_liste && (
-                                <div style={{ marginTop: '3px', fontStyle: 'italic' }}>
-                                    🧱 {eintrag.material_liste}
-                                </div>
-                            )}
-                            <div>🕐 Upload: {hochgeladenText || '–'}</div>
-                            {eintrag.status === 'freigegeben' && eintrag.anmerkung_buero && (
-                                <div style={{ marginTop: '3px', color: 'var(--text-primary)', fontStyle: 'italic' }}>
-                                    💬 Anmerkung: {eintrag.anmerkung_buero}
-                                </div>
-                            )}
-                            {eintrag.status === 'abgelehnt' && eintrag.abgelehnt_grund && (
-                                <div style={{ color: 'var(--accent-red)', marginTop: '3px', fontStyle: 'italic' }}>
-                                    Grund: {eintrag.abgelehnt_grund}
-                                </div>
-                            )}
-                        </div>
-
-                        {eintrag.status === 'wartend' && (
-                            <div style={{ display: 'flex', gap: '5px', marginTop: 'auto' }}>
-                                <button
-                                    onClick={onFreigeben}
-                                    disabled={busy}
-                                    style={{
-                                        flex: 1,
-                                        padding: '7px 10px',
-                                        background: busy ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #27ae60, #219a52)',
-                                        color: busy ? 'var(--text-muted)' : '#fff',
-                                        border: 'none',
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.3px',
-                                        cursor: busy ? 'not-allowed' : 'pointer',
-                                        touchAction: 'manipulation',
-                                        boxShadow: busy ? 'none' : '0 2px 6px rgba(39,174,96,0.30)'
-                                    }}
-                                >{busy ? '⏳...' : '✓ Freigeben'}</button>
-                                <button
-                                    onClick={onAblehnen}
-                                    disabled={busy}
-                                    style={{
-                                        flex: 1,
-                                        padding: '7px 10px',
-                                        background: busy ? 'var(--bg-secondary)' : 'rgba(196,30,30,0.15)',
-                                        color: busy ? 'var(--text-muted)' : 'var(--accent-red)',
-                                        border: '1px solid ' + (busy ? 'var(--border-color)' : 'rgba(196,30,30,0.40)'),
-                                        borderRadius: 'var(--radius-sm)',
-                                        fontFamily: "'Oswald', sans-serif",
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.3px',
-                                        cursor: busy ? 'not-allowed' : 'pointer',
-                                        touchAction: 'manipulation'
-                                    }}
-                                >✗ Ablehnen</button>
-                            </div>
-                        )}
-
-                        {eintrag.status === 'freigegeben' && eintrag.freigegeben_am && (
-                            <div style={{ fontSize: '10px', color: 'var(--success)', marginTop: 'auto', fontStyle: 'italic' }}>
-                                Freigegeben am {new Date(eintrag.freigegeben_am).toLocaleDateString('de-DE')}
-                                {eintrag.kunden_file_id && eintrag.lohn_file_id && ' · in Kunden + Lohn kopiert'}
-                            </div>
-                        )}
-                        {eintrag.status === 'abgelehnt' && eintrag.abgelehnt_am && (
-                            <div style={{ fontSize: '10px', color: 'var(--accent-red)', marginTop: 'auto', fontStyle: 'italic' }}>
-                                Abgelehnt am {new Date(eintrag.abgelehnt_am).toLocaleDateString('de-DE')}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        // ═══════════════════════════════════════════════════════
-        // ETAPPE 4.1 BAUSTEIN 10 — STUNDEN-FREIGEBEN-DIALOG
-        // Overlay beim Freigeben. Optional kann Thomas eine Anmerkung
-        // hinzufuegen, die im Firebase-Eintrag vermerkt wird (und
-        // bei Rueckfrage sichtbar bleibt).
-        // ═══════════════════════════════════════════════════════
-        function StundenFreigebenDialog({ eintrag, onBestaetigen, onSchliessen }) {
-            const [anmerkung, setAnmerkung] = useState('');
-
-            useEffect(function(){
-                function onKey(e) { if (e.key === 'Escape') onSchliessen(); }
-                window.addEventListener('keydown', onKey);
-                return function(){ window.removeEventListener('keydown', onKey); };
-            }, []);
-
-            return (
-                <div
-                    onClick={onSchliessen}
-                    style={{
-                        position: 'fixed',
-                        top: 0, left: 0, right: 0, bottom: 0,
-                        background: 'rgba(0,0,0,0.6)',
-                        zIndex: 10000,
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        justifyContent: 'center',
-                        padding: '40px 12px 20px',
-                        overflowY: 'auto'
-                    }}
-                >
-                    <div
-                        onClick={function(e){ e.stopPropagation(); }}
-                        style={{
-                            background: 'var(--bg-primary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-md)',
-                            width: '100%',
-                            maxWidth: '460px',
-                            padding: '18px',
-                            boxShadow: '0 12px 40px rgba(0,0,0,0.4)'
-                        }}
-                    >
-                        <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            marginBottom: '12px',
-                            gap: '10px'
-                        }}>
-                            <div>
-                                <div style={{
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    letterSpacing: '1px',
-                                    textTransform: 'uppercase',
-                                    color: 'var(--success)'
-                                }}>Stundenzettel freigeben</div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', lineHeight: 1.4 }}>
-                                    Das PDF wird in den Kunden-Stundennachweis<br/>UND in die Lohnbuchhaltung kopiert.
-                                </div>
-                            </div>
-                            <button
-                                onClick={onSchliessen}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: 'var(--text-muted)',
-                                    fontSize: '22px',
-                                    cursor: 'pointer',
-                                    padding: '0 4px',
-                                    lineHeight: 1
-                                }}
-                            >×</button>
-                        </div>
-
-                        {/* Infotabelle */}
-                        <div style={{
-                            padding: '10px 12px',
-                            background: 'var(--bg-secondary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-sm)',
-                            fontSize: '11px',
-                            color: 'var(--text-muted)',
-                            marginBottom: '14px',
-                            lineHeight: 1.6
-                        }}>
-                            <div>👤 <strong style={{color:'var(--text-primary)'}}>{eintrag.ma_id || '–'}</strong></div>
-                            <div>🏗️ <strong style={{color:'var(--text-primary)'}}>{eintrag.baustelle_id || '–'}</strong></div>
-                            {eintrag.monat && <div>📅 Monat: <strong style={{color:'var(--text-primary)'}}>{eintrag.monat}</strong></div>}
-                            {(typeof eintrag.stunden_summe === 'number') && (
-                                <div>⏱ Stunden: <strong style={{color:'var(--text-primary)'}}>{eintrag.stunden_summe}</strong></div>
-                            )}
-                            <div>📄 <strong style={{color:'var(--text-primary)'}}>{eintrag.dateiname || '(ohne Name)'}</strong></div>
-                        </div>
-
-                        <label style={{
-                            display: 'block',
-                            fontSize: '11px',
-                            fontFamily: "'Oswald', sans-serif",
-                            fontWeight: 600,
-                            letterSpacing: '1px',
-                            textTransform: 'uppercase',
-                            color: 'var(--text-muted)',
-                            marginBottom: '5px'
-                        }}>Anmerkung (optional)</label>
-                        <textarea
-                            value={anmerkung}
-                            onChange={function(e){ setAnmerkung(e.target.value); }}
-                            placeholder="z.B. Stunde am 15.04. manuell korrigiert von 8h auf 7,5h."
-                            rows={3}
-                            style={{
-                                width: '100%',
-                                padding: '10px 12px',
-                                background: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: 'var(--radius-sm)',
-                                fontSize: '13px',
-                                boxSizing: 'border-box',
-                                resize: 'vertical',
-                                fontFamily: 'inherit',
-                                marginBottom: '14px'
-                            }}
-                        />
-
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                            <button
-                                onClick={onSchliessen}
-                                style={{
-                                    padding: '10px 14px',
-                                    background: 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: 'pointer',
-                                    touchAction: 'manipulation'
-                                }}
-                            >Abbrechen</button>
-                            <button
-                                onClick={function(){ onBestaetigen((anmerkung || '').trim()); }}
-                                style={{
-                                    flex: 1,
-                                    padding: '10px 14px',
-                                    background: 'linear-gradient(135deg, #27ae60, #219a52)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontFamily: "'Oswald', sans-serif",
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    letterSpacing: '0.5px',
-                                    cursor: 'pointer',
-                                    touchAction: 'manipulation',
-                                    boxShadow: '0 2px 8px rgba(39,174,96,0.30)'
-                                }}
-                            >✓ Freigeben &amp; kopieren</button>
-                        </div>
-                    </div>
                 </div>
             );
         }
