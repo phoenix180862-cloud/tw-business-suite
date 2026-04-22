@@ -547,9 +547,9 @@
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
                     desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
-                    color: '#1E88E5',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
@@ -559,9 +559,9 @@
                     icon: '\uD83D\uDCBE',
                     title: 'Gespeicherte Kundendaten aufrufen',
                     desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
-                    color: '#1E88E5',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: 'OFFLINE',
                     disabled: false,
                     disabledHint: null,
@@ -571,9 +571,9 @@
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
-                    color: '#1E88E5',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: null,
                     disabled: false,
                     disabledHint: null,
@@ -3627,6 +3627,54 @@
             const lvPositionen = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
             const duplicates = findDuplicatePositions(lvPositionen);
 
+            // ═══ ETAPPE 8: Aktionen ins globale Bearbeiten-Dropdown einschleusen ═══
+            useEffect(function() {
+                var hasLast = !!lastRaumData;
+                var hasListe = !!(gesamtliste && gesamtliste.length > 0);
+                var hasSel = !!(selectedPositions && selectedPositions.length > 0);
+                var aktionen = [
+                    { label: 'Raum manuell eingeben', icon: '\u270F\uFE0F',
+                      onClick: function(){ setShowManual(true); } },
+                    { label: 'Baugleicher Raum anlegen', icon: '\uD83D\uDCCB',
+                      disabled: !hasLast,
+                      onClick: function(){
+                          if (!lastRaumData) return;
+                          setBgNr(''); setBgBez('');
+                          setBgGeschoss(lastRaumData.geschoss || '');
+                          setBgSonstiges('');
+                          setShowBaugleich(true);
+                      } },
+                    { label: 'Gesamtliste' + (hasListe ? ' (' + gesamtliste.length + ')' : ''), icon: '\uD83D\uDCCB',
+                      disabled: !hasListe,
+                      onClick: function(){ if (onShowGesamtliste) onShowGesamtliste(); } },
+                    { label: 'Liste speichern', icon: '\uD83D\uDCBE',
+                      disabled: !hasSel,
+                      onClick: function(){ setShowSaveListe(true); } },
+                    { label: 'Liste laden', icon: '\uD83D\uDCC2',
+                      onClick: function(){ setShowLoadListe(true); } },
+                    { type: 'divider' },
+                    { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
+                      onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); } },
+                    { label: 'Aufmassvorlage laden', icon: '\uD83D\uDCE5',
+                      onClick: function(){ if (window._openVorlagenListeHandler) window._openVorlagenListeHandler(); } }
+                ];
+                if (window._registerSeitenAktionen) {
+                    window._registerSeitenAktionen('raumerkennung', aktionen);
+                }
+                // Primaer-Aktion rechts (gruener Button): Aufmassvorlage speichern
+                if (window._registerPrimaerAktion) {
+                    window._registerPrimaerAktion('raumerkennung', {
+                        label: 'Aufmassvorlage speichern',
+                        icon: '\uD83D\uDCE4',
+                        onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); }
+                    });
+                }
+                return function() {
+                    if (window._unregisterSeitenAktionen) window._unregisterSeitenAktionen('raumerkennung');
+                    if (window._unregisterPrimaerAktion) window._unregisterPrimaerAktion('raumerkennung');
+                };
+            }, [lastRaumData, gesamtliste, selectedPositions, onShowGesamtliste]);
+
             // ═══ Auto-Fill: Wenn Vorraum-Daten existieren, Höhen-Felder automatisch vorausfüllen ═══
             useEffect(() => {
                 if (!lastRaumData) return;
@@ -3943,48 +3991,9 @@
                     <div className="page-title">Raumerkennung</div>
                     <div className="page-subtitle">Räume aus Zeichnungen, LV und Raumbuch ermittelt</div>
 
-                    {/* ═══ ROTE AKTIONS-NAVIGATION (Raum manuell / Baugleich / Gesamtliste / Liste speichern / Liste laden) ═══ */}
-                    <div className="rb-nav-red" style={{
-                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'8px', flexWrap:'wrap'
-                    }}>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            onClick={() => setShowManual(true)}>
-                            Raum manuell eingeben
-                        </button>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            disabled={!lastRaumData}
-                            style={{opacity: !lastRaumData ? 0.4 : 1, cursor: !lastRaumData ? 'not-allowed' : 'pointer'}}
-                            title={!lastRaumData ? 'Erst muss ein Raum fertiggestellt werden' : ''}
-                            onClick={() => {
-                                if (!lastRaumData) return;
-                                setBgNr(''); setBgBez('');
-                                setBgGeschoss(lastRaumData.geschoss || '');
-                                setBgSonstiges('');
-                                setShowBaugleich(true);
-                            }}>
-                            Baugleicher Raum anlegen
-                        </button>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            disabled={!gesamtliste || gesamtliste.length === 0}
-                            style={{opacity: (!gesamtliste || gesamtliste.length === 0) ? 0.4 : 1, cursor: (!gesamtliste || gesamtliste.length === 0) ? 'not-allowed' : 'pointer'}}
-                            title={(!gesamtliste || gesamtliste.length === 0) ? 'Noch kein Raum fertiggestellt' : ''}
-                            onClick={onShowGesamtliste}>
-                            Gesamtliste{gesamtliste && gesamtliste.length > 0 ? ' (' + gesamtliste.length + ')' : ''}
-                        </button>
-                        {/* PAKET C: Bearbeitete Listen speichern + aufrufen */}
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            disabled={!selectedPositions || selectedPositions.length === 0}
-                            style={{opacity: (!selectedPositions || selectedPositions.length === 0) ? 0.4 : 1, cursor: (!selectedPositions || selectedPositions.length === 0) ? 'not-allowed' : 'pointer'}}
-                            title={(!selectedPositions || selectedPositions.length === 0) ? 'Erst Positionen auswaehlen' : 'Aktuelle Positionsliste speichern (mit Raumzuordnung oder als Vorlage)'}
-                            onClick={() => setShowSaveListe(true)}>
-                            {'\uD83D\uDCBE'} Liste speichern
-                        </button>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            onClick={() => setShowLoadListe(true)}
-                            title="Gespeicherte Positionsliste laden">
-                            {'\uD83D\uDCC2'} Liste laden
-                        </button>
-                    </div>
+                    {/* ═══ ETAPPE 8: Die frueheren 5 roten Aktions-Buttons (Raum manuell / Baugleich /
+                        Gesamtliste / Liste speichern / Liste laden) wurden in die globale ActionsBar
+                        (Bearbeiten-Dropdown oberhalb der Schnellnavi) verschoben. ═══ */}
 
                     {erkannteRaeume.length > 0 && (
                         <div className="raumerkennung-info">
@@ -7302,6 +7311,73 @@
                 onBack();
             };
 
+            // ═══ ETAPPE 8: Raumblatt-Aktionen ins globale Bearbeiten-Dropdown einschleusen ═══
+            useEffect(function() {
+                var posOkCount = posCards ? posCards.filter(function(p){ return calcPositionResult(p) > 0; }).length : 0;
+                var posTotalCount = posCards ? posCards.length : 0;
+
+                // Sub-Menue "Aktionen" - die frueher roten Buttons
+                var subAktionen = [
+                    { label: 'Zurueck', icon: '\u21A9',
+                      onClick: function(){ doZurueckZurRaumerkennung(); } },
+                    { label: 'Gesamtliste', icon: '\uD83D\uDCCB',
+                      disabled: !onShowGesamtliste,
+                      onClick: function(){ if (onShowGesamtliste) onShowGesamtliste(); } },
+                    { label: 'Raumblatt berechnen', icon: '\uD83D\uDCD0',
+                      onClick: function(){ setCalcModalOpen(true); } },
+                    { label: 'Raumblatt fertigstellen', icon: '\u2714',
+                      disabled: !onFinishRaum,
+                      onClick: function(){ if (onFinishRaum) doRaumblattFertigstellen(); } },
+                    { label: 'Aufmass fertigstellen', icon: '\uD83C\uDFC1',
+                      disabled: !onAufmassBeenden,
+                      onClick: function(){ if (onAufmassBeenden) doAufmassFertigstellen(); } }
+                ];
+
+                // Sub-Menue "Tabs" - die frueher blauen Tab-Buttons
+                var subTabs = [
+                    { label: 'Grundriss' + (rbTab === 0 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(0); } },
+                    { label: 'Fotos - Waende' + (rbTab === 1 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(1); } },
+                    { label: 'Fotos Objekt' + (rbTab === 4 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(4); } },
+                    { label: 'Oeffnungen' + (rbTab === 2 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(2); } },
+                    { label: 'Pos. (' + posOkCount + '/' + posTotalCount + ')' + (rbTab === 3 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(3); } },
+                    { type: 'divider' },
+                    { label: 'Waende: ' + wandAnzahl,
+                      onClick: function(){ setWandAnzahlPopupOpen(true); } },
+                    { label: 'Masse kopieren: ' + (masseKopieren ? 'JA' : 'NEIN'),
+                      onClick: function(){ setMasseKopieren(!masseKopieren); } }
+                ];
+
+                var aktionen = [
+                    { type: 'submenu', label: 'Aktionen', icon: '\u2699', items: subAktionen },
+                    { type: 'submenu', label: 'Tabs', icon: '\uD83D\uDDC2', items: subTabs },
+                    { type: 'divider' },
+                    { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
+                      onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); } },
+                    { label: 'Aufmassvorlage laden', icon: '\uD83D\uDCE5',
+                      onClick: function(){ if (window._openVorlagenListeHandler) window._openVorlagenListeHandler(); } }
+                ];
+                if (window._registerSeitenAktionen) {
+                    window._registerSeitenAktionen('raumblatt', aktionen);
+                }
+                // Primaer-Aktion rechts (gruener Button): Raumblatt berechnen
+                if (window._registerPrimaerAktion) {
+                    window._registerPrimaerAktion('raumblatt', {
+                        label: 'Raumblatt berechnen',
+                        icon: '\uD83D\uDCD0',
+                        onClick: function(){ setCalcModalOpen(true); }
+                    });
+                }
+                return function() {
+                    if (window._unregisterSeitenAktionen) window._unregisterSeitenAktionen('raumblatt');
+                    if (window._unregisterPrimaerAktion) window._unregisterPrimaerAktion('raumblatt');
+                };
+            }, [rbTab, wandAnzahl, masseKopieren, hasUnsavedChanges, posCards, onShowGesamtliste, onFinishRaum, onAufmassBeenden]);
+
             // ── WIP-Speicherung: Aktuellen Bildschirm-Stand einsammeln ──
             // Ref wird bei jedem Render aktualisiert, Listener selbst nur einmal registriert
             const wipCollectorRef = React.useRef(null);
@@ -9142,57 +9218,11 @@
                     {/* ═══ STICKY WRAPPER fuer beide Leisten ═══ */}
                     <div style={{position:'sticky', top:'95px', zIndex:98, background:'var(--bg-primary)', paddingBottom:'4px', borderBottom:'1px solid var(--border-subtle)'}}>
 
-                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raumblatt berechnen, Raumblatt fertig stellen, Aufmass fertigstellen) ═══ */}
-                    <div className="rb-nav-red" style={{
-                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'2px'
-                    }}>
-                        {onBack && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doZurueckZurRaumerkennung}>Zurueck</button>
-                        )}
-                        {onShowGesamtliste && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { onShowGesamtliste(); }}>Gesamtliste</button>
-                        )}
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            style={{background:'linear-gradient(135deg, #4a7a3e, #5d9150)', color:'#ffffff'}}
-                            onClick={function() { setCalcModalOpen(true); }}>
-                            {'\uD83D\uDCD0'} Raumblatt berechnen
-                        </button>
-                        {onFinishRaum && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doRaumblattFertigstellen}>Raumblatt fertig stellen</button>
-                        )}
-                        {onAufmassBeenden && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doAufmassFertigstellen}>Aufmass fertigstellen</button>
-                        )}
-                    </div>
-
-                    {/* ═══ LEISTE 3: BLAUE TAB-NAVIGATION (6 Buttons in 1 Reihe) ═══ */}
-                    <div className="rb-nav-blue" style={{
-                        display:'flex', gap:'3px', padding:'4px 0'
-                    }}>
-                        {[
-                            {id: 0, label: 'Grundriss'},
-                            {id: 1, label: 'Fotos - Waende'},
-                            {id: 4, label: 'Fotos Objekt'},
-                            {id: 2, label: 'Oeffnungen'},
-                            {id: 3, label: 'Pos. (' + posCards.filter(function(p) { return calcPositionResult(p) > 0; }).length + '/' + posCards.length + ')'}
-                        ].map(function(tab) {
-                            return (
-                                <button key={tab.id}
-                                    className={'rb-nav-btn rb-nav-blue-btn' + (rbTab === tab.id ? ' active' : '')}
-                                    onClick={function() { handleTabChange(tab.id); }}>
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                        <button className="rb-nav-btn rb-nav-blue-btn"
-                            onClick={function() { setWandAnzahlPopupOpen(true); }}>
-                            Waende: {wandAnzahl}
-                        </button>
-                        <button className={'rb-nav-btn rb-nav-blue-btn' + (masseKopieren ? ' active' : '')}
-                            onClick={function() { setMasseKopieren(!masseKopieren); }}>
-                            Masse kop. {masseKopieren ? 'JA' : 'NEIN'}
-                        </button>
-                    </div>
+                    {/* ═══ ETAPPE 8: Die beiden frueheren Leisten (rote Aktionen + blaue Tabs)
+                        wurden in die globale ActionsBar verschoben:
+                        - Bearbeiten-Dropdown enthaelt Sub-Menues "Aktionen" und "Tabs"
+                        - Primaer-Aktion "Raumblatt berechnen" ist der gruene Button rechts.
+                        Die sticky Wrapper-Box bleibt fuer die darunter liegenden Inhalte leer sichtbar. ═══ */}
                     </div>{/* Ende Sticky Wrapper */}
 
                     {/* Save-Status Toast */}

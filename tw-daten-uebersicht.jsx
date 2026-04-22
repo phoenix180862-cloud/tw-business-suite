@@ -161,21 +161,20 @@
                         <div style={{fontSize:'12px', color:'var(--text-muted)', marginTop:'4px'}}>{stammFelder.objekt_bauvorhaben || 'Projekt'}</div>
                     </div>
                     {savedMsg && (<div style={{padding:'10px 16px', background:'rgba(30,136,229,0.12)', border:'1px solid rgba(30,136,229,0.3)', borderRadius:'10px', marginBottom:'12px', fontSize:'13px', color:'#1E88E5', fontWeight:'600', textAlign:'center'}}>{savedMsg}</div>)}
-                    {/* ETAPPE 3: 4 Buttons in EINER Reihe (3 Tabs + Bearbeiten-Button), alle blau, gleiche Breite */}
-                    <div style={{display:'flex', gap:'4px', marginBottom:'16px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
+                    <div style={{display:'flex', gap:'4px', marginBottom:'12px', background:'var(--bg-secondary)', borderRadius:'12px', padding:'4px'}}>
                         {tabs.map(function(tab) { var isActive = activeTab === tab.id; return (
-                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 4px', borderRadius:'10px', border: isActive ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: isActive ? 'linear-gradient(135deg, #42a5f5, #1E88E5)' : 'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'11px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease', boxShadow: isActive ? '0 0 12px rgba(30,136,229,0.5), inset 0 1px 0 rgba(255,255,255,0.2)' : '0 2px 6px rgba(30,136,229,0.2)', opacity: isActive ? 1 : 0.75, textShadow: isActive ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', transform: isActive ? 'scale(1.02)' : 'scale(1)' }, touchBase)}>
-                                <span style={{fontSize:'15px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
-                                {tab.label}{tab.count !== null && <span style={{marginLeft:'3px', fontSize:'9px', opacity:0.8}}>({tab.count})</span>}
+                            <button key={tab.id} {...tap(function(){ setActiveTab(tab.id); })} style={Object.assign({ flex:1, padding:'10px 8px', borderRadius:'10px', border: isActive ? '1px solid rgba(255,255,255,0.25)' : 'none', cursor:'pointer', background: isActive ? 'linear-gradient(135deg, #42a5f5, #1E88E5)' : 'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'12px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease', boxShadow: isActive ? '0 0 12px rgba(30,136,229,0.5), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', opacity: isActive ? 1 : 0.55, textShadow: isActive ? '0 0 6px rgba(255,255,255,0.5)' : '0 1px 2px rgba(0,0,0,0.3)', transform: isActive ? 'scale(1.04)' : 'scale(1)' }, touchBase)}>
+                                <span style={{fontSize:'16px', display:'block', marginBottom:'2px'}}>{tab.icon}</span>
+                                {tab.label}{tab.count !== null && <span style={{marginLeft:'4px', fontSize:'10px', opacity:0.8}}>({tab.count})</span>}
                             </button>
                         ); })}
-                        {/* 4. Button: Bearbeiten / Beenden - gleiche Breite wie die Tab-Buttons */}
-                        <button {...tap(function(){ if (!editMode) { setEditMode(true); } else { handleSave(); } })}
-                            title={!editMode ? 'Bearbeitung beginnen' : 'Bearbeitung beenden und Daten in Module laden'}
-                            style={Object.assign({ flex:1, padding:'10px 4px', borderRadius:'10px', border: editMode ? '1px solid rgba(230,126,34,0.6)' : 'none', cursor:'pointer', background: editMode ? 'linear-gradient(135deg, #f39c12, #e67e22)' : 'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'11px', fontWeight:'700', textAlign:'center', transition:'all 0.15s ease', boxShadow: editMode ? '0 0 12px rgba(230,126,34,0.5), inset 0 1px 0 rgba(255,255,255,0.2)' : '0 2px 6px rgba(30,136,229,0.2)', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }, touchBase)}>
-                            <span style={{fontSize:'15px', display:'block', marginBottom:'2px'}}>{editMode ? '\uD83D\uDCBE' : '\u270E'}</span>
-                            {editMode ? 'Beenden' : 'Bearbeiten'}
-                        </button>
+                    </div>
+                    <div style={{display:'flex', gap:'8px', marginBottom:'16px'}}>
+                        {!editMode ? (
+                            <button {...tap(function(){ setEditMode(true); })} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beginnen</button>
+                        ) : (
+                            <button {...tap(handleSave)} style={Object.assign({ flex:1, padding:'14px', borderRadius:'12px', border:'none', cursor:'pointer', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'white', fontSize:'14px', fontWeight:'700', boxShadow:'0 4px 12px rgba(30,136,229,0.3)' }, touchBase)}>Bearbeitung beenden &amp; Daten in Module laden</button>
+                        )}
                     </div>
                     {editMode && (
                         <div style={{padding:'8px 12px', marginBottom:'12px', background:'rgba(46,204,113,0.10)', border:'1px solid rgba(46,204,113,0.25)', borderRadius:'8px', fontSize:'11px', color:'#27ae60', textAlign:'center', fontStyle:'italic'}}>
