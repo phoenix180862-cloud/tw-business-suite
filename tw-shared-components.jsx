@@ -2181,7 +2181,9 @@
             );
         }
 
-        /* Haupt-Eintrag mit optionalem Sub-Panel -- eigene Komponente */
+        /* Haupt-Eintrag mit optionalem Sub-Panel -- eigene Komponente.
+           Sub-Panel wird via React Portal in document.body gerendert, um
+           overflow-Clipping des Parent-Panels zu umgehen. */
         function AktionItem(props) {
             var a = props.action;
             var align = props.align || 'right';
@@ -2193,6 +2195,53 @@
             var subItems = a._subItems || [];
             var hasSub = subItems.length > 0;
             var subOpen = hasSub && openSubId === myId;
+            var btnRef = useRef(null);
+            var [subPos, setSubPos] = useState(null);
+
+            /* Position des Sub-Panels berechnen wenn es oeffnet, + bei Resize/Scroll updaten */
+            useEffect(function() {
+                if (!subOpen || !btnRef.current) { setSubPos(null); return undefined; }
+                var calcPos = function() {
+                    if (!btnRef.current) return;
+                    var r = btnRef.current.getBoundingClientRect();
+                    var vw = window.innerWidth;
+                    var vh = window.innerHeight;
+                    var panelW = 240; // geschaetzte Breite
+                    var gap = 6;
+                    var pos = { top: r.top };
+                    /* Position: vorzugsweise auf der gegenueberliegenden Seite des Haupt-Panels */
+                    if (align === 'right') {
+                        /* Haupt-Panel rechts-ausgerichtet -> Sub nach links */
+                        var leftSide = r.left - panelW - gap;
+                        if (leftSide < 8) {
+                            /* Nicht genug Platz links -> rechts oeffnen */
+                            pos.left = r.right + gap;
+                        } else {
+                            pos.left = leftSide;
+                        }
+                    } else {
+                        /* Haupt-Panel links-ausgerichtet -> Sub nach rechts */
+                        var rightSide = r.right + gap;
+                        if (rightSide + panelW > vw - 8) {
+                            /* Nicht genug Platz rechts -> links oeffnen */
+                            pos.left = Math.max(8, r.left - panelW - gap);
+                        } else {
+                            pos.left = rightSide;
+                        }
+                    }
+                    /* Vertikale Begrenzung: nicht unter den Viewport */
+                    var maxHeight = vh - pos.top - 16;
+                    pos.maxHeight = Math.max(160, maxHeight);
+                    setSubPos(pos);
+                };
+                calcPos();
+                window.addEventListener('resize', calcPos);
+                window.addEventListener('scroll', calcPos, true);
+                return function() {
+                    window.removeEventListener('resize', calcPos);
+                    window.removeEventListener('scroll', calcPos, true);
+                };
+            }, [subOpen, align]);
 
             var getBg = function() {
                 if (disabled) return 'rgba(120,120,120,0.15)';
@@ -2220,22 +2269,28 @@
                 transition: 'background 0.12s ease, filter 0.12s ease',
             };
 
-            /* Sub-Panel links oder rechts oeffnen je nach align */
-            var subPanelPos = align === 'right'
-                ? { right: 'calc(100% + 6px)' }
-                : { left: 'calc(100% + 6px)' };
-            var subPanelStyle = Object.assign({
-                position: 'absolute', top: 0,
-                background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)',
-                borderRadius: '10px', boxShadow: '0 8px 20px rgba(0,0,0,0.55)',
-                padding: '6px', minWidth: '210px', zIndex: 1010,
-                display: 'flex', flexDirection: 'column', gap: '3px',
-            }, subPanelPos);
+            var subPanelStyle = subPos ? {
+                position: 'fixed',
+                top: subPos.top + 'px',
+                left: subPos.left + 'px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
+                padding: '6px',
+                minWidth: '220px',
+                maxWidth: 'calc(100vw - 16px)',
+                maxHeight: subPos.maxHeight + 'px',
+                overflowY: 'auto',
+                zIndex: 10000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            } : null;
 
             var handleClick = function() {
                 if (disabled) return;
                 if (hasSub) {
-                    // Toggle: Wenn ich offen bin -> zu. Sonst mich oeffnen (anderen zu).
                     setOpenSubId(subOpen ? null : myId);
                     return;
                 }
@@ -2246,7 +2301,8 @@
 
             return (
                 <div style={{position:'relative'}}>
-                    <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                    <button ref={btnRef}
+                        type="button" role="menuitem" className="tw-aktion-dropdown-item"
                         disabled={disabled} style={btnStyle}
                         onClick={handleClick}
                         onMouseOver={function(e) {
@@ -2263,12 +2319,15 @@
                         <span style={{flex:1}}>{a.label}</span>
                         {hasSub && <span style={{fontSize:'11px', opacity:0.75, transform: subOpen ? 'rotate(90deg)' : 'none', transition:'transform 0.15s ease'}}>{'\u25B6'}</span>}
                     </button>
-                    {hasSub && subOpen && (
-                        <div className="tw-dropdown-panel tw-aktion-sub-panel" style={subPanelStyle} role="menu">
+                    {hasSub && subOpen && subPanelStyle && typeof document !== 'undefined' && ReactDOM.createPortal(
+                        <div data-tw-aktion-sub="true"
+                            className="tw-dropdown-panel tw-aktion-sub-panel"
+                            style={subPanelStyle} role="menu">
                             {subItems.map(function(si, i) {
                                 return <AktionSubItem key={si.id || si.label || i} item={si} onClose={handleSubClose} />;
                             })}
-                        </div>
+                        </div>,
+                        document.body
                     )}
                 </div>
             );
@@ -2295,7 +2354,12 @@
             useEffect(function() {
                 if (!open) return undefined;
                 var handler = function(e) {
-                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); }
+                    if (!wrapperRef.current) return;
+                    /* Klick innerhalb des Haupt-Wrappers -> nix tun */
+                    if (wrapperRef.current.contains(e.target)) return;
+                    /* Klick im Sub-Panel-Portal -> ebenfalls nix tun */
+                    if (e.target && e.target.closest && e.target.closest('[data-tw-aktion-sub]')) return;
+                    setOpen(false);
                 };
                 var keyHandler = function(e) { if (e.key === 'Escape') { setOpen(false); } };
                 document.addEventListener('mousedown', handler);
