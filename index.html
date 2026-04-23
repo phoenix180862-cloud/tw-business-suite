@@ -2537,6 +2537,7 @@
                 ' @keyframes tw-nav-drop-in-left { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }' +
+                ' @keyframes tw-badge-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); box-shadow: 0 0 18px rgba(196,30,30,0.85); } }' +
                 ' .tw-dropdown-panel { max-height: calc(100vh - 140px); overflow-y: auto; -webkit-overflow-scrolling: touch; }' +
                 ' .tw-dropdown-panel::-webkit-scrollbar { width: 6px; }' +
                 ' .tw-dropdown-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }' +
@@ -2581,11 +2582,41 @@
                     setGeminiStatus('saved');
                     GEMINI_CONFIG.API_KEY = key;
                 }
-                // Drive Check
-                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
-                    setDriveConnected(true);
-                    if (onDriveStatusChange) onDriveStatusChange('online');
-                }
+                // ── Drive Auto-Init: Versucht gespeicherten Token aus localStorage zu laden ──
+                // Falls noch gueltig -> automatisch angemeldet ohne Popup.
+                // Falls abgelaufen -> Silent-Refresh ohne Consent-Popup.
+                (async function() {
+                    try {
+                        var service = window.GoogleDriveService;
+                        if (!service) return;
+                        // Init aufrufen -- das laedt den Token aus localStorage wenn noch gueltig
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Wenn jetzt Token da ist -> verbunden
+                        if (service.accessToken) {
+                            setDriveConnected(true);
+                            if (onDriveStatusChange) onDriveStatusChange('online');
+                            return;
+                        }
+                        // Falls kein Token aber schonmal angemeldet war -> Silent-Refresh versuchen
+                        if (localStorage.getItem('tw_gdrive_token_v1') !== null ||
+                            localStorage.getItem('tw_gdrive_was_connected') === '1') {
+                            try {
+                                await service._silentRefresh();
+                                if (service.accessToken) {
+                                    setDriveConnected(true);
+                                    if (onDriveStatusChange) onDriveStatusChange('online');
+                                }
+                            } catch(e) {
+                                // Silent-Refresh fehlgeschlagen -- User muss manuell neu verbinden
+                                console.log('Silent-Refresh nicht moeglich:', e.message);
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Drive Auto-Init Fehler:', e);
+                    }
+                })();
             }, []);
 
             var testGeminiKey = async function() {
@@ -2632,9 +2663,16 @@
                 try {
                     var service = window.GoogleDriveService;
                     if (!service.accessToken) {
-                        await service.init();
-                        await service.requestAuth();
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Falls init bereits Token geladen hat -> fertig
+                        if (!service.accessToken) {
+                            await service.requestAuth();
+                        }
                     }
+                    // Marker setzen, dass User schonmal verbunden war -> aktiviert silent-refresh beim naechsten Start
+                    try { localStorage.setItem('tw_gdrive_was_connected', '1'); } catch(e){}
                     setDriveConnected(true);
                     setDriveConnecting(false);
                     if (onDriveStatusChange) onDriveStatusChange('online');
@@ -18797,9 +18835,15 @@
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
+            if (subpage === 'nachrichten') {
+                return <NachrichtenStartseite
+                    onBack={function(){ setSubpage('start'); }}
+                />;
+            }
 
             // ════════════════════════════════════════════════════
-            // STARTSEITE: 5 grosse blaue Buttons (Etappe 4.1 B9)
+            // STARTSEITE: 6 grosse blaue Buttons
+            // (Etappe 4.1 B9 + Nachrichten)
             // ════════════════════════════════════════════════════
             return <BaustellenAppStartseite
                 kunde={kunde}
@@ -18810,6 +18854,7 @@
                 onSync={function(){ setSubpage('sync'); }}
                 onHauptkalender={function(){ setSubpage('hauptkalender'); }}
                 onFreigaben={function(){ setSubpage('freigaben'); }}
+                onNachrichten={function(){ setSubpage('nachrichten'); }}
                 onBack={onBack}
             />;
         }
@@ -18820,7 +18865,7 @@
         //   BAUSTELLEN - TEAM - SYNC - HAUPTKALENDER - FREIGABEN
         // HAUPTKALENDER kam in B7 dazu, FREIGABEN in B9.
         // ═══════════════════════════════════════════════════════
-        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onBack }) {
+        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onBack }) {
             // Wartende Foto-Freigaben zaehlen (Live-Listener, fuer Badge)
             const [fotoPending, setFotoPending] = useState(0);
             useEffect(function(){
@@ -18833,6 +18878,31 @@
                         }
                     }
                     setFotoPending(n);
+                });
+                return unsub;
+            }, [fbOk]);
+
+            // Ungelesene Nachrichten zaehlen (alle Threads, von 'ma')
+            const [nachrichtenUngelesen, setNachrichtenUngelesen] = useState(0);
+            const [nachrichtenDringend, setNachrichtenDringend] = useState(0);
+            useEffect(function(){
+                if (!fbOk || !window.FirebaseService || !window.FirebaseService.subscribeAlleChats) return;
+                var unsub = window.FirebaseService.subscribeAlleChats(function(data){
+                    var total = 0, dringend = 0;
+                    for (var maId in data) {
+                        if (!data.hasOwnProperty(maId)) continue;
+                        var thread = data[maId];
+                        for (var nk in thread) {
+                            if (!thread.hasOwnProperty(nk)) continue;
+                            var n = thread[nk];
+                            if (n && n.von === 'ma' && !n.gelesen) {
+                                total++;
+                                if (n.dringend) dringend++;
+                            }
+                        }
+                    }
+                    setNachrichtenUngelesen(total);
+                    setNachrichtenDringend(dringend);
                 });
                 return unsub;
             }, [fbOk]);
@@ -18877,6 +18947,15 @@
                     desc: 'Review-Queue: Fotos der Mitarbeiter pruefen und in die Kunden-Ordner freigeben oder ablehnen.',
                     onClick: onFreigaben,
                     badge: fotoPending > 0 ? String(fotoPending) : null
+                },
+                {
+                    id: 'nachrichten',
+                    icon: '💬',
+                    title: 'Nachrichten',
+                    desc: 'Chat mit allen Mitarbeitern: Kalender, direkte Kommunikation, Dringlichkeits-Benachrichtigungen.',
+                    onClick: onNachrichten,
+                    badge: nachrichtenUngelesen > 0 ? String(nachrichtenUngelesen) : null,
+                    badgeDringend: nachrichtenDringend > 0
                 }
             ];
 
@@ -19044,16 +19123,18 @@
                                             position: 'absolute',
                                             top: 0,
                                             right: 0,
-                                            background: 'var(--accent-orange)',
+                                            background: c.badgeDringend ? 'var(--accent-red)' : 'var(--accent-orange)',
                                             color: '#fff',
                                             padding: '3px 10px',
                                             borderRadius: '0 var(--radius-lg) 0 10px',
                                             fontSize: '11px',
                                             fontWeight: 700,
                                             letterSpacing: '0.5px',
-                                            fontFamily: "'Oswald', sans-serif"
+                                            fontFamily: "'Oswald', sans-serif",
+                                            animation: c.badgeDringend ? 'tw-badge-pulse 1.2s ease-in-out infinite' : 'none',
+                                            boxShadow: c.badgeDringend ? '0 0 12px rgba(196,30,30,0.6)' : 'none'
                                         }}>
-                                            {c.badge}
+                                            {c.badgeDringend ? '\uD83D\uDD14 ' : ''}{c.badge}
                                         </div>
                                     )}
                                 </button>
@@ -23951,6 +24032,65 @@
                     <button onClick={onBack} style={{padding:'12px 32px', background: color, color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:'600', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)'}}>
                         ← Zurueck zur Modulwahl
                     </button>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // NACHRICHTEN-STARTSEITE (von Baustellen-App Hauptstartseite)
+        // Eigener Wrapper mit Header + Zurueck, nutzt intern NachrichtenBereich.
+        // Im Gegensatz zu StagingDetail-Variante nicht baustellen-spezifisch,
+        // sondern uebergreifender Chat-Hub ueber alle Mitarbeiter.
+        // ═══════════════════════════════════════════════════════
+        function NachrichtenStartseite({ onBack }) {
+            return (
+                <div className="page-container" style={{
+                    padding: '16px',
+                    minHeight: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}>
+                    {/* Header mit Zurueck + Titel */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginBottom: '18px'
+                    }}>
+                        <button onClick={onBack} style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            fontSize: '22px',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            touchAction: 'manipulation'
+                        }}>{'\u2190'}</button>
+                        <div style={{ flex: 1 }}>
+                            <div style={{
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '18px',
+                                fontWeight: 600,
+                                letterSpacing: '1.5px',
+                                textTransform: 'uppercase',
+                                color: 'var(--text-primary)'
+                            }}>
+                                {'\uD83D\uDCAC'} Nachrichten
+                            </div>
+                            <div style={{
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                                marginTop: '2px'
+                            }}>
+                                Chat mit allen Mitarbeitern
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Der bereits existierende Nachrichten-Bereich */}
+                    <div style={{ flex: 1 }}>
+                        <NachrichtenBereich baustelleName={null} />
+                    </div>
                 </div>
             );
         }
@@ -30426,6 +30566,138 @@
                     window._unregisterSeitenAktionen = null;
                     window._registerPrimaerAktion = null;
                     window._unregisterPrimaerAktion = null;
+                };
+            }, []);
+
+            // ══════════════════════════════════════════════════════════
+            // GLOBALER DRINGLICHKEITS-ALARM (Baustellen-App Nachrichten)
+            // Hoert auf ALLE Chats und triggert Sound + Notification wenn
+            // eine neue dringende MA-Nachricht eingeht.
+            //
+            // Logik:
+            //   - Referenz-Timestamp im localStorage ('tw_dringend_seen_ts')
+            //   - Nur Nachrichten mit timestamp > seen_ts + dringend + von 'ma' + !gelesen alarmen
+            //   - Bei Alarm: Sound (Web Audio API), Browser-Notification, Toast
+            //   - seen_ts wird nach jedem Scan aktualisiert
+            //   - Wartet bis Firebase verfuegbar ist (polling, max. 60s)
+            // ══════════════════════════════════════════════════════════
+            useEffect(function() {
+                var unsubAlarm = null;
+                var pollTimer = null;
+                var pollCount = 0;
+                var audioCtx = null;
+
+                // Web Audio API: kurzer Alarm-Beep ohne externe Datei
+                var playAlarmSound = function() {
+                    try {
+                        if (!audioCtx) {
+                            var AC = window.AudioContext || window.webkitAudioContext;
+                            if (!AC) return;
+                            audioCtx = new AC();
+                        }
+                        if (audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
+                        // Drei schnelle Pieptoene (880Hz -> 988Hz -> 1175Hz) fuer klares Alarm-Muster
+                        var now = audioCtx.currentTime;
+                        [[880, 0.00], [988, 0.15], [1175, 0.30]].forEach(function(pair) {
+                            var osc = audioCtx.createOscillator();
+                            var gain = audioCtx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.value = pair[0];
+                            gain.gain.setValueAtTime(0.0001, now + pair[1]);
+                            gain.gain.exponentialRampToValueAtTime(0.25, now + pair[1] + 0.02);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + pair[1] + 0.13);
+                            osc.connect(gain); gain.connect(audioCtx.destination);
+                            osc.start(now + pair[1]);
+                            osc.stop(now + pair[1] + 0.14);
+                        });
+                    } catch(e) { console.warn('Alarm-Sound Fehler:', e); }
+                };
+
+                // Browser-Notification (falls erlaubt)
+                var showNotification = function(absenderName, text) {
+                    try {
+                        if (!('Notification' in window)) return;
+                        if (Notification.permission === 'granted') {
+                            new Notification('🔔 Dringende Nachricht von ' + (absenderName || 'Mitarbeiter'), {
+                                body: (text || '').substring(0, 140),
+                                tag: 'tw-dringend',
+                                requireInteraction: true
+                            });
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission();
+                        }
+                    } catch(e) {}
+                };
+
+                var handleChatData = function(data) {
+                    if (!data) return;
+                    var seenTs = parseInt(localStorage.getItem('tw_dringend_seen_ts') || '0', 10) || 0;
+                    var maxTs = seenTs;
+                    var neueDringende = [];
+                    for (var maId in data) {
+                        if (!data.hasOwnProperty(maId)) continue;
+                        var thread = data[maId];
+                        for (var nk in thread) {
+                            if (!thread.hasOwnProperty(nk)) continue;
+                            var n = thread[nk];
+                            if (!n || !n.timestamp) continue;
+                            if (n.timestamp > maxTs) maxTs = n.timestamp;
+                            if (n.dringend && n.von === 'ma' && !n.gelesen && n.timestamp > seenTs) {
+                                neueDringende.push({ maId: maId, nachricht: n });
+                            }
+                        }
+                    }
+                    if (neueDringende.length > 0) {
+                        var erste = neueDringende[0];
+                        var absender = erste.nachricht.absender_name || erste.nachricht.absender || 'Mitarbeiter';
+                        var text = erste.nachricht.text_original || erste.nachricht.text || '';
+                        playAlarmSound();
+                        showNotification(absender, text);
+                        if (window._showToast) {
+                            var msg = neueDringende.length === 1
+                                ? '🔔 Dringend von ' + absender + ': ' + text.substring(0, 80)
+                                : '🔔 ' + neueDringende.length + ' dringende Nachrichten eingegangen';
+                            window._showToast(msg, 'error');
+                        }
+                    }
+                    // Scan-Marker aktualisieren, damit derselbe Alarm nicht mehrfach feuert
+                    if (maxTs > seenTs) {
+                        try { localStorage.setItem('tw_dringend_seen_ts', String(maxTs)); } catch(e) {}
+                    }
+                };
+
+                var startListener = function() {
+                    if (!window.FirebaseService || !window.FirebaseService.db || !window.FirebaseService.subscribeAlleChats) {
+                        return false;
+                    }
+                    try {
+                        unsubAlarm = window.FirebaseService.subscribeAlleChats(handleChatData);
+                        // Browser-Notification-Permission proaktiv anfragen
+                        if ('Notification' in window && Notification.permission === 'default') {
+                            Notification.requestPermission();
+                        }
+                        return true;
+                    } catch(e) {
+                        console.warn('Alarm-Listener konnte nicht starten:', e);
+                        return false;
+                    }
+                };
+
+                // Sofort probieren, dann alle 2 Sekunden bis Firebase ready (max. 60 Sek.)
+                if (!startListener()) {
+                    pollTimer = setInterval(function() {
+                        pollCount++;
+                        if (startListener() || pollCount > 30) {
+                            clearInterval(pollTimer);
+                            pollTimer = null;
+                        }
+                    }, 2000);
+                }
+
+                return function() {
+                    if (unsubAlarm) { try { unsubAlarm(); } catch(e) {} }
+                    if (pollTimer) clearInterval(pollTimer);
+                    if (audioCtx) { try { audioCtx.close(); } catch(e) {} }
                 };
             }, []);
 

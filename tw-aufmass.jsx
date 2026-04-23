@@ -24,11 +24,41 @@
                     setGeminiStatus('saved');
                     GEMINI_CONFIG.API_KEY = key;
                 }
-                // Drive Check
-                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
-                    setDriveConnected(true);
-                    if (onDriveStatusChange) onDriveStatusChange('online');
-                }
+                // ── Drive Auto-Init: Versucht gespeicherten Token aus localStorage zu laden ──
+                // Falls noch gueltig -> automatisch angemeldet ohne Popup.
+                // Falls abgelaufen -> Silent-Refresh ohne Consent-Popup.
+                (async function() {
+                    try {
+                        var service = window.GoogleDriveService;
+                        if (!service) return;
+                        // Init aufrufen -- das laedt den Token aus localStorage wenn noch gueltig
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Wenn jetzt Token da ist -> verbunden
+                        if (service.accessToken) {
+                            setDriveConnected(true);
+                            if (onDriveStatusChange) onDriveStatusChange('online');
+                            return;
+                        }
+                        // Falls kein Token aber schonmal angemeldet war -> Silent-Refresh versuchen
+                        if (localStorage.getItem('tw_gdrive_token_v1') !== null ||
+                            localStorage.getItem('tw_gdrive_was_connected') === '1') {
+                            try {
+                                await service._silentRefresh();
+                                if (service.accessToken) {
+                                    setDriveConnected(true);
+                                    if (onDriveStatusChange) onDriveStatusChange('online');
+                                }
+                            } catch(e) {
+                                // Silent-Refresh fehlgeschlagen -- User muss manuell neu verbinden
+                                console.log('Silent-Refresh nicht moeglich:', e.message);
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Drive Auto-Init Fehler:', e);
+                    }
+                })();
             }, []);
 
             var testGeminiKey = async function() {
@@ -75,9 +105,16 @@
                 try {
                     var service = window.GoogleDriveService;
                     if (!service.accessToken) {
-                        await service.init();
-                        await service.requestAuth();
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Falls init bereits Token geladen hat -> fertig
+                        if (!service.accessToken) {
+                            await service.requestAuth();
+                        }
                     }
+                    // Marker setzen, dass User schonmal verbunden war -> aktiviert silent-refresh beim naechsten Start
+                    try { localStorage.setItem('tw_gdrive_was_connected', '1'); } catch(e){}
                     setDriveConnected(true);
                     setDriveConnecting(false);
                     if (onDriveStatusChange) onDriveStatusChange('online');

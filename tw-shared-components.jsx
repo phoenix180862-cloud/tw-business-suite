@@ -2442,6 +2442,7 @@
                 ' @keyframes tw-nav-drop-in-left { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }' +
+                ' @keyframes tw-badge-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); box-shadow: 0 0 18px rgba(196,30,30,0.85); } }' +
                 ' .tw-dropdown-panel { max-height: calc(100vh - 140px); overflow-y: auto; -webkit-overflow-scrolling: touch; }' +
                 ' .tw-dropdown-panel::-webkit-scrollbar { width: 6px; }' +
                 ' .tw-dropdown-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }' +

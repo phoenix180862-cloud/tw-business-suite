@@ -335,9 +335,41 @@
     window.GoogleDriveService = {
         tokenClient: null,
         accessToken: null,
+        tokenExpiresAt: 0,
         rootFolderId: null,
         _gapiInited: false,
         _gisInited: false,
+        _TOKEN_KEY: 'tw_gdrive_token_v1',
+
+        // ── Persistente Token-Verwaltung (localStorage) ──
+        _loadStoredToken() {
+            try {
+                var raw = localStorage.getItem(this._TOKEN_KEY);
+                if (!raw) return null;
+                var obj = JSON.parse(raw);
+                if (!obj || !obj.token || !obj.expiresAt) return null;
+                // 60-Sekunden-Puffer vor Ablauf (damit nicht mitten im Call abbricht)
+                if (Date.now() + 60000 >= obj.expiresAt) return null;
+                return obj;
+            } catch (e) {
+                return null;
+            }
+        },
+        _saveToken(token, expiresInSec) {
+            try {
+                var expiresAt = Date.now() + ((expiresInSec || 3600) * 1000);
+                localStorage.setItem(this._TOKEN_KEY, JSON.stringify({ token: token, expiresAt: expiresAt }));
+                this.accessToken = token;
+                this.tokenExpiresAt = expiresAt;
+            } catch (e) {
+                console.warn('Token-Speicherung fehlgeschlagen:', e);
+            }
+        },
+        _clearStoredToken() {
+            try { localStorage.removeItem(this._TOKEN_KEY); } catch (e) {}
+            this.accessToken = null;
+            this.tokenExpiresAt = 0;
+        },
 
         // ── Initialisierung ──
         async init() {
@@ -360,6 +392,17 @@
                     callback: () => {}, // wird bei requestAuth gesetzt
                 });
                 this._gisInited = true;
+
+                // ── Gespeicherten Token laden (falls noch gueltig) ──
+                var stored = this._loadStoredToken();
+                if (stored) {
+                    this.accessToken = stored.token;
+                    this.tokenExpiresAt = stored.expiresAt;
+                    // gapi.client mit Token scharf stellen
+                    try { gapi.client.setToken({ access_token: stored.token }); } catch (e) {}
+                    console.log('Google Drive: Token aus localStorage wiederhergestellt');
+                }
+
                 return true;
             } catch (err) {
                 console.error('GDrive Init Fehler:', err);
@@ -367,21 +410,67 @@
             }
         },
 
-        // ── OAuth 2.0 Authentifizierung ──
-        requestAuth() {
-            return new Promise((resolve, reject) => {
-                if (!this.tokenClient) { reject(new Error('Nicht initialisiert')); return; }
-                this.tokenClient.callback = (response) => {
+        // ── Silent Refresh: versucht neuen Token ohne Consent-Popup ──
+        _silentRefresh() {
+            var self = this;
+            return new Promise(function(resolve, reject) {
+                if (!self.tokenClient) { reject(new Error('Nicht initialisiert')); return; }
+                var done = false;
+                var timeout = setTimeout(function() {
+                    if (done) return;
+                    done = true;
+                    reject(new Error('Silent-Refresh Timeout'));
+                }, 5000);
+                self.tokenClient.callback = function(response) {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timeout);
                     if (response.error) { reject(new Error(response.error)); return; }
-                    this.accessToken = response.access_token;
+                    self._saveToken(response.access_token, response.expires_in);
+                    try { gapi.client.setToken({ access_token: response.access_token }); } catch (e) {}
                     resolve(response.access_token);
                 };
-                if (this.accessToken) {
-                    this.tokenClient.requestAccessToken({ prompt: '' });
-                } else {
-                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+                try {
+                    // prompt: '' = kein UI, nur wenn User bereits Consent erteilt hat
+                    self.tokenClient.requestAccessToken({ prompt: '' });
+                } catch (e) {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timeout);
+                    reject(e);
                 }
             });
+        },
+
+        // ── OAuth 2.0 Authentifizierung ──
+        requestAuth() {
+            var self = this;
+            return new Promise(function(resolve, reject) {
+                if (!self.tokenClient) { reject(new Error('Nicht initialisiert')); return; }
+                self.tokenClient.callback = function(response) {
+                    if (response.error) { reject(new Error(response.error)); return; }
+                    self._saveToken(response.access_token, response.expires_in);
+                    try { gapi.client.setToken({ access_token: response.access_token }); } catch (e) {}
+                    resolve(response.access_token);
+                };
+                // Wenn schon mal angemeldet (auch abgelaufener Token vorhanden) -> silent request
+                // Sonst Consent-Popup zeigen
+                var hatBereitsMalAngemeldet = !!localStorage.getItem(self._TOKEN_KEY) || !!self.accessToken;
+                if (hatBereitsMalAngemeldet) {
+                    self.tokenClient.requestAccessToken({ prompt: '' });
+                } else {
+                    self.tokenClient.requestAccessToken({ prompt: 'consent' });
+                }
+            });
+        },
+
+        // ── Abmelden (optional) ──
+        signOut() {
+            if (this.accessToken && window.google && google.accounts && google.accounts.oauth2) {
+                try { google.accounts.oauth2.revoke(this.accessToken, function(){}); } catch (e) {}
+            }
+            this._clearStoredToken();
+            try { gapi.client.setToken(null); } catch (e) {}
         },
 
         isConnected() {

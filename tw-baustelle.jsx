@@ -298,9 +298,15 @@
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
+            if (subpage === 'nachrichten') {
+                return <NachrichtenStartseite
+                    onBack={function(){ setSubpage('start'); }}
+                />;
+            }
 
             // ════════════════════════════════════════════════════
-            // STARTSEITE: 5 grosse blaue Buttons (Etappe 4.1 B9)
+            // STARTSEITE: 6 grosse blaue Buttons
+            // (Etappe 4.1 B9 + Nachrichten)
             // ════════════════════════════════════════════════════
             return <BaustellenAppStartseite
                 kunde={kunde}
@@ -311,6 +317,7 @@
                 onSync={function(){ setSubpage('sync'); }}
                 onHauptkalender={function(){ setSubpage('hauptkalender'); }}
                 onFreigaben={function(){ setSubpage('freigaben'); }}
+                onNachrichten={function(){ setSubpage('nachrichten'); }}
                 onBack={onBack}
             />;
         }
@@ -321,7 +328,7 @@
         //   BAUSTELLEN - TEAM - SYNC - HAUPTKALENDER - FREIGABEN
         // HAUPTKALENDER kam in B7 dazu, FREIGABEN in B9.
         // ═══════════════════════════════════════════════════════
-        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onBack }) {
+        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onBack }) {
             // Wartende Foto-Freigaben zaehlen (Live-Listener, fuer Badge)
             const [fotoPending, setFotoPending] = useState(0);
             useEffect(function(){
@@ -334,6 +341,31 @@
                         }
                     }
                     setFotoPending(n);
+                });
+                return unsub;
+            }, [fbOk]);
+
+            // Ungelesene Nachrichten zaehlen (alle Threads, von 'ma')
+            const [nachrichtenUngelesen, setNachrichtenUngelesen] = useState(0);
+            const [nachrichtenDringend, setNachrichtenDringend] = useState(0);
+            useEffect(function(){
+                if (!fbOk || !window.FirebaseService || !window.FirebaseService.subscribeAlleChats) return;
+                var unsub = window.FirebaseService.subscribeAlleChats(function(data){
+                    var total = 0, dringend = 0;
+                    for (var maId in data) {
+                        if (!data.hasOwnProperty(maId)) continue;
+                        var thread = data[maId];
+                        for (var nk in thread) {
+                            if (!thread.hasOwnProperty(nk)) continue;
+                            var n = thread[nk];
+                            if (n && n.von === 'ma' && !n.gelesen) {
+                                total++;
+                                if (n.dringend) dringend++;
+                            }
+                        }
+                    }
+                    setNachrichtenUngelesen(total);
+                    setNachrichtenDringend(dringend);
                 });
                 return unsub;
             }, [fbOk]);
@@ -378,6 +410,15 @@
                     desc: 'Review-Queue: Fotos der Mitarbeiter pruefen und in die Kunden-Ordner freigeben oder ablehnen.',
                     onClick: onFreigaben,
                     badge: fotoPending > 0 ? String(fotoPending) : null
+                },
+                {
+                    id: 'nachrichten',
+                    icon: '💬',
+                    title: 'Nachrichten',
+                    desc: 'Chat mit allen Mitarbeitern: Kalender, direkte Kommunikation, Dringlichkeits-Benachrichtigungen.',
+                    onClick: onNachrichten,
+                    badge: nachrichtenUngelesen > 0 ? String(nachrichtenUngelesen) : null,
+                    badgeDringend: nachrichtenDringend > 0
                 }
             ];
 
@@ -545,16 +586,18 @@
                                             position: 'absolute',
                                             top: 0,
                                             right: 0,
-                                            background: 'var(--accent-orange)',
+                                            background: c.badgeDringend ? 'var(--accent-red)' : 'var(--accent-orange)',
                                             color: '#fff',
                                             padding: '3px 10px',
                                             borderRadius: '0 var(--radius-lg) 0 10px',
                                             fontSize: '11px',
                                             fontWeight: 700,
                                             letterSpacing: '0.5px',
-                                            fontFamily: "'Oswald', sans-serif"
+                                            fontFamily: "'Oswald', sans-serif",
+                                            animation: c.badgeDringend ? 'tw-badge-pulse 1.2s ease-in-out infinite' : 'none',
+                                            boxShadow: c.badgeDringend ? '0 0 12px rgba(196,30,30,0.6)' : 'none'
                                         }}>
-                                            {c.badge}
+                                            {c.badgeDringend ? '\uD83D\uDD14 ' : ''}{c.badge}
                                         </div>
                                     )}
                                 </button>
@@ -5452,6 +5495,65 @@
                     <button onClick={onBack} style={{padding:'12px 32px', background: color, color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:'600', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)'}}>
                         ← Zurueck zur Modulwahl
                     </button>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // NACHRICHTEN-STARTSEITE (von Baustellen-App Hauptstartseite)
+        // Eigener Wrapper mit Header + Zurueck, nutzt intern NachrichtenBereich.
+        // Im Gegensatz zu StagingDetail-Variante nicht baustellen-spezifisch,
+        // sondern uebergreifender Chat-Hub ueber alle Mitarbeiter.
+        // ═══════════════════════════════════════════════════════
+        function NachrichtenStartseite({ onBack }) {
+            return (
+                <div className="page-container" style={{
+                    padding: '16px',
+                    minHeight: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}>
+                    {/* Header mit Zurueck + Titel */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginBottom: '18px'
+                    }}>
+                        <button onClick={onBack} style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            fontSize: '22px',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            touchAction: 'manipulation'
+                        }}>{'\u2190'}</button>
+                        <div style={{ flex: 1 }}>
+                            <div style={{
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '18px',
+                                fontWeight: 600,
+                                letterSpacing: '1.5px',
+                                textTransform: 'uppercase',
+                                color: 'var(--text-primary)'
+                            }}>
+                                {'\uD83D\uDCAC'} Nachrichten
+                            </div>
+                            <div style={{
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                                marginTop: '2px'
+                            }}>
+                                Chat mit allen Mitarbeitern
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Der bereits existierende Nachrichten-Bereich */}
+                    <div style={{ flex: 1 }}>
+                        <NachrichtenBereich baustelleName={null} />
+                    </div>
                 </div>
             );
         }
