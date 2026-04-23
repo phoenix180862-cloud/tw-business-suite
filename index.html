@@ -2240,28 +2240,148 @@
            Altes Format: { id, label, icon, handler, subItems: [{...}] }
            Neues Format: { type:'submenu', label, icon, items: [{label, icon, onClick}] }
            Auch: { type:'divider' } fuer Trennlinien
+           Architektur: 3 Komponenten (AktionSubItem, AktionItem, AktionDropdown)
+           -> loest React-Closure-Problem in map()-Schleifen
            ═══════════════════════════════════════════ */
+
+        /* Sub-Menue-Eintrag -- eigene Komponente fuer saubere State-Isolation */
+        function AktionSubItem(props) {
+            var si = props.item;
+            var onClose = props.onClose;
+            var disabled = !!si.disabled;
+            var baseStyle = {
+                padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                background: 'transparent', color: disabled ? 'rgba(255,255,255,0.4)' : 'var(--text-primary)',
+                fontSize: '13px', fontWeight: '600', fontFamily: 'Oswald, sans-serif',
+                textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                opacity: disabled ? 0.55 : 1, width: '100%', boxSizing: 'border-box',
+                transition: 'background 0.12s ease',
+            };
+            var handleClick = function() {
+                if (disabled) return;
+                onClose();
+                var fn = si.onClick || si.handler;
+                if (typeof fn === 'function') { try { fn(); } catch(e) { console.error('SubItem:', e); } }
+            };
+            return (
+                <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                    disabled={disabled} style={baseStyle}
+                    onClick={handleClick}
+                    onMouseOver={function(e) { if (!disabled) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                    onMouseOut={function(e) { if (!disabled) e.currentTarget.style.background = 'transparent'; }}>
+                    {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
+                    <span style={{flex:1}}>{si.label}</span>
+                </button>
+            );
+        }
+
+        /* Haupt-Eintrag mit optionalem Sub-Panel -- eigene Komponente */
+        function AktionItem(props) {
+            var a = props.action;
+            var align = props.align || 'right';
+            var onCloseAll = props.onCloseAll;
+            var disabled = !!a.disabled;
+            var subItems = a._subItems || [];
+            var hasSub = subItems.length > 0;
+            var [subOpen, setSubOpen] = useState(false);
+
+            var getBg = function() {
+                if (disabled) return 'rgba(120,120,120,0.15)';
+                if (a.destructive) return 'transparent';
+                if (a.variant === 'red') return 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
+                return 'transparent';
+            };
+            var getColor = function() {
+                if (disabled) return 'rgba(255,255,255,0.4)';
+                if (a.destructive) return 'var(--accent-red-light)';
+                if (a.variant === 'red') return '#fff';
+                return 'var(--text-primary)';
+            };
+
+            var btnStyle = {
+                padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                background: getBg(), color: getColor(),
+                fontSize: '13px', fontWeight: a.variant === 'red' ? '700' : '600',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: a.variant === 'red' ? 'uppercase' : 'none',
+                letterSpacing: a.variant === 'red' ? '0.4px' : '0',
+                textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                opacity: disabled ? 0.55 : 1, width: '100%', boxSizing: 'border-box',
+                transition: 'background 0.12s ease, filter 0.12s ease',
+            };
+
+            /* Sub-Panel links oder rechts oeffnen je nach align */
+            var subPanelPos = align === 'right'
+                ? { right: 'calc(100% + 6px)' }
+                : { left: 'calc(100% + 6px)' };
+            var subPanelStyle = Object.assign({
+                position: 'absolute', top: 0,
+                background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)',
+                borderRadius: '10px', boxShadow: '0 8px 20px rgba(0,0,0,0.55)',
+                padding: '6px', minWidth: '210px', zIndex: 1010,
+                display: 'flex', flexDirection: 'column', gap: '3px',
+            }, subPanelPos);
+
+            var handleClick = function() {
+                if (disabled) return;
+                if (hasSub) { setSubOpen(function(v) { return !v; }); return; }
+                onCloseAll();
+                if (typeof a.handler === 'function') { try { a.handler(); } catch(e) { console.error('AktionItem:', e); } }
+            };
+            var handleSubClose = function() { setSubOpen(false); onCloseAll(); };
+
+            return (
+                <div style={{position:'relative'}}>
+                    <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                        disabled={disabled} style={btnStyle}
+                        onClick={handleClick}
+                        onMouseOver={function(e) {
+                            if (disabled) return;
+                            if (a.variant === 'red') { e.currentTarget.style.filter = 'brightness(1.15)'; }
+                            else { e.currentTarget.style.background = 'var(--bg-hover)'; }
+                        }}
+                        onMouseOut={function(e) {
+                            if (disabled) return;
+                            if (a.variant === 'red') { e.currentTarget.style.filter = 'none'; }
+                            else { e.currentTarget.style.background = getBg(); }
+                        }}>
+                        {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
+                        <span style={{flex:1}}>{a.label}</span>
+                        {hasSub && <span style={{fontSize:'11px', opacity:0.75, transform: subOpen ? 'rotate(90deg)' : 'none', transition:'transform 0.15s ease'}}>{'\u25B6'}</span>}
+                    </button>
+                    {hasSub && subOpen && (
+                        <div className="tw-dropdown-panel" style={subPanelStyle} role="menu">
+                            {subItems.map(function(si, i) {
+                                return <AktionSubItem key={si.id || si.label || i} item={si} onClose={handleSubClose} />;
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         function AktionDropdown(props) {
             var label = props.label || 'Bearbeiten';
             var actions = Array.isArray(props.actions) ? props.actions : [];
             var align = props.align || 'right';
             var containerStyle = props.style || {};
             var color = props.color === 'blue' ? 'blue' : 'red';
-
             var palette = color === 'red'
                 ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)' }
                 : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)' };
 
             var [open, setOpen] = useState(false);
-            var [openSubId, setOpenSubId] = useState(null);
             var wrapperRef = useRef(null);
+            var closeAll = function() { setOpen(false); };
 
             useEffect(function() {
                 if (!open) return undefined;
                 var handler = function(e) {
-                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); setOpenSubId(null); }
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); }
                 };
-                var keyHandler = function(e) { if (e.key === 'Escape') { setOpen(false); setOpenSubId(null); } };
+                var keyHandler = function(e) { if (e.key === 'Escape') { setOpen(false); } };
                 document.addEventListener('mousedown', handler);
                 document.addEventListener('touchstart', handler);
                 document.addEventListener('keydown', keyHandler);
@@ -2272,136 +2392,63 @@
                 };
             }, [open]);
 
-            var mainBtnStyle = { padding: '10px 18px', minHeight: '44px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: palette.mainGrad, color: '#fff', fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px', boxShadow: '0 3px 10px ' + palette.mainShadow, transition: 'all 0.2s ease', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '8px' };
-            var panelStyle = Object.assign({ position: 'absolute', top: 'calc(100% + 6px)', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)', padding: '6px', minWidth: '220px', maxWidth: 'calc(100vw - 16px)', zIndex: 1000, animation: 'tw-nav-drop-in 140ms ease-out', display: 'flex', flexDirection: 'column', gap: '3px' }, align === 'left' ? { left: 0 } : { right: 0 });
-            var subPanelStyle = { position: 'absolute', top: 0, right: 'calc(100% + 4px)', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.45)', padding: '6px', minWidth: '200px', maxWidth: 'calc(100vw - 16px)', zIndex: 1001, display: 'flex', flexDirection: 'column', gap: '3px' };
-
-            var itemStyle = function(disabled, destructive, variant) {
-                var bg, col;
-                if (disabled) { bg = 'rgba(120,120,120,0.15)'; col = 'rgba(255,255,255,0.4)'; }
-                else if (destructive) { bg = 'transparent'; col = 'var(--accent-red-light)'; }
-                else if (variant === 'red') { bg = 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))'; col = '#fff'; }
-                else { bg = 'transparent'; col = 'var(--text-primary)'; }
-                return { padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', background: bg, color: col, fontSize: '13px', fontWeight: variant === 'red' ? '700' : '600', fontFamily: 'Oswald, sans-serif', textTransform: variant === 'red' ? 'uppercase' : 'none', letterSpacing: variant === 'red' ? '0.4px' : '0', textAlign: 'left', transition: 'background 0.12s ease, filter 0.12s ease', display: 'flex', alignItems: 'center', gap: '10px', opacity: disabled ? 0.55 : 1 };
-            };
-
-            // Normalisiert beide Formate in ein einheitliches internes Format
-            var normalizeAction = function(a) {
+            /* Normalisiert beide Action-Formate */
+            var normalizeAction = function(a, idx) {
                 if (!a) return null;
-                if (a.type === 'divider') return { _divider: true };
-                // Neues Format: type:'submenu' mit items:[{label,icon,onClick}]
+                if (a.type === 'divider') return { _divider: true, _key: 'div-' + idx };
                 if (a.type === 'submenu') {
-                    return {
-                        id: a.id || a.label,
-                        label: a.label,
-                        icon: a.icon,
-                        disabled: !!a.disabled,
-                        destructive: false,
-                        variant: a.variant,
-                        _subItems: Array.isArray(a.items) ? a.items : [],
-                        _newFormat: true
-                    };
+                    return { id: a.id || ('sub-' + idx), label: a.label, icon: a.icon,
+                             disabled: !!a.disabled, variant: a.variant,
+                             _subItems: Array.isArray(a.items) ? a.items : [] };
                 }
-                // Altes Format: subItems:[{id,label,icon,handler}]
-                return {
-                    id: a.id || a.label,
-                    label: a.label,
-                    icon: a.icon,
-                    disabled: !!a.disabled,
-                    destructive: !!a.destructive,
-                    variant: a.variant,
-                    handler: a.handler,
-                    _subItems: Array.isArray(a.subItems) ? a.subItems : [],
-                    _newFormat: false
-                };
+                return { id: a.id || ('act-' + idx), label: a.label, icon: a.icon,
+                         disabled: !!a.disabled, destructive: !!a.destructive,
+                         variant: a.variant, handler: a.handler,
+                         _subItems: Array.isArray(a.subItems) ? a.subItems : [] };
             };
+            var normalized = actions.map(normalizeAction).filter(Boolean);
 
-            var normalizedActions = actions.map(normalizeAction).filter(Boolean);
-
-            var handleAction = function(a) {
-                if (a.disabled) return;
-                if (a._subItems && a._subItems.length > 0) {
-                    setOpenSubId(function(cur) { return cur === a.id ? null : a.id; });
-                    return;
-                }
-                setOpen(false); setOpenSubId(null);
-                if (typeof a.handler === 'function') { try { a.handler(); } catch(err) { console.error('AktionDropdown handler:', err); } }
+            var mainBtnStyle = {
+                padding: '10px 18px', minHeight: '44px', borderRadius: '8px', border: 'none',
+                cursor: 'pointer', background: palette.mainGrad, color: '#fff',
+                fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
+                transition: 'all 0.2s ease', whiteSpace: 'nowrap',
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
             };
-
-            var handleSubItem = function(item) {
-                if (item.disabled) return;
-                setOpen(false); setOpenSubId(null);
-                // Neues Format: onClick; Altes Format: handler
-                var fn = item.onClick || item.handler;
-                if (typeof fn === 'function') { try { fn(); } catch(err) { console.error('AktionDropdown sub:', err); } }
-            };
-
-            var hoverOn = function(e, variant) {
-                if (variant === 'red') { e.currentTarget.style.filter = 'brightness(1.15)'; }
-                else { e.currentTarget.style.background = 'var(--bg-hover)'; }
-            };
-            var hoverOff = function(e, variant) {
-                if (variant === 'red') { e.currentTarget.style.filter = 'none'; }
-                else { e.currentTarget.style.background = 'transparent'; }
-            };
+            var panelStyle = Object.assign({
+                position: 'absolute', top: 'calc(100% + 6px)',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px', minWidth: '220px', maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000, animation: 'tw-nav-drop-in-left 140ms ease-out',
+                display: 'flex', flexDirection: 'column', gap: '3px',
+            }, align === 'left' ? { left: 0 } : { right: 0 });
 
             return (
                 <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
                     <button type="button" style={mainBtnStyle}
-                        onClick={function() { setOpen(function(v) { return !v; }); setOpenSubId(null); }}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
                         aria-haspopup="true" aria-expanded={open} title={label}>
                         <span style={{fontSize:'14px'}}>{'\u270E'}</span>
                         <span>{label}</span>
                         <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
                     </button>
-                    {open && normalizedActions.length > 0 && (
+                    {open && normalized.length > 0 && (
                         <div className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
                             style={panelStyle} role="menu">
-                            {normalizedActions.map(function(a, idx) {
+                            {normalized.map(function(a) {
                                 if (a._divider) {
-                                    return <div key={'div-' + idx} style={{height:'1px', background:'var(--border-color)', margin:'3px 6px'}} />;
+                                    return <div key={a._key} style={{height:'1px', background:'var(--border-color)', margin:'3px 6px'}} />;
                                 }
-                                var hasSub = a._subItems && a._subItems.length > 0;
-                                var isSubOpen = openSubId === a.id;
-                                return (
-                                    <div key={a.id} style={{position:'relative'}}>
-                                        <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
-                                            disabled={!!a.disabled}
-                                            style={itemStyle(a.disabled, a.destructive, a.variant)}
-                                            onClick={function() { handleAction(a); }}
-                                            onMouseOver={function(e) { if (!a.disabled) hoverOn(e, a.variant); }}
-                                            onMouseOut={function(e) { if (!a.disabled) hoverOff(e, a.variant); }}>
-                                            {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
-                                            <span style={{flex:1}}>{a.label}</span>
-                                            {hasSub && <span style={{fontSize:'10px', opacity:0.7}}>{'\u25B6'}</span>}
-                                        </button>
-                                        {hasSub && isSubOpen && (
-                                            <div className="tw-dropdown-panel tw-aktion-sub-panel" style={subPanelStyle} role="menu">
-                                                {a._subItems.map(function(si) {
-                                                    return (
-                                                        <button key={si.id || si.label} type="button" role="menuitem"
-                                                            className="tw-aktion-dropdown-item"
-                                                            disabled={!!si.disabled}
-                                                            style={itemStyle(si.disabled, si.destructive, si.variant)}
-                                                            onClick={function() { handleSubItem(si); }}
-                                                            onMouseOver={function(e) { if (!si.disabled) hoverOn(e, si.variant); }}
-                                                            onMouseOut={function(e) { if (!si.disabled) hoverOff(e, si.variant); }}>
-                                                            {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
-                                                            <span style={{flex:1}}>{si.label}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
+                                return <AktionItem key={a.id} action={a} align={align} onCloseAll={closeAll} />;
                             })}
                         </div>
                     )}
                 </div>
             );
         }
-
         /* CSS Keyframes + Dropdown-Animations + Mobile-Fixes */
         (function() {
             if (typeof document === 'undefined') return;
