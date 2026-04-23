@@ -2103,14 +2103,27 @@
 
             // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
             // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
-            // Aktionen via window._setModuleActions(arr). Das globale Bearbeiten-
-            // Dropdown nimmt sie mit auf.
+            // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
+            // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
             const [moduleActions, setModuleActions] = useState([]);
             useEffect(function() {
+                // Altes Pattern: direktes Array setzen
                 window._setModuleActions = function(arr) {
                     setModuleActions(Array.isArray(arr) ? arr : []);
                 };
-                return function() { window._setModuleActions = null; };
+                // Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
+                window._registerSeitenAktionen = function(seite, aktionen) {
+                    setModuleActions(Array.isArray(aktionen) ? aktionen : []);
+                };
+                // Primaer-Aktion (gruener Button rechts) -- fuer spaetere Verwendung reserviert
+                window._registerPrimaerAktion = function(seite, aktion) {
+                    // Aktuell noch nicht als separater Button umgesetzt -- ignorieren
+                };
+                return function() {
+                    window._setModuleActions = null;
+                    window._registerSeitenAktionen = null;
+                    window._registerPrimaerAktion = null;
+                };
             }, []);
 
             var _startFotoSync = React.useCallback(function() {

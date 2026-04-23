@@ -2152,62 +2152,33 @@
         }
 
         /* ═══════════════════════════════════════════
-           NAV DROPDOWN -- Top-Navigation (ersetzt die
-           breite Button-Leiste durch einen einzigen
-           Button, der den aktuellen Modus anzeigt und
-           beim Klick alle anderen Ziele als Dropdown
-           einblendet.
+           NAV DROPDOWN -- Top-Navigation
            ═══════════════════════════════════════════ */
         function NavDropdown(props) {
-            // Props:
-            //   currentMode  string   -> Label im Haupt-Button
-            //   targets      array    -> [{ id, label, handler, disabled }]
-            //   style        object   -> optional Container-Styles
-            //   color        'blue'|'red'  -> Farbschema, default 'red' (alle NavDropdowns sind rot)
             var currentMode = props.currentMode || 'Navigation';
             var targets = Array.isArray(props.targets) ? props.targets : [];
             var containerStyle = props.style || {};
             var color = props.color === 'blue' ? 'blue' : 'red';
 
-            // Farb-Palette je nach color-Prop
             var palette = color === 'red'
-                ? {
-                    mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
-                    mainShadow: 'rgba(196,30,30,0.30)',
-                    itemGrad: 'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))'
-                }
-                : {
-                    mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    mainShadow: 'rgba(30,136,229,0.30)',
-                    itemGrad: 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))'
-                };
+                ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)', itemGrad: 'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))' }
+                : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)', itemGrad: 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))' };
 
             var [open, setOpen] = useState(false);
             var [focusIdx, setFocusIdx] = useState(-1);
             var wrapperRef = useRef(null);
 
-            // Alle Ziele ausser dem aktuellen zeigen (Skill Regel 1.1)
-            var shownTargets = targets.filter(function(t) {
-                return t && t.label !== currentMode;
-            });
+            var shownTargets = targets.filter(function(t) { return t && t.label !== currentMode; });
 
-            // Klick ausserhalb schliesst das Dropdown
             useEffect(function() {
                 if (!open) return undefined;
                 var handler = function(e) {
-                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-                        setOpen(false);
-                    }
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); }
                 };
                 var keyHandler = function(e) {
                     if (e.key === 'Escape') { setOpen(false); setFocusIdx(-1); }
-                    else if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        setFocusIdx(function(i) { return Math.min(i + 1, shownTargets.length - 1); });
-                    } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        setFocusIdx(function(i) { return Math.max(i - 1, 0); });
-                    }
+                    else if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx(function(i) { return Math.min(i + 1, shownTargets.length - 1); }); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setFocusIdx(function(i) { return Math.max(i - 1, 0); }); }
                 };
                 document.addEventListener('mousedown', handler);
                 document.addEventListener('touchstart', handler);
@@ -2219,99 +2190,29 @@
                 };
             }, [open, shownTargets.length]);
 
-            // Fokus-Sync: wenn focusIdx sich aendert, fokussiere den Button via DOM-Ref
             useEffect(function() {
                 if (!open || focusIdx < 0 || !wrapperRef.current) return;
                 var btns = wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');
-                if (btns && btns[focusIdx]) {
-                    try { btns[focusIdx].focus(); } catch(e) {}
-                }
+                if (btns && btns[focusIdx]) { try { btns[focusIdx].focus(); } catch(e) {} }
             }, [focusIdx, open]);
 
-            // Blauer/Roter Gradient - Farbe via color-Prop steuerbar
-            var mainBtnStyle = {
-                padding: '10px 20px',
-                minHeight: '44px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                background: palette.mainGrad,
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: '700',
-                fontFamily: 'Oswald, sans-serif',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                boxShadow: '0 3px 10px ' + palette.mainShadow,
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-            };
-
-            var panelStyle = {
-                position: 'absolute',
-                top: 'calc(100% + 6px)',
-                left: '0',
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-                boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
-                padding: '6px',
-                minWidth: '180px',
-                maxWidth: 'calc(100vw - 16px)',
-                zIndex: 1000,
-                animation: 'tw-nav-drop-in-left 140ms ease-out',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '4px',
-            };
-
+            var mainBtnStyle = { padding: '10px 20px', minHeight: '44px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: palette.mainGrad, color: '#fff', fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px', boxShadow: '0 3px 10px ' + palette.mainShadow, transition: 'all 0.2s ease', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '8px' };
+            var panelStyle = { position: 'absolute', top: 'calc(100% + 6px)', left: '0', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)', padding: '6px', minWidth: '180px', maxWidth: 'calc(100vw - 16px)', zIndex: 1000, animation: 'tw-nav-drop-in-left 140ms ease-out', display: 'flex', flexDirection: 'column', gap: '4px' };
             var itemStyle = function(disabled) {
-                return {
-                    padding: '10px 14px',
-                    minHeight: '42px',
-                    borderRadius: '7px',
-                    border: 'none',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    background: disabled
-                        ? 'rgba(120,120,120,0.18)'
-                        : palette.itemGrad,
-                    color: disabled ? 'rgba(255,255,255,0.45)' : '#fff',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    fontFamily: 'Oswald, sans-serif',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.4px',
-                    textAlign: 'left',
-                    transition: 'all 0.15s ease',
-                    opacity: disabled ? 0.5 : 1,
-                };
+                return { padding: '10px 14px', minHeight: '42px', borderRadius: '7px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', background: disabled ? 'rgba(120,120,120,0.18)' : palette.itemGrad, color: disabled ? 'rgba(255,255,255,0.45)' : '#fff', fontSize: '12px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.4px', textAlign: 'left', transition: 'all 0.15s ease', opacity: disabled ? 0.5 : 1 };
             };
-
             var handleSelect = function(target) {
                 if (target.disabled) return;
-                setOpen(false);
-                setFocusIdx(-1);
-                if (typeof target.handler === 'function') {
-                    try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); }
-                }
+                setOpen(false); setFocusIdx(-1);
+                if (typeof target.handler === 'function') { try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); } }
             };
 
             return (
-                <div
-                    ref={wrapperRef}
-                    style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}
-                >
-                    <button
-                        type="button"
-                        style={mainBtnStyle}
+                <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
+                    <button type="button" style={mainBtnStyle}
                         onClick={function() { setOpen(function(v) { return !v; }); }}
-                        aria-haspopup="true"
-                        aria-expanded={open}
-                        title={'Navigation -- aktuell: ' + currentMode}
-                    >
+                        aria-haspopup="true" aria-expanded={open}
+                        title={'Navigation -- aktuell: ' + currentMode}>
                         <span>{currentMode}</span>
                         <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
                     </button>
@@ -2319,15 +2220,10 @@
                         <div className="tw-dropdown-panel tw-nav-dropdown-panel-center" style={panelStyle} role="menu">
                             {shownTargets.map(function(t) {
                                 return (
-                                    <button
-                                        key={t.id || t.label}
-                                        type="button"
-                                        role="menuitem"
+                                    <button key={t.id || t.label} type="button" role="menuitem"
                                         className="tw-nav-dropdown-item"
-                                        disabled={!!t.disabled}
-                                        style={itemStyle(t.disabled)}
-                                        onClick={function() { handleSelect(t); }}
-                                    >
+                                        disabled={!!t.disabled} style={itemStyle(t.disabled)}
+                                        onClick={function() { handleSelect(t); }}>
                                         {t.label}
                                     </button>
                                 );
@@ -2340,20 +2236,12 @@
 
         /* ═══════════════════════════════════════════
            AKTION DROPDOWN -- "Bearbeiten"-Menue
-           Bundelt alle Funktions-Buttons einer Seite
-           unter einem einzigen Dropdown. Einheitlich
-           gestylt wie NavDropdown.
-           Unterstuetzt: Icons (Emoji-String), Deaktivieren,
-           Sub-Dropdowns (fuer "Akten"), destruktive
-           Aktionen (rot markiert).
+           Unterstuetzt zwei Formate fuer Sub-Menus:
+           Altes Format: { id, label, icon, handler, subItems: [{...}] }
+           Neues Format: { type:'submenu', label, icon, items: [{label, icon, onClick}] }
+           Auch: { type:'divider' } fuer Trennlinien
            ═══════════════════════════════════════════ */
         function AktionDropdown(props) {
-            // Props:
-            //   label      string   -> Button-Beschriftung, default "Bearbeiten"
-            //   actions    array    -> [{ id, label, icon, handler, disabled, destructive, subItems }]
-            //   align      'left'|'right'  -> Ausrichtung des Panels, default 'right'
-            //   style      object   -> optional Container-Styles
-            //   color      'blue'|'red' -> Farbschema des Haupt-Buttons, default 'red' (alle Bearbeiten-Dropdowns sind rot)
             var label = props.label || 'Bearbeiten';
             var actions = Array.isArray(props.actions) ? props.actions : [];
             var align = props.align || 'right';
@@ -2361,14 +2249,8 @@
             var color = props.color === 'blue' ? 'blue' : 'red';
 
             var palette = color === 'red'
-                ? {
-                    mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
-                    mainShadow: 'rgba(196,30,30,0.30)'
-                }
-                : {
-                    mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    mainShadow: 'rgba(30,136,229,0.30)'
-                };
+                ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)' }
+                : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)' };
 
             var [open, setOpen] = useState(false);
             var [openSubId, setOpenSubId] = useState(null);
@@ -2377,14 +2259,9 @@
             useEffect(function() {
                 if (!open) return undefined;
                 var handler = function(e) {
-                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-                        setOpen(false);
-                        setOpenSubId(null);
-                    }
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); setOpenSubId(null); }
                 };
-                var keyHandler = function(e) {
-                    if (e.key === 'Escape') { setOpen(false); setOpenSubId(null); }
-                };
+                var keyHandler = function(e) { if (e.key === 'Escape') { setOpen(false); setOpenSubId(null); } };
                 document.addEventListener('mousedown', handler);
                 document.addEventListener('touchstart', handler);
                 document.addEventListener('keydown', keyHandler);
@@ -2395,209 +2272,120 @@
                 };
             }, [open]);
 
-            var mainBtnStyle = {
-                padding: '10px 18px',
-                minHeight: '44px',
-                borderRadius: '8px',
-                border: 'none',
-                cursor: 'pointer',
-                background: palette.mainGrad,
-                color: '#fff',
-                fontSize: '13px',
-                fontWeight: '700',
-                fontFamily: 'Oswald, sans-serif',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                boxShadow: '0 3px 10px ' + palette.mainShadow,
-                transition: 'all 0.2s ease',
-                whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-            };
-
-            var panelStyle = Object.assign({
-                position: 'absolute',
-                top: 'calc(100% + 6px)',
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-                boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
-                padding: '6px',
-                minWidth: '220px',
-                maxWidth: 'calc(100vw - 16px)',
-                zIndex: 1000,
-                animation: 'tw-nav-drop-in 140ms ease-out',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '3px',
-            }, align === 'left' ? { left: 0 } : { right: 0 });
+            var mainBtnStyle = { padding: '10px 18px', minHeight: '44px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: palette.mainGrad, color: '#fff', fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px', boxShadow: '0 3px 10px ' + palette.mainShadow, transition: 'all 0.2s ease', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '8px' };
+            var panelStyle = Object.assign({ position: 'absolute', top: 'calc(100% + 6px)', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)', padding: '6px', minWidth: '220px', maxWidth: 'calc(100vw - 16px)', zIndex: 1000, animation: 'tw-nav-drop-in 140ms ease-out', display: 'flex', flexDirection: 'column', gap: '3px' }, align === 'left' ? { left: 0 } : { right: 0 });
+            var subPanelStyle = { position: 'absolute', top: 0, right: 'calc(100% + 4px)', background: 'var(--bg-tertiary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.45)', padding: '6px', minWidth: '200px', maxWidth: 'calc(100vw - 16px)', zIndex: 1001, display: 'flex', flexDirection: 'column', gap: '3px' };
 
             var itemStyle = function(disabled, destructive, variant) {
-                // variant 'red' = roter Akzent-Hintergrund fuer besonders markierte Eintraege
-                // (z.B. Aufmass-Vorlage-Eintraege laut User-Wunsch)
                 var bg, col;
-                if (disabled) {
-                    bg = 'rgba(120,120,120,0.15)';
-                    col = 'rgba(255,255,255,0.4)';
-                } else if (destructive) {
-                    bg = 'transparent';
-                    col = 'var(--accent-red-light)';
-                } else if (variant === 'red') {
-                    bg = 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
-                    col = '#fff';
-                } else {
-                    bg = 'transparent';
-                    col = 'var(--text-primary)';
+                if (disabled) { bg = 'rgba(120,120,120,0.15)'; col = 'rgba(255,255,255,0.4)'; }
+                else if (destructive) { bg = 'transparent'; col = 'var(--accent-red-light)'; }
+                else if (variant === 'red') { bg = 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))'; col = '#fff'; }
+                else { bg = 'transparent'; col = 'var(--text-primary)'; }
+                return { padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', background: bg, color: col, fontSize: '13px', fontWeight: variant === 'red' ? '700' : '600', fontFamily: 'Oswald, sans-serif', textTransform: variant === 'red' ? 'uppercase' : 'none', letterSpacing: variant === 'red' ? '0.4px' : '0', textAlign: 'left', transition: 'background 0.12s ease, filter 0.12s ease', display: 'flex', alignItems: 'center', gap: '10px', opacity: disabled ? 0.55 : 1 };
+            };
+
+            // Normalisiert beide Formate in ein einheitliches internes Format
+            var normalizeAction = function(a) {
+                if (!a) return null;
+                if (a.type === 'divider') return { _divider: true };
+                // Neues Format: type:'submenu' mit items:[{label,icon,onClick}]
+                if (a.type === 'submenu') {
+                    return {
+                        id: a.id || a.label,
+                        label: a.label,
+                        icon: a.icon,
+                        disabled: !!a.disabled,
+                        destructive: false,
+                        variant: a.variant,
+                        _subItems: Array.isArray(a.items) ? a.items : [],
+                        _newFormat: true
+                    };
                 }
+                // Altes Format: subItems:[{id,label,icon,handler}]
                 return {
-                    padding: '10px 12px',
-                    minHeight: '42px',
-                    borderRadius: '7px',
-                    border: 'none',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    background: bg,
-                    color: col,
-                    fontSize: '13px',
-                    fontWeight: variant === 'red' ? '700' : '600',
-                    fontFamily: 'Oswald, sans-serif',
-                    textTransform: variant === 'red' ? 'uppercase' : 'none',
-                    letterSpacing: variant === 'red' ? '0.4px' : '0',
-                    textAlign: 'left',
-                    transition: 'background 0.12s ease, filter 0.12s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    opacity: disabled ? 0.55 : 1,
+                    id: a.id || a.label,
+                    label: a.label,
+                    icon: a.icon,
+                    disabled: !!a.disabled,
+                    destructive: !!a.destructive,
+                    variant: a.variant,
+                    handler: a.handler,
+                    _subItems: Array.isArray(a.subItems) ? a.subItems : [],
+                    _newFormat: false
                 };
             };
 
-            var subPanelStyle = {
-                position: 'absolute',
-                top: 0,
-                right: 'calc(100% + 4px)',
-                background: 'var(--bg-tertiary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '10px',
-                boxShadow: '0 8px 16px rgba(0,0,0,0.45)',
-                padding: '6px',
-                minWidth: '200px',
-                maxWidth: 'calc(100vw - 16px)',
-                zIndex: 1001,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '3px',
-            };
+            var normalizedActions = actions.map(normalizeAction).filter(Boolean);
 
             var handleAction = function(a) {
                 if (a.disabled) return;
-                if (a.subItems && a.subItems.length > 0) {
-                    // Sub-Dropdown auf/zu-klappen
+                if (a._subItems && a._subItems.length > 0) {
                     setOpenSubId(function(cur) { return cur === a.id ? null : a.id; });
                     return;
                 }
-                // Normale Aktion ausfuehren
-                setOpen(false);
-                setOpenSubId(null);
-                if (typeof a.handler === 'function') {
-                    try { a.handler(); } catch(err) { console.error('AktionDropdown handler:', err); }
-                }
+                setOpen(false); setOpenSubId(null);
+                if (typeof a.handler === 'function') { try { a.handler(); } catch(err) { console.error('AktionDropdown handler:', err); } }
             };
 
-            var handleSubItem = function(parentId, item) {
+            var handleSubItem = function(item) {
                 if (item.disabled) return;
-                setOpen(false);
-                setOpenSubId(null);
-                if (typeof item.handler === 'function') {
-                    try { item.handler(); } catch(err) { console.error('AktionDropdown sub:', err); }
-                }
+                setOpen(false); setOpenSubId(null);
+                // Neues Format: onClick; Altes Format: handler
+                var fn = item.onClick || item.handler;
+                if (typeof fn === 'function') { try { fn(); } catch(err) { console.error('AktionDropdown sub:', err); } }
+            };
+
+            var hoverOn = function(e, variant) {
+                if (variant === 'red') { e.currentTarget.style.filter = 'brightness(1.15)'; }
+                else { e.currentTarget.style.background = 'var(--bg-hover)'; }
+            };
+            var hoverOff = function(e, variant) {
+                if (variant === 'red') { e.currentTarget.style.filter = 'none'; }
+                else { e.currentTarget.style.background = 'transparent'; }
             };
 
             return (
-                <div
-                    ref={wrapperRef}
-                    style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}
-                >
-                    <button
-                        type="button"
-                        style={mainBtnStyle}
+                <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
+                    <button type="button" style={mainBtnStyle}
                         onClick={function() { setOpen(function(v) { return !v; }); setOpenSubId(null); }}
-                        aria-haspopup="true"
-                        aria-expanded={open}
-                        title={label}
-                    >
+                        aria-haspopup="true" aria-expanded={open} title={label}>
                         <span style={{fontSize:'14px'}}>{'\u270E'}</span>
                         <span>{label}</span>
                         <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
                     </button>
-                    {open && actions.length > 0 && (
-                        <div
-                            className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
-                            style={panelStyle}
-                            role="menu"
-                        >
-                            {actions.map(function(a) {
-                                var hasSub = a.subItems && a.subItems.length > 0;
+                    {open && normalizedActions.length > 0 && (
+                        <div className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
+                            style={panelStyle} role="menu">
+                            {normalizedActions.map(function(a, idx) {
+                                if (a._divider) {
+                                    return <div key={'div-' + idx} style={{height:'1px', background:'var(--border-color)', margin:'3px 6px'}} />;
+                                }
+                                var hasSub = a._subItems && a._subItems.length > 0;
                                 var isSubOpen = openSubId === a.id;
                                 return (
-                                    <div key={a.id || a.label} style={{position:'relative'}}>
-                                        <button
-                                            type="button"
-                                            role="menuitem"
-                                            className="tw-aktion-dropdown-item"
+                                    <div key={a.id} style={{position:'relative'}}>
+                                        <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
                                             disabled={!!a.disabled}
                                             style={itemStyle(a.disabled, a.destructive, a.variant)}
                                             onClick={function() { handleAction(a); }}
-                                            onMouseOver={function(e) {
-                                                if (a.disabled) return;
-                                                if (a.variant === 'red') {
-                                                    e.currentTarget.style.filter = 'brightness(1.15)';
-                                                } else {
-                                                    e.currentTarget.style.background = 'var(--bg-hover)';
-                                                }
-                                            }}
-                                            onMouseOut={function(e) {
-                                                if (a.disabled) return;
-                                                if (a.variant === 'red') {
-                                                    e.currentTarget.style.filter = 'none';
-                                                } else {
-                                                    e.currentTarget.style.background = 'transparent';
-                                                }
-                                            }}
-                                        >
+                                            onMouseOver={function(e) { if (!a.disabled) hoverOn(e, a.variant); }}
+                                            onMouseOut={function(e) { if (!a.disabled) hoverOff(e, a.variant); }}>
                                             {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
                                             <span style={{flex:1}}>{a.label}</span>
                                             {hasSub && <span style={{fontSize:'10px', opacity:0.7}}>{'\u25B6'}</span>}
                                         </button>
                                         {hasSub && isSubOpen && (
                                             <div className="tw-dropdown-panel tw-aktion-sub-panel" style={subPanelStyle} role="menu">
-                                                {a.subItems.map(function(si) {
+                                                {a._subItems.map(function(si) {
                                                     return (
-                                                        <button
-                                                            key={si.id || si.label}
-                                                            type="button"
-                                                            role="menuitem"
+                                                        <button key={si.id || si.label} type="button" role="menuitem"
                                                             className="tw-aktion-dropdown-item"
                                                             disabled={!!si.disabled}
                                                             style={itemStyle(si.disabled, si.destructive, si.variant)}
-                                                            onClick={function() { handleSubItem(a.id, si); }}
-                                                            onMouseOver={function(e) {
-                                                                if (si.disabled) return;
-                                                                if (si.variant === 'red') {
-                                                                    e.currentTarget.style.filter = 'brightness(1.15)';
-                                                                } else {
-                                                                    e.currentTarget.style.background = 'var(--bg-hover)';
-                                                                }
-                                                            }}
-                                                            onMouseOut={function(e) {
-                                                                if (si.disabled) return;
-                                                                if (si.variant === 'red') {
-                                                                    e.currentTarget.style.filter = 'none';
-                                                                } else {
-                                                                    e.currentTarget.style.background = 'transparent';
-                                                                }
-                                                            }}
-                                                        >
+                                                            onClick={function() { handleSubItem(si); }}
+                                                            onMouseOver={function(e) { if (!si.disabled) hoverOn(e, si.variant); }}
+                                                            onMouseOut={function(e) { if (!si.disabled) hoverOff(e, si.variant); }}>
                                                             {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
                                                             <span style={{flex:1}}>{si.label}</span>
                                                         </button>
@@ -2614,7 +2402,7 @@
             );
         }
 
-        /* CSS Keyframes + Etappe-6-Polish (responsive Positionierung, Scroll, Hover/Touch) */
+        /* CSS Keyframes + Dropdown-Animations + Mobile-Fixes */
         (function() {
             if (typeof document === 'undefined') return;
             if (document.getElementById('tw-dropdown-anim-style')) return;
@@ -2625,83 +2413,18 @@
                 ' @keyframes tw-nav-drop-in-left { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }' +
                 ' @keyframes tw-toast-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }' +
-                /* ETAPPE 6: Panel-Scroll bei vielen Eintraegen */
                 ' .tw-dropdown-panel { max-height: calc(100vh - 140px); overflow-y: auto; -webkit-overflow-scrolling: touch; }' +
                 ' .tw-dropdown-panel::-webkit-scrollbar { width: 6px; }' +
                 ' .tw-dropdown-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }' +
-                /* Hover-Feedback fuer NavDropdown-Eintraege (Desktop/Mouse) */
                 ' .tw-nav-dropdown-item:hover:not(:disabled) { filter: brightness(1.15); transform: translateX(2px); }' +
-                /* Active-Feedback fuer Touch (kurzes scale-down beim Tippen) */
                 ' .tw-nav-dropdown-item:active:not(:disabled) { transform: scale(0.97); }' +
                 ' .tw-aktion-dropdown-item:active:not(:disabled) { background: var(--bg-hover) !important; transform: scale(0.98); }' +
-                /* Mobile: Panel linksbuendig am Button statt zentriert -- verhindert Ueberlauf links/rechts */
                 ' @media (max-width: 520px) {' +
-                '   .tw-nav-dropdown-panel-center {' +
-                '     left: 0 !important;' +
-                '     transform: none !important;' +
-                '     animation-name: tw-nav-drop-in-left !important;' +
-                '   }' +
-                '   .tw-aktion-dropdown-panel-right {' +
-                '     right: auto !important;' +
-                '     left: 0 !important;' +
-                '   }' +
-                /* Sub-Dropdown mobile: oeffnet nach unten statt nach links */
-                '   .tw-aktion-sub-panel {' +
-                '     right: auto !important;' +
-                '     left: 0 !important;' +
-                '     top: calc(100% + 4px) !important;' +
-                '     position: absolute !important;' +
-                '   }' +
-                ' }' +
-                /* Smooth transitions fuer alle Dropdown-Eintraege */
-                ' .tw-nav-dropdown-item, .tw-aktion-dropdown-item { transition: background 0.12s ease, transform 0.08s ease, filter 0.12s ease; }';
+                '   .tw-nav-dropdown-panel-center { left: 0 !important; transform: none !important; animation: tw-nav-drop-in-left 140ms ease-out !important; }' +
+                '   .tw-aktion-dropdown-panel-right { right: 0 !important; left: auto !important; }' +
+                '   .tw-aktion-sub-panel { right: auto !important; left: calc(100% + 4px) !important; }' +
+                ' }';
             document.head.appendChild(s);
-        })();
-
-        /* ═══════════════════════════════════════════
-           TOAST HELPER -- dezente Benachrichtigung
-           unten rechts, verschwindet nach ~3.5s.
-           Mehrfachaufrufe werden gestapelt.
-           Global verfuegbar als window._showToast(msg, type?)
-           type: 'success' (default) | 'info' | 'error'
-           ═══════════════════════════════════════════ */
-        (function() {
-            if (typeof window === 'undefined') return;
-            if (window._showToast) return;
-            var containerId = 'tw-toast-container';
-            var getContainer = function() {
-                var c = document.getElementById(containerId);
-                if (!c) {
-                    c = document.createElement('div');
-                    c.id = containerId;
-                    c.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:calc(100vw - 32px);pointer-events:none;';
-                    document.body.appendChild(c);
-                }
-                return c;
-            };
-            window._showToast = function(msg, type) {
-                try {
-                    var t = type || 'success';
-                    var bg = t === 'error' ? 'linear-gradient(135deg, #c0392b, #962d22)'
-                           : t === 'info'  ? 'linear-gradient(135deg, #2c3e50, #1e2a38)'
-                                           : 'linear-gradient(135deg, #1E88E5, #1565C0)';
-                    var shadow = t === 'error' ? 'rgba(196,30,30,0.35)' : 'rgba(30,136,229,0.35)';
-                    var el = document.createElement('div');
-                    el.style.cssText = 'pointer-events:auto;padding:12px 18px;border-radius:10px;background:' + bg +
-                        ';color:#fff;font-family:Oswald, sans-serif;font-size:13px;font-weight:600;letter-spacing:0.3px;' +
-                        'box-shadow:0 6px 18px ' + shadow + ';animation:tw-toast-in 180ms ease-out;max-width:400px;' +
-                        'word-wrap:break-word;line-height:1.35;';
-                    el.textContent = msg;
-                    getContainer().appendChild(el);
-                    setTimeout(function() {
-                        el.style.animation = 'tw-toast-out 220ms ease-in forwards';
-                        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 260);
-                    }, 3200);
-                } catch(e) {
-                    // Im Zweifel keinen Absturz riskieren
-                    try { console.log('[Toast]', msg); } catch(_) {}
-                }
-            };
         })();
 
         /* ═══════════════════════════════════════════
@@ -3257,9 +2980,9 @@
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
                     desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
-                    color: '#1E88E5',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
@@ -3269,9 +2992,9 @@
                     icon: '\uD83D\uDCBE',
                     title: 'Gespeicherte Kundendaten aufrufen',
                     desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
-                    color: '#1E88E5',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: 'OFFLINE',
                     disabled: false,
                     disabledHint: null,
@@ -3281,9 +3004,9 @@
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
-                    color: '#1E88E5',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: null,
                     disabled: false,
                     disabledHint: null,
@@ -6337,6 +6060,54 @@
             const lvPositionen = LV_POSITIONEN[kunde._lvPositionenKey] || LV_POSITIONEN[kunde._driveFolderId] || LV_POSITIONEN[kunde.id] || [];
             const duplicates = findDuplicatePositions(lvPositionen);
 
+            // ═══ ETAPPE 8: Aktionen ins globale Bearbeiten-Dropdown einschleusen ═══
+            useEffect(function() {
+                var hasLast = !!lastRaumData;
+                var hasListe = !!(gesamtliste && gesamtliste.length > 0);
+                var hasSel = !!(selectedPositions && selectedPositions.length > 0);
+                var aktionen = [
+                    { label: 'Raum manuell eingeben', icon: '\u270F\uFE0F',
+                      onClick: function(){ setShowManual(true); } },
+                    { label: 'Baugleicher Raum anlegen', icon: '\uD83D\uDCCB',
+                      disabled: !hasLast,
+                      onClick: function(){
+                          if (!lastRaumData) return;
+                          setBgNr(''); setBgBez('');
+                          setBgGeschoss(lastRaumData.geschoss || '');
+                          setBgSonstiges('');
+                          setShowBaugleich(true);
+                      } },
+                    { label: 'Gesamtliste' + (hasListe ? ' (' + gesamtliste.length + ')' : ''), icon: '\uD83D\uDCCB',
+                      disabled: !hasListe,
+                      onClick: function(){ if (onShowGesamtliste) onShowGesamtliste(); } },
+                    { label: 'Liste speichern', icon: '\uD83D\uDCBE',
+                      disabled: !hasSel,
+                      onClick: function(){ setShowSaveListe(true); } },
+                    { label: 'Liste laden', icon: '\uD83D\uDCC2',
+                      onClick: function(){ setShowLoadListe(true); } },
+                    { type: 'divider' },
+                    { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
+                      onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); } },
+                    { label: 'Aufmassvorlage laden', icon: '\uD83D\uDCE5',
+                      onClick: function(){ if (window._openVorlagenListeHandler) window._openVorlagenListeHandler(); } }
+                ];
+                if (window._registerSeitenAktionen) {
+                    window._registerSeitenAktionen('raumerkennung', aktionen);
+                }
+                // Primaer-Aktion rechts (gruener Button): Aufmassvorlage speichern
+                if (window._registerPrimaerAktion) {
+                    window._registerPrimaerAktion('raumerkennung', {
+                        label: 'Aufmassvorlage speichern',
+                        icon: '\uD83D\uDCE4',
+                        onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); }
+                    });
+                }
+                return function() {
+                    if (window._unregisterSeitenAktionen) window._unregisterSeitenAktionen('raumerkennung');
+                    if (window._unregisterPrimaerAktion) window._unregisterPrimaerAktion('raumerkennung');
+                };
+            }, [lastRaumData, gesamtliste, selectedPositions, onShowGesamtliste]);
+
             // ═══ Auto-Fill: Wenn Vorraum-Daten existieren, Höhen-Felder automatisch vorausfüllen ═══
             useEffect(() => {
                 if (!lastRaumData) return;
@@ -6642,41 +6413,6 @@
                 grouped[g].push(r);
             });
 
-            // ETAPPE 7: Registriere die 5 Aktions-Buttons im globalen Bearbeiten-Dropdown
-            // (User-Feedback: Raum manuell / Baugleich / Gesamtliste / Liste speichern / Liste laden
-            // wandern vom Button-Streifen ins Dropdown, rot markiert).
-            useEffect(function() {
-                if (!window._setModuleActions) return;
-                var hatLastRaum = !!lastRaumData;
-                var hatGesamtliste = !!(gesamtliste && gesamtliste.length > 0);
-                var hatPositionen = !!(selectedPositions && selectedPositions.length > 0);
-                var actions = [
-                    { id:'raumManuell', label:'Raum manuell eingeben', icon:'\u270F\uFE0F', variant:'red',
-                        handler: function() { setShowManual(true); } },
-                    { id:'baugleich', label:'Baugleicher Raum anlegen', icon:'\uD83C\uDFD7\uFE0F', variant:'red',
-                        disabled: !hatLastRaum,
-                        handler: function() {
-                            if (!lastRaumData) return;
-                            setBgNr(''); setBgBez('');
-                            setBgGeschoss(lastRaumData.geschoss || '');
-                            setBgSonstiges('');
-                            setShowBaugleich(true);
-                        }},
-                    { id:'gesamtliste', label:'Gesamtliste' + (hatGesamtliste ? ' (' + gesamtliste.length + ')' : ''), icon:'\uD83D\uDCCB', variant:'red',
-                        disabled: !hatGesamtliste,
-                        handler: function() { if (typeof onShowGesamtliste === 'function') onShowGesamtliste(); } },
-                    { id:'listeSpeichern', label:'Liste speichern', icon:'\uD83D\uDCBE', variant:'red',
-                        disabled: !hatPositionen,
-                        handler: function() { setShowSaveListe(true); } },
-                    { id:'listeLaden', label:'Liste laden', icon:'\uD83D\uDCC2', variant:'red',
-                        handler: function() { setShowLoadListe(true); } }
-                ];
-                window._setModuleActions(actions);
-                return function() {
-                    if (window._setModuleActions) window._setModuleActions([]);
-                };
-            }, [lastRaumData, gesamtliste, selectedPositions, onShowGesamtliste]);
-
             return (
                 <div className="page-container">
                     <div className="breadcrumb">
@@ -6688,50 +6424,9 @@
                     <div className="page-title">Raumerkennung</div>
                     <div className="page-subtitle">Räume aus Zeichnungen, LV und Raumbuch ermittelt</div>
 
-                    {/* ═══ ETAPPE 7: ROTE AKTIONS-NAVIGATION entfernt — Buttons sind jetzt im globalen Bearbeiten-Dropdown ═══ */}
-                    {false && (
-                    <div className="rb-nav-red" style={{
-                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'8px', flexWrap:'wrap'
-                    }}>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            onClick={() => setShowManual(true)}>
-                            Raum manuell eingeben
-                        </button>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            disabled={!lastRaumData}
-                            style={{opacity: !lastRaumData ? 0.4 : 1, cursor: !lastRaumData ? 'not-allowed' : 'pointer'}}
-                            title={!lastRaumData ? 'Erst muss ein Raum fertiggestellt werden' : ''}
-                            onClick={() => {
-                                if (!lastRaumData) return;
-                                setBgNr(''); setBgBez('');
-                                setBgGeschoss(lastRaumData.geschoss || '');
-                                setBgSonstiges('');
-                                setShowBaugleich(true);
-                            }}>
-                            Baugleicher Raum anlegen
-                        </button>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            disabled={!gesamtliste || gesamtliste.length === 0}
-                            style={{opacity: (!gesamtliste || gesamtliste.length === 0) ? 0.4 : 1, cursor: (!gesamtliste || gesamtliste.length === 0) ? 'not-allowed' : 'pointer'}}
-                            title={(!gesamtliste || gesamtliste.length === 0) ? 'Noch kein Raum fertiggestellt' : ''}
-                            onClick={onShowGesamtliste}>
-                            Gesamtliste{gesamtliste && gesamtliste.length > 0 ? ' (' + gesamtliste.length + ')' : ''}
-                        </button>
-                        {/* PAKET C: Bearbeitete Listen speichern + aufrufen */}
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            disabled={!selectedPositions || selectedPositions.length === 0}
-                            style={{opacity: (!selectedPositions || selectedPositions.length === 0) ? 0.4 : 1, cursor: (!selectedPositions || selectedPositions.length === 0) ? 'not-allowed' : 'pointer'}}
-                            title={(!selectedPositions || selectedPositions.length === 0) ? 'Erst Positionen auswaehlen' : 'Aktuelle Positionsliste speichern (mit Raumzuordnung oder als Vorlage)'}
-                            onClick={() => setShowSaveListe(true)}>
-                            {'\uD83D\uDCBE'} Liste speichern
-                        </button>
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            onClick={() => setShowLoadListe(true)}
-                            title="Gespeicherte Positionsliste laden">
-                            {'\uD83D\uDCC2'} Liste laden
-                        </button>
-                    </div>
-                    )}
+                    {/* ═══ ETAPPE 8: Die frueheren 5 roten Aktions-Buttons (Raum manuell / Baugleich /
+                        Gesamtliste / Liste speichern / Liste laden) wurden in die globale ActionsBar
+                        (Bearbeiten-Dropdown oberhalb der Schnellnavi) verschoben. ═══ */}
 
                     {erkannteRaeume.length > 0 && (
                         <div className="raumerkennung-info">
@@ -10049,6 +9744,73 @@
                 onBack();
             };
 
+            // ═══ ETAPPE 8: Raumblatt-Aktionen ins globale Bearbeiten-Dropdown einschleusen ═══
+            useEffect(function() {
+                var posOkCount = posCards ? posCards.filter(function(p){ return calcPositionResult(p) > 0; }).length : 0;
+                var posTotalCount = posCards ? posCards.length : 0;
+
+                // Sub-Menue "Aktionen" - die frueher roten Buttons
+                var subAktionen = [
+                    { label: 'Zurueck', icon: '\u21A9',
+                      onClick: function(){ doZurueckZurRaumerkennung(); } },
+                    { label: 'Gesamtliste', icon: '\uD83D\uDCCB',
+                      disabled: !onShowGesamtliste,
+                      onClick: function(){ if (onShowGesamtliste) onShowGesamtliste(); } },
+                    { label: 'Raumblatt berechnen', icon: '\uD83D\uDCD0',
+                      onClick: function(){ setCalcModalOpen(true); } },
+                    { label: 'Raumblatt fertigstellen', icon: '\u2714',
+                      disabled: !onFinishRaum,
+                      onClick: function(){ if (onFinishRaum) doRaumblattFertigstellen(); } },
+                    { label: 'Aufmass fertigstellen', icon: '\uD83C\uDFC1',
+                      disabled: !onAufmassBeenden,
+                      onClick: function(){ if (onAufmassBeenden) doAufmassFertigstellen(); } }
+                ];
+
+                // Sub-Menue "Tabs" - die frueher blauen Tab-Buttons
+                var subTabs = [
+                    { label: 'Grundriss' + (rbTab === 0 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(0); } },
+                    { label: 'Fotos - Waende' + (rbTab === 1 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(1); } },
+                    { label: 'Fotos Objekt' + (rbTab === 4 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(4); } },
+                    { label: 'Oeffnungen' + (rbTab === 2 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(2); } },
+                    { label: 'Pos. (' + posOkCount + '/' + posTotalCount + ')' + (rbTab === 3 ? '  \u25CF' : ''),
+                      onClick: function(){ handleTabChange(3); } },
+                    { type: 'divider' },
+                    { label: 'Waende: ' + wandAnzahl,
+                      onClick: function(){ setWandAnzahlPopupOpen(true); } },
+                    { label: 'Masse kopieren: ' + (masseKopieren ? 'JA' : 'NEIN'),
+                      onClick: function(){ setMasseKopieren(!masseKopieren); } }
+                ];
+
+                var aktionen = [
+                    { type: 'submenu', label: 'Aktionen', icon: '\u2699', items: subAktionen },
+                    { type: 'submenu', label: 'Tabs', icon: '\uD83D\uDDC2', items: subTabs },
+                    { type: 'divider' },
+                    { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
+                      onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); } },
+                    { label: 'Aufmassvorlage laden', icon: '\uD83D\uDCE5',
+                      onClick: function(){ if (window._openVorlagenListeHandler) window._openVorlagenListeHandler(); } }
+                ];
+                if (window._registerSeitenAktionen) {
+                    window._registerSeitenAktionen('raumblatt', aktionen);
+                }
+                // Primaer-Aktion rechts (gruener Button): Raumblatt berechnen
+                if (window._registerPrimaerAktion) {
+                    window._registerPrimaerAktion('raumblatt', {
+                        label: 'Raumblatt berechnen',
+                        icon: '\uD83D\uDCD0',
+                        onClick: function(){ setCalcModalOpen(true); }
+                    });
+                }
+                return function() {
+                    if (window._unregisterSeitenAktionen) window._unregisterSeitenAktionen('raumblatt');
+                    if (window._unregisterPrimaerAktion) window._unregisterPrimaerAktion('raumblatt');
+                };
+            }, [rbTab, wandAnzahl, masseKopieren, hasUnsavedChanges, posCards, onShowGesamtliste, onFinishRaum, onAufmassBeenden]);
+
             // ── WIP-Speicherung: Aktuellen Bildschirm-Stand einsammeln ──
             // Ref wird bei jedem Render aktualisiert, Listener selbst nur einmal registriert
             const wipCollectorRef = React.useRef(null);
@@ -11852,52 +11614,6 @@
                 );
             };
 
-            // ETAPPE 7: Registriere Raumblatt-Aktionen im globalen Bearbeiten-Dropdown
-            // mit 2 Sub-Dropdowns ("die daneben poppen"):
-            //   - Navigation: Zurueck, Gesamtliste, Berechnen, Fertig stellen, Aufmass fertigstellen (rot)
-            //   - Ansicht:    Grundriss, Fotos-Waende, Fotos Objekt, Oeffnungen, Pos., Waende, Masse kop. (neutral)
-            useEffect(function() {
-                if (!window._setModuleActions) return;
-                var posDone = posCards.filter(function(p) { return calcPositionResult(p) > 0; }).length;
-                var navItems = [];
-                if (onBack) navItems.push({ id:'rb-zurueck', label:'Zurueck', icon:'\u2190', variant:'red',
-                    handler: function() { doZurueckZurRaumerkennung(); } });
-                if (onShowGesamtliste) navItems.push({ id:'rb-gesamtliste', label:'Gesamtliste', icon:'\uD83D\uDCCB', variant:'red',
-                    handler: function() { onShowGesamtliste(); } });
-                navItems.push({ id:'rb-berechnen', label:'Raumblatt berechnen', icon:'\uD83D\uDCD0', variant:'red',
-                    handler: function() { setCalcModalOpen(true); } });
-                if (onFinishRaum) navItems.push({ id:'rb-fertig', label:'Raumblatt fertig stellen', icon:'\u2705', variant:'red',
-                    handler: function() { doRaumblattFertigstellen(); } });
-                if (onAufmassBeenden) navItems.push({ id:'rb-aufmass-fertig', label:'Aufmass fertigstellen', icon:'\uD83C\uDFC1', variant:'red',
-                    handler: function() { doAufmassFertigstellen(); } });
-
-                var ansichtItems = [
-                    { id:'rb-tab-grundriss',   label:'Grundriss',           icon:'\uD83D\uDCD0',
-                        handler: function() { handleTabChange(0); } },
-                    { id:'rb-tab-fotos-waende',label:'Fotos - Waende',      icon:'\uD83D\uDCF7',
-                        handler: function() { handleTabChange(1); } },
-                    { id:'rb-tab-fotos-objekt',label:'Fotos Objekt',        icon:'\uD83D\uDCF8',
-                        handler: function() { handleTabChange(4); } },
-                    { id:'rb-tab-oeffnungen',  label:'Oeffnungen',          icon:'\uD83D\uDEAA',
-                        handler: function() { handleTabChange(2); } },
-                    { id:'rb-tab-positionen',  label:'Positionen (' + posDone + '/' + posCards.length + ')', icon:'\uD83D\uDCDD',
-                        handler: function() { handleTabChange(3); } },
-                    { id:'rb-waende',          label:'Waende: ' + wandAnzahl, icon:'\uD83E\uDDF1',
-                        handler: function() { setWandAnzahlPopupOpen(true); } },
-                    { id:'rb-masse-kop',       label:'Masse kopieren: ' + (masseKopieren ? 'JA' : 'NEIN'), icon:'\uD83D\uDCCB',
-                        handler: function() { setMasseKopieren(!masseKopieren); } }
-                ];
-
-                var actions = [
-                    { id:'rb-navigation', label:'Navigation', icon:'\uD83E\uDDED', variant:'red', subItems: navItems },
-                    { id:'rb-ansicht',    label:'Ansicht',    icon:'\uD83D\uDC41\uFE0F', subItems: ansichtItems }
-                ];
-                window._setModuleActions(actions);
-                return function() {
-                    if (window._setModuleActions) window._setModuleActions([]);
-                };
-            }, [onBack, onFinishRaum, onAufmassBeenden, onShowGesamtliste, posCards, rbTab, wandAnzahl, masseKopieren]);
-
             return (
                 <div className="page-container">
                     <div className="breadcrumb">
@@ -11935,60 +11651,11 @@
                     {/* ═══ STICKY WRAPPER fuer beide Leisten ═══ */}
                     <div style={{position:'sticky', top:'95px', zIndex:98, background:'var(--bg-primary)', paddingBottom:'4px', borderBottom:'1px solid var(--border-subtle)'}}>
 
-                    {/* ═══ ETAPPE 7: LEISTE 2 + 3 entfernt — Buttons sind jetzt als Sub-Dropdowns im Bearbeiten-Dropdown ═══ */}
-                    {false && (<>
-                    {/* ═══ LEISTE 2: ROTE AKTIONS-NAVIGATION (Zurueck, Gesamtliste, Raumblatt berechnen, Raumblatt fertig stellen, Aufmass fertigstellen) ═══ */}
-                    <div className="rb-nav-red" style={{
-                        display:'flex', gap:'3px', padding:'4px 0', marginBottom:'2px'
-                    }}>
-                        {onBack && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doZurueckZurRaumerkennung}>Zurueck</button>
-                        )}
-                        {onShowGesamtliste && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={function() { onShowGesamtliste(); }}>Gesamtliste</button>
-                        )}
-                        <button className="rb-nav-btn rb-nav-red-btn"
-                            style={{background:'linear-gradient(135deg, #4a7a3e, #5d9150)', color:'#ffffff'}}
-                            onClick={function() { setCalcModalOpen(true); }}>
-                            {'\uD83D\uDCD0'} Raumblatt berechnen
-                        </button>
-                        {onFinishRaum && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doRaumblattFertigstellen}>Raumblatt fertig stellen</button>
-                        )}
-                        {onAufmassBeenden && (
-                            <button className="rb-nav-btn rb-nav-red-btn" onClick={doAufmassFertigstellen}>Aufmass fertigstellen</button>
-                        )}
-                    </div>
-
-                    {/* ═══ LEISTE 3: BLAUE TAB-NAVIGATION (6 Buttons in 1 Reihe) ═══ */}
-                    <div className="rb-nav-blue" style={{
-                        display:'flex', gap:'3px', padding:'4px 0'
-                    }}>
-                        {[
-                            {id: 0, label: 'Grundriss'},
-                            {id: 1, label: 'Fotos - Waende'},
-                            {id: 4, label: 'Fotos Objekt'},
-                            {id: 2, label: 'Oeffnungen'},
-                            {id: 3, label: 'Pos. (' + posCards.filter(function(p) { return calcPositionResult(p) > 0; }).length + '/' + posCards.length + ')'}
-                        ].map(function(tab) {
-                            return (
-                                <button key={tab.id}
-                                    className={'rb-nav-btn rb-nav-blue-btn' + (rbTab === tab.id ? ' active' : '')}
-                                    onClick={function() { handleTabChange(tab.id); }}>
-                                    {tab.label}
-                                </button>
-                            );
-                        })}
-                        <button className="rb-nav-btn rb-nav-blue-btn"
-                            onClick={function() { setWandAnzahlPopupOpen(true); }}>
-                            Waende: {wandAnzahl}
-                        </button>
-                        <button className={'rb-nav-btn rb-nav-blue-btn' + (masseKopieren ? ' active' : '')}
-                            onClick={function() { setMasseKopieren(!masseKopieren); }}>
-                            Masse kop. {masseKopieren ? 'JA' : 'NEIN'}
-                        </button>
-                    </div>
-                    </>)}
+                    {/* ═══ ETAPPE 8: Die beiden frueheren Leisten (rote Aktionen + blaue Tabs)
+                        wurden in die globale ActionsBar verschoben:
+                        - Bearbeiten-Dropdown enthaelt Sub-Menues "Aktionen" und "Tabs"
+                        - Primaer-Aktion "Raumblatt berechnen" ist der gruene Button rechts.
+                        Die sticky Wrapper-Box bleibt fuer die darunter liegenden Inhalte leer sichtbar. ═══ */}
                     </div>{/* Ende Sticky Wrapper */}
 
                     {/* Save-Status Toast */}
@@ -30598,14 +30265,27 @@
 
             // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
             // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
-            // Aktionen via window._setModuleActions(arr). Das globale Bearbeiten-
-            // Dropdown nimmt sie mit auf.
+            // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
+            // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
             const [moduleActions, setModuleActions] = useState([]);
             useEffect(function() {
+                // Altes Pattern: direktes Array setzen
                 window._setModuleActions = function(arr) {
                     setModuleActions(Array.isArray(arr) ? arr : []);
                 };
-                return function() { window._setModuleActions = null; };
+                // Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
+                window._registerSeitenAktionen = function(seite, aktionen) {
+                    setModuleActions(Array.isArray(aktionen) ? aktionen : []);
+                };
+                // Primaer-Aktion (gruener Button rechts) -- fuer spaetere Verwendung reserviert
+                window._registerPrimaerAktion = function(seite, aktion) {
+                    // Aktuell noch nicht als separater Button umgesetzt -- ignorieren
+                };
+                return function() {
+                    window._setModuleActions = null;
+                    window._registerSeitenAktionen = null;
+                    window._registerPrimaerAktion = null;
+                };
             }, []);
 
             var _startFotoSync = React.useCallback(function() {
