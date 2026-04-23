@@ -2106,23 +2106,40 @@
             // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
             // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
             const [moduleActions, setModuleActions] = useState([]);
+            // Aktuell registrierte Seite (fuer korrektes Unregister)
+            const moduleActionsSeiteRef = useRef(null);
             useEffect(function() {
                 // Altes Pattern: direktes Array setzen
                 window._setModuleActions = function(arr) {
+                    moduleActionsSeiteRef.current = null;
                     setModuleActions(Array.isArray(arr) ? arr : []);
                 };
                 // Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
                 window._registerSeitenAktionen = function(seite, aktionen) {
+                    moduleActionsSeiteRef.current = seite || null;
                     setModuleActions(Array.isArray(aktionen) ? aktionen : []);
+                };
+                // Cleanup beim Modulwechsel: Nur entfernen wenn die aufrufende Seite noch registriert ist
+                // (verhindert dass ein neu gemountetes Modul sein gerade registriertes Dropdown sofort wieder leert)
+                window._unregisterSeitenAktionen = function(seite) {
+                    if (!seite || moduleActionsSeiteRef.current === seite) {
+                        moduleActionsSeiteRef.current = null;
+                        setModuleActions([]);
+                    }
                 };
                 // Primaer-Aktion (gruener Button rechts) -- fuer spaetere Verwendung reserviert
                 window._registerPrimaerAktion = function(seite, aktion) {
                     // Aktuell noch nicht als separater Button umgesetzt -- ignorieren
                 };
+                window._unregisterPrimaerAktion = function(seite) {
+                    // Counterpart zum Register -- aktuell no-op
+                };
                 return function() {
                     window._setModuleActions = null;
                     window._registerSeitenAktionen = null;
+                    window._unregisterSeitenAktionen = null;
                     window._registerPrimaerAktion = null;
+                    window._unregisterPrimaerAktion = null;
                 };
             }, []);
 

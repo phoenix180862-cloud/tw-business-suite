@@ -2186,10 +2186,13 @@
             var a = props.action;
             var align = props.align || 'right';
             var onCloseAll = props.onCloseAll;
+            var myId = props.myId;
+            var openSubId = props.openSubId;
+            var setOpenSubId = props.setOpenSubId;
             var disabled = !!a.disabled;
             var subItems = a._subItems || [];
             var hasSub = subItems.length > 0;
-            var [subOpen, setSubOpen] = useState(false);
+            var subOpen = hasSub && openSubId === myId;
 
             var getBg = function() {
                 if (disabled) return 'rgba(120,120,120,0.15)';
@@ -2231,11 +2234,15 @@
 
             var handleClick = function() {
                 if (disabled) return;
-                if (hasSub) { setSubOpen(function(v) { return !v; }); return; }
+                if (hasSub) {
+                    // Toggle: Wenn ich offen bin -> zu. Sonst mich oeffnen (anderen zu).
+                    setOpenSubId(subOpen ? null : myId);
+                    return;
+                }
                 onCloseAll();
                 if (typeof a.handler === 'function') { try { a.handler(); } catch(e) { console.error('AktionItem:', e); } }
             };
-            var handleSubClose = function() { setSubOpen(false); onCloseAll(); };
+            var handleSubClose = function() { setOpenSubId(null); onCloseAll(); };
 
             return (
                 <div style={{position:'relative'}}>
@@ -2257,7 +2264,7 @@
                         {hasSub && <span style={{fontSize:'11px', opacity:0.75, transform: subOpen ? 'rotate(90deg)' : 'none', transition:'transform 0.15s ease'}}>{'\u25B6'}</span>}
                     </button>
                     {hasSub && subOpen && (
-                        <div className="tw-dropdown-panel" style={subPanelStyle} role="menu">
+                        <div className="tw-dropdown-panel tw-aktion-sub-panel" style={subPanelStyle} role="menu">
                             {subItems.map(function(si, i) {
                                 return <AktionSubItem key={si.id || si.label || i} item={si} onClose={handleSubClose} />;
                             })}
@@ -2278,8 +2285,12 @@
                 : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)' };
 
             var [open, setOpen] = useState(false);
+            var [openSubId, setOpenSubId] = useState(null);
             var wrapperRef = useRef(null);
-            var closeAll = function() { setOpen(false); };
+            var closeAll = function() { setOpen(false); setOpenSubId(null); };
+
+            /* Reset Sub-State wenn Haupt-Dropdown geschlossen wird */
+            useEffect(function() { if (!open) setOpenSubId(null); }, [open]);
 
             useEffect(function() {
                 if (!open) return undefined;
@@ -2308,7 +2319,7 @@
                 }
                 return { id: a.id || ('act-' + idx), label: a.label, icon: a.icon,
                          disabled: !!a.disabled, destructive: !!a.destructive,
-                         variant: a.variant, handler: a.handler,
+                         variant: a.variant, handler: a.handler || a.onClick,
                          _subItems: Array.isArray(a.subItems) ? a.subItems : [] };
             };
             var normalized = actions.map(normalizeAction).filter(Boolean);
@@ -2347,7 +2358,9 @@
                                 if (a._divider) {
                                     return <div key={a._key} style={{height:'1px', background:'var(--border-color)', margin:'3px 6px'}} />;
                                 }
-                                return <AktionItem key={a.id} action={a} align={align} onCloseAll={closeAll} />;
+                                return <AktionItem key={a.id} action={a} align={align}
+                                    myId={a.id} openSubId={openSubId} setOpenSubId={setOpenSubId}
+                                    onCloseAll={closeAll} />;
                             })}
                         </div>
                     )}
