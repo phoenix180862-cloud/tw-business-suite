@@ -1,0 +1,12 @@
+{
+  "_comment": "Diese Datei in das Root-Verzeichnis kopieren und 'npm install' ausfuehren, damit Babel fuer build.bat verfuegbar ist. (Nicht mit der cloud-functions-package.json verwechseln!)",
+  "name": "tw-business-suite-build",
+  "description": "Build-Dependencies fuer das Vorkompilieren der index.html (Babel-CLI)",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@babel/cli": "^7.23.0",
+    "@babel/core": "^7.23.0",
+    "@babel/preset-react": "^7.23.0"
+  }
+}
