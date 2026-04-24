@@ -233,11 +233,6 @@
             // kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
             const [kundeOpenDialog, setKundeOpenDialog] = useState(null);
 
-            // ── Globaler Toast (FIX 24.04.2026): window._showToast-Bridge ──
-            // toastGlobal: { msg, type, id } -- id dient als React-Key fuer Neustarts
-            // der Ausblend-Animation bei schnell aufeinanderfolgenden Toasts.
-            const [toastGlobal, setToastGlobal] = useState(null);
-
             var PAGE_TO_MODUL = {
                 'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
                 'rechnung': 'rechnung', 'ausgangsbuch': 'ausgangsbuch',
@@ -2094,43 +2089,6 @@
                 });
             };
 
-            // ══════════════════════════════════════════════════════════
-            // FIX 24.04.2026 — Fehlende window.*-Handler-Bridges
-            //
-            // 1) window._showToast: global aufrufbare Toast-Anzeige
-            //    Signatur: window._showToast(message, type)
-            //    type: 'success' | 'error' | 'info'  (default: 'info')
-            //    Wird 9x in tw-app.jsx aufgerufen (Speicher-Status,
-            //    Dringend-Alarm, Foto-Migration, Akten-Funktion).
-            //
-            // 2) window._saveAufmassVorlageHandler: aufgerufen vom
-            //    "Aufmassvorlage speichern"-Button im Aufmass-Modul.
-            //
-            // 3) window._openVorlagenListeHandler: aufgerufen vom
-            //    "Aufmassvorlage laden"-Button im Aufmass-Modul.
-            // ══════════════════════════════════════════════════════════
-            window._showToast = function(message, type) {
-                setToastGlobal({ msg: String(message || ''), type: type || 'info', id: Date.now() });
-            };
-            window._saveAufmassVorlageHandler = function() {
-                if (typeof saveAufmassVorlage === 'function') {
-                    try { saveAufmassVorlage(); } catch(e) { console.warn('Vorlage speichern:', e); }
-                }
-            };
-            window._openVorlagenListeHandler = function() {
-                if (typeof openVorlagenListe === 'function') {
-                    try { openVorlagenListe(); } catch(e) { console.warn('Vorlagen-Liste oeffnen:', e); }
-                }
-            };
-
-            // Toast: Auto-Ausblenden nach 4s (bei Fehler 6s)
-            useEffect(function() {
-                if (!toastGlobal) return;
-                var ms = toastGlobal.type === 'error' ? 6000 : 4000;
-                var t = setTimeout(function() { setToastGlobal(null); }, ms);
-                return function() { clearTimeout(t); };
-            }, [toastGlobal]);
-
             // ── WIP wiederherstellen (aus Akte heraus) ──
             // WICHTIG: listWips() liefert aus Performance-Gruenden NUR Metadaten
             // ohne moduleState. Daher muss hier erst der volle Record nachgeladen
@@ -3261,39 +3219,6 @@
                             </div>
                         </div>
                     )}
-
-                    {/* ═══ GLOBALE TOAST-ANZEIGE (FIX 24.04.2026) ═══ */}
-                    {/* Wird via window._showToast(msg, type) von ueberall getriggert. */}
-                    {/* Auto-Ausblend nach 4 s ueber CSS-Animation + state=null Timeout. */}
-                    {toastGlobal && (
-                        <div key={toastGlobal.id}
-                            style={{
-                                position:'fixed', bottom:'28px', left:'50%', transform:'translateX(-50%)',
-                                zIndex:10000, maxWidth:'92vw', minWidth:'280px',
-                                padding:'14px 22px', borderRadius:'12px',
-                                background: toastGlobal.type === 'error'
-                                    ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)'
-                                    : toastGlobal.type === 'success'
-                                    ? 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)'
-                                    : 'linear-gradient(135deg, #3498db 0%, #1e6ba8 100%)',
-                                color:'#fff', fontSize:'14px', fontWeight:'600',
-                                fontFamily:'Source Sans 3, sans-serif',
-                                boxShadow:'0 8px 28px rgba(0,0,0,0.4)',
-                                border:'1px solid rgba(255,255,255,0.15)',
-                                textAlign:'center',
-                                animation:'twToastSlideIn 0.25s ease-out'
-                            }}
-                            onClick={function(){ setToastGlobal(null); }}
-                        >
-                            {toastGlobal.msg}
-                        </div>
-                    )}
-                    <style dangerouslySetInnerHTML={{__html: `
-@keyframes twToastSlideIn {
-  0%   { opacity:0; transform:translate(-50%, 24px); }
-  100% { opacity:1; transform:translate(-50%, 0); }
-}
-                    `}} />
                 </React.Fragment>
             );
         }

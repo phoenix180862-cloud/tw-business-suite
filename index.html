@@ -3,29 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- CACHE-BUST: Verhindert, dass Browser alte Versionen aus dem Cache ausliefern.
+         GitHub Pages liefert sonst manchmal bis zu 10 Minuten lang eine veraltete
+         index.html, was zu ReferenceErrors fuehrt, weil referenzierte Funktionen
+         in der alten, aber nicht in der neuen Version fehlen. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 
     <script>
-    // Global Error Handler - zeigt Fehler statt schwarzem Bildschirm
+    // ═══ DIAGNOSE-MODUS ═══
+    // Bei jedem App-Crash zeigen wir direkt auf dem Screen die Infos an,
+    // die wir zur Fehleranalyse brauchen — so dass der Thomas nur einen
+    // Screenshot machen muss, keine Browser-Konsole oeffnen.
+
+    // Alle Fehler sammeln (auch vor dem Rendering)
+    window.__twErrors = [];
     window.onerror = function(msg, url, line, col, error) {
+        window.__twErrors.push({msg: msg, line: line, col: col});
         console.error('App Fehler:', msg, 'at', url, line, col);
+        showCrashDiag(msg, line, col);
+        return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+        window.__twErrors.push({msg: 'Promise: ' + (e.reason && e.reason.message || e.reason)});
+        console.error('Unhandled Promise:', e.reason);
+    });
+
+    function showCrashDiag(msg, line, col) {
         var d = document.getElementById('crash-info');
         if (!d) {
             d = document.createElement('div');
             d.id = 'crash-info';
-            d.style.cssText = 'position:fixed;top:20px;left:20px;right:20px;padding:20px;background:#1a2332;color:#ff6b6b;border:2px solid #ff6b6b;border-radius:12px;z-index:99999;font-family:monospace;font-size:13px;white-space:pre-wrap;max-height:80vh;overflow:auto;';
+            d.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;bottom:10px;padding:16px;background:#0d1117;color:#e6edf3;border:2px solid #ff6b6b;border-radius:12px;z-index:99999;font-family:monospace;font-size:12px;overflow:auto;';
             document.body.appendChild(d);
         }
-        d.innerHTML = '<h3 style="color:#ff6b6b;margin:0 0 10px">⚠️ App-Fehler</h3>' + 
-            '<b>Fehler:</b> ' + msg + '\n' +
-            '<b>Zeile:</b> ' + line + '\n' +
-            '<b>Datei:</b> ' + (url || 'inline') + '\n\n' +
-            '<span style="color:#7a8a9e">Bitte Screenshot an den Entwickler schicken.</span>\n' +
-            '<button onclick="this.parentNode.remove()" style="margin-top:10px;padding:8px 16px;background:#c41e1e;color:white;border:none;border-radius:6px;cursor:pointer">Schließen</button>';
-        return false;
-    };
-    window.addEventListener('unhandledrejection', function(e) {
-        console.error('Unhandled Promise:', e.reason);
-    });
+        var s = window.__twSentinel || {};
+        var completed = (s.completedModules || []).join(', ') || '(keins)';
+        var lastMod = s.lastModule || '(keins gestartet)';
+        var built = s.built || '(unbekannt)';
+        var preRender = s.preRenderCheck ? JSON.stringify(s.preRenderCheck, null, 2) : '(nicht erreicht)';
+
+        d.innerHTML =
+            '<h3 style="color:#ff6b6b;margin:0 0 10px;font-size:15px">⚠️ App-Fehler — DIAGNOSE</h3>' +
+            '<div style="color:#ff9999;margin-bottom:8px"><b>Fehler:</b> ' + msg + '</div>' +
+            '<div style="color:#7a8a9e;margin-bottom:12px;font-size:11px">Zeile ' + (line||'?') + ':' + (col||'?') + '</div>' +
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #58a6ff">' +
+            '<div style="color:#58a6ff;font-weight:bold;margin-bottom:4px">BUILD-VERSION</div>' +
+            '<div style="color:#d2a8ff">' + built + '</div></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #3fb950">' +
+            '<div style="color:#3fb950;font-weight:bold;margin-bottom:4px">MODULE GELADEN</div>' +
+            '<div style="color:#e6edf3;font-size:10px;line-height:1.5">' + completed + '</div></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #f0883e">' +
+            '<div style="color:#f0883e;font-weight:bold;margin-bottom:4px">ABGEBROCHEN BEI</div>' +
+            '<div style="color:#e6edf3">' + lastMod + '</div></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #bc8cff">' +
+            '<div style="color:#bc8cff;font-weight:bold;margin-bottom:4px">FUNKTIONEN DEFINIERT</div>' +
+            '<pre style="margin:0;white-space:pre-wrap;color:#e6edf3;font-size:10px">' + preRender + '</pre></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #ff6b6b">' +
+            '<div style="color:#ff6b6b;font-weight:bold;margin-bottom:4px">ALLE FEHLER</div>' +
+            '<pre style="margin:0;white-space:pre-wrap;color:#ff9999;font-size:10px">' +
+            (window.__twErrors.map(function(e,i){return (i+1)+'. '+e.msg;}).join('\n') || '(keine)') +
+            '</pre></div>' +
+
+            '<div style="display:flex;gap:8px;margin-top:12px">' +
+            '<button onclick="location.reload(true)" style="flex:1;padding:10px;background:#1E88E5;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold">🔄 Neu laden (Cache umgehen)</button>' +
+            '<button onclick="document.getElementById(\'crash-info\').remove()" style="padding:10px 16px;background:#30363d;color:#e6edf3;border:none;border-radius:6px;cursor:pointer">✕</button>' +
+            '</div>' +
+            '<div style="color:#7a8a9e;margin-top:10px;font-size:10px;text-align:center">Bitte Screenshot an den Entwickler schicken.</div>';
+    }
+
+    // Wenn nach 5s kein Render erfolgt ist, automatisch Diagnose anzeigen
+    setTimeout(function() {
+        var root = document.getElementById('root');
+        if (!root || root.children.length === 0) {
+            showCrashDiag('App rendert nicht (kein Kind unter #root nach 5s)', '?', '?');
+        }
+    }, 5000);
     </script>
 
     <title>TW Business Suite – Thomas Willwacher Fliesenlegermeister e.K.</title>
@@ -75,23 +133,36 @@
     <!-- QR-Code (Etappe 6: Mitarbeiter-Einladungen) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <!-- ═══ TW BUSINESS SUITE — MODULARES KERN-SYSTEM ═══ -->
-    <script src="tw-core.js"></script>
-    <script src="tw-storage.js"></script>
-    <script src="tw-kundendaten-parser.js"></script>
-    <script src="tw-infrastructure.js"></script>
-    <script src="tw-staging.js"></script>
+    <!-- ═══ TW BUSINESS SUITE — MODULARES KERN-SYSTEM ═══
+         ?v= Query-String erzwingt Browser-Reload nach jedem Build.
+         Bei jedem Build wird hier ein neuer Zeitstempel eingesetzt,
+         damit selbst aggressivste Caches nicht stoeren. -->
+    <script src="tw-core.js?v=20260424-122155"></script>
+    <script src="tw-storage.js?v=20260424-122155"></script>
+    <script src="tw-kundendaten-parser.js?v=20260424-122155"></script>
+    <script src="tw-infrastructure.js?v=20260424-122155"></script>
+    <script src="tw-staging.js?v=20260424-122155"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
 
     <!-- ═══ TW BUSINESS SUITE — DESIGN SYSTEM ═══ -->
-    <link rel="stylesheet" href="tw-design.css">
+    <link rel="stylesheet" href="tw-design.css?v=20260424-122155">
 
 
-    <div id="root"></div>
+    <div id="root" data-build="20260424-122155"></div>
+    <script>
+      // Build-Version in die Console — damit man auf dem Tablet in den DevTools
+      // sofort sieht, ob man die neueste Version hat oder eine gecachte.
+      console.log('%c[TW Build] Version: 20260424-122155', 'color:#1E88E5;font-weight:bold');
+    </script>
 
 
-    <script type="text/babel" data-type="module">
+    <script type="text/babel">
+
+        window.__twSentinel = { startedAt: Date.now(), built: "20260424-122155", completedModules: [] };
+
+        // === MODUL-GRENZE: tw-shared-components.jsx ===
+        window.__twSentinel.lastModule = "tw-shared-components.jsx";
 
         const { useState, useEffect, useCallback, useRef } = React;
 
@@ -2151,76 +2222,390 @@
             );
         }
 
+                /* ═══════════════════════════════════════════
+           NAV DROPDOWN -- Top-Navigation
+           ═══════════════════════════════════════════ */
+        function NavDropdown(props) {
+            var currentMode = props.currentMode || 'Navigation';
+            var targets = Array.isArray(props.targets) ? props.targets : [];
+            var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+
+            var palette = color === 'red'
+                ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)', itemGrad: 'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))' }
+                : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)', itemGrad: 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))' };
+
+            var [open, setOpen] = useState(false);
+            var [focusIdx, setFocusIdx] = useState(-1);
+            var wrapperRef = useRef(null);
+
+            var shownTargets = targets.filter(function(t) { return t && t.label !== currentMode; });
+
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); }
+                };
+                var keyHandler = function(e) {
+                    if (e.key === 'Escape') { setOpen(false); setFocusIdx(-1); }
+                    else if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx(function(i) { return Math.min(i + 1, shownTargets.length - 1); }); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setFocusIdx(function(i) { return Math.max(i - 1, 0); }); }
+                };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open, shownTargets.length]);
+
+            useEffect(function() {
+                if (!open || focusIdx < 0 || !wrapperRef.current) return;
+                var btns = wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');
+                if (btns && btns[focusIdx]) { try { btns[focusIdx].focus(); } catch(e) {} }
+            }, [focusIdx, open]);
+
+            var mainBtnStyle = { padding: '10px 20px', minHeight: '44px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: palette.mainGrad, color: '#fff', fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px', boxShadow: '0 3px 10px ' + palette.mainShadow, transition: 'all 0.2s ease', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '8px' };
+            var panelStyle = { position: 'absolute', top: 'calc(100% + 6px)', left: '0', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)', padding: '6px', minWidth: '180px', maxWidth: 'calc(100vw - 16px)', zIndex: 1000, animation: 'tw-nav-drop-in-left 140ms ease-out', display: 'flex', flexDirection: 'column', gap: '4px' };
+            var itemStyle = function(disabled) {
+                return { padding: '10px 14px', minHeight: '42px', borderRadius: '7px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', background: disabled ? 'rgba(120,120,120,0.18)' : palette.itemGrad, color: disabled ? 'rgba(255,255,255,0.45)' : '#fff', fontSize: '12px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.4px', textAlign: 'left', transition: 'all 0.15s ease', opacity: disabled ? 0.5 : 1 };
+            };
+            var handleSelect = function(target) {
+                if (target.disabled) return;
+                setOpen(false); setFocusIdx(-1);
+                if (typeof target.handler === 'function') { try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); } }
+            };
+
+            return (
+                <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
+                    <button type="button" style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
+                        aria-haspopup="true" aria-expanded={open}
+                        title={'Navigation -- aktuell: ' + currentMode}>
+                        <span>{currentMode}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && shownTargets.length > 0 && (
+                        <div className="tw-dropdown-panel tw-nav-dropdown-panel-center" style={panelStyle} role="menu">
+                            {shownTargets.map(function(t) {
+                                return (
+                                    <button key={t.id || t.label} type="button" role="menuitem"
+                                        className="tw-nav-dropdown-item"
+                                        disabled={!!t.disabled} style={itemStyle(t.disabled)}
+                                        onClick={function() { handleSelect(t); }}>
+                                        {t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
+           AKTION DROPDOWN -- "Bearbeiten"-Menue
+           Unterstuetzt zwei Formate fuer Sub-Menus:
+           Altes Format: { id, label, icon, handler, subItems: [{...}] }
+           Neues Format: { type:'submenu', label, icon, items: [{label, icon, onClick}] }
+           Auch: { type:'divider' } fuer Trennlinien
+           Architektur: 3 Komponenten (AktionSubItem, AktionItem, AktionDropdown)
+           -> loest React-Closure-Problem in map()-Schleifen
+           ═══════════════════════════════════════════ */
+
+        /* Sub-Menue-Eintrag -- eigene Komponente fuer saubere State-Isolation */
+        function AktionSubItem(props) {
+            var si = props.item;
+            var onClose = props.onClose;
+            var disabled = !!si.disabled;
+            var baseStyle = {
+                padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                background: 'transparent', color: disabled ? 'rgba(255,255,255,0.4)' : 'var(--text-primary)',
+                fontSize: '13px', fontWeight: '600', fontFamily: 'Oswald, sans-serif',
+                textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                opacity: disabled ? 0.55 : 1, width: '100%', boxSizing: 'border-box',
+                transition: 'background 0.12s ease',
+            };
+            var handleClick = function() {
+                if (disabled) return;
+                onClose();
+                var fn = si.onClick || si.handler;
+                if (typeof fn === 'function') { try { fn(); } catch(e) { console.error('SubItem:', e); } }
+            };
+            return (
+                <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                    disabled={disabled} style={baseStyle}
+                    onClick={handleClick}
+                    onMouseOver={function(e) { if (!disabled) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                    onMouseOut={function(e) { if (!disabled) e.currentTarget.style.background = 'transparent'; }}>
+                    {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
+                    <span style={{flex:1}}>{si.label}</span>
+                </button>
+            );
+        }
+
+        /* Haupt-Eintrag mit optionalem Sub-Panel -- eigene Komponente.
+           Sub-Panel wird via React Portal in document.body gerendert, um
+           overflow-Clipping des Parent-Panels zu umgehen. */
+        function AktionItem(props) {
+            var a = props.action;
+            var align = props.align || 'right';
+            var onCloseAll = props.onCloseAll;
+            var myId = props.myId;
+            var openSubId = props.openSubId;
+            var setOpenSubId = props.setOpenSubId;
+            var disabled = !!a.disabled;
+            var subItems = a._subItems || [];
+            var hasSub = subItems.length > 0;
+            var subOpen = hasSub && openSubId === myId;
+            var btnRef = useRef(null);
+            var [subPos, setSubPos] = useState(null);
+
+            /* Position des Sub-Panels berechnen wenn es oeffnet, + bei Resize/Scroll updaten */
+            useEffect(function() {
+                if (!subOpen || !btnRef.current) { setSubPos(null); return undefined; }
+                var calcPos = function() {
+                    if (!btnRef.current) return;
+                    var r = btnRef.current.getBoundingClientRect();
+                    var vw = window.innerWidth;
+                    var vh = window.innerHeight;
+                    var panelW = 240; // geschaetzte Breite
+                    var gap = 6;
+                    var pos = { top: r.top };
+                    /* Position: vorzugsweise auf der gegenueberliegenden Seite des Haupt-Panels */
+                    if (align === 'right') {
+                        /* Haupt-Panel rechts-ausgerichtet -> Sub nach links */
+                        var leftSide = r.left - panelW - gap;
+                        if (leftSide < 8) {
+                            /* Nicht genug Platz links -> rechts oeffnen */
+                            pos.left = r.right + gap;
+                        } else {
+                            pos.left = leftSide;
+                        }
+                    } else {
+                        /* Haupt-Panel links-ausgerichtet -> Sub nach rechts */
+                        var rightSide = r.right + gap;
+                        if (rightSide + panelW > vw - 8) {
+                            /* Nicht genug Platz rechts -> links oeffnen */
+                            pos.left = Math.max(8, r.left - panelW - gap);
+                        } else {
+                            pos.left = rightSide;
+                        }
+                    }
+                    /* Vertikale Begrenzung: nicht unter den Viewport */
+                    var maxHeight = vh - pos.top - 16;
+                    pos.maxHeight = Math.max(160, maxHeight);
+                    setSubPos(pos);
+                };
+                calcPos();
+                window.addEventListener('resize', calcPos);
+                window.addEventListener('scroll', calcPos, true);
+                return function() {
+                    window.removeEventListener('resize', calcPos);
+                    window.removeEventListener('scroll', calcPos, true);
+                };
+            }, [subOpen, align]);
+
+            var getBg = function() {
+                if (disabled) return 'rgba(120,120,120,0.15)';
+                if (a.destructive) return 'transparent';
+                if (a.variant === 'red') return 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
+                return 'transparent';
+            };
+            var getColor = function() {
+                if (disabled) return 'rgba(255,255,255,0.4)';
+                if (a.destructive) return 'var(--accent-red-light)';
+                if (a.variant === 'red') return '#fff';
+                return 'var(--text-primary)';
+            };
+
+            var btnStyle = {
+                padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                background: getBg(), color: getColor(),
+                fontSize: '13px', fontWeight: a.variant === 'red' ? '700' : '600',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: a.variant === 'red' ? 'uppercase' : 'none',
+                letterSpacing: a.variant === 'red' ? '0.4px' : '0',
+                textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                opacity: disabled ? 0.55 : 1, width: '100%', boxSizing: 'border-box',
+                transition: 'background 0.12s ease, filter 0.12s ease',
+            };
+
+            var subPanelStyle = subPos ? {
+                position: 'fixed',
+                top: subPos.top + 'px',
+                left: subPos.left + 'px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
+                padding: '6px',
+                minWidth: '220px',
+                maxWidth: 'calc(100vw - 16px)',
+                maxHeight: subPos.maxHeight + 'px',
+                overflowY: 'auto',
+                zIndex: 10000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            } : null;
+
+            var handleClick = function() {
+                if (disabled) return;
+                if (hasSub) {
+                    setOpenSubId(subOpen ? null : myId);
+                    return;
+                }
+                onCloseAll();
+                if (typeof a.handler === 'function') { try { a.handler(); } catch(e) { console.error('AktionItem:', e); } }
+            };
+            var handleSubClose = function() { setOpenSubId(null); onCloseAll(); };
+
+            return (
+                <div style={{position:'relative'}}>
+                    <button ref={btnRef}
+                        type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                        disabled={disabled} style={btnStyle}
+                        onClick={handleClick}
+                        onMouseOver={function(e) {
+                            if (disabled) return;
+                            if (a.variant === 'red') { e.currentTarget.style.filter = 'brightness(1.15)'; }
+                            else { e.currentTarget.style.background = 'var(--bg-hover)'; }
+                        }}
+                        onMouseOut={function(e) {
+                            if (disabled) return;
+                            if (a.variant === 'red') { e.currentTarget.style.filter = 'none'; }
+                            else { e.currentTarget.style.background = getBg(); }
+                        }}>
+                        {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
+                        <span style={{flex:1}}>{a.label}</span>
+                        {hasSub && <span style={{fontSize:'11px', opacity:0.75, transform: subOpen ? 'rotate(90deg)' : 'none', transition:'transform 0.15s ease'}}>{'\u25B6'}</span>}
+                    </button>
+                    {hasSub && subOpen && subPanelStyle && typeof document !== 'undefined' && ReactDOM.createPortal(
+                        <div data-tw-aktion-sub="true"
+                            className="tw-dropdown-panel tw-aktion-sub-panel"
+                            style={subPanelStyle} role="menu">
+                            {subItems.map(function(si, i) {
+                                return <AktionSubItem key={si.id || si.label || i} item={si} onClose={handleSubClose} />;
+                            })}
+                        </div>,
+                        document.body
+                    )}
+                </div>
+            );
+        }
+
+        function AktionDropdown(props) {
+            var label = props.label || 'Bearbeiten';
+            var actions = Array.isArray(props.actions) ? props.actions : [];
+            var align = props.align || 'right';
+            var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+            var palette = color === 'red'
+                ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)' }
+                : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)' };
+
+            var [open, setOpen] = useState(false);
+            var [openSubId, setOpenSubId] = useState(null);
+            var wrapperRef = useRef(null);
+            var closeAll = function() { setOpen(false); setOpenSubId(null); };
+
+            /* Reset Sub-State wenn Haupt-Dropdown geschlossen wird */
+            useEffect(function() { if (!open) setOpenSubId(null); }, [open]);
+
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (!wrapperRef.current) return;
+                    /* Klick innerhalb des Haupt-Wrappers -> nix tun */
+                    if (wrapperRef.current.contains(e.target)) return;
+                    /* Klick im Sub-Panel-Portal -> ebenfalls nix tun */
+                    if (e.target && e.target.closest && e.target.closest('[data-tw-aktion-sub]')) return;
+                    setOpen(false);
+                };
+                var keyHandler = function(e) { if (e.key === 'Escape') { setOpen(false); } };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open]);
+
+            /* Normalisiert beide Action-Formate */
+            var normalizeAction = function(a, idx) {
+                if (!a) return null;
+                if (a.type === 'divider') return { _divider: true, _key: 'div-' + idx };
+                if (a.type === 'submenu') {
+                    return { id: a.id || ('sub-' + idx), label: a.label, icon: a.icon,
+                             disabled: !!a.disabled, variant: a.variant,
+                             _subItems: Array.isArray(a.items) ? a.items : [] };
+                }
+                return { id: a.id || ('act-' + idx), label: a.label, icon: a.icon,
+                         disabled: !!a.disabled, destructive: !!a.destructive,
+                         variant: a.variant, handler: a.handler || a.onClick,
+                         _subItems: Array.isArray(a.subItems) ? a.subItems : [] };
+            };
+            var normalized = actions.map(normalizeAction).filter(Boolean);
+
+            var mainBtnStyle = {
+                padding: '10px 18px', minHeight: '44px', borderRadius: '8px', border: 'none',
+                cursor: 'pointer', background: palette.mainGrad, color: '#fff',
+                fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
+                transition: 'all 0.2s ease', whiteSpace: 'nowrap',
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+            };
+            var panelStyle = Object.assign({
+                position: 'absolute', top: 'calc(100% + 6px)',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px', minWidth: '220px', maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000, animation: 'tw-nav-drop-in-left 140ms ease-out',
+                display: 'flex', flexDirection: 'column', gap: '3px',
+            }, align === 'left' ? { left: 0 } : { right: 0 });
+
+            return (
+                <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
+                    <button type="button" style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
+                        aria-haspopup="true" aria-expanded={open} title={label}>
+                        <span style={{fontSize:'14px'}}>{'\u270E'}</span>
+                        <span>{label}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && normalized.length > 0 && (
+                        <div className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
+                            style={panelStyle} role="menu">
+                            {normalized.map(function(a) {
+                                if (a._divider) {
+                                    return <div key={a._key} style={{height:'1px', background:'var(--border-color)', margin:'3px 6px'}} />;
+                                }
+                                return <AktionItem key={a.id} action={a} align={align}
+                                    myId={a.id} openSubId={openSubId} setOpenSubId={setOpenSubId}
+                                    onCloseAll={closeAll} />;
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
 
-        // ═══════════════════════════════════════════════════════════════
-        // PERFORMANCE-FIX (24.04.2026): Uhr als ISOLIERTE Komponente
-        //
-        // Vorher: setCurrentTime lief 1x/Sek. in Startseite -> triggerte
-        // Komplett-Re-Render inkl. BauteamAnimation mit 7 SVG-Figuren
-        // und ~261 SVG-Elementen. Auf Tablets (begrenzter Renderer-RAM)
-        // fuehrte das nach 1-2 Minuten zu einem Renderer-Crash
-        // ("Oh nein! Fehler beim Anzeigen dieser Webseite").
-        //
-        // Jetzt: Nur die UhrAnzeige rendert sich neu, die BauteamAnimation
-        // und alle anderen Startseiten-Elemente bleiben stabil.
-        // ═══════════════════════════════════════════════════════════════
-        function UhrAnzeige() {
-            const [currentTime, setCurrentTime] = useState(new Date());
-            useEffect(function() {
-                var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
-                return function() { clearInterval(timer); };
-            }, []);
+        window.__twSentinel.completedModules.push("tw-shared-components.jsx");
 
-            var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-            var tag = tage[currentTime.getDay()];
-            var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
-            var stunden = String(currentTime.getHours()).padStart(2,'0');
-            var minuten = String(currentTime.getMinutes()).padStart(2,'0');
-            var sekunden = String(currentTime.getSeconds()).padStart(2,'0');
-
-            return (
-                <div style={{
-                    margin:'0 20px 12px', padding:'24px 20px',
-                    background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
-                    borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
-                    border:'1px solid rgba(77,166,255,0.2)',
-                    boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
-                }}>
-                    {/* Dekorative Elemente */}
-                    <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
-                    <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
-
-                    {/* Tag */}
-                    <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
-                        {tag}
-                    </div>
-
-                    {/* Uhrzeit — GROSS */}
-                    <div style={{
-                        fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
-                        fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
-                        lineHeight:'1', marginBottom:'10px', position:'relative'
-                    }}>
-                        <span style={{fontWeight:'300'}}>{stunden}</span>
-                        <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
-                        <span style={{fontWeight:'300'}}>{minuten}</span>
-                        <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
-                    </div>
-
-                    {/* Datum */}
-                    <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
-                        {datum}
-                    </div>
-
-                    {/* Trennlinie */}
-                    <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
-                </div>
-            );
-        }
+        // === MODUL-GRENZE: tw-aufmass.jsx ===
+        window.__twSentinel.lastModule = "tw-aufmass.jsx";
 
         function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl, onDriveStatusChange }) {
             // ── State ──
@@ -2231,10 +2616,14 @@
             const [geminiStatus, setGeminiStatus] = useState(geminiKey ? 'saved' : 'none');
             const [showKey, setShowKey] = useState(false);
             const [geminiModelPref, setGeminiModelPref] = useState(localStorage.getItem('gemini_model_pref') || 'pro');
+            const [currentTime, setCurrentTime] = useState(new Date());
             const [driveConnecting, setDriveConnecting] = useState(false);
 
-            // PERFORMANCE-FIX 24.04.2026: currentTime + Uhr-Interval jetzt in isolierter
-            // <UhrAnzeige />-Komponente -- verhindert Rerender der BauteamAnimation jede Sekunde.
+            // ── Uhr aktualisieren ──
+            useEffect(function() {
+                var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
+                return function() { clearInterval(timer); };
+            }, []);
 
             // ── Gemini Check bei Mount ──
             useEffect(function() {
@@ -2471,8 +2860,14 @@
                 }
             };
 
-            // ── Datum/Uhrzeit-Formatierung jetzt INNERHALB <UhrAnzeige /> (s.o.) ──
-            // (nicht mehr hier, damit Startseite nicht jede Sekunde neu rendert)
+            // ── Datum/Uhrzeit formatieren ──
+            var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            var tag = tage[currentTime.getDay()];
+            var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
+            var stunden = String(currentTime.getHours()).padStart(2,'0');
+            var minuten = String(currentTime.getMinutes()).padStart(2,'0');
+            var sekunden = String(currentTime.getSeconds()).padStart(2,'0');
 
             return (
                 <div className="startseite" style={{position:'relative', overflow:'hidden', minHeight:'100vh'}}>
@@ -2487,9 +2882,43 @@
                         </div>
                     </div>
 
-                    {/* ═══ UHR & DATUM — ISOLIERT in <UhrAnzeige /> ═══ */}
-                    {/* (verhindert Rerender der BauteamAnimation jede Sekunde) */}
-                    <UhrAnzeige />
+                    {/* ═══ UHR & DATUM — Premium Design (GROSS) ═══ */}
+                    <div style={{
+                        margin:'0 20px 12px', padding:'24px 20px',
+                        background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
+                        borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
+                        border:'1px solid rgba(77,166,255,0.2)',
+                        boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+                    }}>
+                        {/* Dekorative Elemente */}
+                        <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
+                        
+                        {/* Tag */}
+                        <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
+                            {tag}
+                        </div>
+                        
+                        {/* Uhrzeit — GROSS */}
+                        <div style={{
+                            fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
+                            fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+                            lineHeight:'1', marginBottom:'10px', position:'relative'
+                        }}>
+                            <span style={{fontWeight:'300'}}>{stunden}</span>
+                            <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
+                            <span style={{fontWeight:'300'}}>{minuten}</span>
+                            <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
+                        </div>
+                        
+                        {/* Datum */}
+                        <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
+                            {datum}
+                        </div>
+                        
+                        {/* Trennlinie */}
+                        <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
+                    </div>
 
                     {/* ═══ VERBINDUNGS-BUTTONS (nebeneinander, kompakt) ═══ */}
                     <div style={{padding:'0 20px', marginBottom:'10px', width:'100%', maxWidth:'500px'}}>
@@ -16122,6 +16551,11 @@
             );
         }
 
+        window.__twSentinel.completedModules.push("tw-aufmass.jsx");
+
+        // === MODUL-GRENZE: tw-modulwahl.jsx ===
+        window.__twSentinel.lastModule = "tw-modulwahl.jsx";
+
         function ModulWahl({ kunde, onSelectModul, ordnerAnalyseMeta, onDatenBearbeiten, onOrdnerBrowser }) {
             var module = [
                 { id: 'aufmass', name: 'Aufmass', desc: 'VOB-konforme Aufmass-Erfassung', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
@@ -16843,6 +17277,11 @@
            RECHNUNGSMODUL -- VOB-konforme Rechnungen
            §14 UStG konform · Abschlag/Schluss/Nachtrag/Stundenlohn/Einzelrechnung
            ═══════════════════════════════════════════ */
+
+        window.__twSentinel.completedModules.push("tw-modulwahl.jsx");
+
+        // === MODUL-GRENZE: tw-rechnung.jsx ===
+        window.__twSentinel.lastModule = "tw-rechnung.jsx";
 
         /* =====================================================================
            RECHNUNGSMODUL -- 6 Untermodule, PDF-nahe Startseite
@@ -17599,6 +18038,11 @@
             return null;
         }
 
+        window.__twSentinel.completedModules.push("tw-rechnung.jsx");
+
+        // === MODUL-GRENZE: tw-schriftverkehr.jsx ===
+        window.__twSentinel.lastModule = "tw-schriftverkehr.jsx";
+
         /* =====================================================================
            SCHRIFTVERKEHR-MODUL -- Mail & Brief Korrespondenz
            Skill: SKILL-schriftverkehr-briefkopf.md + SKILL-jspdf-briefkopf.md
@@ -17992,6 +18436,11 @@
 
             return null;
         }
+
+        window.__twSentinel.completedModules.push("tw-schriftverkehr.jsx");
+
+        // === MODUL-GRENZE: tw-ausgangsbuch.jsx ===
+        window.__twSentinel.lastModule = "tw-ausgangsbuch.jsx";
 
         function RechnungsAusgangsbuch({ kunde, onBack }) {
             var AB_KEY = 'tw_ausgangsbuch';
@@ -18685,6 +19134,11 @@
            BAUSTELLEN-APP ADMIN -- Firebase-Anbindung
            Kunden an Baustellen-App pushen, Mitarbeiter freigeben
            ═══════════════════════════════════════════ */
+
+        window.__twSentinel.completedModules.push("tw-ausgangsbuch.jsx");
+
+        // === MODUL-GRENZE: tw-baustelle.jsx ===
+        window.__twSentinel.lastModule = "tw-baustelle.jsx";
 
         // ═══════════════════════════════════════════════════════
         // BAUSTELLEN-APP-MODUL — Haupt-Container
@@ -28301,6 +28755,11 @@
         }
 
 
+        window.__twSentinel.completedModules.push("tw-baustelle.jsx");
+
+        // === MODUL-GRENZE: tw-daten-uebersicht.jsx ===
+        window.__twSentinel.lastModule = "tw-daten-uebersicht.jsx";
+
         /* DatenUebersicht v4 — kunde._importResult als Fallback */
         function DatenUebersicht({ kunde, importResult, onSave, onBack, onWeiterZuModulen, onGoToOrdner }) {
             var ir = importResult || (kunde && kunde._importResult) || {};
@@ -28575,6 +29034,11 @@
             );
         }
 
+        window.__twSentinel.completedModules.push("tw-daten-uebersicht.jsx");
+
+        // === MODUL-GRENZE: tw-app.jsx ===
+        window.__twSentinel.lastModule = "tw-app.jsx";
+
         // ═══════════════════════════════════════════════════════════
         // FOTO-SYNC STATUS-INDIKATOR (Phase 2)
         // ═══════════════════════════════════════════════════════════
@@ -28809,11 +29273,6 @@
             const [vorlageList, setVorlageList] = useState(null);
             // kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
             const [kundeOpenDialog, setKundeOpenDialog] = useState(null);
-
-            // ── Globaler Toast (FIX 24.04.2026): window._showToast-Bridge ──
-            // toastGlobal: { msg, type, id } -- id dient als React-Key fuer Neustarts
-            // der Ausblend-Animation bei schnell aufeinanderfolgenden Toasts.
-            const [toastGlobal, setToastGlobal] = useState(null);
 
             var PAGE_TO_MODUL = {
                 'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
@@ -30671,43 +31130,6 @@
                 });
             };
 
-            // ══════════════════════════════════════════════════════════
-            // FIX 24.04.2026 — Fehlende window.*-Handler-Bridges
-            //
-            // 1) window._showToast: global aufrufbare Toast-Anzeige
-            //    Signatur: window._showToast(message, type)
-            //    type: 'success' | 'error' | 'info'  (default: 'info')
-            //    Wird 9x in tw-app.jsx aufgerufen (Speicher-Status,
-            //    Dringend-Alarm, Foto-Migration, Akten-Funktion).
-            //
-            // 2) window._saveAufmassVorlageHandler: aufgerufen vom
-            //    "Aufmassvorlage speichern"-Button im Aufmass-Modul.
-            //
-            // 3) window._openVorlagenListeHandler: aufgerufen vom
-            //    "Aufmassvorlage laden"-Button im Aufmass-Modul.
-            // ══════════════════════════════════════════════════════════
-            window._showToast = function(message, type) {
-                setToastGlobal({ msg: String(message || ''), type: type || 'info', id: Date.now() });
-            };
-            window._saveAufmassVorlageHandler = function() {
-                if (typeof saveAufmassVorlage === 'function') {
-                    try { saveAufmassVorlage(); } catch(e) { console.warn('Vorlage speichern:', e); }
-                }
-            };
-            window._openVorlagenListeHandler = function() {
-                if (typeof openVorlagenListe === 'function') {
-                    try { openVorlagenListe(); } catch(e) { console.warn('Vorlagen-Liste oeffnen:', e); }
-                }
-            };
-
-            // Toast: Auto-Ausblenden nach 4s (bei Fehler 6s)
-            useEffect(function() {
-                if (!toastGlobal) return;
-                var ms = toastGlobal.type === 'error' ? 6000 : 4000;
-                var t = setTimeout(function() { setToastGlobal(null); }, ms);
-                return function() { clearTimeout(t); };
-            }, [toastGlobal]);
-
             // ── WIP wiederherstellen (aus Akte heraus) ──
             // WICHTIG: listWips() liefert aus Performance-Gruenden NUR Metadaten
             // ohne moduleState. Daher muss hier erst der volle Record nachgeladen
@@ -31838,39 +32260,6 @@
                             </div>
                         </div>
                     )}
-
-                    {/* ═══ GLOBALE TOAST-ANZEIGE (FIX 24.04.2026) ═══ */}
-                    {/* Wird via window._showToast(msg, type) von ueberall getriggert. */}
-                    {/* Auto-Ausblend nach 4 s ueber CSS-Animation + state=null Timeout. */}
-                    {toastGlobal && (
-                        <div key={toastGlobal.id}
-                            style={{
-                                position:'fixed', bottom:'28px', left:'50%', transform:'translateX(-50%)',
-                                zIndex:10000, maxWidth:'92vw', minWidth:'280px',
-                                padding:'14px 22px', borderRadius:'12px',
-                                background: toastGlobal.type === 'error'
-                                    ? 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)'
-                                    : toastGlobal.type === 'success'
-                                    ? 'linear-gradient(135deg, #27ae60 0%, #1e8449 100%)'
-                                    : 'linear-gradient(135deg, #3498db 0%, #1e6ba8 100%)',
-                                color:'#fff', fontSize:'14px', fontWeight:'600',
-                                fontFamily:'Source Sans 3, sans-serif',
-                                boxShadow:'0 8px 28px rgba(0,0,0,0.4)',
-                                border:'1px solid rgba(255,255,255,0.15)',
-                                textAlign:'center',
-                                animation:'twToastSlideIn 0.25s ease-out'
-                            }}
-                            onClick={function(){ setToastGlobal(null); }}
-                        >
-                            {toastGlobal.msg}
-                        </div>
-                    )}
-                    <style dangerouslySetInnerHTML={{__html: `
-@keyframes twToastSlideIn {
-  0%   { opacity:0; transform:translate(-50%, 24px); }
-  100% { opacity:1; transform:translate(-50%, 0); }
-}
-                    `}} />
                 </React.Fragment>
             );
         }
@@ -31879,7 +32268,22 @@
            MOUNT
            ═══════════════════════════════════════════ */
 
-        const root = ReactDOM.createRoot(document.getElementById("root"));
+        window.__twSentinel.completedModules.push("tw-app.jsx");
+
+        // === PRE-RENDER CHECK ===
+        window.__twSentinel.preRenderCheck = {
+            NavDropdown: typeof NavDropdown,
+            AktionDropdown: typeof AktionDropdown,
+            App: typeof App,
+            ErrorBoundary: typeof ErrorBoundary,
+            FirmenLogo: typeof FirmenLogo,
+            ModulWahl: typeof ModulWahl,
+            Aufmass: typeof Aufmass,
+            BaustellenApp: typeof BaustellenApp
+        };
+        console.log('[TW Sentinel] Pre-render check:', window.__twSentinel.preRenderCheck);
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>

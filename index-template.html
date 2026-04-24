@@ -3,29 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- CACHE-BUST: Verhindert, dass Browser alte Versionen aus dem Cache ausliefern.
+         GitHub Pages liefert sonst manchmal bis zu 10 Minuten lang eine veraltete
+         index.html, was zu ReferenceErrors fuehrt, weil referenzierte Funktionen
+         in der alten, aber nicht in der neuen Version fehlen. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 
     <script>
-    // Global Error Handler - zeigt Fehler statt schwarzem Bildschirm
+    // ═══ DIAGNOSE-MODUS ═══
+    // Bei jedem App-Crash zeigen wir direkt auf dem Screen die Infos an,
+    // die wir zur Fehleranalyse brauchen — so dass der Thomas nur einen
+    // Screenshot machen muss, keine Browser-Konsole oeffnen.
+
+    // Alle Fehler sammeln (auch vor dem Rendering)
+    window.__twErrors = [];
     window.onerror = function(msg, url, line, col, error) {
+        window.__twErrors.push({msg: msg, line: line, col: col});
         console.error('App Fehler:', msg, 'at', url, line, col);
+        showCrashDiag(msg, line, col);
+        return false;
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+        window.__twErrors.push({msg: 'Promise: ' + (e.reason && e.reason.message || e.reason)});
+        console.error('Unhandled Promise:', e.reason);
+    });
+
+    function showCrashDiag(msg, line, col) {
         var d = document.getElementById('crash-info');
         if (!d) {
             d = document.createElement('div');
             d.id = 'crash-info';
-            d.style.cssText = 'position:fixed;top:20px;left:20px;right:20px;padding:20px;background:#1a2332;color:#ff6b6b;border:2px solid #ff6b6b;border-radius:12px;z-index:99999;font-family:monospace;font-size:13px;white-space:pre-wrap;max-height:80vh;overflow:auto;';
+            d.style.cssText = 'position:fixed;top:10px;left:10px;right:10px;bottom:10px;padding:16px;background:#0d1117;color:#e6edf3;border:2px solid #ff6b6b;border-radius:12px;z-index:99999;font-family:monospace;font-size:12px;overflow:auto;';
             document.body.appendChild(d);
         }
-        d.innerHTML = '<h3 style="color:#ff6b6b;margin:0 0 10px">⚠️ App-Fehler</h3>' + 
-            '<b>Fehler:</b> ' + msg + '\n' +
-            '<b>Zeile:</b> ' + line + '\n' +
-            '<b>Datei:</b> ' + (url || 'inline') + '\n\n' +
-            '<span style="color:#7a8a9e">Bitte Screenshot an den Entwickler schicken.</span>\n' +
-            '<button onclick="this.parentNode.remove()" style="margin-top:10px;padding:8px 16px;background:#c41e1e;color:white;border:none;border-radius:6px;cursor:pointer">Schließen</button>';
-        return false;
-    };
-    window.addEventListener('unhandledrejection', function(e) {
-        console.error('Unhandled Promise:', e.reason);
-    });
+        var s = window.__twSentinel || {};
+        var completed = (s.completedModules || []).join(', ') || '(keins)';
+        var lastMod = s.lastModule || '(keins gestartet)';
+        var built = s.built || '(unbekannt)';
+        var preRender = s.preRenderCheck ? JSON.stringify(s.preRenderCheck, null, 2) : '(nicht erreicht)';
+
+        d.innerHTML =
+            '<h3 style="color:#ff6b6b;margin:0 0 10px;font-size:15px">⚠️ App-Fehler — DIAGNOSE</h3>' +
+            '<div style="color:#ff9999;margin-bottom:8px"><b>Fehler:</b> ' + msg + '</div>' +
+            '<div style="color:#7a8a9e;margin-bottom:12px;font-size:11px">Zeile ' + (line||'?') + ':' + (col||'?') + '</div>' +
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #58a6ff">' +
+            '<div style="color:#58a6ff;font-weight:bold;margin-bottom:4px">BUILD-VERSION</div>' +
+            '<div style="color:#d2a8ff">' + built + '</div></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #3fb950">' +
+            '<div style="color:#3fb950;font-weight:bold;margin-bottom:4px">MODULE GELADEN</div>' +
+            '<div style="color:#e6edf3;font-size:10px;line-height:1.5">' + completed + '</div></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #f0883e">' +
+            '<div style="color:#f0883e;font-weight:bold;margin-bottom:4px">ABGEBROCHEN BEI</div>' +
+            '<div style="color:#e6edf3">' + lastMod + '</div></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #bc8cff">' +
+            '<div style="color:#bc8cff;font-weight:bold;margin-bottom:4px">FUNKTIONEN DEFINIERT</div>' +
+            '<pre style="margin:0;white-space:pre-wrap;color:#e6edf3;font-size:10px">' + preRender + '</pre></div>' +
+
+            '<div style="background:#161b22;padding:10px;border-radius:6px;margin-bottom:10px;border-left:3px solid #ff6b6b">' +
+            '<div style="color:#ff6b6b;font-weight:bold;margin-bottom:4px">ALLE FEHLER</div>' +
+            '<pre style="margin:0;white-space:pre-wrap;color:#ff9999;font-size:10px">' +
+            (window.__twErrors.map(function(e,i){return (i+1)+'. '+e.msg;}).join('\n') || '(keine)') +
+            '</pre></div>' +
+
+            '<div style="display:flex;gap:8px;margin-top:12px">' +
+            '<button onclick="location.reload(true)" style="flex:1;padding:10px;background:#1E88E5;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold">🔄 Neu laden (Cache umgehen)</button>' +
+            '<button onclick="document.getElementById(\'crash-info\').remove()" style="padding:10px 16px;background:#30363d;color:#e6edf3;border:none;border-radius:6px;cursor:pointer">✕</button>' +
+            '</div>' +
+            '<div style="color:#7a8a9e;margin-top:10px;font-size:10px;text-align:center">Bitte Screenshot an den Entwickler schicken.</div>';
+    }
+
+    // Wenn nach 5s kein Render erfolgt ist, automatisch Diagnose anzeigen
+    setTimeout(function() {
+        var root = document.getElementById('root');
+        if (!root || root.children.length === 0) {
+            showCrashDiag('App rendert nicht (kein Kind unter #root nach 5s)', '?', '?');
+        }
+    }, 5000);
     </script>
 
     <title>TW Business Suite – Thomas Willwacher Fliesenlegermeister e.K.</title>
@@ -75,18 +133,26 @@
     <!-- QR-Code (Etappe 6: Mitarbeiter-Einladungen) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-    <!-- ═══ TW BUSINESS SUITE — MODULARES KERN-SYSTEM ═══ -->
-    <script src="tw-core.js"></script>
-    <script src="tw-storage.js"></script>
-    <script src="tw-kundendaten-parser.js"></script>
-    <script src="tw-infrastructure.js"></script>
-    <script src="tw-staging.js"></script>
+    <!-- ═══ TW BUSINESS SUITE — MODULARES KERN-SYSTEM ═══
+         ?v= Query-String erzwingt Browser-Reload nach jedem Build.
+         Bei jedem Build wird hier ein neuer Zeitstempel eingesetzt,
+         damit selbst aggressivste Caches nicht stoeren. -->
+    <script src="tw-core.js?v=CACHEBUST_PLACEHOLDER"></script>
+    <script src="tw-storage.js?v=CACHEBUST_PLACEHOLDER"></script>
+    <script src="tw-kundendaten-parser.js?v=CACHEBUST_PLACEHOLDER"></script>
+    <script src="tw-infrastructure.js?v=CACHEBUST_PLACEHOLDER"></script>
+    <script src="tw-staging.js?v=CACHEBUST_PLACEHOLDER"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
 
     <!-- ═══ TW BUSINESS SUITE — DESIGN SYSTEM ═══ -->
-    <link rel="stylesheet" href="tw-design.css">
+    <link rel="stylesheet" href="tw-design.css?v=CACHEBUST_PLACEHOLDER">
 
 
-    <div id="root"></div>
+    <div id="root" data-build="CACHEBUST_PLACEHOLDER"></div>
+    <script>
+      // Build-Version in die Console — damit man auf dem Tablet in den DevTools
+      // sofort sieht, ob man die neueste Version hat oder eine gecachte.
+      console.log('%c[TW Build] Version: CACHEBUST_PLACEHOLDER', 'color:#1E88E5;font-weight:bold');
+    </script>
 
