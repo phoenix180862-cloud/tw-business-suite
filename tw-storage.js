@@ -624,6 +624,8 @@
     }
 
     // Alle Fotos eines Kunden mit DataURLs laden (fuer Anzeige im UI)
+    // WARNUNG: Teuer bei vielen Fotos -- bevorzugt loadFotosByIdsAsDataURLs
+    // verwenden, wenn moeglich.
     function loadFotosByKundeAsDataURLs(kundeId) {
         return getByIndex('fotos', 'kundeId', String(kundeId)).then(function(records) {
             return Promise.all(records.map(function(r) {
@@ -647,6 +649,32 @@
                 logSyncAction(rec.kundeId, 'foto_delete', rec.kontext, fotoId, '');
                 return true;
             });
+        });
+    }
+
+    // BLOCK-B2-FIX (24.04.2026): Gezielt nur SPEZIFISCHE Fotos als DataURL laden.
+    // Das verhindert, dass alle 100+ Fotos eines Kunden in den Heap gezogen werden,
+    // obwohl nur ein Raumblatt mit evtl. 10-20 Fotos angezeigt wird.
+    //
+    // ids: Array von Foto-IDs (strings) die geladen werden sollen
+    // Rueckgabe: Array von {id, dataUrl, kontext, raumKey, subKey, ...} fuer NUR diese IDs
+    function loadFotosByIdsAsDataURLs(ids) {
+        if (!Array.isArray(ids) || !ids.length) return Promise.resolve([]);
+        // Einzelne getItem-Aufrufe, kein "alle Fotos in den Heap"
+        var promises = ids.map(function(id) {
+            return getItem('fotos', id).then(function(r) {
+                if (!r || !r.blob) return null;
+                return blobToDataURL(r.blob).then(function(dataUrl) {
+                    return {
+                        id: r.id, dataUrl: dataUrl, kontext: r.kontext, raumKey: r.raumKey,
+                        subKey: r.subKey, meta: r.meta || {}, size: r.size,
+                        driveUploaded: r.driveUploaded
+                    };
+                });
+            }).catch(function() { return null; });
+        });
+        return Promise.all(promises).then(function(results) {
+            return results.filter(function(r) { return r !== null; });
         });
     }
 
@@ -2269,6 +2297,7 @@
         loadFotoAsDataURL: loadFotoAsDataURL,
         listFotosByKunde: listFotosByKunde,
         loadFotosByKundeAsDataURLs: loadFotosByKundeAsDataURLs,
+        loadFotosByIdsAsDataURLs: loadFotosByIdsAsDataURLs,
         deleteFoto: deleteFoto,
         getUnuploadedFotos: getUnuploadedFotos,
         markFotoAsUploaded: markFotoAsUploaded,

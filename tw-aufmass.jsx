@@ -7684,17 +7684,49 @@
                         // holen wir die Bild-Blobs aus dem persistenten Foto-Store nach.
                         // Fallback auf alten Format: wenn noch vollstaendige DataURLs drin
                         // sind (aus Vor-B2-Saves), uebernehmen wir die direkt.
+                        // BLOCK B2-FIX (24.04.2026): Das doppelte loadFotosByKundeAsDataURLs
+                        // hat am Tablet den Heap gesprengt (2 GB nach 60s). Jetzt: Alle Fotos
+                        // EINMAL laden und auf beide States verteilen. Zusaetzlich:
+                        // Nur Fotos laden, die der Payload tatsaechlich referenziert
+                        // (keine Geisterfotos aus anderen Raumblaettern).
+                        var phasenIstSchlank = false;
+                        var objektIstSchlank = false;
                         if (s.phasenFotos) {
                             var firstPhase = Object.keys(s.phasenFotos)[0];
                             var firstWand = firstPhase && Object.keys(s.phasenFotos[firstPhase] || {})[0];
                             var firstEntry = firstWand && s.phasenFotos[firstPhase][firstWand];
-                            var istSchlank = firstEntry && (firstEntry.hasImage !== undefined) && !firstEntry.image;
-                            if (istSchlank && window.TWStorage && window.TWStorage.loadFotosByKundeAsDataURLs && kunde) {
-                                // Async-Hydrierung — initial leeren State setzen, danach nachfuellen
-                                setPhasenFotos(s.phasenFotos);
-                                var kundeId = kunde._driveFolderId || kunde.id || kunde.name;
-                                window.TWStorage.loadFotosByKundeAsDataURLs(kundeId).then(function(fotos) {
-                                    if (!fotos || !fotos.length) return;
+                            phasenIstSchlank = firstEntry && (firstEntry.hasImage !== undefined) && !firstEntry.image;
+                            // Sofort setzen (schlank oder vollstaendig)
+                            setPhasenFotos(s.phasenFotos);
+                        }
+                        if (s.objektFotos) {
+                            var erster = s.objektFotos[0];
+                            objektIstSchlank = erster && (erster.hasImage !== undefined) && !erster.image;
+                            setObjektFotos(s.objektFotos);
+                        }
+
+                        // Nur EINEN Fetch durchfuehren, falls irgendeine Rehydrierung noetig ist
+                        if ((phasenIstSchlank || objektIstSchlank) &&
+                            window.TWStorage && window.TWStorage.listFotosByKunde &&
+                            window.TWStorage.loadFotosByIdsAsDataURLs && kunde) {
+                            var kId = kunde._driveFolderId || kunde.id || kunde.name;
+                            var raumKey = (raum && (raum.bez || raum.nr)) || raumName || 'raum';
+                            // Schritt 1: Nur Metadaten aller Fotos holen (klein)
+                            window.TWStorage.listFotosByKunde(kId).then(function(meta) {
+                                if (!meta || !meta.length) return [];
+                                // Schritt 2: Nur die Fotos unseres Raums filtern
+                                // (phase + objekt, Key muss zu dem aktuellen Raum passen)
+                                var relevanteIds = meta.filter(function(m) {
+                                    return (m.kontext === 'phase' || m.kontext === 'objekt')
+                                        && m.raumKey === raumKey;
+                                }).map(function(m) { return m.id; });
+                                if (relevanteIds.length === 0) return [];
+                                // Schritt 3: Nur DIESE als DataURL laden -- kein Foto-Ueberschwall
+                                return window.TWStorage.loadFotosByIdsAsDataURLs(relevanteIds);
+                            }).then(function(fotos) {
+                                if (!fotos || !fotos.length) return;
+                                // Phasenfotos verteilen
+                                if (phasenIstSchlank) {
                                     setPhasenFotos(function(prev) {
                                         var merged = Object.assign({}, prev);
                                         fotos.forEach(function(rec) {
@@ -7712,19 +7744,9 @@
                                         });
                                         return merged;
                                     });
-                                }).catch(function(e) { console.warn('[Raumblatt] Foto-Rehydrierung fehlgeschlagen:', e.message); });
-                            } else {
-                                setPhasenFotos(s.phasenFotos);
-                            }
-                        }
-                        if (s.objektFotos) {
-                            var erster = s.objektFotos[0];
-                            var objSchlank = erster && (erster.hasImage !== undefined) && !erster.image;
-                            if (objSchlank && window.TWStorage && window.TWStorage.loadFotosByKundeAsDataURLs && kunde) {
-                                setObjektFotos(s.objektFotos);
-                                var kId = kunde._driveFolderId || kunde.id || kunde.name;
-                                window.TWStorage.loadFotosByKundeAsDataURLs(kId).then(function(fotos) {
-                                    if (!fotos || !fotos.length) return;
+                                }
+                                // Objektfotos verteilen
+                                if (objektIstSchlank) {
                                     setObjektFotos(function(prev) {
                                         var arr = prev.slice();
                                         fotos.forEach(function(rec) {
@@ -7737,10 +7759,10 @@
                                         });
                                         return arr;
                                     });
-                                }).catch(function(e) { console.warn('[Raumblatt] Objekt-Foto-Rehydrierung:', e.message); });
-                            } else {
-                                setObjektFotos(s.objektFotos);
-                            }
+                                }
+                                // Referenz aus dem Closure loesen, damit der GC die Fotos freigeben kann
+                                fotos = null;
+                            }).catch(function(e) { console.warn('[Raumblatt] Foto-Rehydrierung fehlgeschlagen:', e.message); });
                         }
                         if (s.kiErgebnisse) setKiErgebnisse(s.kiErgebnisse);
                         if (s.kiFotoErgebnisse) setKiFotoErgebnisse(s.kiFotoErgebnisse);
