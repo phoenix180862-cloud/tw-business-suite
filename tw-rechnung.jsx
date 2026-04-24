@@ -456,8 +456,12 @@
                 } // Ende else (Standard-Rechnungstabelle)
                 if(bemerkung){y+=3;doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(85,85,85);var bL=doc.splitTextToSize(bemerkung,CW);bL.forEach(function(l){if(y+4>PH-MB){doc.addPage();pn++;y=MT;drawFooter(pn);}doc.text(l,ML,y);y+=3.8;});}
                 if(!footerDrawn[pn]){drawFooter(pn);}
-                // PDF oeffnen
-                var blob=doc.output('blob');var url=URL.createObjectURL(blob);window.open(url,'_blank');
+                // PDF oeffnen — BLOCK B / FIX B1: Blob-URL wird nach
+                // 60s automatisch freigegeben, sonst akkumuliert sich
+                // bei jeder Vorschau ein MB-grosser Leak.
+                var blob=doc.output('blob');var url=URL.createObjectURL(blob);
+                var pdfWin=window.open(url,'_blank');
+                setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
                 saveToGoogleDrive();
             };
             var escXml=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};

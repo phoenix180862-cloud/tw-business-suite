@@ -51,7 +51,30 @@
 
             var bildInputRef = React.useRef(null);
             var kameraInputRef = React.useRef(null);
-            var handleBild = function(e) { var file = e.target.files && e.target.files[0]; if (!file) return; var img = new Image(); var canvas = document.createElement('canvas'); img.onload = function() { var w = img.width, h = img.height; var maxW = 1200, maxH = 900; if (w > maxW) { h = h * maxW / w; w = maxW; } if (h > maxH) { w = w * maxH / h; h = maxH; } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); setBilder(function(prev) { return prev.concat([{ name: file.name, dataUrl: canvas.toDataURL('image/jpeg', 0.85) }]); }); }; img.src = URL.createObjectURL(file); e.target.value = ''; };
+            var handleBild = function(e) {
+                var file = e.target.files && e.target.files[0];
+                if (!file) return;
+                var img = new Image();
+                var canvas = document.createElement('canvas');
+                // BLOCK B / FIX B1 — Blob-URL merken fuer revoke
+                var blobUrl = URL.createObjectURL(file);
+                img.onload = function() {
+                    var w = img.width, h = img.height;
+                    var maxW = 1200, maxH = 900;
+                    if (w > maxW) { h = h * maxW / w; w = maxW; }
+                    if (h > maxH) { w = w * maxH / h; h = maxH; }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    setBilder(function(prev) { return prev.concat([{ name: file.name, dataUrl: canvas.toDataURL('image/jpeg', 0.85) }]); });
+                    try { URL.revokeObjectURL(blobUrl); } catch(err) {}
+                };
+                img.onerror = function() {
+                    try { URL.revokeObjectURL(blobUrl); } catch(err) {}
+                    alert('Bild konnte nicht geladen werden.');
+                };
+                img.src = blobUrl;
+                e.target.value = '';
+            };
             var removeBild = function(idx) { setBilder(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
 
             // -- Adresse aufsplitten --
@@ -204,10 +227,11 @@
                 doc.text('Thomas Willwacher', ML, y); y += 5;
                 doc.text('Fliesenlegermeister e.K.', ML, y);
 
-                // PDF oeffnen
+                // PDF oeffnen — BLOCK B / FIX B1: revoke nach 60s
                 var pdfBlob = doc.output('blob');
                 var pdfUrl = URL.createObjectURL(pdfBlob);
                 window.open(pdfUrl, '_blank');
+                setTimeout(function(){ try{ URL.revokeObjectURL(pdfUrl); }catch(e){} }, 60000);
                 return pdfBlob;
             };
 
@@ -235,7 +259,18 @@
             };
 
             var handleDriveSpeichern = async function() {
-                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var uOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; var pdfBlob = generatePDF(); await service.uploadFile(uOId, fN, 'application/pdf', pdfBlob); alert('\u2705 PDF gespeichert in Schriftverkehr/' + (versandKanal==='mail'?'Mail':'Briefe') + '/'); } else { var pdfBlob2 = generatePDF(); var a = document.createElement('a'); a.href = URL.createObjectURL(pdfBlob2); a.download = (versandKanal==='mail'?'Mail':'Brief') + '_' + new Date().toISOString().slice(0,10) + '.pdf'; a.click(); } } catch(err) { console.error('Speichern-Fehler:', err); alert('Fehler: ' + err.message); }
+                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var uOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; var pdfBlob = generatePDF(); await service.uploadFile(uOId, fN, 'application/pdf', pdfBlob); alert('\u2705 PDF gespeichert in Schriftverkehr/' + (versandKanal==='mail'?'Mail':'Briefe') + '/'); } else {
+                    // BLOCK B / FIX B1 — Fallback-Download: Blob-URL nach Click sofort freigeben
+                    var pdfBlob2 = generatePDF();
+                    var dlUrl = URL.createObjectURL(pdfBlob2);
+                    var a = document.createElement('a');
+                    a.href = dlUrl;
+                    a.download = (versandKanal==='mail'?'Mail':'Brief') + '_' + new Date().toISOString().slice(0,10) + '.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(function(){ try{ URL.revokeObjectURL(dlUrl); }catch(e){} }, 5000);
+                } } catch(err) { console.error('Speichern-Fehler:', err); alert('Fehler: ' + err.message); }
             };
 
             var openMailDialog = function() { setMailAdresse(kunde?(kunde.ag_email||kunde.bl_email||''):''); setShowMailDialog(true); };

@@ -534,6 +534,9 @@
         _activated: false,
         _lastSavedAt: null,
         _suppressed: false,    // temporaer deaktiviert (z.B. waehrend Kundenwechsel)
+        // BLOCK B / FIX B3 — Save-Lock gegen parallele Saves:
+        _saving: false,        // true, solange _saveFn laeuft
+        _queuedAfterSave: false, // Flag: nach Abschluss nochmal flushen
 
         // Registriert die eigentliche Speicher-Funktion. payload -> Promise.
         // Wird einmal zentral in tw-app.jsx gesetzt.
@@ -549,6 +552,14 @@
             if (this._suppressed) return;
             this._pendingPayload = payload;
             this._broadcast('pending');
+            // BLOCK B / FIX B3: Wenn gerade ein Save laeuft, NICHT sofort
+            // einen zweiten starten — stattdessen Flag setzen, damit nach
+            // Abschluss erneut geflusht wird. Das verhindert Race-Conditions
+            // bei grossen States (Foto-heavy Raumblatt).
+            if (this._saving) {
+                this._queuedAfterSave = true;
+                return;
+            }
             if (this._timer) clearTimeout(this._timer);
             var self = this;
             this._timer = setTimeout(function() { self.flush(); }, this._delay);
@@ -560,30 +571,56 @@
             if (this._timer) { clearTimeout(this._timer); this._timer = null; }
             if (!this._pendingPayload) return Promise.resolve(null);
             if (!this._saveFn) return Promise.resolve(null);
+            // BLOCK B / FIX B3: Lock — verhindert, dass zwei _saveFn-Aufrufe
+            // parallel laufen und sich gegenseitig ueberschreiben. Wenn
+            // bereits gesaved wird, merken wir uns "nochmal flushen" und
+            // geben ein Promise zurueck, das auf den laufenden Save wartet.
+            if (this._saving) {
+                this._queuedAfterSave = true;
+                return Promise.resolve(null);
+            }
+            this._saving = true;
 
             var payload = this._pendingPayload;
             this._pendingPayload = null;
             this._broadcast('saving');
+
+            var finishOk = function(v) {
+                self._lastSavedAt = new Date();
+                self._broadcast('saved');
+                self._saving = false;
+                // Wenn zwischenzeitlich erneut markDirty kam, jetzt nachflushen
+                if (self._queuedAfterSave) {
+                    self._queuedAfterSave = false;
+                    if (self._pendingPayload) {
+                        if (self._timer) clearTimeout(self._timer);
+                        self._timer = setTimeout(function(){ self.flush(); }, self._delay);
+                    }
+                }
+                return v;
+            };
+            var finishErr = function(e) {
+                console.warn('[AutoSave] Fehler:', e);
+                self._broadcast('error');
+                self._saving = false;
+                if (self._queuedAfterSave) {
+                    self._queuedAfterSave = false;
+                    if (self._pendingPayload) {
+                        if (self._timer) clearTimeout(self._timer);
+                        self._timer = setTimeout(function(){ self.flush(); }, self._delay);
+                    }
+                }
+                throw e;
+            };
+
             try {
                 var result = this._saveFn(payload);
                 if (result && typeof result.then === 'function') {
-                    return result.then(function(v) {
-                        self._lastSavedAt = new Date();
-                        self._broadcast('saved');
-                        return v;
-                    }).catch(function(e) {
-                        console.warn('[AutoSave] Fehler:', e);
-                        self._broadcast('error');
-                        throw e;
-                    });
+                    return result.then(finishOk).catch(finishErr);
                 }
-                this._lastSavedAt = new Date();
-                this._broadcast('saved');
-                return Promise.resolve(result);
+                return Promise.resolve(finishOk(result));
             } catch(e) {
-                console.warn('[AutoSave] Sofort-Fehler:', e);
-                this._broadcast('error');
-                return Promise.reject(e);
+                return Promise.reject(finishErr(e));
             }
         },
 

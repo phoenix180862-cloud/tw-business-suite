@@ -86,6 +86,106 @@
             );
         }
 
+        // ═══ BLOCK D / FIX D2 — Speicher-Anzeige ═══
+        // Zeigt Nutzung der IndexedDB in Prozent & absolut.
+        // Klickbar: Modal mit Details + Cleanup-Button.
+        // Farbe: gruen < 70 %, gelb 70-89 %, rot ab 90 %.
+        // Refreshed sich alle 60 s.
+        function StorageIndicator() {
+            const [info, setInfo] = useState(null);
+            const [modalOpen, setModalOpen] = useState(false);
+            const [cleaning, setCleaning] = useState(false);
+
+            const refreshInfo = React.useCallback(function() {
+                if (!window.TWStorage || !window.TWStorage.getStorageInfo) return;
+                window.TWStorage.getStorageInfo().then(function(x) { setInfo(x); }).catch(function(){});
+            }, []);
+
+            useEffect(function() {
+                refreshInfo();
+                var iv = setInterval(refreshInfo, 60000); // alle 60 s
+                return function() { clearInterval(iv); };
+            }, [refreshInfo]);
+
+            if (!info) return null;
+
+            var pct = info.percentUsed || 0;
+            var label, bg, tip;
+            if (pct >= 90) {
+                label = 'Voll ' + Math.round(pct) + '%';
+                bg = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                tip = 'WARNUNG: Lokaler Speicher fast voll (' + info.usageMB + ' / ' + info.quotaMB + ' MB). Klicken zum Aufraeumen.';
+            } else if (pct >= 70) {
+                label = Math.round(pct) + '%';
+                bg = 'linear-gradient(135deg, #f39c12, #e67e22)';
+                tip = 'Lokaler Speicher: ' + info.usageMB + ' von ' + info.quotaMB + ' MB (' + Math.round(pct) + '%). Klicken fuer Details.';
+            } else {
+                label = Math.round(pct) + '%';
+                bg = 'linear-gradient(135deg, #3498db, #2980b9)';
+                tip = 'Lokaler Speicher: ' + info.usageMB + ' von ' + info.quotaMB + ' MB (' + Math.round(pct) + '%). Klicken fuer Details.';
+            }
+
+            const handleCleanup = function() {
+                if (!window.TWStorage || !window.TWStorage.cleanupUploadedFotosForSpace) return;
+                if (!confirm('Drive-gesicherte Fotos aus dem lokalen Cache entfernen, um Platz zu schaffen?\n\nDie Originale bleiben sicher im Google Drive-Archiv.')) return;
+                setCleaning(true);
+                window.TWStorage.cleanupUploadedFotosForSpace(50 * 1024 * 1024).then(function(res) {
+                    setCleaning(false);
+                    refreshInfo();
+                    alert('Aufgeraeumt: ' + (res.geloescht || 0) + ' Fotos entfernt, ' + Math.round((res.freigabeBytes || 0)/1024/1024*10)/10 + ' MB frei.');
+                }).catch(function(e) {
+                    setCleaning(false);
+                    alert('Cleanup-Fehler: ' + e.message);
+                });
+            };
+
+            return (
+                <React.Fragment>
+                    <div title={tip}
+                        onClick={function(){ setModalOpen(true); refreshInfo(); }}
+                        style={{flex:'0 0 auto', padding:'6px 10px', minWidth:'48px', borderRadius:'var(--radius-sm)', border:'none', background:bg, color:'#fff', fontSize:'11px', fontWeight:'700', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.3px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', userSelect:'none', whiteSpace:'nowrap', cursor:'pointer'}}>
+                        {'\uD83D\uDCBE'} {label}
+                    </div>
+                    {modalOpen && (
+                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.65)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px'}}
+                            onClick={function(){ setModalOpen(false); }}>
+                            <div onClick={function(e){ e.stopPropagation(); }}
+                                style={{maxWidth:'380px', width:'100%', background:'var(--bg-primary)', border:'1px solid var(--border-subtle)', borderRadius:'14px', padding:'18px', fontFamily:'Source Sans 3, sans-serif'}}>
+                                <div style={{fontFamily:'Oswald, sans-serif', fontWeight:700, fontSize:'16px', textTransform:'uppercase', letterSpacing:'0.5px', color:'var(--text-white)', marginBottom:'14px'}}>
+                                    {'\uD83D\uDCBE'} Lokaler Speicher
+                                </div>
+                                <div style={{fontSize:'13px', lineHeight:1.5, color:'var(--text-primary)', marginBottom:'12px'}}>
+                                    <div>Belegt: <strong>{info.usageMB} MB</strong></div>
+                                    <div>Verfuegbar: <strong>{info.quotaMB} MB</strong> ({info.quotaGB} GB)</div>
+                                    <div>Auslastung: <strong>{Math.round(pct * 10) / 10} %</strong></div>
+                                </div>
+                                <div style={{height:'12px', background:'var(--bg-tertiary)', borderRadius:'6px', overflow:'hidden', marginBottom:'14px'}}>
+                                    <div style={{height:'100%', width:Math.min(100, pct) + '%', background:bg, transition:'width 0.3s'}} />
+                                </div>
+                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'14px', lineHeight:1.5}}>
+                                    Lokale Fotos werden nach erfolgreichem Drive-Upload als "gesichert" markiert. Diese koennen bei Bedarf entfernt werden, um Platz zu schaffen — die Originale bleiben im Google Drive-Archiv.
+                                </div>
+                                <div style={{display:'flex', gap:'8px'}}>
+                                    <button onClick={handleCleanup} disabled={cleaning}
+                                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'none', cursor: cleaning ? 'wait' : 'pointer',
+                                            background: cleaning ? '#7f8c8d' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                            boxShadow: cleaning ? 'none' : '0 3px 10px rgba(30,136,229,0.3)',
+                                            color:'#fff', fontSize:'12px', fontWeight:700, fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {cleaning ? 'Raeume auf...' : 'Aufraeumen'}
+                                    </button>
+                                    <button onClick={function(){ setModalOpen(false); }}
+                                        style={{flex:1, padding:'10px', borderRadius:'8px', border:'1px solid var(--border-subtle)', background:'transparent', color:'var(--text-primary)', fontSize:'12px', fontWeight:700, fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', cursor:'pointer'}}>
+                                        Schliessen
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </React.Fragment>
+            );
+        }
+
+
         function App() {
             // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
             const [page, setPage] = useState('start');
@@ -2103,176 +2203,14 @@
 
             // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
             // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
-            // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
-            // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
+            // Aktionen via window._setModuleActions(arr). Das globale Bearbeiten-
+            // Dropdown nimmt sie mit auf.
             const [moduleActions, setModuleActions] = useState([]);
-            // Aktuell registrierte Seite (fuer korrektes Unregister)
-            const moduleActionsSeiteRef = useRef(null);
             useEffect(function() {
-                // Altes Pattern: direktes Array setzen
                 window._setModuleActions = function(arr) {
-                    moduleActionsSeiteRef.current = null;
                     setModuleActions(Array.isArray(arr) ? arr : []);
                 };
-                // Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
-                window._registerSeitenAktionen = function(seite, aktionen) {
-                    moduleActionsSeiteRef.current = seite || null;
-                    setModuleActions(Array.isArray(aktionen) ? aktionen : []);
-                };
-                // Cleanup beim Modulwechsel: Nur entfernen wenn die aufrufende Seite noch registriert ist
-                // (verhindert dass ein neu gemountetes Modul sein gerade registriertes Dropdown sofort wieder leert)
-                window._unregisterSeitenAktionen = function(seite) {
-                    if (!seite || moduleActionsSeiteRef.current === seite) {
-                        moduleActionsSeiteRef.current = null;
-                        setModuleActions([]);
-                    }
-                };
-                // Primaer-Aktion (gruener Button rechts) -- fuer spaetere Verwendung reserviert
-                window._registerPrimaerAktion = function(seite, aktion) {
-                    // Aktuell noch nicht als separater Button umgesetzt -- ignorieren
-                };
-                window._unregisterPrimaerAktion = function(seite) {
-                    // Counterpart zum Register -- aktuell no-op
-                };
-                return function() {
-                    window._setModuleActions = null;
-                    window._registerSeitenAktionen = null;
-                    window._unregisterSeitenAktionen = null;
-                    window._registerPrimaerAktion = null;
-                    window._unregisterPrimaerAktion = null;
-                };
-            }, []);
-
-            // ══════════════════════════════════════════════════════════
-            // GLOBALER DRINGLICHKEITS-ALARM (Baustellen-App Nachrichten)
-            // Hoert auf ALLE Chats und triggert Sound + Notification wenn
-            // eine neue dringende MA-Nachricht eingeht.
-            //
-            // Logik:
-            //   - Referenz-Timestamp im localStorage ('tw_dringend_seen_ts')
-            //   - Nur Nachrichten mit timestamp > seen_ts + dringend + von 'ma' + !gelesen alarmen
-            //   - Bei Alarm: Sound (Web Audio API), Browser-Notification, Toast
-            //   - seen_ts wird nach jedem Scan aktualisiert
-            //   - Wartet bis Firebase verfuegbar ist (polling, max. 60s)
-            // ══════════════════════════════════════════════════════════
-            useEffect(function() {
-                var unsubAlarm = null;
-                var pollTimer = null;
-                var pollCount = 0;
-                var audioCtx = null;
-
-                // Web Audio API: kurzer Alarm-Beep ohne externe Datei
-                var playAlarmSound = function() {
-                    try {
-                        if (!audioCtx) {
-                            var AC = window.AudioContext || window.webkitAudioContext;
-                            if (!AC) return;
-                            audioCtx = new AC();
-                        }
-                        if (audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
-                        // Drei schnelle Pieptoene (880Hz -> 988Hz -> 1175Hz) fuer klares Alarm-Muster
-                        var now = audioCtx.currentTime;
-                        [[880, 0.00], [988, 0.15], [1175, 0.30]].forEach(function(pair) {
-                            var osc = audioCtx.createOscillator();
-                            var gain = audioCtx.createGain();
-                            osc.type = 'sine';
-                            osc.frequency.value = pair[0];
-                            gain.gain.setValueAtTime(0.0001, now + pair[1]);
-                            gain.gain.exponentialRampToValueAtTime(0.25, now + pair[1] + 0.02);
-                            gain.gain.exponentialRampToValueAtTime(0.0001, now + pair[1] + 0.13);
-                            osc.connect(gain); gain.connect(audioCtx.destination);
-                            osc.start(now + pair[1]);
-                            osc.stop(now + pair[1] + 0.14);
-                        });
-                    } catch(e) { console.warn('Alarm-Sound Fehler:', e); }
-                };
-
-                // Browser-Notification (falls erlaubt)
-                var showNotification = function(absenderName, text) {
-                    try {
-                        if (!('Notification' in window)) return;
-                        if (Notification.permission === 'granted') {
-                            new Notification('🔔 Dringende Nachricht von ' + (absenderName || 'Mitarbeiter'), {
-                                body: (text || '').substring(0, 140),
-                                tag: 'tw-dringend',
-                                requireInteraction: true
-                            });
-                        } else if (Notification.permission !== 'denied') {
-                            Notification.requestPermission();
-                        }
-                    } catch(e) {}
-                };
-
-                var handleChatData = function(data) {
-                    if (!data) return;
-                    var seenTs = parseInt(localStorage.getItem('tw_dringend_seen_ts') || '0', 10) || 0;
-                    var maxTs = seenTs;
-                    var neueDringende = [];
-                    for (var maId in data) {
-                        if (!data.hasOwnProperty(maId)) continue;
-                        var thread = data[maId];
-                        for (var nk in thread) {
-                            if (!thread.hasOwnProperty(nk)) continue;
-                            var n = thread[nk];
-                            if (!n || !n.timestamp) continue;
-                            if (n.timestamp > maxTs) maxTs = n.timestamp;
-                            if (n.dringend && n.von === 'ma' && !n.gelesen && n.timestamp > seenTs) {
-                                neueDringende.push({ maId: maId, nachricht: n });
-                            }
-                        }
-                    }
-                    if (neueDringende.length > 0) {
-                        var erste = neueDringende[0];
-                        var absender = erste.nachricht.absender_name || erste.nachricht.absender || 'Mitarbeiter';
-                        var text = erste.nachricht.text_original || erste.nachricht.text || '';
-                        playAlarmSound();
-                        showNotification(absender, text);
-                        if (window._showToast) {
-                            var msg = neueDringende.length === 1
-                                ? '🔔 Dringend von ' + absender + ': ' + text.substring(0, 80)
-                                : '🔔 ' + neueDringende.length + ' dringende Nachrichten eingegangen';
-                            window._showToast(msg, 'error');
-                        }
-                    }
-                    // Scan-Marker aktualisieren, damit derselbe Alarm nicht mehrfach feuert
-                    if (maxTs > seenTs) {
-                        try { localStorage.setItem('tw_dringend_seen_ts', String(maxTs)); } catch(e) {}
-                    }
-                };
-
-                var startListener = function() {
-                    if (!window.FirebaseService || !window.FirebaseService.db || !window.FirebaseService.subscribeAlleChats) {
-                        return false;
-                    }
-                    try {
-                        unsubAlarm = window.FirebaseService.subscribeAlleChats(handleChatData);
-                        // Browser-Notification-Permission proaktiv anfragen
-                        if ('Notification' in window && Notification.permission === 'default') {
-                            Notification.requestPermission();
-                        }
-                        return true;
-                    } catch(e) {
-                        console.warn('Alarm-Listener konnte nicht starten:', e);
-                        return false;
-                    }
-                };
-
-                // Sofort probieren, dann alle 2 Sekunden bis Firebase ready (max. 60 Sek.)
-                if (!startListener()) {
-                    pollTimer = setInterval(function() {
-                        pollCount++;
-                        if (startListener() || pollCount > 30) {
-                            clearInterval(pollTimer);
-                            pollTimer = null;
-                        }
-                    }, 2000);
-                }
-
-                return function() {
-                    if (unsubAlarm) { try { unsubAlarm(); } catch(e) {} }
-                    if (pollTimer) clearInterval(pollTimer);
-                    if (audioCtx) { try { audioCtx.close(); } catch(e) {} }
-                };
+                return function() { window._setModuleActions = null; };
             }, []);
 
             var _startFotoSync = React.useCallback(function() {
@@ -2422,6 +2360,9 @@
                 TWStorage.openAppDatei(dateiId).then(function(result) {
                     if (result && result.url) {
                         window.open(result.url, '_blank');
+                        // BLOCK B / FIX B1 — Blob-URL freigeben nach 60s
+                        // (Tab ist dann geoeffnet und hat den Blob referenziert).
+                        setTimeout(function(){ try{ URL.revokeObjectURL(result.url); }catch(e){} }, 60000);
                     }
                 });
             };
@@ -2757,10 +2698,11 @@
                                     );
                                 })()}
                             </div>
-                            {/* Rechte Gruppe: AutoSave + FotoSync - kompakt in der Ecke */}
+                            {/* Rechte Gruppe: AutoSave + FotoSync + Speicher - kompakt in der Ecke */}
                             <div style={{display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto'}}>
                                 <AutoSaveStatusIndicator />
                                 <FotoSyncIndicator status={fotoSyncStatus} />
+                                <StorageIndicator />
                             </div>
                         </div>
                     )}

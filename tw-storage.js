@@ -398,6 +398,10 @@
         quality = (typeof quality === 'number') ? quality : 0.85;
         return new Promise(function(resolve, reject) {
             var img = new Image();
+            var blobUrl = null; // Fuer revokeObjectURL nach Load
+            var cleanup = function() {
+                if (blobUrl) { try { URL.revokeObjectURL(blobUrl); } catch(e) {} blobUrl = null; }
+            };
             img.onload = function() {
                 try {
                     var w = img.naturalWidth || img.width;
@@ -413,20 +417,49 @@
                     canvas.height = ch;
                     var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, cw, ch);
+                    cleanup();
                     canvas.toBlob(function(blob) {
                         if (blob) resolve(blob);
                         else reject(new Error('Canvas.toBlob fehlgeschlagen'));
                     }, 'image/jpeg', quality);
-                } catch(e) { reject(e); }
+                } catch(e) { cleanup(); reject(e); }
             };
-            img.onerror = function() { reject(new Error('Bild konnte nicht geladen werden')); };
+            img.onerror = function() { cleanup(); reject(new Error('Bild konnte nicht geladen werden')); };
             if (typeof dataUrlOrBlob === 'string') {
                 img.src = dataUrlOrBlob;
             } else if (dataUrlOrBlob instanceof Blob) {
-                img.src = URL.createObjectURL(dataUrlOrBlob);
+                blobUrl = URL.createObjectURL(dataUrlOrBlob);
+                img.src = blobUrl;
             } else {
                 reject(new Error('Ungueltiger Bild-Input'));
             }
+        });
+    }
+
+    // ============================================================
+    // NEU (Block A / Baustellen-Stabilitaet):
+    // compressFileToDataUrl — liest ein File direkt ein, komprimiert
+    // es ONLINE (max. 1920 px Kante, JPEG Q0.85) und gibt eine kleine
+    // Data-URL zurueck. Verwendung in allen Foto-Upload-Handlern,
+    // damit im React-State nie rohe 10-15 MB Handy-Fotos landen.
+    // Groessen-Check: Dateien > MAX_INPUT_BYTES werden abgelehnt,
+    // damit der Browser beim Parsen nicht kippt.
+    // ============================================================
+    var MAX_INPUT_BYTES = 25 * 1024 * 1024; // 25 MB Handy-Foto Cap
+    function compressFileToDataUrl(file, maxEdge, quality) {
+        return new Promise(function(resolve, reject) {
+            if (!file) { reject(new Error('Keine Datei uebergeben')); return; }
+            if (file.size && file.size > MAX_INPUT_BYTES) {
+                reject(new Error('Foto zu grosz (' + Math.round(file.size/1024/1024) + ' MB, max. 25 MB).'));
+                return;
+            }
+            compressImageToBlob(file, maxEdge || 1920, (typeof quality === 'number') ? quality : 0.85)
+                .then(function(blob) {
+                    return blobToDataURL(blob).then(function(dataUrl) {
+                        resolve({ dataUrl: dataUrl, blob: blob, size: blob.size });
+                    });
+                })
+                .catch(function(e) { reject(e); });
         });
     }
 
@@ -446,6 +479,47 @@
         return 'foto_' + safe(kundeId) + '_' + safe(kontext) + '_' +
                safe(raumKey) + '_' + safe(subKey) + '_' + Date.now() +
                '_' + Math.random().toString(36).substr(2, 5);
+    }
+
+    // ═══ BLOCK D / FIX D1 — Auto-Cleanup bei voller IndexedDB ═══
+    // Wenn putItem fuer ein Foto scheitert wegen QuotaExceededError,
+    // loeschen wir die aeltesten bereits nach Drive hochgeladenen Fotos
+    // (driveUploaded=1) — die sind im Drive-Archiv sicher und belegen
+    // nur noch lokal Platz. Dann versuchen wir den Save erneut.
+    //
+    // Sicherheit: NIEMALS ungeladene Fotos loeschen (driveUploaded=0),
+    // denn die sind NUR lokal vorhanden. Die bleiben auf jeden Fall.
+    //
+    // Rueckgabe: Anzahl der geloeschten Fotos, 0 wenn nichts entfernt wurde.
+    function cleanupUploadedFotosForSpace(targetBytes) {
+        return getAllItems('fotos').then(function(alle) {
+            // Nur bereits hochgeladene Fotos nach Alter sortiert (aelteste zuerst)
+            var uploaded = alle.filter(function(f) { return f.driveUploaded === 1; });
+            uploaded.sort(function(a, b) {
+                var ta = new Date(a.updatedAt || a.createdAt || 0).getTime();
+                var tb = new Date(b.updatedAt || b.createdAt || 0).getTime();
+                return ta - tb;
+            });
+            var freed = 0;
+            var count = 0;
+            var chain = Promise.resolve();
+            // Mindestens 5x die Zielgroesse freimachen — gibt Puffer fuer
+            // mehrere weitere Fotos, spart Hektik-Cleanups
+            var wanted = Math.max(targetBytes * 5, 10 * 1024 * 1024); // min 10 MB
+            uploaded.forEach(function(rec) {
+                if (freed >= wanted) return;
+                chain = chain.then(function() {
+                    return deleteItem('fotos', rec.id).then(function() {
+                        freed += rec.size || 0;
+                        count++;
+                    }).catch(function(){ /* ignore */ });
+                });
+            });
+            return chain.then(function() {
+                if (count > 0) console.log('[TW-Storage] Auto-Cleanup: ' + count + ' Drive-gesicherte Fotos geloescht, ' + Math.round(freed/1024/1024*10)/10 + ' MB frei.');
+                return { geloescht: count, freigabeBytes: freed };
+            });
+        });
     }
 
     // Foto speichern (komprimiert, als Blob)
@@ -470,10 +544,30 @@
                 createdAt: (meta && meta.createdAt) || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
-            return putItem('fotos', record).then(function() {
-                logSyncAction(kundeId, 'foto_save', kontext + '/' + raumKey + '/' + subKey, id, '');
-                return blobToDataURL(blob).then(function(dataUrl) {
-                    return { id: id, dataUrl: dataUrl, size: blob.size };
+            // BLOCK D / FIX D1 — Quota-Save mit Auto-Cleanup-Retry
+            var tryPut = function() {
+                return putItem('fotos', record).then(function() {
+                    logSyncAction(kundeId, 'foto_save', kontext + '/' + raumKey + '/' + subKey, id, '');
+                    return blobToDataURL(blob).then(function(dataUrl) {
+                        return { id: id, dataUrl: dataUrl, size: blob.size };
+                    });
+                });
+            };
+            return tryPut().catch(function(err) {
+                // Quota-Fehler? Dann Cleanup + einmal neu versuchen.
+                var isQuota = err && (
+                    err.name === 'QuotaExceededError' ||
+                    err.code === 22 || err.code === 1014 ||
+                    (err.message && /quota/i.test(err.message))
+                );
+                if (!isQuota) throw err;
+                console.warn('[TW-Storage] Quota ueberschritten beim Foto-Save, starte Auto-Cleanup');
+                return cleanupUploadedFotosForSpace(blob.size).then(function(res) {
+                    if (res.geloescht === 0) {
+                        // Nichts zum Aufraeumen vorhanden — klarer Fehler
+                        throw new Error('Lokaler Speicher voll und kein Drive-gesichertes Foto zum Loeschen vorhanden. Bitte Fotos manuell bereinigen.');
+                    }
+                    return tryPut();
                 });
             });
         });
@@ -2178,8 +2272,11 @@
         deleteFoto: deleteFoto,
         getUnuploadedFotos: getUnuploadedFotos,
         markFotoAsUploaded: markFotoAsUploaded,
+        // BLOCK D / FIX D1 — Cleanup-Helper fuer voll gelaufenen Speicher
+        cleanupUploadedFotosForSpace: cleanupUploadedFotosForSpace,
         FotoSync: FotoSync,
         compressImageToBlob: compressImageToBlob,
+        compressFileToDataUrl: compressFileToDataUrl,
         blobToDataURL: blobToDataURL,
         // Ausgangsbuch (IndexedDB statt localStorage)
         saveAusgangsbuchEintrag: saveAusgangsbuchEintrag, loadAusgangsbuch: loadAusgangsbuch,

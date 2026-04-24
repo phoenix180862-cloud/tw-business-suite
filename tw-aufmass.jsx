@@ -24,41 +24,11 @@
                     setGeminiStatus('saved');
                     GEMINI_CONFIG.API_KEY = key;
                 }
-                // ── Drive Auto-Init: Versucht gespeicherten Token aus localStorage zu laden ──
-                // Falls noch gueltig -> automatisch angemeldet ohne Popup.
-                // Falls abgelaufen -> Silent-Refresh ohne Consent-Popup.
-                (async function() {
-                    try {
-                        var service = window.GoogleDriveService;
-                        if (!service) return;
-                        // Init aufrufen -- das laedt den Token aus localStorage wenn noch gueltig
-                        if (!service._gapiInited) {
-                            await service.init();
-                        }
-                        // Wenn jetzt Token da ist -> verbunden
-                        if (service.accessToken) {
-                            setDriveConnected(true);
-                            if (onDriveStatusChange) onDriveStatusChange('online');
-                            return;
-                        }
-                        // Falls kein Token aber schonmal angemeldet war -> Silent-Refresh versuchen
-                        if (localStorage.getItem('tw_gdrive_token_v1') !== null ||
-                            localStorage.getItem('tw_gdrive_was_connected') === '1') {
-                            try {
-                                await service._silentRefresh();
-                                if (service.accessToken) {
-                                    setDriveConnected(true);
-                                    if (onDriveStatusChange) onDriveStatusChange('online');
-                                }
-                            } catch(e) {
-                                // Silent-Refresh fehlgeschlagen -- User muss manuell neu verbinden
-                                console.log('Silent-Refresh nicht moeglich:', e.message);
-                            }
-                        }
-                    } catch(e) {
-                        console.warn('Drive Auto-Init Fehler:', e);
-                    }
-                })();
+                // Drive Check
+                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
+                    setDriveConnected(true);
+                    if (onDriveStatusChange) onDriveStatusChange('online');
+                }
             }, []);
 
             var testGeminiKey = async function() {
@@ -71,10 +41,11 @@
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
                     try {
                         var testModel = modelsToTry[mi];
-                        var res = await fetch(
+                        var res = await (window.fetchWithTimeout || fetch)(
                             GEMINI_CONFIG.BASE_URL + '/models/' + testModel + ':generateContent?key=' + geminiKey,
                             { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ contents: [{ parts: [{ text: 'Sage nur: OK' }] }] }) }
+                              body: JSON.stringify({ contents: [{ parts: [{ text: 'Sage nur: OK' }] }] }) },
+                            15000
                         );
                         if (res.ok) {
                             GEMINI_CONFIG.MODEL = testModel;
@@ -105,16 +76,9 @@
                 try {
                     var service = window.GoogleDriveService;
                     if (!service.accessToken) {
-                        if (!service._gapiInited) {
-                            await service.init();
-                        }
-                        // Falls init bereits Token geladen hat -> fertig
-                        if (!service.accessToken) {
-                            await service.requestAuth();
-                        }
+                        await service.init();
+                        await service.requestAuth();
                     }
-                    // Marker setzen, dass User schonmal verbunden war -> aktiviert silent-refresh beim naechsten Start
-                    try { localStorage.setItem('tw_gdrive_was_connected', '1'); } catch(e){}
                     setDriveConnected(true);
                     setDriveConnecting(false);
                     if (onDriveStatusChange) onDriveStatusChange('online');
@@ -584,9 +548,9 @@
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
                     desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
-                    color: 'var(--accent-blue)',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
@@ -596,9 +560,9 @@
                     icon: '\uD83D\uDCBE',
                     title: 'Gespeicherte Kundendaten aufrufen',
                     desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
-                    color: 'var(--accent-blue)',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: 'OFFLINE',
                     disabled: false,
                     disabledHint: null,
@@ -608,9 +572,9 @@
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
-                    color: 'var(--accent-blue)',
-                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
-                    shadow: 'rgba(30,136,229,0.30)',
+                    color: 'var(--accent-red)',
+                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+                    shadow: 'rgba(196,30,30,0.30)',
                     badge: null,
                     disabled: false,
                     disabledHint: null,
@@ -912,6 +876,7 @@
                                 processStammRows(allRows.slice(1), allRows[0] || []);
                             } catch(err) { setUploadStatus('Fehler: ' + err.message); }
                         };
+                        readerS.onerror = function() { setUploadStatus('Datei konnte nicht gelesen werden'); };
                         readerS.readAsText(file);
                     } else if (ext === 'xlsx' || ext === 'xls') {
                         var readerS2 = new FileReader();
@@ -925,6 +890,7 @@
                                 processStammRows(rows.slice(1), rows[0] || []);
                             } catch(err) { setUploadStatus('Excel-Fehler: ' + err.message); }
                         };
+                        readerS2.onerror = function() { setUploadStatus('Excel-Datei konnte nicht gelesen werden'); };
                         readerS2.readAsArrayBuffer(file);
                     } else { setUploadStatus('Format nicht unterstuetzt (CSV, XLSX, XLS)'); }
                     e.target.value = '';
@@ -967,6 +933,7 @@
                             processRows(dataRows, isRaum);
                         } catch(err) { setUploadStatus('Fehler: ' + err.message); }
                     };
+                    reader.onerror = function() { setUploadStatus('Datei konnte nicht gelesen werden'); };
                     reader.readAsText(file);
                 } else if (ext === 'xlsx' || ext === 'xls') {
                     var reader2 = new FileReader();
@@ -982,6 +949,7 @@
                             processRows(rows.slice(1), isRaum);
                         } catch(err) { setUploadStatus('Excel-Fehler: ' + err.message); }
                     };
+                    reader2.onerror = function() { setUploadStatus('Excel-Datei konnte nicht gelesen werden'); };
                     reader2.readAsArrayBuffer(file);
                 } else { setUploadStatus('Format nicht unterstuetzt'); }
                 e.target.value = '';
@@ -5295,6 +5263,125 @@
             const fullscreenCanvasRef = React.useRef(null);
             const fullscreenImgRef = React.useRef(null);
 
+            // ═══ BLOCK E / FIX E1 + E2 — Touch-Performance ═══
+            // Vorher: JEDES touchmove feuerte ein setFullscreenEdit({...p, ...})
+            // mit vollstaendigem Spread. Bei 60 fps + grossem Foto im State
+            // entstand Lag ueber das ganze System.
+            //
+            // Jetzt:
+            //  - drawBufferRef haelt die aktuellen Zeichenpunkte live.
+            //  - cropBufferRef haelt das Crop-Rechteck live.
+            //  - Ein rAF-Loop comitted die Buffers EINMAL pro Frame in den
+            //    State, so dass die UI gerendert wird, aber ohne dass jeder
+            //    Touch-Move einen eigenen setState triggert.
+            //  - Beim touchend wird final gesetzt (drawing in drawings[]).
+            const drawBufferRef = React.useRef(null);     // {points:[], color, width}
+            const cropBufferRef = React.useRef(null);     // {x, y, w, h, dragging}
+            const rafPendingRef = React.useRef(false);
+
+            // rAF-Commit: schreibt Buffer -> State (genau einmal pro Frame)
+            const flushDrawBuffers = React.useCallback(function() {
+                rafPendingRef.current = false;
+                setFullscreenEdit(function(p) {
+                    var next = p;
+                    if (drawBufferRef.current) {
+                        next = Object.assign({}, next, { currentDraw: {
+                            points: drawBufferRef.current.points.slice(),
+                            color: drawBufferRef.current.color,
+                            width: drawBufferRef.current.width
+                        }});
+                    }
+                    if (cropBufferRef.current) {
+                        next = Object.assign({}, next, {
+                            cropRect: {
+                                x: cropBufferRef.current.x,
+                                y: cropBufferRef.current.y,
+                                w: cropBufferRef.current.w,
+                                h: cropBufferRef.current.h
+                            },
+                            cropDragging: cropBufferRef.current.dragging
+                        });
+                    }
+                    return next;
+                });
+            }, []);
+
+            const scheduleDrawFlush = React.useCallback(function() {
+                if (rafPendingRef.current) return;
+                rafPendingRef.current = true;
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(flushDrawBuffers);
+                } else {
+                    setTimeout(flushDrawBuffers, 16);
+                }
+            }, [flushDrawBuffers]);
+
+            // Zentrale Touch-/Mouse-Handler, werden beide an JSX gehaengt.
+            const fsEditPointerStart = React.useCallback(function(px, py) {
+                setFullscreenEdit(function(p) {
+                    if (p.editMode === 'draw') {
+                        drawBufferRef.current = {
+                            points: [{x: px, y: py}],
+                            color: p.drawColor, width: p.drawWidth
+                        };
+                        return Object.assign({}, p, { currentDraw: {
+                            points: [{x: px, y: py}], color: p.drawColor, width: p.drawWidth
+                        }});
+                    } else if (p.editMode === 'crop') {
+                        cropBufferRef.current = { x: px, y: py, w: 0, h: 0, dragging: true };
+                        return Object.assign({}, p, {
+                            cropRect: { x: px, y: py, w: 0, h: 0 },
+                            cropDragging: true
+                        });
+                    }
+                    return p;
+                });
+            }, []);
+
+            const fsEditPointerMove = React.useCallback(function(px, py) {
+                // Im Draw-Mode: Punkt in Buffer, rAF-Flush
+                if (drawBufferRef.current) {
+                    drawBufferRef.current.points.push({x: px, y: py});
+                    scheduleDrawFlush();
+                    return;
+                }
+                // Im Crop-Mode: Rechteck im Buffer aktualisieren
+                if (cropBufferRef.current && cropBufferRef.current.dragging) {
+                    cropBufferRef.current.w = px - cropBufferRef.current.x;
+                    cropBufferRef.current.h = py - cropBufferRef.current.y;
+                    scheduleDrawFlush();
+                }
+            }, [scheduleDrawFlush]);
+
+            const fsEditPointerEnd = React.useCallback(function() {
+                // Draw-Abschluss: aus Buffer final in drawings[] uebernehmen
+                if (drawBufferRef.current) {
+                    var finished = drawBufferRef.current;
+                    drawBufferRef.current = null;
+                    setFullscreenEdit(function(p) {
+                        if (finished.points.length > 1) {
+                            return Object.assign({}, p, {
+                                drawings: p.drawings.concat([{
+                                    points: finished.points,
+                                    color: finished.color,
+                                    width: finished.width
+                                }]),
+                                currentDraw: null
+                            });
+                        }
+                        return Object.assign({}, p, { currentDraw: null });
+                    });
+                    return;
+                }
+                // Crop-Abschluss
+                if (cropBufferRef.current) {
+                    cropBufferRef.current = null;
+                    setFullscreenEdit(function(p) {
+                        return Object.assign({}, p, { cropDragging: false });
+                    });
+                }
+            }, []);
+
             // ── Vollbild-Editor oeffnen ──
             const openFullscreenEdit = (phase, wandId) => {
                 const foto = aktFotos[phase] && aktFotos[phase][wandId];
@@ -5398,25 +5485,29 @@
                             const updated = {...prev};
                             if (updated[fs.phase] && updated[fs.phase][fs.wandId]) {
                                 var existing = updated[fs.phase][fs.wandId];
-                                // Original-Bild als Backup behalten (Versionshistorie)
-                                var history = existing.imageHistory || [];
-                                if (existing.image && history.indexOf(existing.image) === -1) {
-                                    history = history.concat([existing.image]);
-                                }
-                                if (existing.croppedImage && history.indexOf(existing.croppedImage) === -1) {
-                                    history = history.concat([existing.croppedImage]);
-                                }
+                                // BLOCK A / FIX A2 — imageHistory ENTFERNT.
+                                // Vorher: jeder Edit haengte image + croppedImage
+                                // dauerhaft an imageHistory[]. Das war ein akkumulierender
+                                // Memory-Leak (mehrere MB pro Edit-Zyklus).
+                                // Das Original-Foto liegt jetzt bereits sicher in
+                                // TWStorage (IndexedDB / Drive), Crop wird also NUR
+                                // noch auf croppedImage angewandt.
                                 updated[fs.phase] = {...updated[fs.phase],
                                     [fs.wandId]: {
                                         ...existing,
                                         croppedImage: editedImage,
-                                        drawings: fs.drawings,
-                                        imageHistory: history
+                                        drawings: fs.drawings
                                     }
                                 };
                             }
                             return updated;
                         });
+                        closeFullscreenEdit();
+                    };
+                    // BLOCK A / FIX (Teil) — onerror nachruesten, sonst stiller Ausfall
+                    img.onerror = function() {
+                        console.warn('[Foto-Edit] Originalbild konnte nicht geladen werden');
+                        alert('Foto konnte nicht verarbeitet werden. Bitte erneut versuchen.');
                         closeFullscreenEdit();
                     };
                     img.src = sourceImage;
@@ -7418,6 +7509,49 @@
             // ── WIP-Speicherung: Aktuellen Bildschirm-Stand einsammeln ──
             // Ref wird bei jedem Render aktualisiert, Listener selbst nur einmal registriert
             const wipCollectorRef = React.useRef(null);
+
+            // BLOCK B / FIX B2 — Foto-Strippen: DataURLs aus dem WIP-Payload
+            // entfernen. Die vollstaendigen Fotos liegen ohnehin sicher im
+            // TWStorage-Foto-Store (IndexedDB, Blob). Im WIP werden nur noch
+            // Metadaten persistiert (Zeit, Markierung, KI-Ergebnis, Zeichnungen).
+            // Beim Restore ziehen wir die Bilder bei Bedarf wieder aus dem Store.
+            // WICHTIG: Die Originaldaten im React-State bleiben unveraendert —
+            // nur der SERIALISIERTE Payload wird schlank gemacht.
+            var stripPhotoDataUrls = function(phasen) {
+                if (!phasen || typeof phasen !== 'object') return phasen;
+                var out = {};
+                Object.keys(phasen).forEach(function(phaseKey) {
+                    var phase = phasen[phaseKey] || {};
+                    out[phaseKey] = {};
+                    Object.keys(phase).forEach(function(wandId) {
+                        var f = phase[wandId] || {};
+                        // Sichere Platzhalter: image-Felder rausziehen,
+                        // Metadaten und Flags behalten
+                        out[phaseKey][wandId] = {
+                            hasImage: !!(f.image || f.croppedImage),
+                            hasCrop: !!f.croppedImage,
+                            zeit: f.zeit || '',
+                            marked: !!f.marked,
+                            aiAnalysis: f.aiAnalysis || null,
+                            drawings: f.drawings || []
+                        };
+                    });
+                });
+                return out;
+            };
+            var stripObjektFotoDataUrls = function(slots) {
+                if (!Array.isArray(slots)) return slots;
+                return slots.map(function(s) {
+                    return {
+                        nr: s.nr,
+                        hasImage: !!(s.image || s.croppedImage),
+                        hasCrop: !!s.croppedImage,
+                        zeit: s.zeit || '',
+                        marked: !!s.marked
+                    };
+                });
+            };
+
             wipCollectorRef.current = function() {
                 return {
                     moduleState: {
@@ -7441,8 +7575,11 @@
                         bodenPlusTuerlaibung: bodenPlusTuerlaibung,
                         fensterUebernehmen: fensterUebernehmen,
                         sonstigeUebernehmen: sonstigeUebernehmen,
-                        phasenFotos: phasenFotos,
-                        objektFotos: objektFotos,
+                        // BLOCK B / FIX B2: DataURLs rausgestrippt.
+                        // Phasen-Fotos und Objekt-Fotos liegen komplett im
+                        // TWStorage-Foto-Store — hier nur Meta-Schatten.
+                        phasenFotos: stripPhotoDataUrls(phasenFotos),
+                        objektFotos: stripObjektFotoDataUrls(objektFotos),
                         kiErgebnisse: kiErgebnisse,
                         kiFotoErgebnisse: kiFotoErgebnisse,
                         // App-weite Daten (werden vom Fallback-Handler ueberschrieben)
@@ -7502,8 +7639,71 @@
                         if (typeof s.bodenPlusTuerlaibung === 'boolean') setBodenPlusTuerlaibung(s.bodenPlusTuerlaibung);
                         if (typeof s.fensterUebernehmen === 'boolean') setFensterUebernehmen(s.fensterUebernehmen);
                         if (typeof s.sonstigeUebernehmen === 'boolean') setSonstigeUebernehmen(s.sonstigeUebernehmen);
-                        if (s.phasenFotos) setPhasenFotos(s.phasenFotos);
-                        if (s.objektFotos) setObjektFotos(s.objektFotos);
+
+                        // BLOCK B / FIX B2 — Foto-Rehydrierung aus TWStorage:
+                        // Wenn der Payload Meta-Schatten enthaelt (hasImage statt image),
+                        // holen wir die Bild-Blobs aus dem persistenten Foto-Store nach.
+                        // Fallback auf alten Format: wenn noch vollstaendige DataURLs drin
+                        // sind (aus Vor-B2-Saves), uebernehmen wir die direkt.
+                        if (s.phasenFotos) {
+                            var firstPhase = Object.keys(s.phasenFotos)[0];
+                            var firstWand = firstPhase && Object.keys(s.phasenFotos[firstPhase] || {})[0];
+                            var firstEntry = firstWand && s.phasenFotos[firstPhase][firstWand];
+                            var istSchlank = firstEntry && (firstEntry.hasImage !== undefined) && !firstEntry.image;
+                            if (istSchlank && window.TWStorage && window.TWStorage.loadFotosByKundeAsDataURLs && kunde) {
+                                // Async-Hydrierung — initial leeren State setzen, danach nachfuellen
+                                setPhasenFotos(s.phasenFotos);
+                                var kundeId = kunde._driveFolderId || kunde.id || kunde.name;
+                                window.TWStorage.loadFotosByKundeAsDataURLs(kundeId).then(function(fotos) {
+                                    if (!fotos || !fotos.length) return;
+                                    setPhasenFotos(function(prev) {
+                                        var merged = Object.assign({}, prev);
+                                        fotos.forEach(function(rec) {
+                                            if (rec.kontext !== 'phase' || !rec.subKey) return;
+                                            var parts = rec.subKey.split('__');
+                                            if (parts.length < 2) return;
+                                            var phase = parts[0];
+                                            var wandId = parts[1];
+                                            if (!merged[phase]) merged[phase] = {};
+                                            var meta = merged[phase][wandId] || {};
+                                            merged[phase][wandId] = Object.assign({}, meta, {
+                                                image: rec.dataUrl,
+                                                croppedImage: meta.hasCrop ? rec.dataUrl : null
+                                            });
+                                        });
+                                        return merged;
+                                    });
+                                }).catch(function(e) { console.warn('[Raumblatt] Foto-Rehydrierung fehlgeschlagen:', e.message); });
+                            } else {
+                                setPhasenFotos(s.phasenFotos);
+                            }
+                        }
+                        if (s.objektFotos) {
+                            var erster = s.objektFotos[0];
+                            var objSchlank = erster && (erster.hasImage !== undefined) && !erster.image;
+                            if (objSchlank && window.TWStorage && window.TWStorage.loadFotosByKundeAsDataURLs && kunde) {
+                                setObjektFotos(s.objektFotos);
+                                var kId = kunde._driveFolderId || kunde.id || kunde.name;
+                                window.TWStorage.loadFotosByKundeAsDataURLs(kId).then(function(fotos) {
+                                    if (!fotos || !fotos.length) return;
+                                    setObjektFotos(function(prev) {
+                                        var arr = prev.slice();
+                                        fotos.forEach(function(rec) {
+                                            if (rec.kontext !== 'objekt' || !rec.subKey) return;
+                                            var slotNr = parseInt(String(rec.subKey).replace('slot_', ''), 10);
+                                            if (!isNaN(slotNr)) {
+                                                var idx = arr.findIndex(function(x) { return x.nr === slotNr; });
+                                                if (idx >= 0) arr[idx] = Object.assign({}, arr[idx], { image: rec.dataUrl });
+                                            }
+                                        });
+                                        return arr;
+                                    });
+                                }).catch(function(e) { console.warn('[Raumblatt] Objekt-Foto-Rehydrierung:', e.message); });
+                            } else {
+                                setObjektFotos(s.objektFotos);
+                            }
+                        }
+
                         if (s.kiErgebnisse) setKiErgebnisse(s.kiErgebnisse);
                         if (s.kiFotoErgebnisse) setKiFotoErgebnisse(s.kiFotoErgebnisse);
                     } catch(e) { console.error('[Raumblatt] wip:restoreState Fehler:', e); }
@@ -7765,36 +7965,53 @@
             const handlePhotoFileChange = (e) => {
                 const file = e.target.files && e.target.files[0];
                 if (!file || !fotoContext) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const dataUrl = ev.target.result;
-                    setAktFotos(prev => {
-                        const updated = { ...prev };
-                        updated[fotoContext.phase] = {
-                            ...updated[fotoContext.phase],
-                            [fotoContext.wandId]: {
-                                image: dataUrl, croppedImage: null,
-                                zeit: new Date().toLocaleTimeString('de-DE'),
-                                aiAnalysis: null, marked: false
-                            }
-                        };
+                // ═══ BLOCK A / FIX A1 ═══
+                // Foto VOR dem State-Update auf 1920 px/Q0.85 komprimieren.
+                // Verhindert, dass 10-15 MB Base64-Strings im React-Heap landen.
+                // Ohne Kompression = auf der Baustelle nach ~20 Fotos Browser-Crash.
+                var ctx = fotoContext; // Context jetzt greifen, Promise kann spaeter feuern
+                var doFallback = function(dataUrl) {
+                    setAktFotos(function(prev) {
+                        var updated = Object.assign({}, prev);
+                        updated[ctx.phase] = Object.assign({}, updated[ctx.phase], (function(){ var o={}; o[ctx.wandId]={
+                            image: dataUrl, croppedImage: null,
+                            zeit: new Date().toLocaleTimeString('de-DE'),
+                            aiAnalysis: null, marked: false
+                        }; return o; })());
                         return updated;
                     });
-                    // PHASE 2: Paralleles Sicherheitsnetz — Foto als Blob in den Foto-Store
-                    // schreiben. Geschieht im Hintergrund, blockiert die UI nicht.
                     try {
                         if (window.TWStorage && window.TWStorage.saveFoto && kunde) {
                             var kundeId = kunde._driveFolderId || kunde.id || kunde.name;
                             var raumKey = (raum && (raum.bez || raum.nr)) || raumName || 'raum';
                             window.TWStorage.saveFoto(
-                                kundeId, 'phase', raumKey, fotoContext.phase + '__' + fotoContext.wandId,
-                                dataUrl, { phase: fotoContext.phase, wandId: fotoContext.wandId, aufgenommen: new Date().toISOString() }
+                                kundeId, 'phase', raumKey, ctx.phase + '__' + ctx.wandId,
+                                dataUrl, { phase: ctx.phase, wandId: ctx.wandId, aufgenommen: new Date().toISOString() }
                             ).catch(function(e) { console.warn('[Foto-Persist] Phase:', e.message); });
                         }
                     } catch(e) { /* still */ }
                     setFotoContext(null);
                 };
-                reader.readAsDataURL(file);
+                if (window.TWStorage && window.TWStorage.compressFileToDataUrl) {
+                    window.TWStorage.compressFileToDataUrl(file, 1920, 0.85)
+                        .then(function(res) { doFallback(res.dataUrl); })
+                        .catch(function(err) {
+                            console.warn('[Foto-Upload] Kompression fehlgeschlagen:', err.message);
+                            alert('Foto konnte nicht geladen werden: ' + err.message);
+                            setFotoContext(null);
+                            // Cleanup-Sicherung: Input-Wert leeren damit nochmal probiert werden kann
+                            if (fotoInputRef2.current) fotoInputRef2.current.value = '';
+                        });
+                } else {
+                    // Fallback fuer alte Builds ohne Kompressions-Helper
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { doFallback(ev.target.result); };
+                    reader.onerror = function() {
+                        alert('Foto konnte nicht gelesen werden. Bitte ein anderes Foto waehlen.');
+                        setFotoContext(null);
+                    };
+                    reader.readAsDataURL(file);
+                }
             };
 
             const handlePhotoDelete = (phaseKey, wandId) => {
@@ -7897,40 +8114,60 @@
                 }
             };
 
-            const handleCropMove = (e) => {
-                if (!cropState || !cropState.dragging) return;
-                e.preventDefault();
-                const canvas = cropCanvasRef.current;
-                if (!canvas) return;
-                const pos = cropGetPos(e, canvas);
-                const dx = pos.x - cropState.dragStart.x;
-                const dy = pos.y - cropState.dragStart.y;
-                setCropState(prev => {
-                    let r = {...prev.cropRect};
-                    const corner = prev.dragCorner;
+            // BLOCK E / FIX E1 — rAF-Throttle fuer Crop-Move
+            // (Bei jedem touchmove war ein voller setCropState({...}) noetig.
+            // Jetzt: Position in Ref puffern, einmal pro Frame in State.)
+            const cropMovePosRef = React.useRef(null);
+            const cropRafPendingRef = React.useRef(false);
+            const flushCropMove = React.useCallback(function() {
+                cropRafPendingRef.current = false;
+                var pos = cropMovePosRef.current;
+                if (!pos) return;
+                cropMovePosRef.current = null;
+                setCropState(function(prev) {
+                    if (!prev || !prev.dragging) return prev;
+                    var r = Object.assign({}, prev.cropRect);
+                    var dx = pos.x - prev.dragStart.x;
+                    var dy = pos.y - prev.dragStart.y;
+                    var corner = prev.dragCorner;
                     if (corner === 'move') {
                         r.x = Math.max(0, Math.min(1 - r.w, r.x + dx));
                         r.y = Math.max(0, Math.min(1 - r.h, r.y + dy));
                     } else if (corner === 'tl') {
-                        const newX = Math.max(0, r.x + dx);
-                        const newY = Math.max(0, r.y + dy);
+                        var newX = Math.max(0, r.x + dx);
+                        var newY = Math.max(0, r.y + dy);
                         r.w = r.w - (newX - r.x); r.h = r.h - (newY - r.y);
                         r.x = newX; r.y = newY;
                     } else if (corner === 'tr') {
                         r.w = Math.min(1 - r.x, r.w + dx);
-                        const newY = Math.max(0, r.y + dy);
-                        r.h = r.h - (newY - r.y); r.y = newY;
+                        var nyTr = Math.max(0, r.y + dy);
+                        r.h = r.h - (nyTr - r.y); r.y = nyTr;
                     } else if (corner === 'bl') {
-                        const newX = Math.max(0, r.x + dx);
-                        r.w = r.w - (newX - r.x); r.x = newX;
+                        var nxBl = Math.max(0, r.x + dx);
+                        r.w = r.w - (nxBl - r.x); r.x = nxBl;
                         r.h = Math.min(1 - r.y, r.h + dy);
                     } else if (corner === 'br') {
                         r.w = Math.min(1 - r.x, r.w + dx);
                         r.h = Math.min(1 - r.y, r.h + dy);
                     }
                     r.w = Math.max(0.05, r.w); r.h = Math.max(0.05, r.h);
-                    return {...prev, cropRect: r, dragStart: pos};
+                    return Object.assign({}, prev, { cropRect: r, dragStart: pos });
                 });
+            }, []);
+            const handleCropMove = (e) => {
+                if (!cropState || !cropState.dragging) return;
+                e.preventDefault();
+                const canvas = cropCanvasRef.current;
+                if (!canvas) return;
+                const pos = cropGetPos(e, canvas);
+                cropMovePosRef.current = pos;
+                if (cropRafPendingRef.current) return;
+                cropRafPendingRef.current = true;
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(flushCropMove);
+                } else {
+                    setTimeout(flushCropMove, 16);
+                }
             };
 
             const handleCropEnd = () => {
@@ -7985,6 +8222,69 @@
                 return 'Analysiere dieses Bild einer Wand/Boden. ' + raumInfo + ' Zaehle: loecher, wandanschluesse, innenecken, aussenecken, Sanitaer-Objekte. ZUSAETZLICH schaetze: abdichtung (flaeche_m2, dichtungsbaender_lfm), geflieste_flaeche_m2. Antworte NUR als JSON: {"loecher":0,"wandanschluesse":0,"innenecken":0,"aussenecken":0,"objekte":[{"typ":"","anzahl":0}],"abdichtung":{"flaeche_m2":0,"dichtungsbaender_lfm":0},"geflieste_flaeche_m2":0,"zusammenfassung":""}';
             };
 
+            // ═══ BLOCK C / FIX C1 — Cancel-Ref fuer KI-Analyse ═══
+            // Wenn der Nutzer den Abbrechen-Button drueckt, wird
+            // analyseAbortRef.current = true gesetzt. Die Schleife in
+            // runKiAnalyse prueft dieses Flag nach jedem Foto und steigt
+            // kontrolliert aus.
+            const analyseAbortRef = React.useRef(false);
+
+            // ═══ BLOCK C / FIX C2 — Retry-Wrapper mit Exponential Backoff ═══
+            // Bei 429 (rate limit) oder 5xx von Gemini: bis zu 3 Versuche
+            // mit 1s, 2s, 4s Pause dazwischen. Bei 4xx (aussser 429):
+            // kein Retry, direkt Fehler.
+            const callGeminiWithRetry = async function(url, opts, timeoutMs) {
+                var maxTries = 3;
+                var lastErr = null;
+                for (var attempt = 1; attempt <= maxTries; attempt++) {
+                    // Cancel-Check vor jedem Versuch
+                    if (analyseAbortRef.current) throw new Error('CANCELLED');
+                    try {
+                        var resp = await (window.fetchWithTimeout || fetch)(url, opts, timeoutMs || 60000);
+                        if (resp.ok) return resp;
+                        // 429 (rate limit) oder 5xx: retry-faehig
+                        if (resp.status === 429 || (resp.status >= 500 && resp.status < 600)) {
+                            lastErr = new Error('Gemini-API Status ' + resp.status);
+                            if (attempt < maxTries) {
+                                var waitMs = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+                                console.warn('[KI Retry] Versuch ' + attempt + '/' + maxTries + ' fehlgeschlagen (' + resp.status + '), warte ' + waitMs + 'ms');
+                                await new Promise(function(r){ setTimeout(r, waitMs); });
+                                continue;
+                            }
+                        } else {
+                            // 4xx: kein Retry, direkt werfen
+                            throw new Error('Gemini-API Fehler ' + resp.status);
+                        }
+                    } catch(err) {
+                        // TIMEOUT oder Netzwerk: retry-faehig
+                        if (err && err.code === 'TIMEOUT') {
+                            lastErr = err;
+                            if (attempt < maxTries) {
+                                console.warn('[KI Retry] Timeout in Versuch ' + attempt + '/' + maxTries);
+                                continue; // Sofort neuer Versuch bei Timeout
+                            }
+                        } else if (err && err.message === 'CANCELLED') {
+                            throw err;
+                        } else {
+                            // Netzwerk-Fehler: nur einmal retry
+                            lastErr = err;
+                            if (attempt < 2) {
+                                await new Promise(function(r){ setTimeout(r, 1000); });
+                                continue;
+                            }
+                            throw err;
+                        }
+                    }
+                }
+                throw lastErr || new Error('KI-Analyse fehlgeschlagen nach ' + maxTries + ' Versuchen');
+            };
+
+            // ═══ BLOCK C / FIX C1+C2 — Cancel-Handler fuer UI ═══
+            const cancelKiAnalyse = function() {
+                analyseAbortRef.current = true;
+                console.log('[KI] Abbruch angefordert');
+            };
+
             const runKiAnalyse = async (stufe) => {
                 const marked = getMarkedFotos();
                 if (marked.length === 0) { alert('Keine Fotos markiert! Markiere Fotos mit dem Haekchen oben rechts.'); return; }
@@ -7992,12 +8292,21 @@
                 if (!geminiApiKey) {
                     alert('Gemini API-Key nicht konfiguriert. Bitte zuerst auf der Startseite verbinden.'); return;
                 }
+                // BLOCK C / FIX C1 — Abort-Flag zuruecksetzen vor Start
+                analyseAbortRef.current = false;
                 setAnalyseRunning(true);
                 setAnalyseProgress({ current: 0, total: marked.length, wandId: '' });
                 const results = [];
                 var proModelId = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS['pro']) ? GEMINI_CONFIG.MODELS['pro'].id : 'gemini-2.5-pro';
+                var cancelledCount = 0;
 
                 for (let i = 0; i < marked.length; i++) {
+                    // BLOCK C / FIX C1 — Cancel-Check pro Iteration
+                    if (analyseAbortRef.current) {
+                        cancelledCount = marked.length - i;
+                        console.log('[KI] Abgebrochen nach ' + i + '/' + marked.length + ' Fotos');
+                        break;
+                    }
                     const m = marked[i];
                     setAnalyseProgress({ current: i + 1, total: marked.length, wandId: m.wandId });
                     try {
@@ -8013,7 +8322,8 @@
                         }
                         if (!rawText) {
                             var baseUrl = (typeof GEMINI_CONFIG !== 'undefined' && GEMINI_CONFIG.BASE_URL) || 'https://generativelanguage.googleapis.com/v1beta';
-                            const resp = await fetch(baseUrl + '/models/' + proModelId + ':generateContent?key=' + geminiApiKey, {
+                            // BLOCK C / FIX C2 — mit Retry-Wrapper statt nackt fetch
+                            const resp = await callGeminiWithRetry(baseUrl + '/models/' + proModelId + ':generateContent?key=' + geminiApiKey, {
                                 method: 'POST', headers: {'Content-Type':'application/json'},
                                 body: JSON.stringify({
                                     contents: [{ parts: [
@@ -8022,7 +8332,7 @@
                                     ]}],
                                     generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json' }
                                 })
-                            });
+                            }, 60000);
                             const data = await resp.json();
                             rawText = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) || '{}';
                         }
@@ -8040,6 +8350,11 @@
                             return updated;
                         });
                     } catch(err) {
+                        if (err && err.message === 'CANCELLED') {
+                            cancelledCount = marked.length - i;
+                            console.log('[KI] Abgebrochen im Foto ' + (i + 1));
+                            break;
+                        }
                         console.error('KI-Analyse Fehler Wand ' + m.wandId + ':', err);
                         results.push({ _phase: m.phase, loecher: 0, wandanschluesse: 0, innenecken: 0, aussenecken: 0, zusammenfassung: 'Fehler: ' + err.message });
                     }
@@ -8081,7 +8396,17 @@
                 });
                 setKiErgebnisse(agg);
                 setAnalyseRunning(false);
-                console.log('[TW KI] Analyse abgeschlossen:', agg);
+                // BLOCK C / FIX C1 — Abort-Flag zuruecksetzen, Nutzer-Feedback
+                var wasCancelled = analyseAbortRef.current;
+                analyseAbortRef.current = false;
+                if (wasCancelled) {
+                    console.log('[TW KI] Analyse abgebrochen — ' + results.length + ' Fotos fertig, ' + cancelledCount + ' uebersprungen');
+                    setTimeout(function() {
+                        alert('KI-Analyse abgebrochen.\n\n' + results.length + ' Fotos sind ausgewertet, ' + cancelledCount + ' wurden uebersprungen.');
+                    }, 100);
+                } else {
+                    console.log('[TW KI] Analyse abgeschlossen:', agg);
+                }
             };
 
             const transferKiErgebnisseToPositions = () => {
@@ -8102,9 +8427,8 @@
             const handleFotoCapture = (e) => {
                 const file = e.target.files && e.target.files[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const base64 = ev.target.result;
+                // ═══ BLOCK A / FIX A1 ═══ Sofort-Kompression vor State
+                var applyFoto = function(base64) {
                     const wandId = fotoTargetWand.current || 'extra_' + Date.now();
                     const existing = fotos.find(f => f.wandId === wandId);
                     if (existing) {
@@ -8123,7 +8447,6 @@
                             aiAnalysis: null
                         }]);
                     }
-                    // PHASE 2: Paralleles Sicherheitsnetz — Foto als Blob in den Foto-Store
                     try {
                         if (window.TWStorage && window.TWStorage.saveFoto && kunde) {
                             var kundeId = kunde._driveFolderId || kunde.id || kunde.name;
@@ -8135,7 +8458,20 @@
                         }
                     } catch(e) { /* still */ }
                 };
-                reader.readAsDataURL(file);
+                if (window.TWStorage && window.TWStorage.compressFileToDataUrl) {
+                    window.TWStorage.compressFileToDataUrl(file, 1920, 0.85)
+                        .then(function(res) { applyFoto(res.dataUrl); })
+                        .catch(function(err) {
+                            console.warn('[Foto-Upload] Kompression fehlgeschlagen:', err.message);
+                            alert('Foto konnte nicht geladen werden: ' + err.message);
+                            if (fotoInputRef.current) fotoInputRef.current.value = '';
+                        });
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { applyFoto(ev.target.result); };
+                    reader.onerror = function() { alert('Foto konnte nicht gelesen werden.'); };
+                    reader.readAsDataURL(file);
+                }
             };
 
             const handleFotoDelete = (wandId) => {
@@ -8463,16 +8799,25 @@
                     const startDraw = (e) => { drawing = true; const r = canvas.getBoundingClientRect(); ctx.beginPath(); ctx.moveTo(e.clientX - r.left, e.clientY - r.top); };
                     const draw = (e) => { if (!drawing) return; const r = canvas.getBoundingClientRect(); ctx.lineTo(e.clientX - r.left, e.clientY - r.top); ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 2; ctx.stroke(); };
                     const stopDraw = () => { drawing = false; };
+                    // BLOCK A / FIX A5 — Touch-Handler als BENANNTE Funktionen,
+                    // damit sie im Cleanup entfernt werden koennen. Vorher waren
+                    // sie anonyme Arrow-Funktionen und leakten bei jedem Toggle.
+                    const touchStartHandler = (e) => { e.preventDefault(); startDraw(e.touches[0]); };
+                    const touchMoveHandler = (e) => { e.preventDefault(); draw(e.touches[0]); };
+                    const touchEndHandler = stopDraw;
                     canvas.addEventListener('mousedown', startDraw);
                     canvas.addEventListener('mousemove', draw);
                     canvas.addEventListener('mouseup', stopDraw);
-                    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e.touches[0]); });
-                    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e.touches[0]); });
-                    canvas.addEventListener('touchend', stopDraw);
+                    canvas.addEventListener('touchstart', touchStartHandler);
+                    canvas.addEventListener('touchmove', touchMoveHandler);
+                    canvas.addEventListener('touchend', touchEndHandler);
                     return () => {
                         canvas.removeEventListener('mousedown', startDraw);
                         canvas.removeEventListener('mousemove', draw);
                         canvas.removeEventListener('mouseup', stopDraw);
+                        canvas.removeEventListener('touchstart', touchStartHandler);
+                        canvas.removeEventListener('touchmove', touchMoveHandler);
+                        canvas.removeEventListener('touchend', touchEndHandler);
                     };
                 }
             }, [isDrawMode]);
@@ -8559,18 +8904,42 @@
                 const pos = skizzeSnap(skizzeGetPos(e));
                 setSkizze(prev => ({...prev, currentPath: { points: [pos], color: prev.penColor, width: prev.penWidth }}));
             };
+            // BLOCK E / FIX E1 — rAF-Throttle fuer Skizze-Zeichnen
+            const skizzeMovePosRef = React.useRef(null);
+            const skizzeRafPendingRef = React.useRef(false);
+            const flushSkizzeMove = React.useCallback(function() {
+                skizzeRafPendingRef.current = false;
+                var pos = skizzeMovePosRef.current;
+                if (!pos) return;
+                skizzeMovePosRef.current = null;
+                setSkizze(function(prev) {
+                    if (!prev.currentPath) return prev;
+                    return Object.assign({}, prev, {
+                        currentPath: Object.assign({}, prev.currentPath, {
+                            points: prev.currentPath.points.concat([pos])
+                        })
+                    });
+                });
+            }, []);
             const handleSkizzeMove = (e) => {
                 if (!zeichnenAktiv) return;
                 if (!skizze.currentPath) return;
                 e.preventDefault();
                 const pos = skizzeGetPos(e);
-                // Mindest-Bewegungsdistanz
+                // Mindest-Bewegungsdistanz (bestehende Logik beibehalten)
                 var lastPt = skizze.currentPath.points[skizze.currentPath.points.length - 1];
                 var minDist = 11 - stiftEmpfindlichkeit;
                 var dx = pos.x - lastPt.x;
                 var dy = pos.y - lastPt.y;
                 if (Math.sqrt(dx*dx + dy*dy) < minDist) return;
-                setSkizze(prev => ({...prev, currentPath: {...prev.currentPath, points: [...prev.currentPath.points, pos]}}));
+                skizzeMovePosRef.current = pos;
+                if (skizzeRafPendingRef.current) return;
+                skizzeRafPendingRef.current = true;
+                if (typeof requestAnimationFrame === 'function') {
+                    requestAnimationFrame(flushSkizzeMove);
+                } else {
+                    setTimeout(flushSkizzeMove, 16);
+                }
             };
             const handleSkizzeEnd = () => {
                 if (!zeichnenAktiv) return;
@@ -8639,6 +9008,68 @@
             // Ausschlieszlich Gemini Pro (gemini-2.5-pro), kein Flash-Fallback
             // Ausgabe: maszstabsgetreuer SVG-Grundriss mit Bemassung, Tuerboegen und Fenstersymbolen
             // ═══════════════════════════════════════════════════════════════
+
+            // ═══ BLOCK C / FIX C3 — SVG-Sanitizer fuer KI-Output ═══
+            // Gemini Pro liefert theoretisch beliebiges SVG zurueck.
+            // Ohne Sanitizing koennten <script>-Tags, event-Handler
+            // (onload/onclick) oder <foreignObject> mit HTML/JS ausgeliefert
+            // werden -- waere ein XSS-Vektor, selbst wenn es nur intern
+            // zwischen uns und Gemini passiert. Wir filtern daher:
+            //   - <script>, <style> (ohne CSS-Injection), <foreignObject>
+            //   - alle on*-Attribute (onload, onclick, onerror, ...)
+            //   - javascript:-URLs in href/src/xlink:href
+            // Erlaubte Tags werden behalten, unerwuenschte entfernt.
+            // Bei Parsing-Fehler: leeres SVG statt Crash.
+            var sanitizeKiSvg = function(rawSvg) {
+                if (!rawSvg || typeof rawSvg !== 'string') return '';
+                try {
+                    var parser = new DOMParser();
+                    // Erst als SVG parsen, Fehler-Toleranz: wenn XML-Parse scheitert,
+                    // als HTML-Fragment parsen
+                    var doc = parser.parseFromString(rawSvg, 'image/svg+xml');
+                    var parseErr = doc.getElementsByTagName('parsererror');
+                    if (parseErr && parseErr.length > 0) {
+                        var wrapper = parser.parseFromString('<div>' + rawSvg + '</div>', 'text/html');
+                        doc = wrapper;
+                    }
+                    var root = doc.documentElement;
+                    if (!root) return '';
+                    var forbiddenTags = ['script', 'foreignobject', 'iframe', 'object', 'embed', 'link', 'meta', 'style'];
+                    var removeList = [];
+                    var walk = function(node) {
+                        if (!node || node.nodeType !== 1) return;
+                        var tag = (node.nodeName || '').toLowerCase();
+                        if (forbiddenTags.indexOf(tag) >= 0) { removeList.push(node); return; }
+                        if (node.attributes) {
+                            var toRemove = [];
+                            for (var i = 0; i < node.attributes.length; i++) {
+                                var attr = node.attributes[i];
+                                var aname = (attr.name || '').toLowerCase();
+                                var aval = (attr.value || '').toLowerCase();
+                                // on*-Handler komplett entfernen
+                                if (aname.indexOf('on') === 0) { toRemove.push(attr.name); continue; }
+                                // javascript:-URLs entfernen
+                                if ((aname === 'href' || aname === 'xlink:href' || aname === 'src') &&
+                                    (aval.indexOf('javascript:') === 0 || aval.indexOf('data:text/html') === 0)) {
+                                    toRemove.push(attr.name); continue;
+                                }
+                            }
+                            toRemove.forEach(function(n) { try { node.removeAttribute(n); } catch(e){} });
+                        }
+                        // Kinder rekursiv
+                        var children = node.childNodes ? Array.prototype.slice.call(node.childNodes) : [];
+                        for (var j = 0; j < children.length; j++) walk(children[j]);
+                    };
+                    walk(root);
+                    removeList.forEach(function(n) { try { n.parentNode && n.parentNode.removeChild(n); } catch(e){} });
+                    // Zurueck in String-Form
+                    var out = new XMLSerializer().serializeToString(root);
+                    return out;
+                } catch(e) {
+                    console.warn('[sanitizeKiSvg] Parse-Fehler, gebe leeres SVG zurueck:', e.message);
+                    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="50" y="50" text-anchor="middle" fill="#e74c3c">SVG-Fehler</text></svg>';
+                }
+            };
 
             // ── Maszstabsgetreuer SVG-Grundriss (aus grundrissPolygon_mm) ──
             const generateMaszstabsgetreuenSvg = (result, hatMasze) => {
@@ -9062,7 +9493,8 @@
 
                 try {
                     console.log('[TW Skizze] Gemini Pro Request — hatMasze:', hatMasze, '| Tueren:', tuerenDaten.length, '| Fenster:', fensterDaten.length);
-                    const res = await fetch(baseUrl + '/models/' + modelId + ':generateContent?key=' + apiKey, {
+                    // BLOCK A / FIX A4 — 60s Timeout fuer Handskizze-Begradigung
+                    const res = await (window.fetchWithTimeout || fetch)(baseUrl + '/models/' + modelId + ':generateContent?key=' + apiKey, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
@@ -9072,7 +9504,7 @@
                             ]}],
                             generationConfig: { temperature: 0.1, maxOutputTokens: 8192 }
                         })
-                    });
+                    }, 60000);
 
                     if (res.status === 429) {
                         setSkizze(p => ({...p, mode: 'draw'}));
@@ -9531,7 +9963,7 @@
                                             </div>
                                         </React.Fragment>
                                     ) : (
-                                        <div dangerouslySetInnerHTML={{__html: skizze.processedSvg}}
+                                        <div dangerouslySetInnerHTML={{__html: sanitizeKiSvg(skizze.processedSvg)}}
                                             style={{width:'100%', height:'100%', padding:'10px'}} />
                                     )}
                                 </div>
@@ -9788,11 +10220,23 @@
                         style={{display:'none'}} onChange={e => {
                             var file = e.target.files && e.target.files[0];
                             if (!file || !fotoAnalyse) return;
-                            var reader = new FileReader();
-                            reader.onload = function(ev) {
-                                setFotoAnalyse(prev => ({...prev, photo: ev.target.result, step: prev.mode === 'fertig' ? 'analyse' : 'referenz' }));
-                            };
-                            reader.readAsDataURL(file);
+                            // BLOCK A / FIX A1 — Sofort-Kompression auch hier
+                            if (window.TWStorage && window.TWStorage.compressFileToDataUrl) {
+                                window.TWStorage.compressFileToDataUrl(file, 1920, 0.85)
+                                    .then(function(res) {
+                                        setFotoAnalyse(prev => ({...prev, photo: res.dataUrl, step: prev.mode === 'fertig' ? 'analyse' : 'referenz' }));
+                                    })
+                                    .catch(function(err) {
+                                        alert('Foto konnte nicht geladen werden: ' + err.message);
+                                    });
+                            } else {
+                                var reader = new FileReader();
+                                reader.onload = function(ev) {
+                                    setFotoAnalyse(prev => ({...prev, photo: ev.target.result, step: prev.mode === 'fertig' ? 'analyse' : 'referenz' }));
+                                };
+                                reader.onerror = function() { alert('Foto konnte nicht gelesen werden.'); };
+                                reader.readAsDataURL(file);
+                            }
                             e.target.value = '';
                         }} />
                     <input type="file" accept="image/*" capture="environment" ref={fotoInputRef}
@@ -10418,6 +10862,19 @@
                                                 transition:'width 0.3s'
                                             }} />
                                         </div>
+                                        {/* BLOCK C / FIX C1 — Abbrechen-Button */}
+                                        <button onClick={cancelKiAnalyse}
+                                            style={{
+                                                marginTop:'10px', padding:'8px 18px',
+                                                background:'rgba(231,76,60,0.12)',
+                                                border:'1px solid rgba(231,76,60,0.5)',
+                                                color:'#e74c3c', borderRadius:'8px',
+                                                fontSize:'12px', fontWeight:700, cursor:'pointer',
+                                                fontFamily:'Oswald, sans-serif',
+                                                textTransform:'uppercase', letterSpacing:'0.5px'
+                                            }}>
+                                            \u2715 Abbrechen
+                                        </button>
                                     </div>
                                 )}
 
@@ -10746,54 +11203,32 @@
                                             var rect = e.currentTarget.getBoundingClientRect();
                                             var px = (e.clientX - rect.left) / rect.width;
                                             var py = (e.clientY - rect.top) / rect.height;
-                                            if (fullscreenEdit.editMode === 'draw') {
-                                                setFullscreenEdit(p => ({...p, currentDraw: {points:[{x:px,y:py}], color:p.drawColor, width:p.drawWidth}}));
-                                            } else if (fullscreenEdit.editMode === 'crop') {
-                                                setFullscreenEdit(p => ({...p, cropRect: {x:px, y:py, w:0, h:0}, cropDragging:true}));
-                                            }
+                                            fsEditPointerStart(px, py);
                                         }}
                                         onMouseMove={(e) => {
+                                            if (!drawBufferRef.current && !cropBufferRef.current) return;
                                             var rect = e.currentTarget.getBoundingClientRect();
                                             var px = (e.clientX - rect.left) / rect.width;
                                             var py = (e.clientY - rect.top) / rect.height;
-                                            if (fullscreenEdit.editMode === 'draw' && fullscreenEdit.currentDraw) {
-                                                setFullscreenEdit(p => ({...p, currentDraw: {...p.currentDraw, points: [...p.currentDraw.points, {x:px,y:py}]}}));
-                                            } else if (fullscreenEdit.editMode === 'crop' && fullscreenEdit.cropDragging) {
-                                                setFullscreenEdit(p => ({...p, cropRect: {...p.cropRect, w: px - p.cropRect.x, h: py - p.cropRect.y}}));
-                                            }
+                                            fsEditPointerMove(px, py);
                                         }}
-                                        onMouseUp={() => {
-                                            if (fullscreenEdit.currentDraw && fullscreenEdit.currentDraw.points.length > 1) {
-                                                setFullscreenEdit(p => ({...p, drawings: [...p.drawings, p.currentDraw], currentDraw:null}));
-                                            } else { setFullscreenEdit(p => ({...p, currentDraw:null, cropDragging:false})); }
-                                        }}
+                                        onMouseUp={() => { fsEditPointerEnd(); }}
                                         onTouchStart={(e) => {
                                             e.preventDefault();
                                             var t = e.touches[0]; var rect = e.currentTarget.getBoundingClientRect();
                                             var px = (t.clientX - rect.left) / rect.width;
                                             var py = (t.clientY - rect.top) / rect.height;
-                                            if (fullscreenEdit.editMode === 'draw') {
-                                                setFullscreenEdit(p => ({...p, currentDraw: {points:[{x:px,y:py}], color:p.drawColor, width:p.drawWidth}}));
-                                            } else if (fullscreenEdit.editMode === 'crop') {
-                                                setFullscreenEdit(p => ({...p, cropRect: {x:px, y:py, w:0, h:0}, cropDragging:true}));
-                                            }
+                                            fsEditPointerStart(px, py);
                                         }}
                                         onTouchMove={(e) => {
+                                            if (!drawBufferRef.current && !cropBufferRef.current) return;
                                             e.preventDefault();
                                             var t = e.touches[0]; var rect = e.currentTarget.getBoundingClientRect();
                                             var px = (t.clientX - rect.left) / rect.width;
                                             var py = (t.clientY - rect.top) / rect.height;
-                                            if (fullscreenEdit.editMode === 'draw' && fullscreenEdit.currentDraw) {
-                                                setFullscreenEdit(p => ({...p, currentDraw: {...p.currentDraw, points: [...p.currentDraw.points, {x:px,y:py}]}}));
-                                            } else if (fullscreenEdit.editMode === 'crop' && fullscreenEdit.cropDragging) {
-                                                setFullscreenEdit(p => ({...p, cropRect: {...p.cropRect, w: px - p.cropRect.x, h: py - p.cropRect.y}}));
-                                            }
+                                            fsEditPointerMove(px, py);
                                         }}
-                                        onTouchEnd={() => {
-                                            if (fullscreenEdit.currentDraw && fullscreenEdit.currentDraw.points.length > 1) {
-                                                setFullscreenEdit(p => ({...p, drawings: [...p.drawings, p.currentDraw], currentDraw:null}));
-                                            } else { setFullscreenEdit(p => ({...p, currentDraw:null, cropDragging:false})); }
-                                        }}
+                                        onTouchEnd={() => { fsEditPointerEnd(); }}
                                     >
                                         {fullscreenEdit.image && (
                                             <img src={fullscreenEdit.image} style={{width:'100%', height:'100%', objectFit:'contain', pointerEvents:'none'}} />
@@ -11072,9 +11507,8 @@
                                     var file = e.target.files && e.target.files[0];
                                     var nr = objektFotoTarget.current;
                                     if (!file || nr === null) return;
-                                    var reader = new FileReader();
-                                    reader.onload = function(ev) {
-                                        var dataUrl = ev.target.result;
+                                    // BLOCK A / FIX A1 — Sofort-Kompression vor State
+                                    var applySlotFoto = function(dataUrl) {
                                         setObjektFotos(function(prev) {
                                             return prev.map(function(slot) {
                                                 if (slot.nr === nr) return Object.assign({}, slot, {
@@ -11085,7 +11519,6 @@
                                                 return slot;
                                             });
                                         });
-                                        // PHASE 2: Paralleles Sicherheitsnetz — Foto als Blob im Foto-Store
                                         try {
                                             if (window.TWStorage && window.TWStorage.saveFoto && kunde) {
                                                 var kId = kunde._driveFolderId || kunde.id || kunde.name;
@@ -11097,7 +11530,24 @@
                                         } catch(e) { /* still */ }
                                         objektFotoTarget.current = null;
                                     };
-                                    reader.readAsDataURL(file);
+                                    if (window.TWStorage && window.TWStorage.compressFileToDataUrl) {
+                                        window.TWStorage.compressFileToDataUrl(file, 1920, 0.85)
+                                            .then(function(res) { applySlotFoto(res.dataUrl); })
+                                            .catch(function(err) {
+                                                console.warn('[Foto-Upload] Kompression fehlgeschlagen:', err.message);
+                                                alert('Foto konnte nicht geladen werden: ' + err.message);
+                                                objektFotoTarget.current = null;
+                                                if (objektFotoInputRef.current) objektFotoInputRef.current.value = '';
+                                            });
+                                    } else {
+                                        var reader = new FileReader();
+                                        reader.onload = function(ev) { applySlotFoto(ev.target.result); };
+                                        reader.onerror = function() {
+                                            alert('Foto konnte nicht gelesen werden.');
+                                            objektFotoTarget.current = null;
+                                        };
+                                        reader.readAsDataURL(file);
+                                    }
                                 }} />
 
                             {/* Modus-Header */}
@@ -11134,12 +11584,14 @@
                                             for (var fi = 0; fi < mitBild.length; fi++) {
                                                 var foto = mitBild[fi];
                                                 var imgData = (foto.croppedImage || foto.image);
+                                                // fetch(dataUrl) ist lokal -> kein Timeout noetig
                                                 var blob = await fetch(imgData).then(function(r) { return r.blob(); });
                                                 var metadata = JSON.stringify({name: 'Foto_' + String(foto.nr).padStart(2, '0') + '.jpg', parents: [archivF.id]});
                                                 var formData = new FormData();
                                                 formData.append('metadata', new Blob([metadata], {type:'application/json'}));
                                                 formData.append('file', blob);
-                                                await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer ' + svc.accessToken}, body:formData});
+                                                // BLOCK A / FIX A4 — 45s Timeout pro Foto-Upload
+                                                await (window.fetchWithTimeout || fetch)('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {method:'POST', headers:{'Authorization':'Bearer ' + svc.accessToken}, body:formData}, 45000);
                                             }
                                             setObjektFotos(Array.from({length: 20}, function(_, i) { return { nr: i + 1, image: null, croppedImage: null, marked: false, zeit: '' }; }));
                                             alert(mitBild.length + ' Fotos erfolgreich archiviert!');
@@ -11274,9 +11726,15 @@
                                                             var loaded = [];
                                                             for (var li = 0; li < Math.min(imgFiles.length, 20); li++) {
                                                                 try {
-                                                                    var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + imgFiles[li].id + '?alt=media', {headers:{'Authorization':'Bearer ' + svc.accessToken}});
+                                                                    // BLOCK A / FIX A4 — 30s Timeout pro Download
+                                                                    var resp = await (window.fetchWithTimeout || fetch)('https://www.googleapis.com/drive/v3/files/' + imgFiles[li].id + '?alt=media', {headers:{'Authorization':'Bearer ' + svc.accessToken}}, 30000);
                                                                     var blob = await resp.blob();
-                                                                    var dataUrl = await new Promise(function(res) { var r = new FileReader(); r.onload = function() { res(r.result); }; r.readAsDataURL(blob); });
+                                                                    var dataUrl = await new Promise(function(res, rej) {
+                                                                        var r = new FileReader();
+                                                                        r.onload = function() { res(r.result); };
+                                                                        r.onerror = function() { rej(new Error('Archiv-Foto lesen fehlgeschlagen')); };
+                                                                        r.readAsDataURL(blob);
+                                                                    });
                                                                     loaded.push({nr: li + 1, image: dataUrl, croppedImage: null, marked: false, zeit: archiv.datum});
                                                                 } catch(e) { loaded.push({nr: li + 1, image: null, croppedImage: null, marked: false, zeit: ''}); }
                                                             }
