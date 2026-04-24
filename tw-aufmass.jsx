@@ -12,6 +12,7 @@
 
             // ── Uhr aktualisieren ──
             useEffect(function() {
+                if (window.__twDebugFlags && window.__twDebugFlags.noClock) return;
                 var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
                 return function() { clearInterval(timer); };
             }, []);

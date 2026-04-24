@@ -2256,6 +2256,11 @@
             //   - Wartet bis Firebase verfuegbar ist (polling, max. 60s)
             // ══════════════════════════════════════════════════════════
             useEffect(function() {
+                // DEBUG: via URL ?noAlarm=1 abschaltbar
+                if (window.__twDebugFlags && window.__twDebugFlags.noAlarm) {
+                    console.log('[TW] Alarm-Listener deaktiviert (Debug-Flag)');
+                    return;
+                }
                 var unsubAlarm = null;
                 var pollTimer = null;
                 var pollCount = 0;
@@ -2376,6 +2381,7 @@
             }, []);
 
             var _startFotoSync = React.useCallback(function() {
+                if (window.__twDebugFlags && window.__twDebugFlags.noSync) return;
                 if (!selectedKunde) return;
                 if (!navigator.onLine) return;
                 if (!window.TWStorage || !window.TWStorage.FotoSync) return;
@@ -2477,6 +2483,7 @@
             // Idempotent: bereits lokale Drive-IDs werden uebersprungen.
             // ══════════════════════════════════════════════════════════
             var _startFotoDownloadSync = React.useCallback(function() {
+                if (window.__twDebugFlags && window.__twDebugFlags.noSync) return;
                 if (!selectedKunde) return;
                 if (!navigator.onLine) return;
                 if (!window.TWStorage || !window.TWStorage.FotoSync || !window.TWStorage.FotoSync.downloadMissingFotos) return;
