@@ -1,3 +1,70 @@
+        // ═══════════════════════════════════════════════════════════════
+        // PERFORMANCE-FIX (24.04.2026): Uhr als ISOLIERTE Komponente
+        //
+        // Vorher: setCurrentTime lief 1x/Sek. in Startseite -> triggerte
+        // Komplett-Re-Render inkl. BauteamAnimation mit 7 SVG-Figuren
+        // und ~261 SVG-Elementen. Auf Tablets (begrenzter Renderer-RAM)
+        // fuehrte das nach 1-2 Minuten zu einem Renderer-Crash
+        // ("Oh nein! Fehler beim Anzeigen dieser Webseite").
+        //
+        // Jetzt: Nur die UhrAnzeige rendert sich neu, die BauteamAnimation
+        // und alle anderen Startseiten-Elemente bleiben stabil.
+        // ═══════════════════════════════════════════════════════════════
+        function UhrAnzeige() {
+            const [currentTime, setCurrentTime] = useState(new Date());
+            useEffect(function() {
+                var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
+                return function() { clearInterval(timer); };
+            }, []);
+
+            var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+            var tag = tage[currentTime.getDay()];
+            var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
+            var stunden = String(currentTime.getHours()).padStart(2,'0');
+            var minuten = String(currentTime.getMinutes()).padStart(2,'0');
+            var sekunden = String(currentTime.getSeconds()).padStart(2,'0');
+
+            return (
+                <div style={{
+                    margin:'0 20px 12px', padding:'24px 20px',
+                    background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
+                    borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
+                    border:'1px solid rgba(77,166,255,0.2)',
+                    boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+                }}>
+                    {/* Dekorative Elemente */}
+                    <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
+                    <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
+
+                    {/* Tag */}
+                    <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
+                        {tag}
+                    </div>
+
+                    {/* Uhrzeit — GROSS */}
+                    <div style={{
+                        fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
+                        fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+                        lineHeight:'1', marginBottom:'10px', position:'relative'
+                    }}>
+                        <span style={{fontWeight:'300'}}>{stunden}</span>
+                        <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
+                        <span style={{fontWeight:'300'}}>{minuten}</span>
+                        <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
+                    </div>
+
+                    {/* Datum */}
+                    <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
+                        {datum}
+                    </div>
+
+                    {/* Trennlinie */}
+                    <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
+                </div>
+            );
+        }
+
         function Startseite({ onKundeNeu, onKundeAnalysiert, onKundeManuell, onKundenauswahl, onDriveStatusChange }) {
             // ── State ──
             const [geminiConnected, setGeminiConnected] = useState(false);
@@ -7,14 +74,10 @@
             const [geminiStatus, setGeminiStatus] = useState(geminiKey ? 'saved' : 'none');
             const [showKey, setShowKey] = useState(false);
             const [geminiModelPref, setGeminiModelPref] = useState(localStorage.getItem('gemini_model_pref') || 'pro');
-            const [currentTime, setCurrentTime] = useState(new Date());
             const [driveConnecting, setDriveConnecting] = useState(false);
 
-            // ── Uhr aktualisieren ──
-            useEffect(function() {
-                var timer = setInterval(function() { setCurrentTime(new Date()); }, 1000);
-                return function() { clearInterval(timer); };
-            }, []);
+            // PERFORMANCE-FIX 24.04.2026: currentTime + Uhr-Interval jetzt in isolierter
+            // <UhrAnzeige />-Komponente -- verhindert Rerender der BauteamAnimation jede Sekunde.
 
             // ── Gemini Check bei Mount ──
             useEffect(function() {
@@ -251,14 +314,8 @@
                 }
             };
 
-            // ── Datum/Uhrzeit formatieren ──
-            var tage = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
-            var monate = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
-            var tag = tage[currentTime.getDay()];
-            var datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
-            var stunden = String(currentTime.getHours()).padStart(2,'0');
-            var minuten = String(currentTime.getMinutes()).padStart(2,'0');
-            var sekunden = String(currentTime.getSeconds()).padStart(2,'0');
+            // ── Datum/Uhrzeit-Formatierung jetzt INNERHALB <UhrAnzeige /> (s.o.) ──
+            // (nicht mehr hier, damit Startseite nicht jede Sekunde neu rendert)
 
             return (
                 <div className="startseite" style={{position:'relative', overflow:'hidden', minHeight:'100vh'}}>
@@ -273,43 +330,9 @@
                         </div>
                     </div>
 
-                    {/* ═══ UHR & DATUM — Premium Design (GROSS) ═══ */}
-                    <div style={{
-                        margin:'0 20px 12px', padding:'24px 20px',
-                        background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
-                        borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
-                        border:'1px solid rgba(77,166,255,0.2)',
-                        boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
-                    }}>
-                        {/* Dekorative Elemente */}
-                        <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
-                        <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
-                        
-                        {/* Tag */}
-                        <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
-                            {tag}
-                        </div>
-                        
-                        {/* Uhrzeit — GROSS */}
-                        <div style={{
-                            fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
-                            fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
-                            lineHeight:'1', marginBottom:'10px', position:'relative'
-                        }}>
-                            <span style={{fontWeight:'300'}}>{stunden}</span>
-                            <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
-                            <span style={{fontWeight:'300'}}>{minuten}</span>
-                            <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
-                        </div>
-                        
-                        {/* Datum */}
-                        <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
-                            {datum}
-                        </div>
-                        
-                        {/* Trennlinie */}
-                        <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
-                    </div>
+                    {/* ═══ UHR & DATUM — ISOLIERT in <UhrAnzeige /> ═══ */}
+                    {/* (verhindert Rerender der BauteamAnimation jede Sekunde) */}
+                    <UhrAnzeige />
 
                     {/* ═══ VERBINDUNGS-BUTTONS (nebeneinander, kompakt) ═══ */}
                     <div style={{padding:'0 20px', marginBottom:'10px', width:'100%', maxWidth:'500px'}}>
