@@ -678,6 +678,40 @@
         });
     }
 
+    // MEMORY-KRITISCHER FIX (24.04.2026): Blob-URLs statt Base64-DataURLs.
+    //
+    // Base64-DataURL: "data:image/jpeg;base64,/9j/4AAQSk..." (komplettes Bild im String)
+    //  -> 1 Foto mit 3 MB Blob wird ~4 MB String. Bei 30 Fotos im State: 120 MB.
+    //  -> Jeder React-Render kopiert die Strings. Heap schwillt an.
+    //
+    // Blob-URL: "blob:https://xyz.github.io/abc-123-def" (nur ~60 Byte Pointer)
+    //  -> Der Browser haelt den Blob im Hintergrund, zeigt ihn bei <img src=...> live an.
+    //  -> Bei 30 Fotos: nur 1.8 KB Pointer statt 120 MB Strings. ~99% weniger Heap.
+    //
+    // Rueckgabe: Array mit {id, blobUrl (statt dataUrl), ...}.
+    // WICHTIG: Wenn die Fotos nicht mehr gebraucht werden, muss URL.revokeObjectURL
+    // aufgerufen werden! Sonst bleiben die Blobs im Browser-Memory haengen.
+    function loadFotosByIdsAsBlobURLs(ids) {
+        if (!Array.isArray(ids) || !ids.length) return Promise.resolve([]);
+        var promises = ids.map(function(id) {
+            return getItem('fotos', id).then(function(r) {
+                if (!r || !r.blob) return null;
+                var blobUrl = URL.createObjectURL(r.blob);
+                return {
+                    id: r.id,
+                    blobUrl: blobUrl,
+                    dataUrl: blobUrl, // Kompatibilitaets-Alias fuer vorhandenen Code
+                    kontext: r.kontext, raumKey: r.raumKey, subKey: r.subKey,
+                    meta: r.meta || {}, size: r.size,
+                    driveUploaded: r.driveUploaded
+                };
+            }).catch(function() { return null; });
+        });
+        return Promise.all(promises).then(function(results) {
+            return results.filter(function(r) { return r !== null; });
+        });
+    }
+
     // Nicht hochgeladene Fotos eines Kunden ermitteln (fuer Hintergrund-Drive-Sync)
     function getUnuploadedFotos(kundeId) {
         return getByIndex('fotos', 'kundeId', String(kundeId)).then(function(records) {
@@ -2298,6 +2332,7 @@
         listFotosByKunde: listFotosByKunde,
         loadFotosByKundeAsDataURLs: loadFotosByKundeAsDataURLs,
         loadFotosByIdsAsDataURLs: loadFotosByIdsAsDataURLs,
+        loadFotosByIdsAsBlobURLs: loadFotosByIdsAsBlobURLs,
         deleteFoto: deleteFoto,
         getUnuploadedFotos: getUnuploadedFotos,
         markFotoAsUploaded: markFotoAsUploaded,

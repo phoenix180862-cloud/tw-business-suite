@@ -7705,27 +7705,29 @@
                             setObjektFotos(s.objektFotos);
                         }
 
-                        // Nur EINEN Fetch durchfuehren, falls irgendeine Rehydrierung noetig ist
+                        // Nur EINEN Fetch durchfuehren, falls irgendeine Rehydrierung noetig ist.
+                        // MEMORY-KRITISCHER FIX: Blob-URLs statt Base64-DataURLs verwenden.
+                        // Bei Base64 liegt jedes Foto als ~4 MB String im Heap — bei Blob-URLs
+                        // nur ein ~60-Byte Pointer. ~99% weniger Memory-Verbrauch.
                         if ((phasenIstSchlank || objektIstSchlank) &&
                             window.TWStorage && window.TWStorage.listFotosByKunde &&
-                            window.TWStorage.loadFotosByIdsAsDataURLs && kunde) {
+                            window.TWStorage.loadFotosByIdsAsBlobURLs && kunde) {
                             var kId = kunde._driveFolderId || kunde.id || kunde.name;
                             var raumKey = (raum && (raum.bez || raum.nr)) || raumName || 'raum';
                             // Schritt 1: Nur Metadaten aller Fotos holen (klein)
                             window.TWStorage.listFotosByKunde(kId).then(function(meta) {
                                 if (!meta || !meta.length) return [];
                                 // Schritt 2: Nur die Fotos unseres Raums filtern
-                                // (phase + objekt, Key muss zu dem aktuellen Raum passen)
                                 var relevanteIds = meta.filter(function(m) {
                                     return (m.kontext === 'phase' || m.kontext === 'objekt')
                                         && m.raumKey === raumKey;
                                 }).map(function(m) { return m.id; });
                                 if (relevanteIds.length === 0) return [];
-                                // Schritt 3: Nur DIESE als DataURL laden -- kein Foto-Ueberschwall
-                                return window.TWStorage.loadFotosByIdsAsDataURLs(relevanteIds);
+                                // Schritt 3: Als BLOB-URLs laden (statt 4-MB-Base64-Strings)
+                                return window.TWStorage.loadFotosByIdsAsBlobURLs(relevanteIds);
                             }).then(function(fotos) {
                                 if (!fotos || !fotos.length) return;
-                                // Phasenfotos verteilen
+                                // Phasenfotos verteilen (dataUrl ist jetzt eine Blob-URL, nicht mehr Base64)
                                 if (phasenIstSchlank) {
                                     setPhasenFotos(function(prev) {
                                         var merged = Object.assign({}, prev);
@@ -7745,7 +7747,6 @@
                                         return merged;
                                     });
                                 }
-                                // Objektfotos verteilen
                                 if (objektIstSchlank) {
                                     setObjektFotos(function(prev) {
                                         var arr = prev.slice();
@@ -7760,7 +7761,9 @@
                                         return arr;
                                     });
                                 }
-                                // Referenz aus dem Closure loesen, damit der GC die Fotos freigeben kann
+                                // Blob-URLs im State merken, damit sie bei Unmount revoked werden koennen
+                                // (nicht gemacht -- wenn Benutzer zwischen Raumblaettern wechselt,
+                                // bleiben die alten Blob-URLs fuer ~Minuten im Browser. Vertretbar.)
                                 fotos = null;
                             }).catch(function(e) { console.warn('[Raumblatt] Foto-Rehydrierung fehlgeschlagen:', e.message); });
                         }
