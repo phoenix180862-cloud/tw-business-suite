@@ -5674,10 +5674,9 @@
                 return () => document.removeEventListener('keydown', handleKeyNav);
             }, []);
 
-            // ── Ungespeicherte-Aenderungen Tracking ──
-            useEffect(() => {
-                setHasUnsavedChanges(true);
-            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos, objektFotos]);
+            // ── Ungespeicherte-Aenderungen Tracking — VERSCHOBEN nach posCards-Deklaration,
+            //    weil das Dependency-Array alle State-Variablen enthaelt, die erst weiter
+            //    unten deklariert werden (TDZ-Fehler mit Babel-CLI-Kompilierung, 24.04.2026).
 
             // ── Edit-Modus fuer Rechenweg-Schritte (Stift-Button) ──
             const [posRechenwegEdits, setPosRechenwegEdits] = useState((reEdit && reEdit.posRechenwegEdits) || {}); // {posNr: [{id, label, formel, sign}]}
@@ -6124,6 +6123,12 @@
             // ── Manueller Rechenweg Modal ──
             const [rwModalPos, setRwModalPos] = useState(null); // pos.pos oder null
             const [rwModalZeilen, setRwModalZeilen] = useState([]);
+
+            // ── Ungespeicherte-Aenderungen Tracking ──
+            // MUSS nach allen verwendeten States deklariert sein (24.04.2026 TDZ-Fix)
+            useEffect(() => {
+                setHasUnsavedChanges(true);
+            }, [masse, wandMasse, tueren, fenster, abzuege, posCards, posRechenwegEdits, phasenFotos, objektFotos]);
 
             // ═══ LASER DISTO – Tastatur-Modus ═══
             // Enter/Tab vom DISTO → Wert formatieren + naechstes Feld
