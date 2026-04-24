@@ -2203,14 +2203,176 @@
 
             // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
             // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
-            // Aktionen via window._setModuleActions(arr). Das globale Bearbeiten-
-            // Dropdown nimmt sie mit auf.
+            // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
+            // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
             const [moduleActions, setModuleActions] = useState([]);
+            // Aktuell registrierte Seite (fuer korrektes Unregister)
+            const moduleActionsSeiteRef = useRef(null);
             useEffect(function() {
+                // Altes Pattern: direktes Array setzen
                 window._setModuleActions = function(arr) {
+                    moduleActionsSeiteRef.current = null;
                     setModuleActions(Array.isArray(arr) ? arr : []);
                 };
-                return function() { window._setModuleActions = null; };
+                // Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
+                window._registerSeitenAktionen = function(seite, aktionen) {
+                    moduleActionsSeiteRef.current = seite || null;
+                    setModuleActions(Array.isArray(aktionen) ? aktionen : []);
+                };
+                // Cleanup beim Modulwechsel: Nur entfernen wenn die aufrufende Seite noch registriert ist
+                // (verhindert dass ein neu gemountetes Modul sein gerade registriertes Dropdown sofort wieder leert)
+                window._unregisterSeitenAktionen = function(seite) {
+                    if (!seite || moduleActionsSeiteRef.current === seite) {
+                        moduleActionsSeiteRef.current = null;
+                        setModuleActions([]);
+                    }
+                };
+                // Primaer-Aktion (gruener Button rechts) -- fuer spaetere Verwendung reserviert
+                window._registerPrimaerAktion = function(seite, aktion) {
+                    // Aktuell noch nicht als separater Button umgesetzt -- ignorieren
+                };
+                window._unregisterPrimaerAktion = function(seite) {
+                    // Counterpart zum Register -- aktuell no-op
+                };
+                return function() {
+                    window._setModuleActions = null;
+                    window._registerSeitenAktionen = null;
+                    window._unregisterSeitenAktionen = null;
+                    window._registerPrimaerAktion = null;
+                    window._unregisterPrimaerAktion = null;
+                };
+            }, []);
+
+            // ══════════════════════════════════════════════════════════
+            // GLOBALER DRINGLICHKEITS-ALARM (Baustellen-App Nachrichten)
+            // Hoert auf ALLE Chats und triggert Sound + Notification wenn
+            // eine neue dringende MA-Nachricht eingeht.
+            //
+            // Logik:
+            //   - Referenz-Timestamp im localStorage ('tw_dringend_seen_ts')
+            //   - Nur Nachrichten mit timestamp > seen_ts + dringend + von 'ma' + !gelesen alarmen
+            //   - Bei Alarm: Sound (Web Audio API), Browser-Notification, Toast
+            //   - seen_ts wird nach jedem Scan aktualisiert
+            //   - Wartet bis Firebase verfuegbar ist (polling, max. 60s)
+            // ══════════════════════════════════════════════════════════
+            useEffect(function() {
+                var unsubAlarm = null;
+                var pollTimer = null;
+                var pollCount = 0;
+                var audioCtx = null;
+
+                // Web Audio API: kurzer Alarm-Beep ohne externe Datei
+                var playAlarmSound = function() {
+                    try {
+                        if (!audioCtx) {
+                            var AC = window.AudioContext || window.webkitAudioContext;
+                            if (!AC) return;
+                            audioCtx = new AC();
+                        }
+                        if (audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
+                        // Drei schnelle Pieptoene (880Hz -> 988Hz -> 1175Hz) fuer klares Alarm-Muster
+                        var now = audioCtx.currentTime;
+                        [[880, 0.00], [988, 0.15], [1175, 0.30]].forEach(function(pair) {
+                            var osc = audioCtx.createOscillator();
+                            var gain = audioCtx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.value = pair[0];
+                            gain.gain.setValueAtTime(0.0001, now + pair[1]);
+                            gain.gain.exponentialRampToValueAtTime(0.25, now + pair[1] + 0.02);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + pair[1] + 0.13);
+                            osc.connect(gain); gain.connect(audioCtx.destination);
+                            osc.start(now + pair[1]);
+                            osc.stop(now + pair[1] + 0.14);
+                        });
+                    } catch(e) { console.warn('Alarm-Sound Fehler:', e); }
+                };
+
+                // Browser-Notification (falls erlaubt)
+                var showNotification = function(absenderName, text) {
+                    try {
+                        if (!('Notification' in window)) return;
+                        if (Notification.permission === 'granted') {
+                            new Notification('🔔 Dringende Nachricht von ' + (absenderName || 'Mitarbeiter'), {
+                                body: (text || '').substring(0, 140),
+                                tag: 'tw-dringend',
+                                requireInteraction: true
+                            });
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission();
+                        }
+                    } catch(e) {}
+                };
+
+                var handleChatData = function(data) {
+                    if (!data) return;
+                    var seenTs = parseInt(localStorage.getItem('tw_dringend_seen_ts') || '0', 10) || 0;
+                    var maxTs = seenTs;
+                    var neueDringende = [];
+                    for (var maId in data) {
+                        if (!data.hasOwnProperty(maId)) continue;
+                        var thread = data[maId];
+                        for (var nk in thread) {
+                            if (!thread.hasOwnProperty(nk)) continue;
+                            var n = thread[nk];
+                            if (!n || !n.timestamp) continue;
+                            if (n.timestamp > maxTs) maxTs = n.timestamp;
+                            if (n.dringend && n.von === 'ma' && !n.gelesen && n.timestamp > seenTs) {
+                                neueDringende.push({ maId: maId, nachricht: n });
+                            }
+                        }
+                    }
+                    if (neueDringende.length > 0) {
+                        var erste = neueDringende[0];
+                        var absender = erste.nachricht.absender_name || erste.nachricht.absender || 'Mitarbeiter';
+                        var text = erste.nachricht.text_original || erste.nachricht.text || '';
+                        playAlarmSound();
+                        showNotification(absender, text);
+                        if (window._showToast) {
+                            var msg = neueDringende.length === 1
+                                ? '🔔 Dringend von ' + absender + ': ' + text.substring(0, 80)
+                                : '🔔 ' + neueDringende.length + ' dringende Nachrichten eingegangen';
+                            window._showToast(msg, 'error');
+                        }
+                    }
+                    // Scan-Marker aktualisieren, damit derselbe Alarm nicht mehrfach feuert
+                    if (maxTs > seenTs) {
+                        try { localStorage.setItem('tw_dringend_seen_ts', String(maxTs)); } catch(e) {}
+                    }
+                };
+
+                var startListener = function() {
+                    if (!window.FirebaseService || !window.FirebaseService.db || !window.FirebaseService.subscribeAlleChats) {
+                        return false;
+                    }
+                    try {
+                        unsubAlarm = window.FirebaseService.subscribeAlleChats(handleChatData);
+                        // Browser-Notification-Permission proaktiv anfragen
+                        if ('Notification' in window && Notification.permission === 'default') {
+                            Notification.requestPermission();
+                        }
+                        return true;
+                    } catch(e) {
+                        console.warn('Alarm-Listener konnte nicht starten:', e);
+                        return false;
+                    }
+                };
+
+                // Sofort probieren, dann alle 2 Sekunden bis Firebase ready (max. 60 Sek.)
+                if (!startListener()) {
+                    pollTimer = setInterval(function() {
+                        pollCount++;
+                        if (startListener() || pollCount > 30) {
+                            clearInterval(pollTimer);
+                            pollTimer = null;
+                        }
+                    }, 2000);
+                }
+
+                return function() {
+                    if (unsubAlarm) { try { unsubAlarm(); } catch(e) {} }
+                    if (pollTimer) clearInterval(pollTimer);
+                    if (audioCtx) { try { audioCtx.close(); } catch(e) {} }
+                };
             }, []);
 
             var _startFotoSync = React.useCallback(function() {

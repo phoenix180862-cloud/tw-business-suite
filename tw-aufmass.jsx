@@ -24,11 +24,41 @@
                     setGeminiStatus('saved');
                     GEMINI_CONFIG.API_KEY = key;
                 }
-                // Drive Check
-                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
-                    setDriveConnected(true);
-                    if (onDriveStatusChange) onDriveStatusChange('online');
-                }
+                // ── Drive Auto-Init: Versucht gespeicherten Token aus localStorage zu laden ──
+                // Falls noch gueltig -> automatisch angemeldet ohne Popup.
+                // Falls abgelaufen -> Silent-Refresh ohne Consent-Popup.
+                (async function() {
+                    try {
+                        var service = window.GoogleDriveService;
+                        if (!service) return;
+                        // Init aufrufen -- das laedt den Token aus localStorage wenn noch gueltig
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Wenn jetzt Token da ist -> verbunden
+                        if (service.accessToken) {
+                            setDriveConnected(true);
+                            if (onDriveStatusChange) onDriveStatusChange('online');
+                            return;
+                        }
+                        // Falls kein Token aber schonmal angemeldet war -> Silent-Refresh versuchen
+                        if (localStorage.getItem('tw_gdrive_token_v1') !== null ||
+                            localStorage.getItem('tw_gdrive_was_connected') === '1') {
+                            try {
+                                await service._silentRefresh();
+                                if (service.accessToken) {
+                                    setDriveConnected(true);
+                                    if (onDriveStatusChange) onDriveStatusChange('online');
+                                }
+                            } catch(e) {
+                                // Silent-Refresh fehlgeschlagen -- User muss manuell neu verbinden
+                                console.log('Silent-Refresh nicht moeglich:', e.message);
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Drive Auto-Init Fehler:', e);
+                    }
+                })();
             }, []);
 
             var testGeminiKey = async function() {
@@ -76,9 +106,16 @@
                 try {
                     var service = window.GoogleDriveService;
                     if (!service.accessToken) {
-                        await service.init();
-                        await service.requestAuth();
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Falls init bereits Token geladen hat -> fertig
+                        if (!service.accessToken) {
+                            await service.requestAuth();
+                        }
                     }
+                    // Marker setzen, dass User schonmal verbunden war -> aktiviert silent-refresh beim naechsten Start
+                    try { localStorage.setItem('tw_gdrive_was_connected', '1'); } catch(e){}
                     setDriveConnected(true);
                     setDriveConnecting(false);
                     if (onDriveStatusChange) onDriveStatusChange('online');
@@ -548,9 +585,9 @@
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
                     desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
-                    color: 'var(--accent-red)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.30)',
+                    color: 'var(--accent-blue)',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
@@ -560,9 +597,9 @@
                     icon: '\uD83D\uDCBE',
                     title: 'Gespeicherte Kundendaten aufrufen',
                     desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
-                    color: 'var(--accent-red)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.30)',
+                    color: 'var(--accent-blue)',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: 'OFFLINE',
                     disabled: false,
                     disabledHint: null,
@@ -572,9 +609,9 @@
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
-                    color: 'var(--accent-red)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.30)',
+                    color: 'var(--accent-blue)',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: null,
                     disabled: false,
                     disabledHint: null,
@@ -7575,9 +7612,6 @@
                         bodenPlusTuerlaibung: bodenPlusTuerlaibung,
                         fensterUebernehmen: fensterUebernehmen,
                         sonstigeUebernehmen: sonstigeUebernehmen,
-                        // BLOCK B / FIX B2: DataURLs rausgestrippt.
-                        // Phasen-Fotos und Objekt-Fotos liegen komplett im
-                        // TWStorage-Foto-Store — hier nur Meta-Schatten.
                         phasenFotos: stripPhotoDataUrls(phasenFotos),
                         objektFotos: stripObjektFotoDataUrls(objektFotos),
                         kiErgebnisse: kiErgebnisse,
@@ -7639,7 +7673,6 @@
                         if (typeof s.bodenPlusTuerlaibung === 'boolean') setBodenPlusTuerlaibung(s.bodenPlusTuerlaibung);
                         if (typeof s.fensterUebernehmen === 'boolean') setFensterUebernehmen(s.fensterUebernehmen);
                         if (typeof s.sonstigeUebernehmen === 'boolean') setSonstigeUebernehmen(s.sonstigeUebernehmen);
-
                         // BLOCK B / FIX B2 — Foto-Rehydrierung aus TWStorage:
                         // Wenn der Payload Meta-Schatten enthaelt (hasImage statt image),
                         // holen wir die Bild-Blobs aus dem persistenten Foto-Store nach.
@@ -7703,7 +7736,6 @@
                                 setObjektFotos(s.objektFotos);
                             }
                         }
-
                         if (s.kiErgebnisse) setKiErgebnisse(s.kiErgebnisse);
                         if (s.kiFotoErgebnisse) setKiFotoErgebnisse(s.kiFotoErgebnisse);
                     } catch(e) { console.error('[Raumblatt] wip:restoreState Fehler:', e); }
@@ -10873,7 +10905,7 @@
                                                 fontFamily:'Oswald, sans-serif',
                                                 textTransform:'uppercase', letterSpacing:'0.5px'
                                             }}>
-                                            \u2715 Abbrechen
+                                            {'\u2715'} Abbrechen
                                         </button>
                                     </div>
                                 )}

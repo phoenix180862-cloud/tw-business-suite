@@ -2151,6 +2151,382 @@
             );
         }
 
+                /* ═══════════════════════════════════════════
+           NAV DROPDOWN -- Top-Navigation
+           ═══════════════════════════════════════════ */
+        function NavDropdown(props) {
+            var currentMode = props.currentMode || 'Navigation';
+            var targets = Array.isArray(props.targets) ? props.targets : [];
+            var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+
+            var palette = color === 'red'
+                ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)', itemGrad: 'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))' }
+                : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)', itemGrad: 'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))' };
+
+            var [open, setOpen] = useState(false);
+            var [focusIdx, setFocusIdx] = useState(-1);
+            var wrapperRef = useRef(null);
+
+            var shownTargets = targets.filter(function(t) { return t && t.label !== currentMode; });
+
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (wrapperRef.current && !wrapperRef.current.contains(e.target)) { setOpen(false); }
+                };
+                var keyHandler = function(e) {
+                    if (e.key === 'Escape') { setOpen(false); setFocusIdx(-1); }
+                    else if (e.key === 'ArrowDown') { e.preventDefault(); setFocusIdx(function(i) { return Math.min(i + 1, shownTargets.length - 1); }); }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setFocusIdx(function(i) { return Math.max(i - 1, 0); }); }
+                };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open, shownTargets.length]);
+
+            useEffect(function() {
+                if (!open || focusIdx < 0 || !wrapperRef.current) return;
+                var btns = wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');
+                if (btns && btns[focusIdx]) { try { btns[focusIdx].focus(); } catch(e) {} }
+            }, [focusIdx, open]);
+
+            var mainBtnStyle = { padding: '10px 20px', minHeight: '44px', borderRadius: '8px', border: 'none', cursor: 'pointer', background: palette.mainGrad, color: '#fff', fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px', boxShadow: '0 3px 10px ' + palette.mainShadow, transition: 'all 0.2s ease', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '8px' };
+            var panelStyle = { position: 'absolute', top: 'calc(100% + 6px)', left: '0', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)', padding: '6px', minWidth: '180px', maxWidth: 'calc(100vw - 16px)', zIndex: 1000, animation: 'tw-nav-drop-in-left 140ms ease-out', display: 'flex', flexDirection: 'column', gap: '4px' };
+            var itemStyle = function(disabled) {
+                return { padding: '10px 14px', minHeight: '42px', borderRadius: '7px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', background: disabled ? 'rgba(120,120,120,0.18)' : palette.itemGrad, color: disabled ? 'rgba(255,255,255,0.45)' : '#fff', fontSize: '12px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.4px', textAlign: 'left', transition: 'all 0.15s ease', opacity: disabled ? 0.5 : 1 };
+            };
+            var handleSelect = function(target) {
+                if (target.disabled) return;
+                setOpen(false); setFocusIdx(-1);
+                if (typeof target.handler === 'function') { try { target.handler(); } catch(err) { console.error('NavDropdown handler:', err); } }
+            };
+
+            return (
+                <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
+                    <button type="button" style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
+                        aria-haspopup="true" aria-expanded={open}
+                        title={'Navigation -- aktuell: ' + currentMode}>
+                        <span>{currentMode}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && shownTargets.length > 0 && (
+                        <div className="tw-dropdown-panel tw-nav-dropdown-panel-center" style={panelStyle} role="menu">
+                            {shownTargets.map(function(t) {
+                                return (
+                                    <button key={t.id || t.label} type="button" role="menuitem"
+                                        className="tw-nav-dropdown-item"
+                                        disabled={!!t.disabled} style={itemStyle(t.disabled)}
+                                        onClick={function() { handleSelect(t); }}>
+                                        {t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
+           AKTION DROPDOWN -- "Bearbeiten"-Menue
+           Unterstuetzt zwei Formate fuer Sub-Menus:
+           Altes Format: { id, label, icon, handler, subItems: [{...}] }
+           Neues Format: { type:'submenu', label, icon, items: [{label, icon, onClick}] }
+           Auch: { type:'divider' } fuer Trennlinien
+           Architektur: 3 Komponenten (AktionSubItem, AktionItem, AktionDropdown)
+           -> loest React-Closure-Problem in map()-Schleifen
+           ═══════════════════════════════════════════ */
+
+        /* Sub-Menue-Eintrag -- eigene Komponente fuer saubere State-Isolation */
+        function AktionSubItem(props) {
+            var si = props.item;
+            var onClose = props.onClose;
+            var disabled = !!si.disabled;
+            var baseStyle = {
+                padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                background: 'transparent', color: disabled ? 'rgba(255,255,255,0.4)' : 'var(--text-primary)',
+                fontSize: '13px', fontWeight: '600', fontFamily: 'Oswald, sans-serif',
+                textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                opacity: disabled ? 0.55 : 1, width: '100%', boxSizing: 'border-box',
+                transition: 'background 0.12s ease',
+            };
+            var handleClick = function() {
+                if (disabled) return;
+                onClose();
+                var fn = si.onClick || si.handler;
+                if (typeof fn === 'function') { try { fn(); } catch(e) { console.error('SubItem:', e); } }
+            };
+            return (
+                <button type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                    disabled={disabled} style={baseStyle}
+                    onClick={handleClick}
+                    onMouseOver={function(e) { if (!disabled) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                    onMouseOut={function(e) { if (!disabled) e.currentTarget.style.background = 'transparent'; }}>
+                    {si.icon && <span style={{fontSize:'14px', minWidth:'18px'}}>{si.icon}</span>}
+                    <span style={{flex:1}}>{si.label}</span>
+                </button>
+            );
+        }
+
+        /* Haupt-Eintrag mit optionalem Sub-Panel -- eigene Komponente.
+           Sub-Panel wird via React Portal in document.body gerendert, um
+           overflow-Clipping des Parent-Panels zu umgehen. */
+        function AktionItem(props) {
+            var a = props.action;
+            var align = props.align || 'right';
+            var onCloseAll = props.onCloseAll;
+            var myId = props.myId;
+            var openSubId = props.openSubId;
+            var setOpenSubId = props.setOpenSubId;
+            var disabled = !!a.disabled;
+            var subItems = a._subItems || [];
+            var hasSub = subItems.length > 0;
+            var subOpen = hasSub && openSubId === myId;
+            var btnRef = useRef(null);
+            var [subPos, setSubPos] = useState(null);
+
+            /* Position des Sub-Panels berechnen wenn es oeffnet, + bei Resize/Scroll updaten */
+            useEffect(function() {
+                if (!subOpen || !btnRef.current) { setSubPos(null); return undefined; }
+                var calcPos = function() {
+                    if (!btnRef.current) return;
+                    var r = btnRef.current.getBoundingClientRect();
+                    var vw = window.innerWidth;
+                    var vh = window.innerHeight;
+                    var panelW = 240; // geschaetzte Breite
+                    var gap = 6;
+                    var pos = { top: r.top };
+                    /* Position: vorzugsweise auf der gegenueberliegenden Seite des Haupt-Panels */
+                    if (align === 'right') {
+                        /* Haupt-Panel rechts-ausgerichtet -> Sub nach links */
+                        var leftSide = r.left - panelW - gap;
+                        if (leftSide < 8) {
+                            /* Nicht genug Platz links -> rechts oeffnen */
+                            pos.left = r.right + gap;
+                        } else {
+                            pos.left = leftSide;
+                        }
+                    } else {
+                        /* Haupt-Panel links-ausgerichtet -> Sub nach rechts */
+                        var rightSide = r.right + gap;
+                        if (rightSide + panelW > vw - 8) {
+                            /* Nicht genug Platz rechts -> links oeffnen */
+                            pos.left = Math.max(8, r.left - panelW - gap);
+                        } else {
+                            pos.left = rightSide;
+                        }
+                    }
+                    /* Vertikale Begrenzung: nicht unter den Viewport */
+                    var maxHeight = vh - pos.top - 16;
+                    pos.maxHeight = Math.max(160, maxHeight);
+                    setSubPos(pos);
+                };
+                calcPos();
+                window.addEventListener('resize', calcPos);
+                window.addEventListener('scroll', calcPos, true);
+                return function() {
+                    window.removeEventListener('resize', calcPos);
+                    window.removeEventListener('scroll', calcPos, true);
+                };
+            }, [subOpen, align]);
+
+            var getBg = function() {
+                if (disabled) return 'rgba(120,120,120,0.15)';
+                if (a.destructive) return 'transparent';
+                if (a.variant === 'red') return 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
+                return 'transparent';
+            };
+            var getColor = function() {
+                if (disabled) return 'rgba(255,255,255,0.4)';
+                if (a.destructive) return 'var(--accent-red-light)';
+                if (a.variant === 'red') return '#fff';
+                return 'var(--text-primary)';
+            };
+
+            var btnStyle = {
+                padding: '10px 12px', minHeight: '42px', borderRadius: '7px', border: 'none',
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                background: getBg(), color: getColor(),
+                fontSize: '13px', fontWeight: a.variant === 'red' ? '700' : '600',
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: a.variant === 'red' ? 'uppercase' : 'none',
+                letterSpacing: a.variant === 'red' ? '0.4px' : '0',
+                textAlign: 'left', display: 'flex', alignItems: 'center', gap: '10px',
+                opacity: disabled ? 0.55 : 1, width: '100%', boxSizing: 'border-box',
+                transition: 'background 0.12s ease, filter 0.12s ease',
+            };
+
+            var subPanelStyle = subPos ? {
+                position: 'fixed',
+                top: subPos.top + 'px',
+                left: subPos.left + 'px',
+                background: 'var(--bg-tertiary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.65)',
+                padding: '6px',
+                minWidth: '220px',
+                maxWidth: 'calc(100vw - 16px)',
+                maxHeight: subPos.maxHeight + 'px',
+                overflowY: 'auto',
+                zIndex: 10000,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px',
+            } : null;
+
+            var handleClick = function() {
+                if (disabled) return;
+                if (hasSub) {
+                    setOpenSubId(subOpen ? null : myId);
+                    return;
+                }
+                onCloseAll();
+                if (typeof a.handler === 'function') { try { a.handler(); } catch(e) { console.error('AktionItem:', e); } }
+            };
+            var handleSubClose = function() { setOpenSubId(null); onCloseAll(); };
+
+            return (
+                <div style={{position:'relative'}}>
+                    <button ref={btnRef}
+                        type="button" role="menuitem" className="tw-aktion-dropdown-item"
+                        disabled={disabled} style={btnStyle}
+                        onClick={handleClick}
+                        onMouseOver={function(e) {
+                            if (disabled) return;
+                            if (a.variant === 'red') { e.currentTarget.style.filter = 'brightness(1.15)'; }
+                            else { e.currentTarget.style.background = 'var(--bg-hover)'; }
+                        }}
+                        onMouseOut={function(e) {
+                            if (disabled) return;
+                            if (a.variant === 'red') { e.currentTarget.style.filter = 'none'; }
+                            else { e.currentTarget.style.background = getBg(); }
+                        }}>
+                        {a.icon && <span style={{fontSize:'15px', minWidth:'18px'}}>{a.icon}</span>}
+                        <span style={{flex:1}}>{a.label}</span>
+                        {hasSub && <span style={{fontSize:'11px', opacity:0.75, transform: subOpen ? 'rotate(90deg)' : 'none', transition:'transform 0.15s ease'}}>{'\u25B6'}</span>}
+                    </button>
+                    {hasSub && subOpen && subPanelStyle && typeof document !== 'undefined' && ReactDOM.createPortal(
+                        <div data-tw-aktion-sub="true"
+                            className="tw-dropdown-panel tw-aktion-sub-panel"
+                            style={subPanelStyle} role="menu">
+                            {subItems.map(function(si, i) {
+                                return <AktionSubItem key={si.id || si.label || i} item={si} onClose={handleSubClose} />;
+                            })}
+                        </div>,
+                        document.body
+                    )}
+                </div>
+            );
+        }
+
+        function AktionDropdown(props) {
+            var label = props.label || 'Bearbeiten';
+            var actions = Array.isArray(props.actions) ? props.actions : [];
+            var align = props.align || 'right';
+            var containerStyle = props.style || {};
+            var color = props.color === 'blue' ? 'blue' : 'red';
+            var palette = color === 'red'
+                ? { mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)', mainShadow: 'rgba(196,30,30,0.30)' }
+                : { mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)', mainShadow: 'rgba(30,136,229,0.30)' };
+
+            var [open, setOpen] = useState(false);
+            var [openSubId, setOpenSubId] = useState(null);
+            var wrapperRef = useRef(null);
+            var closeAll = function() { setOpen(false); setOpenSubId(null); };
+
+            /* Reset Sub-State wenn Haupt-Dropdown geschlossen wird */
+            useEffect(function() { if (!open) setOpenSubId(null); }, [open]);
+
+            useEffect(function() {
+                if (!open) return undefined;
+                var handler = function(e) {
+                    if (!wrapperRef.current) return;
+                    /* Klick innerhalb des Haupt-Wrappers -> nix tun */
+                    if (wrapperRef.current.contains(e.target)) return;
+                    /* Klick im Sub-Panel-Portal -> ebenfalls nix tun */
+                    if (e.target && e.target.closest && e.target.closest('[data-tw-aktion-sub]')) return;
+                    setOpen(false);
+                };
+                var keyHandler = function(e) { if (e.key === 'Escape') { setOpen(false); } };
+                document.addEventListener('mousedown', handler);
+                document.addEventListener('touchstart', handler);
+                document.addEventListener('keydown', keyHandler);
+                return function() {
+                    document.removeEventListener('mousedown', handler);
+                    document.removeEventListener('touchstart', handler);
+                    document.removeEventListener('keydown', keyHandler);
+                };
+            }, [open]);
+
+            /* Normalisiert beide Action-Formate */
+            var normalizeAction = function(a, idx) {
+                if (!a) return null;
+                if (a.type === 'divider') return { _divider: true, _key: 'div-' + idx };
+                if (a.type === 'submenu') {
+                    return { id: a.id || ('sub-' + idx), label: a.label, icon: a.icon,
+                             disabled: !!a.disabled, variant: a.variant,
+                             _subItems: Array.isArray(a.items) ? a.items : [] };
+                }
+                return { id: a.id || ('act-' + idx), label: a.label, icon: a.icon,
+                         disabled: !!a.disabled, destructive: !!a.destructive,
+                         variant: a.variant, handler: a.handler || a.onClick,
+                         _subItems: Array.isArray(a.subItems) ? a.subItems : [] };
+            };
+            var normalized = actions.map(normalizeAction).filter(Boolean);
+
+            var mainBtnStyle = {
+                padding: '10px 18px', minHeight: '44px', borderRadius: '8px', border: 'none',
+                cursor: 'pointer', background: palette.mainGrad, color: '#fff',
+                fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif',
+                textTransform: 'uppercase', letterSpacing: '0.5px',
+                boxShadow: '0 3px 10px ' + palette.mainShadow,
+                transition: 'all 0.2s ease', whiteSpace: 'nowrap',
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+            };
+            var panelStyle = Object.assign({
+                position: 'absolute', top: 'calc(100% + 6px)',
+                background: 'var(--bg-secondary)', border: '1px solid var(--border-color)',
+                borderRadius: '10px', boxShadow: '0 8px 16px rgba(0,0,0,0.4)',
+                padding: '6px', minWidth: '220px', maxWidth: 'calc(100vw - 16px)',
+                zIndex: 1000, animation: 'tw-nav-drop-in-left 140ms ease-out',
+                display: 'flex', flexDirection: 'column', gap: '3px',
+            }, align === 'left' ? { left: 0 } : { right: 0 });
+
+            return (
+                <div ref={wrapperRef} style={Object.assign({position:'relative', display:'inline-block'}, containerStyle)}>
+                    <button type="button" style={mainBtnStyle}
+                        onClick={function() { setOpen(function(v) { return !v; }); }}
+                        aria-haspopup="true" aria-expanded={open} title={label}>
+                        <span style={{fontSize:'14px'}}>{'\u270E'}</span>
+                        <span>{label}</span>
+                        <span style={{fontSize:'10px', opacity:0.85, transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.18s ease'}}>{'\u25BC'}</span>
+                    </button>
+                    {open && normalized.length > 0 && (
+                        <div className={'tw-dropdown-panel ' + (align === 'right' ? 'tw-aktion-dropdown-panel-right' : 'tw-aktion-dropdown-panel-left')}
+                            style={panelStyle} role="menu">
+                            {normalized.map(function(a) {
+                                if (a._divider) {
+                                    return <div key={a._key} style={{height:'1px', background:'var(--border-color)', margin:'3px 6px'}} />;
+                                }
+                                return <AktionItem key={a.id} action={a} align={align}
+                                    myId={a.id} openSubId={openSubId} setOpenSubId={setOpenSubId}
+                                    onCloseAll={closeAll} />;
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
@@ -2181,11 +2557,41 @@
                     setGeminiStatus('saved');
                     GEMINI_CONFIG.API_KEY = key;
                 }
-                // Drive Check
-                if (window.GoogleDriveService && window.GoogleDriveService.accessToken) {
-                    setDriveConnected(true);
-                    if (onDriveStatusChange) onDriveStatusChange('online');
-                }
+                // ── Drive Auto-Init: Versucht gespeicherten Token aus localStorage zu laden ──
+                // Falls noch gueltig -> automatisch angemeldet ohne Popup.
+                // Falls abgelaufen -> Silent-Refresh ohne Consent-Popup.
+                (async function() {
+                    try {
+                        var service = window.GoogleDriveService;
+                        if (!service) return;
+                        // Init aufrufen -- das laedt den Token aus localStorage wenn noch gueltig
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Wenn jetzt Token da ist -> verbunden
+                        if (service.accessToken) {
+                            setDriveConnected(true);
+                            if (onDriveStatusChange) onDriveStatusChange('online');
+                            return;
+                        }
+                        // Falls kein Token aber schonmal angemeldet war -> Silent-Refresh versuchen
+                        if (localStorage.getItem('tw_gdrive_token_v1') !== null ||
+                            localStorage.getItem('tw_gdrive_was_connected') === '1') {
+                            try {
+                                await service._silentRefresh();
+                                if (service.accessToken) {
+                                    setDriveConnected(true);
+                                    if (onDriveStatusChange) onDriveStatusChange('online');
+                                }
+                            } catch(e) {
+                                // Silent-Refresh fehlgeschlagen -- User muss manuell neu verbinden
+                                console.log('Silent-Refresh nicht moeglich:', e.message);
+                            }
+                        }
+                    } catch(e) {
+                        console.warn('Drive Auto-Init Fehler:', e);
+                    }
+                })();
             }, []);
 
             var testGeminiKey = async function() {
@@ -2233,9 +2639,16 @@
                 try {
                     var service = window.GoogleDriveService;
                     if (!service.accessToken) {
-                        await service.init();
-                        await service.requestAuth();
+                        if (!service._gapiInited) {
+                            await service.init();
+                        }
+                        // Falls init bereits Token geladen hat -> fertig
+                        if (!service.accessToken) {
+                            await service.requestAuth();
+                        }
                     }
+                    // Marker setzen, dass User schonmal verbunden war -> aktiviert silent-refresh beim naechsten Start
+                    try { localStorage.setItem('tw_gdrive_was_connected', '1'); } catch(e){}
                     setDriveConnected(true);
                     setDriveConnecting(false);
                     if (onDriveStatusChange) onDriveStatusChange('online');
@@ -2705,9 +3118,9 @@
                     icon: '\uD83D\uDCE5',
                     title: 'Kundendaten laden',
                     desc: 'Alle Ordner und Dokumente vom Kunden werden komplett geladen. Die 3 Listen (Stammdaten, Positionen, Raeume) werden automatisch aus dem Kunden-Daten Ordner uebertragen.',
-                    color: 'var(--accent-red)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.30)',
+                    color: 'var(--accent-blue)',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: 'EMPFOHLEN',
                     disabled: !(connections && connections.driveConnected),
                     disabledHint: 'Google Drive verbinden',
@@ -2717,9 +3130,9 @@
                     icon: '\uD83D\uDCBE',
                     title: 'Gespeicherte Kundendaten aufrufen',
                     desc: 'Alle lokal auf diesem Geraet gespeicherten Kundenbaustellen als Liste (mit Bearbeitungsdatum). Oeffnen ohne Drive-Zugriff, fuer Baustelle ohne Internet.',
-                    color: 'var(--accent-red)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.30)',
+                    color: 'var(--accent-blue)',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: 'OFFLINE',
                     disabled: false,
                     disabledHint: null,
@@ -2729,9 +3142,9 @@
                     icon: '\uD83D\uDCDD',
                     title: 'Manuell anlegen',
                     desc: 'Kundendaten, Positionslisten und Raumlisten werden manuell eingegeben oder hochgeladen.',
-                    color: 'var(--accent-red)',
-                    gradient: 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
-                    shadow: 'rgba(196,30,30,0.30)',
+                    color: 'var(--accent-blue)',
+                    gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    shadow: 'rgba(30,136,229,0.30)',
                     badge: null,
                     disabled: false,
                     disabledHint: null,
@@ -9732,9 +10145,6 @@
                         bodenPlusTuerlaibung: bodenPlusTuerlaibung,
                         fensterUebernehmen: fensterUebernehmen,
                         sonstigeUebernehmen: sonstigeUebernehmen,
-                        // BLOCK B / FIX B2: DataURLs rausgestrippt.
-                        // Phasen-Fotos und Objekt-Fotos liegen komplett im
-                        // TWStorage-Foto-Store — hier nur Meta-Schatten.
                         phasenFotos: stripPhotoDataUrls(phasenFotos),
                         objektFotos: stripObjektFotoDataUrls(objektFotos),
                         kiErgebnisse: kiErgebnisse,
@@ -9796,7 +10206,6 @@
                         if (typeof s.bodenPlusTuerlaibung === 'boolean') setBodenPlusTuerlaibung(s.bodenPlusTuerlaibung);
                         if (typeof s.fensterUebernehmen === 'boolean') setFensterUebernehmen(s.fensterUebernehmen);
                         if (typeof s.sonstigeUebernehmen === 'boolean') setSonstigeUebernehmen(s.sonstigeUebernehmen);
-
                         // BLOCK B / FIX B2 — Foto-Rehydrierung aus TWStorage:
                         // Wenn der Payload Meta-Schatten enthaelt (hasImage statt image),
                         // holen wir die Bild-Blobs aus dem persistenten Foto-Store nach.
@@ -9860,7 +10269,6 @@
                                 setObjektFotos(s.objektFotos);
                             }
                         }
-
                         if (s.kiErgebnisse) setKiErgebnisse(s.kiErgebnisse);
                         if (s.kiFotoErgebnisse) setKiFotoErgebnisse(s.kiFotoErgebnisse);
                     } catch(e) { console.error('[Raumblatt] wip:restoreState Fehler:', e); }
@@ -13030,7 +13438,7 @@
                                                 fontFamily:'Oswald, sans-serif',
                                                 textTransform:'uppercase', letterSpacing:'0.5px'
                                             }}>
-                                            \u2715 Abbrechen
+                                            {'\u2715'} Abbrechen
                                         </button>
                                     </div>
                                 )}
@@ -18931,9 +19339,15 @@
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
+            if (subpage === 'nachrichten') {
+                return <NachrichtenStartseite
+                    onBack={function(){ setSubpage('start'); }}
+                />;
+            }
 
             // ════════════════════════════════════════════════════
-            // STARTSEITE: 5 grosse blaue Buttons (Etappe 4.1 B9)
+            // STARTSEITE: 6 grosse blaue Buttons
+            // (Etappe 4.1 B9 + Nachrichten)
             // ════════════════════════════════════════════════════
             return <BaustellenAppStartseite
                 kunde={kunde}
@@ -18944,6 +19358,7 @@
                 onSync={function(){ setSubpage('sync'); }}
                 onHauptkalender={function(){ setSubpage('hauptkalender'); }}
                 onFreigaben={function(){ setSubpage('freigaben'); }}
+                onNachrichten={function(){ setSubpage('nachrichten'); }}
                 onBack={onBack}
             />;
         }
@@ -18954,7 +19369,7 @@
         //   BAUSTELLEN - TEAM - SYNC - HAUPTKALENDER - FREIGABEN
         // HAUPTKALENDER kam in B7 dazu, FREIGABEN in B9.
         // ═══════════════════════════════════════════════════════
-        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onBack }) {
+        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onBack }) {
             // Wartende Foto-Freigaben zaehlen (Live-Listener, fuer Badge)
             const [fotoPending, setFotoPending] = useState(0);
             useEffect(function(){
@@ -18967,6 +19382,31 @@
                         }
                     }
                     setFotoPending(n);
+                });
+                return unsub;
+            }, [fbOk]);
+
+            // Ungelesene Nachrichten zaehlen (alle Threads, von 'ma')
+            const [nachrichtenUngelesen, setNachrichtenUngelesen] = useState(0);
+            const [nachrichtenDringend, setNachrichtenDringend] = useState(0);
+            useEffect(function(){
+                if (!fbOk || !window.FirebaseService || !window.FirebaseService.subscribeAlleChats) return;
+                var unsub = window.FirebaseService.subscribeAlleChats(function(data){
+                    var total = 0, dringend = 0;
+                    for (var maId in data) {
+                        if (!data.hasOwnProperty(maId)) continue;
+                        var thread = data[maId];
+                        for (var nk in thread) {
+                            if (!thread.hasOwnProperty(nk)) continue;
+                            var n = thread[nk];
+                            if (n && n.von === 'ma' && !n.gelesen) {
+                                total++;
+                                if (n.dringend) dringend++;
+                            }
+                        }
+                    }
+                    setNachrichtenUngelesen(total);
+                    setNachrichtenDringend(dringend);
                 });
                 return unsub;
             }, [fbOk]);
@@ -19011,6 +19451,15 @@
                     desc: 'Review-Queue: Fotos der Mitarbeiter pruefen und in die Kunden-Ordner freigeben oder ablehnen.',
                     onClick: onFreigaben,
                     badge: fotoPending > 0 ? String(fotoPending) : null
+                },
+                {
+                    id: 'nachrichten',
+                    icon: '💬',
+                    title: 'Nachrichten',
+                    desc: 'Chat mit allen Mitarbeitern: Kalender, direkte Kommunikation, Dringlichkeits-Benachrichtigungen.',
+                    onClick: onNachrichten,
+                    badge: nachrichtenUngelesen > 0 ? String(nachrichtenUngelesen) : null,
+                    badgeDringend: nachrichtenDringend > 0
                 }
             ];
 
@@ -19178,16 +19627,18 @@
                                             position: 'absolute',
                                             top: 0,
                                             right: 0,
-                                            background: 'var(--accent-orange)',
+                                            background: c.badgeDringend ? 'var(--accent-red)' : 'var(--accent-orange)',
                                             color: '#fff',
                                             padding: '3px 10px',
                                             borderRadius: '0 var(--radius-lg) 0 10px',
                                             fontSize: '11px',
                                             fontWeight: 700,
                                             letterSpacing: '0.5px',
-                                            fontFamily: "'Oswald', sans-serif"
+                                            fontFamily: "'Oswald', sans-serif",
+                                            animation: c.badgeDringend ? 'tw-badge-pulse 1.2s ease-in-out infinite' : 'none',
+                                            boxShadow: c.badgeDringend ? '0 0 12px rgba(196,30,30,0.6)' : 'none'
                                         }}>
-                                            {c.badge}
+                                            {c.badgeDringend ? '\uD83D\uDD14 ' : ''}{c.badge}
                                         </div>
                                     )}
                                 </button>
@@ -24085,6 +24536,65 @@
                     <button onClick={onBack} style={{padding:'12px 32px', background: color, color:'white', border:'none', borderRadius:'12px', fontSize:'14px', fontWeight:'600', cursor:'pointer', boxShadow:'0 4px 12px rgba(0,0,0,0.2)'}}>
                         ← Zurueck zur Modulwahl
                     </button>
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // NACHRICHTEN-STARTSEITE (von Baustellen-App Hauptstartseite)
+        // Eigener Wrapper mit Header + Zurueck, nutzt intern NachrichtenBereich.
+        // Im Gegensatz zu StagingDetail-Variante nicht baustellen-spezifisch,
+        // sondern uebergreifender Chat-Hub ueber alle Mitarbeiter.
+        // ═══════════════════════════════════════════════════════
+        function NachrichtenStartseite({ onBack }) {
+            return (
+                <div className="page-container" style={{
+                    padding: '16px',
+                    minHeight: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column'
+                }}>
+                    {/* Header mit Zurueck + Titel */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginBottom: '18px'
+                    }}>
+                        <button onClick={onBack} style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            fontSize: '22px',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            touchAction: 'manipulation'
+                        }}>{'\u2190'}</button>
+                        <div style={{ flex: 1 }}>
+                            <div style={{
+                                fontFamily: "'Oswald', sans-serif",
+                                fontSize: '18px',
+                                fontWeight: 600,
+                                letterSpacing: '1.5px',
+                                textTransform: 'uppercase',
+                                color: 'var(--text-primary)'
+                            }}>
+                                {'\uD83D\uDCAC'} Nachrichten
+                            </div>
+                            <div style={{
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                                marginTop: '2px'
+                            }}>
+                                Chat mit allen Mitarbeitern
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Der bereits existierende Nachrichten-Bereich */}
+                    <div style={{ flex: 1 }}>
+                        <NachrichtenBereich baustelleName={null} />
+                    </div>
                 </div>
             );
         }
@@ -30623,14 +31133,176 @@
 
             // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
             // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
-            // Aktionen via window._setModuleActions(arr). Das globale Bearbeiten-
-            // Dropdown nimmt sie mit auf.
+            // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
+            // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
             const [moduleActions, setModuleActions] = useState([]);
+            // Aktuell registrierte Seite (fuer korrektes Unregister)
+            const moduleActionsSeiteRef = useRef(null);
             useEffect(function() {
+                // Altes Pattern: direktes Array setzen
                 window._setModuleActions = function(arr) {
+                    moduleActionsSeiteRef.current = null;
                     setModuleActions(Array.isArray(arr) ? arr : []);
                 };
-                return function() { window._setModuleActions = null; };
+                // Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
+                window._registerSeitenAktionen = function(seite, aktionen) {
+                    moduleActionsSeiteRef.current = seite || null;
+                    setModuleActions(Array.isArray(aktionen) ? aktionen : []);
+                };
+                // Cleanup beim Modulwechsel: Nur entfernen wenn die aufrufende Seite noch registriert ist
+                // (verhindert dass ein neu gemountetes Modul sein gerade registriertes Dropdown sofort wieder leert)
+                window._unregisterSeitenAktionen = function(seite) {
+                    if (!seite || moduleActionsSeiteRef.current === seite) {
+                        moduleActionsSeiteRef.current = null;
+                        setModuleActions([]);
+                    }
+                };
+                // Primaer-Aktion (gruener Button rechts) -- fuer spaetere Verwendung reserviert
+                window._registerPrimaerAktion = function(seite, aktion) {
+                    // Aktuell noch nicht als separater Button umgesetzt -- ignorieren
+                };
+                window._unregisterPrimaerAktion = function(seite) {
+                    // Counterpart zum Register -- aktuell no-op
+                };
+                return function() {
+                    window._setModuleActions = null;
+                    window._registerSeitenAktionen = null;
+                    window._unregisterSeitenAktionen = null;
+                    window._registerPrimaerAktion = null;
+                    window._unregisterPrimaerAktion = null;
+                };
+            }, []);
+
+            // ══════════════════════════════════════════════════════════
+            // GLOBALER DRINGLICHKEITS-ALARM (Baustellen-App Nachrichten)
+            // Hoert auf ALLE Chats und triggert Sound + Notification wenn
+            // eine neue dringende MA-Nachricht eingeht.
+            //
+            // Logik:
+            //   - Referenz-Timestamp im localStorage ('tw_dringend_seen_ts')
+            //   - Nur Nachrichten mit timestamp > seen_ts + dringend + von 'ma' + !gelesen alarmen
+            //   - Bei Alarm: Sound (Web Audio API), Browser-Notification, Toast
+            //   - seen_ts wird nach jedem Scan aktualisiert
+            //   - Wartet bis Firebase verfuegbar ist (polling, max. 60s)
+            // ══════════════════════════════════════════════════════════
+            useEffect(function() {
+                var unsubAlarm = null;
+                var pollTimer = null;
+                var pollCount = 0;
+                var audioCtx = null;
+
+                // Web Audio API: kurzer Alarm-Beep ohne externe Datei
+                var playAlarmSound = function() {
+                    try {
+                        if (!audioCtx) {
+                            var AC = window.AudioContext || window.webkitAudioContext;
+                            if (!AC) return;
+                            audioCtx = new AC();
+                        }
+                        if (audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
+                        // Drei schnelle Pieptoene (880Hz -> 988Hz -> 1175Hz) fuer klares Alarm-Muster
+                        var now = audioCtx.currentTime;
+                        [[880, 0.00], [988, 0.15], [1175, 0.30]].forEach(function(pair) {
+                            var osc = audioCtx.createOscillator();
+                            var gain = audioCtx.createGain();
+                            osc.type = 'sine';
+                            osc.frequency.value = pair[0];
+                            gain.gain.setValueAtTime(0.0001, now + pair[1]);
+                            gain.gain.exponentialRampToValueAtTime(0.25, now + pair[1] + 0.02);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + pair[1] + 0.13);
+                            osc.connect(gain); gain.connect(audioCtx.destination);
+                            osc.start(now + pair[1]);
+                            osc.stop(now + pair[1] + 0.14);
+                        });
+                    } catch(e) { console.warn('Alarm-Sound Fehler:', e); }
+                };
+
+                // Browser-Notification (falls erlaubt)
+                var showNotification = function(absenderName, text) {
+                    try {
+                        if (!('Notification' in window)) return;
+                        if (Notification.permission === 'granted') {
+                            new Notification('🔔 Dringende Nachricht von ' + (absenderName || 'Mitarbeiter'), {
+                                body: (text || '').substring(0, 140),
+                                tag: 'tw-dringend',
+                                requireInteraction: true
+                            });
+                        } else if (Notification.permission !== 'denied') {
+                            Notification.requestPermission();
+                        }
+                    } catch(e) {}
+                };
+
+                var handleChatData = function(data) {
+                    if (!data) return;
+                    var seenTs = parseInt(localStorage.getItem('tw_dringend_seen_ts') || '0', 10) || 0;
+                    var maxTs = seenTs;
+                    var neueDringende = [];
+                    for (var maId in data) {
+                        if (!data.hasOwnProperty(maId)) continue;
+                        var thread = data[maId];
+                        for (var nk in thread) {
+                            if (!thread.hasOwnProperty(nk)) continue;
+                            var n = thread[nk];
+                            if (!n || !n.timestamp) continue;
+                            if (n.timestamp > maxTs) maxTs = n.timestamp;
+                            if (n.dringend && n.von === 'ma' && !n.gelesen && n.timestamp > seenTs) {
+                                neueDringende.push({ maId: maId, nachricht: n });
+                            }
+                        }
+                    }
+                    if (neueDringende.length > 0) {
+                        var erste = neueDringende[0];
+                        var absender = erste.nachricht.absender_name || erste.nachricht.absender || 'Mitarbeiter';
+                        var text = erste.nachricht.text_original || erste.nachricht.text || '';
+                        playAlarmSound();
+                        showNotification(absender, text);
+                        if (window._showToast) {
+                            var msg = neueDringende.length === 1
+                                ? '🔔 Dringend von ' + absender + ': ' + text.substring(0, 80)
+                                : '🔔 ' + neueDringende.length + ' dringende Nachrichten eingegangen';
+                            window._showToast(msg, 'error');
+                        }
+                    }
+                    // Scan-Marker aktualisieren, damit derselbe Alarm nicht mehrfach feuert
+                    if (maxTs > seenTs) {
+                        try { localStorage.setItem('tw_dringend_seen_ts', String(maxTs)); } catch(e) {}
+                    }
+                };
+
+                var startListener = function() {
+                    if (!window.FirebaseService || !window.FirebaseService.db || !window.FirebaseService.subscribeAlleChats) {
+                        return false;
+                    }
+                    try {
+                        unsubAlarm = window.FirebaseService.subscribeAlleChats(handleChatData);
+                        // Browser-Notification-Permission proaktiv anfragen
+                        if ('Notification' in window && Notification.permission === 'default') {
+                            Notification.requestPermission();
+                        }
+                        return true;
+                    } catch(e) {
+                        console.warn('Alarm-Listener konnte nicht starten:', e);
+                        return false;
+                    }
+                };
+
+                // Sofort probieren, dann alle 2 Sekunden bis Firebase ready (max. 60 Sek.)
+                if (!startListener()) {
+                    pollTimer = setInterval(function() {
+                        pollCount++;
+                        if (startListener() || pollCount > 30) {
+                            clearInterval(pollTimer);
+                            pollTimer = null;
+                        }
+                    }, 2000);
+                }
+
+                return function() {
+                    if (unsubAlarm) { try { unsubAlarm(); } catch(e) {} }
+                    if (pollTimer) clearInterval(pollTimer);
+                    if (audioCtx) { try { audioCtx.close(); } catch(e) {} }
+                };
             }, []);
 
             var _startFotoSync = React.useCallback(function() {
@@ -31485,7 +32157,7 @@
            MOUNT
            ═══════════════════════════════════════════ */
 
-        const root = ReactDOM.createRoot(document.getElementById("root"));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
