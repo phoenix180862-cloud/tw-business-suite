@@ -7691,25 +7691,34 @@
                         // (keine Geisterfotos aus anderen Raumblaettern).
                         var phasenIstSchlank = false;
                         var objektIstSchlank = false;
-                        if (s.phasenFotos) {
-                            var firstPhase = Object.keys(s.phasenFotos)[0];
-                            var firstWand = firstPhase && Object.keys(s.phasenFotos[firstPhase] || {})[0];
-                            var firstEntry = firstWand && s.phasenFotos[firstPhase][firstWand];
-                            phasenIstSchlank = firstEntry && (firstEntry.hasImage !== undefined) && !firstEntry.image;
-                            // Sofort setzen (schlank oder vollstaendig)
-                            setPhasenFotos(s.phasenFotos);
-                        }
-                        if (s.objektFotos) {
-                            var erster = s.objektFotos[0];
-                            objektIstSchlank = erster && (erster.hasImage !== undefined) && !erster.image;
-                            setObjektFotos(s.objektFotos);
+                        // DIAGNOSE-FLAG (?noFotos=1): Foto-States komplett leer lassen
+                        // um den Heap-Kollaps durch Foto-Rendering zu isolieren.
+                        if (window.__twNoFotos) {
+                            console.log('[Raumblatt] DIAGNOSE-MODUS aktiv — Fotos werden NICHT geladen');
+                        } else {
+                            if (s.phasenFotos) {
+                                var firstPhase = Object.keys(s.phasenFotos)[0];
+                                var firstWand = firstPhase && Object.keys(s.phasenFotos[firstPhase] || {})[0];
+                                var firstEntry = firstWand && s.phasenFotos[firstPhase][firstWand];
+                                phasenIstSchlank = firstEntry && (firstEntry.hasImage !== undefined) && !firstEntry.image;
+                                // Sofort setzen (schlank oder vollstaendig)
+                                setPhasenFotos(s.phasenFotos);
+                            }
+                            if (s.objektFotos) {
+                                var erster = s.objektFotos[0];
+                                objektIstSchlank = erster && (erster.hasImage !== undefined) && !erster.image;
+                                setObjektFotos(s.objektFotos);
+                            }
                         }
 
                         // Nur EINEN Fetch durchfuehren, falls irgendeine Rehydrierung noetig ist.
                         // MEMORY-KRITISCHER FIX: Blob-URLs statt Base64-DataURLs verwenden.
                         // Bei Base64 liegt jedes Foto als ~4 MB String im Heap — bei Blob-URLs
                         // nur ein ~60-Byte Pointer. ~99% weniger Memory-Verbrauch.
-                        if ((phasenIstSchlank || objektIstSchlank) &&
+                        // DIAGNOSE-FLAG (?noFotos=1): Foto-Rehydrierung komplett skippen,
+                        // um zu testen, ob Fotos der Memory-Leak-Verursacher sind.
+                        if (!window.__twNoFotos &&
+                            (phasenIstSchlank || objektIstSchlank) &&
                             window.TWStorage && window.TWStorage.listFotosByKunde &&
                             window.TWStorage.loadFotosByIdsAsBlobURLs && kunde) {
                             var kId = kunde._driveFolderId || kunde.id || kunde.name;
@@ -10697,7 +10706,30 @@
 
                     </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
-                    {rbTab === 1 && (
+                    {rbTab === 1 && window.__twNoFotos && (
+                        <div style={{
+                            padding:'40px 20px', textAlign:'center',
+                            background:'rgba(230,126,34,0.08)',
+                            border:'2px dashed #e67e22', borderRadius:'12px',
+                            margin:'20px'
+                        }}>
+                            <div style={{fontSize:'48px', marginBottom:'12px'}}>{'\uD83D\uDD0D'}</div>
+                            <div style={{fontSize:'18px', fontWeight:700, color:'#e67e22', marginBottom:'8px'}}>
+                                DIAGNOSE-MODUS: Fotos deaktiviert
+                            </div>
+                            <div style={{fontSize:'13px', color:'var(--text-secondary)', lineHeight:1.5, maxWidth:'500px', margin:'0 auto'}}>
+                                Die Foto-Seite wurde per URL-Flag <code style={{background:'rgba(0,0,0,0.1)',padding:'2px 6px',borderRadius:'4px'}}>?noFotos=1</code> abgeschaltet,
+                                um zu pruefen ob sie der Memory-Leak-Verursacher ist.
+                                <br/><br/>
+                                Beobachte jetzt den Memory-Badge oben rechts.
+                                Wenn die Werte im blauen Bereich bleiben, sind die Fotos schuld.
+                                Wenn sie trotzdem ins Rote gehen, liegt das Problem woanders.
+                                <br/><br/>
+                                Flag entfernen: URL ohne <code style={{background:'rgba(0,0,0,0.1)',padding:'2px 6px',borderRadius:'4px'}}>?noFotos=1</code> aufrufen.
+                            </div>
+                        </div>
+                    )}
+                    {rbTab === 1 && !window.__twNoFotos && (
                         <div>
                             {/* Hidden file input fuer Phasen-Fotos */}
                             <input type="file" accept="image/*" capture="environment"

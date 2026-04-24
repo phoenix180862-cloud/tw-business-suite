@@ -12,6 +12,35 @@
     <meta http-equiv="Expires" content="0">
 
     <script>
+    // ═══ URL-DEBUG-FLAGS ═══
+    // Diagnose-Flags die per URL-Parameter aktiviert werden.
+    // Beispiele: ?noFotos=1, ?noFotos=1&noSync=1
+    (function() {
+        try {
+            var params = new URLSearchParams(window.location.search);
+            window.__twNoFotos = params.get('noFotos') === '1';
+            window.__twNoAlarm = params.get('noAlarm') === '1';
+            window.__twNoSync = params.get('noSync') === '1';
+            window.__twNoClock = params.get('noClock') === '1';
+            window.__twMinimal = params.get('minimal') === '1';
+            if (window.__twMinimal) {
+                window.__twNoAlarm = true;
+                window.__twNoSync = true;
+                window.__twNoClock = true;
+            }
+            var flags = [];
+            if (window.__twNoFotos) flags.push('noFotos');
+            if (window.__twNoAlarm) flags.push('noAlarm');
+            if (window.__twNoSync) flags.push('noSync');
+            if (window.__twNoClock) flags.push('noClock');
+            if (flags.length) {
+                console.log('%c[TW Debug-Flags aktiv] ' + flags.join(', '), 'color:#e67e22;font-weight:bold;font-size:14px');
+            }
+        } catch(e) { /* URLSearchParams nicht verfuegbar -- ignorieren */ }
+    })();
+    </script>
+
+    <script>
     // ═══ DIAGNOSE-MODUS ═══
     // Bei jedem App-Crash zeigen wir direkt auf dem Screen die Infos an,
     // die wir zur Fehleranalyse brauchen — so dass der Thomas nur einen
