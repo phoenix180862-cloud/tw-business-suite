@@ -4085,48 +4085,46 @@
                         Gesamtliste / Liste speichern / Liste laden) wurden in die globale ActionsBar
                         (Bearbeiten-Dropdown oberhalb der Schnellnavi) verschoben. ═══ */}
 
-                    {erkannteRaeume.length > 0 && (
-                        <div className="raumerkennung-info">
-                            <span style={{fontSize:'18px'}}>🔍</span>
-                            <span><strong>{erkannteRaeume.length} Räume</strong> erkannt – Raum antippen → Positionen auswählen → Aufmass starten</span>
-                        </div>
-                    )}
-
-                    {/* Direkt Aufmass starten */}
-                    <div style={{padding:'0 0 16px 0'}}>
-                        <button
-                            onClick={function() {
-                                var direktRaum = {
-                                    nr: '',
-                                    geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
-                                    bez: '',
-                                    quelle: 'Direkt',
-                                    waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
-                                    hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
-                                    fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
-                                    raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
-                                    abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
-                                    sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
-                                    fliesenUmlaufend: true,
-                                    abdichtungUmlaufend: true,
-                                    manuell: true,
-                                };
-                                onSelectRaum(direktRaum, []);
-                            }}
-                            style={{
-                                width:'100%', padding:'16px 20px', borderRadius:'14px', border:'none', cursor:'pointer',
-                                background:'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                color:'white', fontSize:'15px', fontWeight:'700',
-                                boxShadow:'0 4px 16px rgba(30,136,229,0.35)',
-                                display:'flex', alignItems:'center', justifyContent:'center', gap:'10px',
-                                fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
-                            }}>
-                            {'\uD83D\uDCD0'} Aufmass direkt starten
-                        </button>
-                        <div style={{fontSize:'11px', color:'var(--text-muted)', textAlign:'center', marginTop:'6px'}}>
-                            Ohne Raumauswahl und Positionsauswahl
-                        </div>
-                    </div>
+                    {/* PHASE-2-PLATZOPTIMIERUNG (Skill 2.1+2.2, Bild 3 vom 25.04.):
+                        Banner "X Raeume erkannt..." und Querbalken "Aufmass direkt starten"
+                        wandern in eine kompakte ToolbarRow. Banner wird StatusPill mit Tooltip.
+                        Querbalken wird ToolbarButton (blau). Spart ~110px vertikalen Platz. */}
+                    <ToolbarRow
+                        sticky={false}
+                        left={
+                            <ToolbarButton
+                                icon={'\uD83D\uDCD0'}
+                                label="Direkt-Start"
+                                color="blue"
+                                title="Aufmass direkt starten -- ohne Raumauswahl und Positionsauswahl"
+                                onClick={function() {
+                                    var direktRaum = {
+                                        nr: '',
+                                        geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
+                                        bez: '',
+                                        quelle: 'Direkt',
+                                        waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                        hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                        fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                        raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
+                                        abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
+                                        sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
+                                        fliesenUmlaufend: true,
+                                        abdichtungUmlaufend: true,
+                                        manuell: true,
+                                    };
+                                    onSelectRaum(direktRaum, []);
+                                }}
+                            />
+                        }
+                        right={erkannteRaeume.length > 0 ? (
+                            <StatusPill
+                                text={erkannteRaeume.length + ' R\u00C4UME'}
+                                color="success"
+                                title={erkannteRaeume.length + ' R\u00e4ume erkannt \u2014 Raum antippen \u2192 Positionen ausw\u00e4hlen \u2192 Aufmass starten'}
+                            />
+                        ) : null}
+                    />
 
                     {Object.entries(grouped).map(([geschoss, raeume]) => (
                         <React.Fragment key={geschoss}>
@@ -4646,7 +4644,10 @@
                     {/* ═══ POSITIONSAUSWAHL MODAL ═══ */}
                     {showPosModal && activeRaum && (
                         <div className="pos-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowPosModal(false); setActiveRaum(null); } }}>
-                            {/* Titelzeile: reiner Text links oben, kein roter Balken, kein Button */}
+                            {/* PHASE-2-PLATZOPTIMIERUNG (Skill 2.1, Bild 4 vom 25.04.):
+                                Header schlanker (nur Raum-Bez, Pos-Zahl wandert in Pill).
+                                Querbalken "Liste speichern" / "Liste laden" wandern in
+                                kompakte ToolbarRow als ToolbarButtons. */}
                             <div className="pos-modal-header" style={{
                                 background: 'transparent',
                                 padding: '8px 14px 4px',
@@ -4663,34 +4664,44 @@
                                     textAlign: 'left',
                                     color: '#fff'
                                 }}>
-                                    {'\uD83D\uDCCB'} {activeRaum.bez} ({activeRaum.nr}) — {selectedPositions.length} Pos. ausgewaehlt
+                                    {'\uD83D\uDCCB'} {activeRaum.bez} ({activeRaum.nr})
                                 </div>
                             </div>
 
-                            {/* PAKET C: Listen-Aktionen im Pos-Modal */}
-                            <div className="rb-nav-red" style={{
-                                display:'flex', gap:'3px', padding:'4px 6px', marginBottom:'0',
-                                background:'var(--bg-card)', borderBottom:'1px solid var(--border-color)'
-                            }}>
-                                <button className="rb-nav-btn rb-nav-red-btn"
-                                    disabled={!selectedPositions || selectedPositions.length === 0}
-                                    style={{opacity: (!selectedPositions || selectedPositions.length === 0) ? 0.4 : 1, cursor: (!selectedPositions || selectedPositions.length === 0) ? 'not-allowed' : 'pointer', fontSize:'12px'}}
-                                    title={(!selectedPositions || selectedPositions.length === 0) ? 'Erst Positionen auswaehlen' : 'Aktuelle Auswahl als wiederverwendbare Liste speichern'}
-                                    onClick={() => {
-                                        // Aktuell aktiven Raum direkt vorauswaehlen
-                                        var rk = activeRaum.nr || activeRaum.id;
-                                        if (rk) setSaveListRaumIds({[rk]: true});
-                                        setShowSaveListe(true);
-                                    }}>
-                                    {'\uD83D\uDCBE'} Liste speichern
-                                </button>
-                                <button className="rb-nav-btn rb-nav-red-btn"
-                                    style={{fontSize:'12px'}}
-                                    onClick={() => setShowLoadListe(true)}
-                                    title="Gespeicherte Positionsliste laden">
-                                    {'\uD83D\uDCC2'} Liste laden
-                                </button>
-                            </div>
+                            {/* Listen-Aktionen als Toolbar (Phase 2, vorher: rb-nav-red Querbalken) */}
+                            <ToolbarRow
+                                sticky={false}
+                                left={
+                                    <React.Fragment>
+                                        <ToolbarButton
+                                            icon={'\uD83D\uDCBE'}
+                                            label="Speichern"
+                                            color="red"
+                                            disabled={!selectedPositions || selectedPositions.length === 0}
+                                            title={(!selectedPositions || selectedPositions.length === 0) ? 'Erst Positionen auswaehlen' : 'Aktuelle Auswahl als wiederverwendbare Liste speichern'}
+                                            onClick={() => {
+                                                var rk = activeRaum.nr || activeRaum.id;
+                                                if (rk) setSaveListRaumIds({[rk]: true});
+                                                setShowSaveListe(true);
+                                            }}
+                                        />
+                                        <ToolbarButton
+                                            icon={'\uD83D\uDCC2'}
+                                            label="Laden"
+                                            color="red"
+                                            title="Gespeicherte Positionsliste laden"
+                                            onClick={() => setShowLoadListe(true)}
+                                        />
+                                    </React.Fragment>
+                                }
+                                right={
+                                    <StatusPill
+                                        text={selectedPositions.length + ' POS.'}
+                                        color={selectedPositions.length > 0 ? 'success' : 'muted'}
+                                        title={selectedPositions.length + ' Positionen ausgew\u00e4hlt'}
+                                    />
+                                }
+                            />
 
                             <div className="pos-modal-body">
                                 {/* Empfohlene Positionen */}

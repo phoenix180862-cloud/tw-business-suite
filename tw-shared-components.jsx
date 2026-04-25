@@ -2079,14 +2079,20 @@
         //   left:  React-Knoten fuer linke Gruppe (Dropdowns, Action-Buttons)
         //   right: React-Knoten fuer rechte Gruppe (Status-Pills)
         //   stickyTop: Pixel-Wert fuer position:sticky.top (default 60)
+        //   sticky:    boolean (default true). Auf false setzen fuer
+        //              Verwendung in Modals oder anderen Scroll-Containern.
         //   children: Falls weder left noch right uebergeben werden, wird
         //             children direkt eingefuegt (freies Layout)
-        function ToolbarRow({ left, right, stickyTop, children }) {
+        function ToolbarRow({ left, right, stickyTop, sticky, children }) {
             var topPx = (typeof stickyTop === 'number') ? stickyTop : 60;
+            var isSticky = (sticky !== false); // default true
+            var posStyle = isSticky
+                ? { position: 'sticky', top: topPx + 'px', zIndex: 95 }
+                : { position: 'relative' };
             return (
                 <div
                     className="tw-toolbar-row"
-                    style={{
+                    style={Object.assign({
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
@@ -2097,11 +2103,8 @@
                         overflowY: 'visible',
                         flexWrap: 'nowrap',
                         minHeight: '44px',
-                        position: 'sticky',
-                        top: topPx + 'px',
-                        zIndex: 95,
                         scrollbarWidth: 'thin'
-                    }}
+                    }, posStyle)}
                 >
                     {children}
                     {left && (
