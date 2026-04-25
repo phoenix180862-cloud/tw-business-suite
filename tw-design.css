@@ -6544,3 +6544,73 @@
     0%, 100% { transform: scale(1);    opacity: 1; }
     50%      { transform: scale(1.35); opacity: 0.7; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   PLATZOPTIMIERUNG-TOOLBAR -- Animationen + Helfer-Klassen
+   Stand: 25.04.2026
+   Skill: SKILL-platzoptimierung-toolbar.md (Teil B + Teil C)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Bottom-Sheet glaesst von unten hoch (Mobile-Dropdown) */
+@keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+
+/* Akkordeon-Submenue klappt nach unten auf */
+@keyframes twAccordionDown {
+    from { opacity: 0; max-height: 0;     transform: translateY(-4px); }
+    to   { opacity: 1; max-height: 600px; transform: translateY(0); }
+}
+
+/* Desktop-Dropdown-Panel sanft eingleiten */
+@keyframes twDropDown {
+    from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* Toolbar-Helfer: kompakte sticky Zeile, scrollbar bei Bedarf */
+.tw-toolbar-row {
+    -webkit-overflow-scrolling: touch;
+}
+.tw-toolbar-row::-webkit-scrollbar { height: 4px; }
+.tw-toolbar-row::-webkit-scrollbar-track { background: transparent; }
+.tw-toolbar-row::-webkit-scrollbar-thumb {
+    background: rgba(184, 196, 212, 0.25);
+    border-radius: 2px;
+}
+.tw-toolbar-row::-webkit-scrollbar-thumb:hover {
+    background: rgba(184, 196, 212, 0.45);
+}
+
+/* Hover-Feedback auf Toolbar-Buttons (Touch-Geraete bekommen es nicht
+   sichtbar, das ist OK -- der :active state der globalen Button-Regel
+   greift dort) */
+.tw-toolbar-row button:not(:disabled):hover {
+    filter: brightness(1.08);
+}
+.tw-toolbar-row button:not(:disabled):active {
+    transform: scale(0.97);
+}
+
+/* Bottom-Sheet-Drag-Indikator pulsiert dezent als Hinweis aufs Schliessen */
+@keyframes twSheetIndicatorPulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 0.7; }
+}
+[data-tw-bottom-sheet] > div:first-child {
+    animation: twSheetIndicatorPulse 2s ease-in-out infinite;
+}
+
+/* Akkordeon-Sub-Items: linker roter Strich als visueller Anker */
+.tw-aktion-dropdown-subitem {
+    position: relative;
+}
+
+/* Auf kleinen Bildschirmen die Toolbar-Padding reduzieren */
+@media (max-width: 480px) {
+    .tw-toolbar-row {
+        padding: 5px 8px;
+        gap: 4px;
+    }
+}

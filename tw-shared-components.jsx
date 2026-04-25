@@ -2060,599 +2060,220 @@
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
 
-        /* ═══════════════════════════════════════════════════════════════
-           STORAGE-HEALTH-DASHBOARD (Punkt 6 aus Architektur-Plan, 25.04.2026)
-           Modal-Dashboard mit IDB-Belegung, Queue-Status, pro-Kunde-Sync.
-           Aufruf: window._openStorageHealth() von ueberall.
-           Quellsync (Etappe A, 25.04.2026): zurueck in JSX-Quellen ueber-
-           fuehrt (war zuvor nur im Live-Build).
-           ═══════════════════════════════════════════════════════════════ */
-        function StorageHealthDashboard({ open, onClose }) {
-            const [info, setInfo] = React.useState(null);
-            const [queueStatus, setQueueStatus] = React.useState(null);
-            const [refreshTick, setRefreshTick] = React.useState(0);
+        /* ═══════════════════════════════════════════════════════════════════
+           PLATZOPTIMIERUNG-TOOLBAR -- Bausteine fuer App-weite Migration
+           Stand: 25.04.2026
+           Skill:  SKILL-platzoptimierung-toolbar.md (Teil B + Teil F)
+           ───────────────────────────────────────────────────────────────────
+           Diese Komponenten werden in den seitenweisen Migrations-Sprints
+           verwendet, um Querbalken-Buttons und Status-Banner durch eine
+           kompakte Toolbar-Zeile zu ersetzen. Sie erfuellen die Skill-
+           Vorgaben aus Teil B (Toolbar-System) und Teil F (Status-Pill-
+           Wortlaut).
+           ═══════════════════════════════════════════════════════════════════ */
 
-            React.useEffect(function() {
-                if (!open) return;
-                let cancelled = false;
-                async function load() {
-                    try {
-                        if (!window.TWStorage || !window.TWStorage.isReady()) {
-                            setInfo({ error: 'TWStorage nicht bereit' });
-                            return;
-                        }
-                        const storage = await window.TWStorage.getStorageInfo();
-                        const counts  = await window.TWStorage.getRecordCounts();
-                        const kunden  = await window.TWStorage.listKunden();
-                        // Pro Kunde: ungesyncte Fotos + appDateien + letzter Sync
-                        const perKunde = [];
-                        for (let i = 0; i < kunden.length; i++) {
-                            const k = kunden[i];
-                            const kid = k.id;
-                            let unsyncedFotos = 0, unsyncedAppDateien = 0, lastSync = null;
-                            try {
-                                const fotos = await window.TWStorage.getByIndex('fotos', 'kundeId', String(kid));
-                                unsyncedFotos = (fotos || []).filter(function(f) { return !f.driveUploaded; }).length;
-                            } catch (e) { /* still */ }
-                            try {
-                                const ad = await window.TWStorage.getByIndex('appDateien', 'kundeId', kid);
-                                unsyncedAppDateien = (ad || []).filter(function(a) { return a.syncStatus === 'pending'; }).length;
-                            } catch (e) { /* still */ }
-                            try {
-                                if (window.TWStorage.DriveUploadSync && window.TWStorage.DriveUploadSync.getLastSyncTime) {
-                                    lastSync = await window.TWStorage.DriveUploadSync.getLastSyncTime(kid);
-                                }
-                            } catch (e) { /* still */ }
-                            perKunde.push({
-                                id: kid,
-                                name: k.name || k.bauvorhaben || kid,
-                                unsyncedFotos: unsyncedFotos,
-                                unsyncedAppDateien: unsyncedAppDateien,
-                                lastSync: lastSync
-                            });
-                        }
-                        const schemaInfo = window.TWSchema && window.TWSchema.getDiagnostics
-                            ? window.TWSchema.getDiagnostics() : null;
-                        if (cancelled) return;
-                        setInfo({
-                            storage: storage,
-                            counts: counts,
-                            perKunde: perKunde,
-                            dbVersion: window.TWStorage.DB_VERSION,
-                            schema: schemaInfo,
-                            apiAvailable: !!window.TWStorageAPI
-                        });
-                    } catch (err) {
-                        if (!cancelled) setInfo({ error: err.message });
-                    }
-                }
-                load();
-                // Queue-Status abonnieren
-                let unsubQueue = null;
-                if (window.TWStorageAPI && window.TWStorageAPI.queue) {
-                    setQueueStatus(window.TWStorageAPI.queue.status());
-                    unsubQueue = window.TWStorageAPI.queue.subscribe(function(s) {
-                        setQueueStatus(s);
-                    });
-                }
-                return function() {
-                    cancelled = true;
-                    if (unsubQueue) unsubQueue();
-                };
-            }, [open, refreshTick]);
-
-            if (!open) return null;
-
-            const fmtBytes = function(b) {
-                if (!b || b < 1024) return (b || 0) + ' B';
-                if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
-                if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
-                return (b/(1024*1024*1024)).toFixed(2) + ' GB';
-            };
-            const fmtTime = function(iso) {
-                if (!iso) return 'nie';
-                try {
-                    const d = new Date(iso);
-                    return d.toLocaleString('de-DE', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit'
-                    });
-                } catch (e) { return iso; }
-            };
-
+        // === ToolbarRow ===========================================
+        // Sticky horizontale Toolbar-Zeile, scrollbar bei Bedarf,
+        // bricht NIE auf 2 Zeilen um (Skill 5).
+        // Props:
+        //   left:  React-Knoten fuer linke Gruppe (Dropdowns, Action-Buttons)
+        //   right: React-Knoten fuer rechte Gruppe (Status-Pills)
+        //   stickyTop: Pixel-Wert fuer position:sticky.top (default 60)
+        //   children: Falls weder left noch right uebergeben werden, wird
+        //             children direkt eingefuegt (freies Layout)
+        function ToolbarRow({ left, right, stickyTop, children }) {
+            var topPx = (typeof stickyTop === 'number') ? stickyTop : 60;
             return (
-                <div style={{position:'fixed', inset:0, zIndex:9000, background:'rgba(10,15,25,0.78)',
-                             display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
-                     onClick={function(e) { if (e.target === e.currentTarget) onClose && onClose(); }}>
-                    <div style={{background:'var(--bg-elevated, #1a2030)', color:'var(--text-primary, #fff)',
-                                 borderRadius:'14px', boxShadow:'0 20px 60px rgba(0,0,0,0.6)',
-                                 maxWidth:'900px', width:'100%', maxHeight:'85vh', overflow:'auto', padding:'24px'}}>
-                        {/* Kopfzeile */}
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center',
-                                     marginBottom:'16px', borderBottom:'1px solid rgba(255,255,255,0.1)',
-                                     paddingBottom:'12px'}}>
-                            <h2 style={{margin:0, fontSize:'20px', fontWeight:600}}>
-                                Storage-Health-Dashboard
-                            </h2>
-                            <div style={{display:'flex', gap:'8px'}}>
-                                <button onClick={function() { setRefreshTick(refreshTick + 1); }}
-                                        style={{background:'rgba(33,150,243,0.2)', color:'#90CAF9',
-                                                border:'1px solid rgba(33,150,243,0.4)', padding:'6px 14px',
-                                                borderRadius:'6px', cursor:'pointer', fontSize:'13px'}}>
-                                    Aktualisieren
-                                </button>
-                                <button onClick={onClose}
-                                        style={{background:'rgba(244,67,54,0.2)', color:'#EF9A9A',
-                                                border:'1px solid rgba(244,67,54,0.4)', padding:'6px 14px',
-                                                borderRadius:'6px', cursor:'pointer', fontSize:'13px'}}>
-                                    Schliessen
-                                </button>
-                            </div>
+                <div
+                    className="tw-toolbar-row"
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        background: 'var(--bg-secondary)',
+                        borderBottom: '1px solid var(--border-color)',
+                        overflowX: 'auto',
+                        overflowY: 'visible',
+                        flexWrap: 'nowrap',
+                        minHeight: '44px',
+                        position: 'sticky',
+                        top: topPx + 'px',
+                        zIndex: 95,
+                        scrollbarWidth: 'thin'
+                    }}
+                >
+                    {children}
+                    {left && (
+                        <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'nowrap'}}>
+                            {left}
                         </div>
-
-                        {/* Lade- und Fehler-Status */}
-                        {!info && (
-                            <div style={{padding:'40px', textAlign:'center', opacity:0.6}}>
-                                Daten werden geladen...
-                            </div>
-                        )}
-                        {info && info.error && (
-                            <div style={{padding:'20px', background:'rgba(244,67,54,0.15)',
-                                         border:'1px solid rgba(244,67,54,0.4)', borderRadius:'8px',
-                                         color:'#EF9A9A'}}>
-                                Fehler: {info.error}
-                            </div>
-                        )}
-
-                        {/* Block 1: System */}
-                        {info && !info.error && (
-                            <div style={{marginBottom:'20px'}}>
-                                <h3 style={{fontSize:'14px', textTransform:'uppercase',
-                                            letterSpacing:'1px', opacity:0.7, margin:'0 0 10px'}}>
-                                    System
-                                </h3>
-                                <div style={{display:'grid',
-                                             gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',
-                                             gap:'10px'}}>
-                                    <_HealthCard
-                                        label="IDB belegt"
-                                        value={fmtBytes(info.storage && info.storage.usage)}
-                                        hint={'von ' + fmtBytes(info.storage && info.storage.quota)} />
-                                    <_HealthCard
-                                        label="DB-Version"
-                                        value={'v' + info.dbVersion}
-                                        hint={'Schema: ' + (info.schema ? info.schema.storeCount + ' Stores' : '?')} />
-                                    <_HealthCard
-                                        label="Kunden"
-                                        value={info.counts && info.counts.kunden || 0}
-                                        hint={(info.counts && info.counts.aufmass || 0) + ' Aufmasse'} />
-                                    <_HealthCard
-                                        label="Storage-API"
-                                        value={info.apiAvailable ? 'aktiv' : 'fehlt'}
-                                        hint={info.apiAvailable ? 'TWStorageAPI bereit' : 'nicht geladen'}
-                                        accent={info.apiAvailable ? '#4CAF50' : '#F44336'} />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Block 2: Drive-Upload-Queue */}
-                        {info && !info.error && queueStatus && (
-                            <div style={{marginBottom:'20px'}}>
-                                <h3 style={{fontSize:'14px', textTransform:'uppercase',
-                                            letterSpacing:'1px', opacity:0.7, margin:'0 0 10px'}}>
-                                    Drive-Upload-Queue
-                                </h3>
-                                <div style={{background:'rgba(255,255,255,0.04)', padding:'14px',
-                                             borderRadius:'10px', display:'grid',
-                                             gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',
-                                             gap:'10px'}}>
-                                    <_HealthCard
-                                        label="Pending"
-                                        value={queueStatus.queueLength}
-                                        hint={queueStatus.processing ? 'wird abgearbeitet' : 'wartet'} />
-                                    <_HealthCard
-                                        label="Hochgeladen"
-                                        value={queueStatus.stats.uploaded}
-                                        hint="seit App-Start"
-                                        accent="#4CAF50" />
-                                    <_HealthCard
-                                        label="Retried"
-                                        value={queueStatus.stats.retried}
-                                        hint="auto. Wiederholungen"
-                                        accent="#FF9800" />
-                                    <_HealthCard
-                                        label="Failed"
-                                        value={queueStatus.stats.failed}
-                                        hint="final fehlgeschlagen"
-                                        accent={queueStatus.stats.failed > 0 ? '#F44336' : '#666'} />
-                                </div>
-                                {queueStatus.stats.failed > 0 && (
-                                    <button onClick={function() {
-                                        if (window.TWStorageAPI && window.TWStorageAPI.queue) {
-                                            window.TWStorageAPI.queue.retry();
-                                        }
-                                    }}
-                                    style={{marginTop:'10px', background:'rgba(255,152,0,0.2)',
-                                            color:'#FFB74D', border:'1px solid rgba(255,152,0,0.4)',
-                                            padding:'6px 14px', borderRadius:'6px', cursor:'pointer',
-                                            fontSize:'12px'}}>
-                                        Failed neu versuchen
-                                    </button>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Block 3: Pro Kunde */}
-                        {info && !info.error && info.perKunde && info.perKunde.length > 0 && (
-                            <div>
-                                <h3 style={{fontSize:'14px', textTransform:'uppercase',
-                                            letterSpacing:'1px', opacity:0.7, margin:'0 0 10px'}}>
-                                    Pro Kunde
-                                </h3>
-                                <div style={{background:'rgba(255,255,255,0.04)', borderRadius:'10px',
-                                             overflow:'hidden'}}>
-                                    {info.perKunde.slice(0, 10).map(function(k, idx) {
-                                        return (
-                                            <div key={k.id}
-                                                 style={{padding:'12px 14px', display:'grid',
-                                                         gridTemplateColumns:'2fr 1fr 1fr 1.5fr',
-                                                         gap:'8px', fontSize:'13px',
-                                                         borderBottom: idx < info.perKunde.length - 1
-                                                             ? '1px solid rgba(255,255,255,0.04)' : 'none'}}>
-                                                <div style={{fontWeight:500}}>{k.name}</div>
-                                                <div style={{color: k.unsyncedFotos > 0 ? '#FFB74D' : '#888'}}>
-                                                    {(k.unsyncedFotos || 0) + ' Fotos pending'}
-                                                </div>
-                                                <div style={{color: k.unsyncedAppDateien > 0 ? '#FFB74D' : '#888'}}>
-                                                    {(k.unsyncedAppDateien || 0) + ' Docs pending'}
-                                                </div>
-                                                <div style={{opacity:0.7, fontSize:'11px'}}>
-                                                    {'Sync: ' + fmtTime(k.lastSync)}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-
-        /* Hilfs-Komponente fuer die Karten im Dashboard */
-        function _HealthCard({ label, value, hint, accent }) {
-            return (
-                <div style={{background:'rgba(255,255,255,0.04)', padding:'12px 14px',
-                             borderRadius:'8px', borderLeft:'3px solid ' + (accent || '#1E88E5')}}>
-                    <div style={{fontSize:'11px', opacity:0.6, textTransform:'uppercase',
-                                 letterSpacing:'0.5px', marginBottom:'4px'}}>
-                        {label}
-                    </div>
-                    <div style={{fontSize:'20px', fontWeight:600, color: accent || '#90CAF9',
-                                 marginBottom:'2px'}}>
-                        {value}
-                    </div>
-                    {hint && (
-                        <div style={{fontSize:'11px', opacity:0.5}}>
-                            {hint}
+                    )}
+                    {(left || right) && <div style={{flex: 1, minWidth: '4px'}} />}
+                    {right && (
+                        <div style={{display:'flex', alignItems:'center', gap:'5px', flexWrap:'nowrap'}}>
+                            {right}
                         </div>
                     )}
                 </div>
             );
         }
 
-        /* ═══════════════════════════════════════════════════════════════
-           MEMORY-BADGE (Etappe B, 25.04.2026)
-           Floating-Pille oben rechts, dezent.
-           Zeigt: Pending-Uploads-Zahl + Status-Punkt.
-           Klick oeffnet das Storage-Health-Dashboard.
-           Faerbt sich rot bei failed > 0.
-           ═══════════════════════════════════════════════════════════════ */
-        function MemoryBadge() {
-            const [pending, setPending] = React.useState(0);
-            const [failed, setFailed] = React.useState(0);
-            const [processing, setProcessing] = React.useState(false);
-
-            React.useEffect(function() {
-                // Initial-Snapshot + Subscription auf Queue-Status
-                if (!window.TWStorageAPI || !window.TWStorageAPI.queue) return;
-                const apply = function(s) {
-                    if (!s) return;
-                    setPending(s.queueLength || 0);
-                    setFailed(s.stats && s.stats.failed || 0);
-                    setProcessing(!!s.processing);
-                };
-                apply(window.TWStorageAPI.queue.status());
-                const unsub = window.TWStorageAPI.queue.subscribe(apply);
-                // Periodischer Refresh (alle 5s) als Fallback
-                const tick = setInterval(function() {
-                    if (window.TWStorageAPI && window.TWStorageAPI.queue) {
-                        apply(window.TWStorageAPI.queue.status());
-                    }
-                }, 5000);
-                return function() {
-                    if (typeof unsub === 'function') unsub();
-                    clearInterval(tick);
-                };
-            }, []);
-
-            const handleClick = function() {
-                if (typeof window._openStorageHealth === 'function') {
-                    window._openStorageHealth();
-                }
-            };
-
-            // Farb-Logik: rot wenn Failed, orange wenn Pending, gruen sonst
-            const dotColor = failed > 0 ? '#F44336'
-                           : pending > 0 ? '#FF9800'
-                           : '#4CAF50';
-            const bgColor  = failed > 0 ? 'rgba(244,67,54,0.18)'
-                           : pending > 0 ? 'rgba(255,152,0,0.15)'
-                           : 'rgba(76,175,80,0.12)';
-            const borderC  = failed > 0 ? 'rgba(244,67,54,0.45)'
-                           : pending > 0 ? 'rgba(255,152,0,0.4)'
-                           : 'rgba(76,175,80,0.35)';
-            const labelTxt = failed > 0 ? (failed + ' fehler')
-                           : pending > 0 ? (pending + ' pending')
-                           : 'OK';
-            const titleTxt = failed > 0 ? ('Storage-Health: ' + failed + ' fehlgeschlagene Uploads')
-                           : pending > 0 ? ('Storage-Health: ' + pending + ' Uploads in der Queue')
-                           : 'Storage-Health: alles synchron';
-
+        // === ToolbarButton ========================================
+        // Kompakter Action-Button fuer die Toolbar (Icon + 1-2 Worte).
+        // Skill Kapitel 4.2 + 6.
+        // Props:
+        //   icon:    Emoji oder kurzer String
+        //   label:   Aktions-Bezeichnung (Oswald uppercase)
+        //   onClick: Klick-Handler
+        //   color:   'red' (default), 'blue', 'orange', 'green'
+        //   disabled: optional
+        //   title:   optional title-Attribut fuer Hover-Tooltip
+        function ToolbarButton({ icon, label, onClick, color, disabled, title }) {
+            var col = color || 'red';
+            var grad;
+            if (col === 'blue')        grad = 'linear-gradient(135deg, #4da6ff, #1565C0)';
+            else if (col === 'orange') grad = 'linear-gradient(135deg, var(--accent-orange-light), var(--accent-orange))';
+            else if (col === 'green')  grad = 'linear-gradient(135deg, #2ecc71, #27ae60)';
+            else                       grad = 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))';
             return (
-                <button type="button"
-                        onClick={handleClick}
-                        title={titleTxt}
-                        style={{
-                            display:'inline-flex', alignItems:'center', gap:'6px',
-                            padding:'4px 10px', minHeight:'28px',
-                            borderRadius:'14px', border:'1px solid ' + borderC,
-                            background: bgColor, cursor:'pointer',
-                            fontSize:'11px', fontWeight:600,
-                            fontFamily:'Oswald, sans-serif',
-                            letterSpacing:'0.4px', textTransform:'uppercase',
-                            color:'var(--text-secondary, #aaa)',
-                            transition:'all 0.15s ease'
-                        }}>
-                    <span style={{
-                        width:'8px', height:'8px', borderRadius:'50%',
-                        background: dotColor,
-                        boxShadow:'0 0 6px ' + dotColor,
-                        animation: processing ? 'tw-mem-pulse 1.2s ease-in-out infinite' : 'none'
-                    }} />
-                    <span style={{whiteSpace:'nowrap'}}>{labelTxt}</span>
+                <button
+                    type="button"
+                    onClick={disabled ? undefined : onClick}
+                    onPointerDown={function(e){ e.stopPropagation(); }}
+                    disabled={!!disabled}
+                    title={title || label}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '7px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: 'none',
+                        background: disabled ? 'rgba(120,120,120,0.20)' : grad,
+                        color: disabled ? 'rgba(255,255,255,0.55)' : '#fff',
+                        fontFamily: 'Oswald, sans-serif',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        letterSpacing: '0.5px',
+                        textTransform: 'uppercase',
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        whiteSpace: 'nowrap',
+                        touchAction: 'manipulation',
+                        userSelect: 'none',
+                        minHeight: '32px',
+                        opacity: disabled ? 0.55 : 1,
+                        transition: 'transform 0.15s ease, filter 0.15s ease'
+                    }}
+                >
+                    {icon && <span style={{fontSize:'13px'}}>{icon}</span>}
+                    <span>{label}</span>
                 </button>
             );
         }
 
-        /* ═══════════════════════════════════════════════════════════════
-           Globale Exports der neuen Komponenten
-           (damit tw-app.jsx sie referenzieren kann)
-           ═══════════════════════════════════════════════════════════════ */
-        if (typeof window !== 'undefined') {
-            window.StorageHealthDashboard = StorageHealthDashboard;
-            window.MemoryBadge = MemoryBadge;
-        }
-
-
-        /* ═══════════════════════════════════════════════════════════════
-           KONFLIKT-DIALOG (Etappe D, 25.04.2026)
-           Wird angezeigt wenn TWStorageAPI.detectConflict einen Konflikt
-           zwischen lokalem und Drive-Stand meldet. Der User entscheidet:
-            - Lokal behalten   = Drive ueberschreiben (wir sind die Wahrheit)
-            - Drive uebernehmen= lokale Aenderung verwerfen
-            - Vergleichen      = Drive-Datei in neuem Tab oeffnen, manuell mergen
-           Aufruf von ueberall:
-             window._showKonfliktDialog(info, function(action) { ... });
-           Wo info = {
-             titel:           "Rechnung_RE_2026_001 ..."
-             ordnerName:      "Rechnung-A.Kontozahlung"
-             kundeId:         "..."
-             driveFileId:     ""  (optional, fuer Vergleich-Link)
-             anzahlGeaendert: 3
-             neuesteAenderung: ISO-String
-           }
-           und action = "lokal" | "drive" | "vergleich" | "abbrechen"
-           ═══════════════════════════════════════════════════════════════ */
-        function KonfliktDialog({ info, onChoice, onClose }) {
-            if (!info) return null;
-            const handle = function(action) {
-                try {
-                    if (typeof onChoice === 'function') onChoice(action);
-                } finally {
-                    if (typeof onClose === 'function') onClose();
-                }
-            };
-            const driveLink = info.driveFileId
-                ? ('https://drive.google.com/file/d/' + info.driveFileId + '/view')
-                : null;
+        // === StatusPill ===========================================
+        // Anzeige-Pille (NICHT klickbar) fuer Zaehler und Stati.
+        // Skill Kapitel 4.3 + 7 + 19.
+        // Props:
+        //   text:  String (z.B. "7 RAEUME", "OK 32s")
+        //   color: 'success' | 'info' | 'warn' | 'muted'
+        //   title: optional Tooltip
+        function StatusPill({ text, color, title }) {
+            var col = color || 'info';
+            var palette;
+            if (col === 'success')      palette = { bg:'rgba(39,174,96,0.15)',  border:'rgba(39,174,96,0.45)',  fg:'#27ae60' };
+            else if (col === 'warn')    palette = { bg:'rgba(230,126,34,0.15)', border:'rgba(230,126,34,0.45)', fg:'#e67e22' };
+            else if (col === 'muted')   palette = { bg:'rgba(184,196,212,0.10)',border:'rgba(184,196,212,0.30)',fg:'#b8c4d4' };
+            else                        palette = { bg:'rgba(77,166,255,0.15)', border:'rgba(77,166,255,0.45)', fg:'#4da6ff' };
             return (
-                <div style={{position:'fixed', inset:0, zIndex:9500,
-                             background:'rgba(10,15,25,0.82)',
-                             display:'flex', alignItems:'center', justifyContent:'center',
-                             padding:'20px'}}
-                     onClick={function(e){ if (e.target === e.currentTarget) handle('abbrechen'); }}>
-                    <div style={{background:'var(--bg-elevated, #1a2030)',
-                                 color:'var(--text-primary, #fff)',
-                                 borderRadius:'14px',
-                                 boxShadow:'0 20px 60px rgba(0,0,0,0.7)',
-                                 maxWidth:'520px', width:'100%',
-                                 padding:'24px',
-                                 borderTop:'4px solid #FF9800'}}>
-                        {/* Kopf */}
-                        <div style={{display:'flex', alignItems:'center', gap:'12px',
-                                     marginBottom:'16px'}}>
-                            <div style={{fontSize:'32px'}}>{'\u26A0\uFE0F'}</div>
-                            <div>
-                                <h2 style={{margin:0, fontSize:'18px', fontWeight:600,
-                                            fontFamily:'Oswald, sans-serif',
-                                            textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                    Konflikt erkannt
-                                </h2>
-                                <div style={{fontSize:'12px', opacity:0.7, marginTop:'2px'}}>
-                                    Ein anderes Geraet hat denselben Datensatz bearbeitet.
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Detail-Box */}
-                        <div style={{background:'rgba(255,152,0,0.08)',
-                                     border:'1px solid rgba(255,152,0,0.3)',
-                                     borderRadius:'10px',
-                                     padding:'12px 14px', marginBottom:'18px',
-                                     fontSize:'13px', lineHeight:'1.6'}}>
-                            <div><strong>Datei:</strong> {info.titel || '(unbenannt)'}</div>
-                            {info.ordnerName && (
-                                <div><strong>Ordner:</strong> {info.ordnerName}</div>
-                            )}
-                            {info.anzahlGeaendert > 0 && (
-                                <div><strong>Auf Drive geaendert:</strong>{' '}
-                                    {info.anzahlGeaendert} {info.anzahlGeaendert === 1 ? 'Datei' : 'Dateien'}
-                                </div>
-                            )}
-                            {info.neuesteAenderung && (
-                                <div><strong>Letzte Drive-Aenderung:</strong>{' '}
-                                    {(function(){
-                                        try { return new Date(info.neuesteAenderung).toLocaleString('de-DE'); }
-                                        catch(e) { return info.neuesteAenderung; }
-                                    })()}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Frage */}
-                        <div style={{fontSize:'14px', marginBottom:'16px',
-                                     fontWeight:500}}>
-                            Wie soll der Konflikt geloest werden?
-                        </div>
-
-                        {/* Optionen */}
-                        <div style={{display:'flex', flexDirection:'column', gap:'8px',
-                                     marginBottom:'18px'}}>
-                            {/* Option 1: Lokal behalten */}
-                            <button type="button"
-                                    onClick={function(){ handle('lokal'); }}
-                                    style={{padding:'14px 16px',
-                                            background:'linear-gradient(135deg, #1E88E5, #1565C0)',
-                                            color:'#fff', border:'none', borderRadius:'10px',
-                                            cursor:'pointer', textAlign:'left',
-                                            fontFamily:'Oswald, sans-serif',
-                                            display:'flex', alignItems:'center', gap:'12px'}}>
-                                <span style={{fontSize:'22px'}}>{'\uD83D\uDCBE'}</span>
-                                <div style={{flex:1}}>
-                                    <div style={{fontSize:'14px', fontWeight:600,
-                                                 textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                        Lokal behalten
-                                    </div>
-                                    <div style={{fontSize:'11px', opacity:0.85, marginTop:'2px',
-                                                 fontFamily:'Source Sans 3, sans-serif',
-                                                 textTransform:'none', letterSpacing:0}}>
-                                        Drive-Version wird ueberschrieben. Nutze das wenn DEINE Aenderung
-                                        die richtige ist.
-                                    </div>
-                                </div>
-                            </button>
-
-                            {/* Option 2: Drive übernehmen */}
-                            <button type="button"
-                                    onClick={function(){ handle('drive'); }}
-                                    style={{padding:'14px 16px',
-                                            background:'linear-gradient(135deg, #27ae60, #1e8449)',
-                                            color:'#fff', border:'none', borderRadius:'10px',
-                                            cursor:'pointer', textAlign:'left',
-                                            fontFamily:'Oswald, sans-serif',
-                                            display:'flex', alignItems:'center', gap:'12px'}}>
-                                <span style={{fontSize:'22px'}}>{'\u2601\uFE0F'}</span>
-                                <div style={{flex:1}}>
-                                    <div style={{fontSize:'14px', fontWeight:600,
-                                                 textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                        Drive uebernehmen
-                                    </div>
-                                    <div style={{fontSize:'11px', opacity:0.85, marginTop:'2px',
-                                                 fontFamily:'Source Sans 3, sans-serif',
-                                                 textTransform:'none', letterSpacing:0}}>
-                                        Deine lokale Aenderung wird verworfen. Nutze das wenn das andere
-                                        Geraet die richtige Version hat.
-                                    </div>
-                                </div>
-                            </button>
-
-                            {/* Option 3: Vergleichen (nur wenn Drive-Link existiert) */}
-                            {driveLink && (
-                                <button type="button"
-                                        onClick={function(){
-                                            try { window.open(driveLink, '_blank'); } catch(e) {}
-                                            handle('vergleich');
-                                        }}
-                                        style={{padding:'14px 16px',
-                                                background:'linear-gradient(135deg, #8e44ad, #6c3483)',
-                                                color:'#fff', border:'none', borderRadius:'10px',
-                                                cursor:'pointer', textAlign:'left',
-                                                fontFamily:'Oswald, sans-serif',
-                                                display:'flex', alignItems:'center', gap:'12px'}}>
-                                    <span style={{fontSize:'22px'}}>{'\uD83D\uDD0D'}</span>
-                                    <div style={{flex:1}}>
-                                        <div style={{fontSize:'14px', fontWeight:600,
-                                                     textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                            Erst vergleichen
-                                        </div>
-                                        <div style={{fontSize:'11px', opacity:0.85, marginTop:'2px',
-                                                     fontFamily:'Source Sans 3, sans-serif',
-                                                     textTransform:'none', letterSpacing:0}}>
-                                            Drive-Version in neuem Tab oeffnen. Dann manuell entscheiden
-                                            und Save erneut starten.
-                                        </div>
-                                    </div>
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Abbrechen */}
-                        <button type="button"
-                                onClick={function(){ handle('abbrechen'); }}
-                                style={{width:'100%', padding:'10px',
-                                        background:'transparent',
-                                        color:'var(--text-secondary, #aaa)',
-                                        border:'1px solid var(--border-color, rgba(255,255,255,0.1))',
-                                        borderRadius:'8px', cursor:'pointer',
-                                        fontFamily:'Oswald, sans-serif',
-                                        fontSize:'12px', textTransform:'uppercase',
-                                        letterSpacing:'0.5px'}}>
-                            Abbrechen (nichts tun)
-                        </button>
-                    </div>
+                <div
+                    title={title || text}
+                    style={{
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        background: palette.bg,
+                        border: '1px solid ' + palette.border,
+                        color: palette.fg,
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        fontFamily: 'Oswald, sans-serif',
+                        letterSpacing: '0.3px',
+                        textTransform: 'uppercase',
+                        whiteSpace: 'nowrap',
+                        userSelect: 'none',
+                        minHeight: '24px',
+                        display: 'inline-flex',
+                        alignItems: 'center'
+                    }}
+                >
+                    {text}
                 </div>
             );
         }
 
-        /* ═══════════════════════════════════════════════════════════════
-           KonfliktDialog-Host: Stateful-Wrapper, der window._showKonfliktDialog
-           bereitstellt. Wird einmal in tw-app.jsx gerendert.
-           ═══════════════════════════════════════════════════════════════ */
-        function KonfliktDialogHost() {
-            const [state, setState] = React.useState(null); // {info, callback} oder null
+        // === BottomSheetJSX =======================================
+        // JSX-Variante des Bottom-Sheets fuer Module, die direkt eines
+        // brauchen (etwa fuer Form-Auswahl auf Mobile).
+        // Die Dropdown-Komponenten in tw-nav-dropdowns.js bringen ihren
+        // eigenen Bottom-Sheet bereits mit -- diese hier ist die Standalone-
+        // Version fuer freie Verwendung.
+        // Props: title, onClose, children
+        function BottomSheetJSX({ title, onClose, children }) {
             React.useEffect(function() {
-                window._showKonfliktDialog = function(info, callback) {
-                    setState({ info: info, callback: callback || function(){} });
-                };
-                return function() { delete window._showKonfliktDialog; };
+                var prev = document.body.style.overflow;
+                document.body.style.overflow = 'hidden';
+                return function() { document.body.style.overflow = prev; };
             }, []);
-            if (!state) return null;
             return (
-                <KonfliktDialog
-                    info={state.info}
-                    onChoice={function(action) {
-                        try { state.callback(action); }
-                        catch(e) { console.warn('[KonfliktDialog] callback:', e); }
-                    }}
-                    onClose={function() { setState(null); }} />
+                <React.Fragment>
+                    <div onClick={onClose}
+                        style={{
+                            position:'fixed', inset:0,
+                            background:'rgba(0,0,0,0.55)',
+                            zIndex:9998,
+                            animation:'fadeIn 0.18s ease'
+                        }} />
+                    <div data-tw-bottom-sheet="true"
+                        style={{
+                            position:'fixed', bottom:0, left:0, right:0,
+                            background:'var(--bg-secondary)',
+                            borderTopLeftRadius:'var(--radius-lg)',
+                            borderTopRightRadius:'var(--radius-lg)',
+                            padding:'12px 12px 24px',
+                            zIndex:9999,
+                            maxHeight:'80vh',
+                            overflowY:'auto',
+                            boxShadow:'0 -10px 40px rgba(0,0,0,0.5)',
+                            animation:'slideUpSheet 0.25s ease-out',
+                            borderTop:'1px solid var(--border-color)'
+                        }}>
+                        <div style={{
+                            width:'40px', height:'4px',
+                            background:'var(--text-muted)',
+                            borderRadius:'2px',
+                            margin:'0 auto 12px', opacity:0.5
+                        }} />
+                        {title && (
+                            <div style={{
+                                fontFamily:'Oswald, sans-serif',
+                                fontSize:'13px', fontWeight:'700',
+                                textTransform:'uppercase', letterSpacing:'1px',
+                                color:'var(--text-white)',
+                                marginBottom:'12px', padding:'0 4px'
+                            }}>{title}</div>
+                        )}
+                        {children}
+                    </div>
+                </React.Fragment>
             );
         }
 
-        /* Globale Exports der Konflikt-Dialog-Komponenten */
+        // Globaler Export fuer Code-Stellen, die ausserhalb des Bundles
+        // (z.B. in tw-nav-dropdowns.js oder per window-Referenz) zugreifen.
         if (typeof window !== 'undefined') {
-            window.KonfliktDialog = KonfliktDialog;
-            window.KonfliktDialogHost = KonfliktDialogHost;
+            window.ToolbarRow     = ToolbarRow;
+            window.ToolbarButton  = ToolbarButton;
+            window.StatusPill     = StatusPill;
+            window.BottomSheetJSX = BottomSheetJSX;
         }
-

@@ -1,55 +1,652 @@
 /* =====================================================================
-   TW BUSINESS SUITE -- Nav-Dropdowns (extrahiert aus Live-Build)
+   TW BUSINESS SUITE -- Nav-Dropdowns V2 (Platzoptimierung & Toolbar)
    Stand: 25.04.2026
 
-   ZWECK:
-   Diese Komponenten (NavDropdown, AktionDropdown etc.) waren bisher
-   NUR im kompilierten Live-Build vorhanden, NICHT in den JSX-Quellen.
-   Dadurch konnte ein sauberer Rebuild nicht funktionieren.
-   Siehe LIESMICH-HOTFIX-NAVDROPDOWN.md fuer die Hintergrundinfo.
+   ZWECK V2:
+   Komplett-Rewrite der NavDropdown / AktionDropdown Komponenten gemaess
+   SKILL-platzoptimierung-toolbar.md (Teil C).
 
-   FIX: Komponenten wurden mit einem Klammern-Zaehler aus dem alten Live-
-   Build extrahiert und liegen jetzt als bereits kompiliertes JS hier.
-   Sie werden vor dem Babel-Bundle geladen, sodass sie im globalen
-   Scope verfuegbar sind, wenn die App() sie referenziert.
+   AENDERUNGEN GEGENUEBER V1:
+   - Submenues klappen jetzt als AKKORDEON nach unten auf (nicht mehr
+     rechts daneben). Damit kein Abschneide-Problem auf dem Handy.
+   - Auf Mobile (< 600px Breite) werden Dropdowns zu BOTTOM-SHEETS,
+     die von unten ins Bild gleiten. Spuerbar bessere Bedienbarkeit.
+   - Robuste Touch-Handler: onPointerDown mit stopPropagation auf dem
+     Trigger-Button, kein onMouseDown mehr.
+   - Jedes Dropdown hat seinen eigenen useState -- mehrere koennen
+     gleichzeitig offen sein (Skill 9.2).
+   - touchAction:'manipulation' auf allen interaktiven Elementen.
 
-   IDEAL waere die Rueckfuehrung in tw-shared-components.jsx als echte
-   JSX-Quellen. Das ist eine Aufgabe fuer einen spaeteren Sprint.
+   API-Kompatibilitaet zu V1: VOLL.
+   - NavDropdown(props) mit currentMode, targets, color, style
+   - AktionDropdown(props) mit label, actions, align, color, style
+   - actions[] unterstuetzt: regulaere Items, type:'divider',
+     type:'submenu' mit items[], und subItems[] auf normalen Items.
+
+   Komponenten werden weiterhin als bereits-kompiliertes JS ausgeliefert
+   (kein JSX), damit sie vor dem Babel-Bundle geladen werden koennen.
    ===================================================================== */
 
 (function(global) {
     'use strict';
 
-    // React-Hooks aus dem globalen React-Objekt destrukturieren
-    var React     = global.React;
-    if (!React) { console.error('[TW-NavDropdowns] React nicht geladen'); return; }
+    var React = global.React;
+    if (!React) { console.error('[TW-NavDropdowns V2] React nicht geladen'); return; }
     var useState  = React.useState;
     var useEffect = React.useEffect;
     var useRef    = React.useRef;
 
+    // ---- Hilfsfunktion: Mobile-Breakpoint ----
+    // Wir lesen die Breite zur Render-Zeit -- bei Drehung des Tablets
+    // ist das ausreichend, weil React beim Resize neu rendert (resize-Listener
+    // im Hook unten).
+    function useIsMobile() {
+        var initial = (typeof window !== 'undefined') ? (window.innerWidth < 600) : false;
+        var pair = useState(initial);
+        var isMobile = pair[0];
+        var setIsMobile = pair[1];
+        useEffect(function() {
+            var handler = function() {
+                var nowMobile = window.innerWidth < 600;
+                setIsMobile(function(prev) { return prev !== nowMobile ? nowMobile : prev; });
+            };
+            window.addEventListener('resize', handler);
+            window.addEventListener('orientationchange', handler);
+            return function() {
+                window.removeEventListener('resize', handler);
+                window.removeEventListener('orientationchange', handler);
+            };
+        }, []);
+        return isMobile;
+    }
 
-    // === NavDropdown ===
-    function NavDropdown(props){var currentMode=props.currentMode||'Navigation';var targets=Array.isArray(props.targets)?props.targets:[];var containerStyle=props.style||{};var color=props.color==='blue'?'blue':'red';var palette=color==='red'?{mainGrad:'linear-gradient(135deg, #e63535, #c41e1e)',mainShadow:'rgba(196,30,30,0.30)',itemGrad:'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))'}:{mainGrad:'linear-gradient(135deg, #1E88E5, #1565C0)',mainShadow:'rgba(30,136,229,0.30)',itemGrad:'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))'};var[open,setOpen]=useState(false);var[focusIdx,setFocusIdx]=useState(-1);var wrapperRef=useRef(null);var shownTargets=targets.filter(function(t){return t&&t.label!==currentMode;});useEffect(function(){if(!open)return undefined;var handler=function(e){if(wrapperRef.current&&!wrapperRef.current.contains(e.target)){setOpen(false);}};var keyHandler=function(e){if(e.key==='Escape'){setOpen(false);setFocusIdx(-1);}else if(e.key==='ArrowDown'){e.preventDefault();setFocusIdx(function(i){return Math.min(i+1,shownTargets.length-1);});}else if(e.key==='ArrowUp'){e.preventDefault();setFocusIdx(function(i){return Math.max(i-1,0);});}};document.addEventListener('mousedown',handler);document.addEventListener('touchstart',handler);document.addEventListener('keydown',keyHandler);return function(){document.removeEventListener('mousedown',handler);document.removeEventListener('touchstart',handler);document.removeEventListener('keydown',keyHandler);};},[open,shownTargets.length]);useEffect(function(){if(!open||focusIdx<0||!wrapperRef.current)return;var btns=wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');if(btns&&btns[focusIdx]){try{btns[focusIdx].focus();}catch(e){}}},[focusIdx,open]);var mainBtnStyle={padding:'10px 20px',minHeight:'44px',borderRadius:'8px',border:'none',cursor:'pointer',background:palette.mainGrad,color:'#fff',fontSize:'13px',fontWeight:'700',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px',boxShadow:'0 3px 10px '+palette.mainShadow,transition:'all 0.2s ease',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:'8px'};var panelStyle={position:'absolute',top:'calc(100% + 6px)',left:'0',background:'var(--bg-secondary)',border:'1px solid var(--border-color)',borderRadius:'10px',boxShadow:'0 8px 16px rgba(0,0,0,0.4)',padding:'6px',minWidth:'180px',maxWidth:'calc(100vw - 16px)',zIndex:1000,animation:'tw-nav-drop-in-left 140ms ease-out',display:'flex',flexDirection:'column',gap:'4px'};var itemStyle=function(disabled){return{padding:'10px 14px',minHeight:'42px',borderRadius:'7px',border:'none',cursor:disabled?'not-allowed':'pointer',background:disabled?'rgba(120,120,120,0.18)':palette.itemGrad,color:disabled?'rgba(255,255,255,0.45)':'#fff',fontSize:'12px',fontWeight:'700',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.4px',textAlign:'left',transition:'all 0.15s ease',opacity:disabled?0.5:1};};var handleSelect=function(target){if(target.disabled)return;setOpen(false);setFocusIdx(-1);if(typeof target.handler==='function'){try{target.handler();}catch(err){console.error('NavDropdown handler:',err);}}};return/*#__PURE__*/React.createElement("div",{ref:wrapperRef,style:Object.assign({position:'relative',display:'inline-block'},containerStyle)},/*#__PURE__*/React.createElement("button",{type:"button",style:mainBtnStyle,onClick:function(){setOpen(function(v){return!v;});},"aria-haspopup":"true","aria-expanded":open,title:'Navigation -- aktuell: '+currentMode},/*#__PURE__*/React.createElement("span",null,currentMode),/*#__PURE__*/React.createElement("span",{style:{fontSize:'10px',opacity:0.85,transform:open?'rotate(180deg)':'none',transition:'transform 0.18s ease'}},'\u25BC')),open&&shownTargets.length>0&&/*#__PURE__*/React.createElement("div",{className:"tw-dropdown-panel tw-nav-dropdown-panel-center",style:panelStyle,role:"menu"},shownTargets.map(function(t){return/*#__PURE__*/React.createElement("button",{key:t.id||t.label,type:"button",role:"menuitem",className:"tw-nav-dropdown-item",disabled:!!t.disabled,style:itemStyle(t.disabled),onClick:function(){handleSelect(t);}},t.label);})));}
+    // ---- Click-Outside-Hook (schliesst NUR dieses Dropdown) ----
+    function useClickOutside(ref, isOpen, onClose) {
+        useEffect(function() {
+            if (!isOpen) return undefined;
+            var handler = function(e) {
+                if (!ref.current) return;
+                // Klick im Wrapper -> ignorieren
+                if (ref.current.contains(e.target)) return;
+                // Klick im Bottom-Sheet-Portal: pruefen ob es zu UNS gehoert
+                if (e.target && e.target.closest) {
+                    var clickedPanel = e.target.closest('[data-tw-dropdown-id]');
+                    if (clickedPanel) {
+                        // Eigenes Panel? -> ignorieren (Click hat eigenen Handler)
+                        var ownPanelId = ref.current.getAttribute('data-tw-owner-id');
+                        var clickedId  = clickedPanel.getAttribute('data-tw-dropdown-id');
+                        if (ownPanelId && clickedId && ownPanelId === clickedId) return;
+                    }
+                }
+                onClose();
+            };
+            var keyHandler = function(e) {
+                if (e.key === 'Escape') onClose();
+            };
+            // pointerdown deckt Maus + Touch ab
+            document.addEventListener('pointerdown', handler);
+            document.addEventListener('keydown', keyHandler);
+            return function() {
+                document.removeEventListener('pointerdown', handler);
+                document.removeEventListener('keydown', keyHandler);
+            };
+        }, [isOpen]);
+    }
 
-    // === AktionSubItem ===
-    function AktionSubItem(props){var si=props.item;var onClose=props.onClose;var disabled=!!si.disabled;var baseStyle={padding:'10px 12px',minHeight:'42px',borderRadius:'7px',border:'none',cursor:disabled?'not-allowed':'pointer',background:'transparent',color:disabled?'rgba(255,255,255,0.4)':'var(--text-primary)',fontSize:'13px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textAlign:'left',display:'flex',alignItems:'center',gap:'10px',opacity:disabled?0.55:1,width:'100%',boxSizing:'border-box',transition:'background 0.12s ease'};var handleClick=function(){if(disabled)return;onClose();var fn=si.onClick||si.handler;if(typeof fn==='function'){try{fn();}catch(e){console.error('SubItem:',e);}}};return/*#__PURE__*/React.createElement("button",{type:"button",role:"menuitem",className:"tw-aktion-dropdown-item",disabled:disabled,style:baseStyle,onClick:handleClick,onMouseOver:function(e){if(!disabled)e.currentTarget.style.background='var(--bg-hover)';},onMouseOut:function(e){if(!disabled)e.currentTarget.style.background='transparent';}},si.icon&&/*#__PURE__*/React.createElement("span",{style:{fontSize:'14px',minWidth:'18px'}},si.icon),/*#__PURE__*/React.createElement("span",{style:{flex:1}},si.label));}
+    // ---- BOTTOM-SHEET (Mobile-Variante des Dropdown-Panels) ----
+    function BottomSheet(props) {
+        var title = props.title;
+        var onClose = props.onClose;
+        var children = props.children;
+        var sheetId = props.sheetId;
 
-    // === AktionItem ===
-    function AktionItem(props){var a=props.action;var align=props.align||'right';var onCloseAll=props.onCloseAll;var myId=props.myId;var openSubId=props.openSubId;var setOpenSubId=props.setOpenSubId;var disabled=!!a.disabled;var subItems=a._subItems||[];var hasSub=subItems.length>0;var subOpen=hasSub&&openSubId===myId;var btnRef=useRef(null);var[subPos,setSubPos]=useState(null);/* Position des Sub-Panels berechnen wenn es oeffnet, + bei Resize/Scroll updaten */useEffect(function(){if(!subOpen||!btnRef.current){setSubPos(null);return undefined;}var calcPos=function(){if(!btnRef.current)return;var r=btnRef.current.getBoundingClientRect();var vw=window.innerWidth;var vh=window.innerHeight;var panelW=240;// geschaetzte Breite
-    var gap=6;var pos={top:r.top};/* Position: vorzugsweise auf der gegenueberliegenden Seite des Haupt-Panels */if(align==='right'){/* Haupt-Panel rechts-ausgerichtet -> Sub nach links */var leftSide=r.left-panelW-gap;if(leftSide<8){/* Nicht genug Platz links -> rechts oeffnen */pos.left=r.right+gap;}else{pos.left=leftSide;}}else{/* Haupt-Panel links-ausgerichtet -> Sub nach rechts */var rightSide=r.right+gap;if(rightSide+panelW>vw-8){/* Nicht genug Platz rechts -> links oeffnen */pos.left=Math.max(8,r.left-panelW-gap);}else{pos.left=rightSide;}}/* Vertikale Begrenzung: nicht unter den Viewport */var maxHeight=vh-pos.top-16;pos.maxHeight=Math.max(160,maxHeight);setSubPos(pos);};calcPos();window.addEventListener('resize',calcPos);window.addEventListener('scroll',calcPos,true);return function(){window.removeEventListener('resize',calcPos);window.removeEventListener('scroll',calcPos,true);};},[subOpen,align]);var getBg=function(){if(disabled)return'rgba(120,120,120,0.15)';if(a.destructive)return'transparent';if(a.variant==='red')return'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';return'transparent';};var getColor=function(){if(disabled)return'rgba(255,255,255,0.4)';if(a.destructive)return'var(--accent-red-light)';if(a.variant==='red')return'#fff';return'var(--text-primary)';};var btnStyle={padding:'10px 12px',minHeight:'42px',borderRadius:'7px',border:'none',cursor:disabled?'not-allowed':'pointer',background:getBg(),color:getColor(),fontSize:'13px',fontWeight:a.variant==='red'?'700':'600',fontFamily:'Oswald, sans-serif',textTransform:a.variant==='red'?'uppercase':'none',letterSpacing:a.variant==='red'?'0.4px':'0',textAlign:'left',display:'flex',alignItems:'center',gap:'10px',opacity:disabled?0.55:1,width:'100%',boxSizing:'border-box',transition:'background 0.12s ease, filter 0.12s ease'};var subPanelStyle=subPos?{position:'fixed',top:subPos.top+'px',left:subPos.left+'px',background:'var(--bg-tertiary)',border:'1px solid var(--border-color)',borderRadius:'10px',boxShadow:'0 8px 24px rgba(0,0,0,0.65)',padding:'6px',minWidth:'220px',maxWidth:'calc(100vw - 16px)',maxHeight:subPos.maxHeight+'px',overflowY:'auto',zIndex:10000,display:'flex',flexDirection:'column',gap:'3px'}:null;var handleClick=function(){if(disabled)return;if(hasSub){setOpenSubId(subOpen?null:myId);return;}onCloseAll();if(typeof a.handler==='function'){try{a.handler();}catch(e){console.error('AktionItem:',e);}}};var handleSubClose=function(){setOpenSubId(null);onCloseAll();};return/*#__PURE__*/React.createElement("div",{style:{position:'relative'}},/*#__PURE__*/React.createElement("button",{ref:btnRef,type:"button",role:"menuitem",className:"tw-aktion-dropdown-item",disabled:disabled,style:btnStyle,onClick:handleClick,onMouseOver:function(e){if(disabled)return;if(a.variant==='red'){e.currentTarget.style.filter='brightness(1.15)';}else{e.currentTarget.style.background='var(--bg-hover)';}},onMouseOut:function(e){if(disabled)return;if(a.variant==='red'){e.currentTarget.style.filter='none';}else{e.currentTarget.style.background=getBg();}}},a.icon&&/*#__PURE__*/React.createElement("span",{style:{fontSize:'15px',minWidth:'18px'}},a.icon),/*#__PURE__*/React.createElement("span",{style:{flex:1}},a.label),hasSub&&/*#__PURE__*/React.createElement("span",{style:{fontSize:'11px',opacity:0.75,transform:subOpen?'rotate(90deg)':'none',transition:'transform 0.15s ease'}},'\u25B6')),hasSub&&subOpen&&subPanelStyle&&typeof document!=='undefined'&&ReactDOM.createPortal(/*#__PURE__*/React.createElement("div",{"data-tw-aktion-sub":"true",className:"tw-dropdown-panel tw-aktion-sub-panel",style:subPanelStyle,role:"menu"},subItems.map(function(si,i){return/*#__PURE__*/React.createElement(AktionSubItem,{key:si.id||si.label||i,item:si,onClose:handleSubClose});})),document.body));}
+        // Body-Scroll-Lock waehrend Sheet offen
+        useEffect(function() {
+            var prev = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            return function() { document.body.style.overflow = prev; };
+        }, []);
 
-    // === AktionDropdown ===
-    function AktionDropdown(props){var label=props.label||'Bearbeiten';var actions=Array.isArray(props.actions)?props.actions:[];var align=props.align||'right';var containerStyle=props.style||{};var color=props.color==='blue'?'blue':'red';var palette=color==='red'?{mainGrad:'linear-gradient(135deg, #e63535, #c41e1e)',mainShadow:'rgba(196,30,30,0.30)'}:{mainGrad:'linear-gradient(135deg, #1E88E5, #1565C0)',mainShadow:'rgba(30,136,229,0.30)'};var[open,setOpen]=useState(false);var[openSubId,setOpenSubId]=useState(null);var wrapperRef=useRef(null);var closeAll=function(){setOpen(false);setOpenSubId(null);};/* Reset Sub-State wenn Haupt-Dropdown geschlossen wird */useEffect(function(){if(!open)setOpenSubId(null);},[open]);useEffect(function(){if(!open)return undefined;var handler=function(e){if(!wrapperRef.current)return;/* Klick innerhalb des Haupt-Wrappers -> nix tun */if(wrapperRef.current.contains(e.target))return;/* Klick im Sub-Panel-Portal -> ebenfalls nix tun */if(e.target&&e.target.closest&&e.target.closest('[data-tw-aktion-sub]'))return;setOpen(false);};var keyHandler=function(e){if(e.key==='Escape'){setOpen(false);}};document.addEventListener('mousedown',handler);document.addEventListener('touchstart',handler);document.addEventListener('keydown',keyHandler);return function(){document.removeEventListener('mousedown',handler);document.removeEventListener('touchstart',handler);document.removeEventListener('keydown',keyHandler);};},[open]);/* Normalisiert beide Action-Formate */var normalizeAction=function(a,idx){if(!a)return null;if(a.type==='divider')return{_divider:true,_key:'div-'+idx};if(a.type==='submenu'){return{id:a.id||'sub-'+idx,label:a.label,icon:a.icon,disabled:!!a.disabled,variant:a.variant,_subItems:Array.isArray(a.items)?a.items:[]};}return{id:a.id||'act-'+idx,label:a.label,icon:a.icon,disabled:!!a.disabled,destructive:!!a.destructive,variant:a.variant,handler:a.handler||a.onClick,_subItems:Array.isArray(a.subItems)?a.subItems:[]};};var normalized=actions.map(normalizeAction).filter(Boolean);var mainBtnStyle={padding:'10px 18px',minHeight:'44px',borderRadius:'8px',border:'none',cursor:'pointer',background:palette.mainGrad,color:'#fff',fontSize:'13px',fontWeight:'700',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px',boxShadow:'0 3px 10px '+palette.mainShadow,transition:'all 0.2s ease',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:'8px'};var panelStyle=Object.assign({position:'absolute',top:'calc(100% + 6px)',background:'var(--bg-secondary)',border:'1px solid var(--border-color)',borderRadius:'10px',boxShadow:'0 8px 16px rgba(0,0,0,0.4)',padding:'6px',minWidth:'220px',maxWidth:'calc(100vw - 16px)',zIndex:1000,animation:'tw-nav-drop-in-left 140ms ease-out',display:'flex',flexDirection:'column',gap:'3px'},align==='left'?{left:0}:{right:0});return/*#__PURE__*/React.createElement("div",{ref:wrapperRef,style:Object.assign({position:'relative',display:'inline-block'},containerStyle)},/*#__PURE__*/React.createElement("button",{type:"button",style:mainBtnStyle,onClick:function(){setOpen(function(v){return!v;});},"aria-haspopup":"true","aria-expanded":open,title:label},/*#__PURE__*/React.createElement("span",{style:{fontSize:'14px'}},'\u270E'),/*#__PURE__*/React.createElement("span",null,label),/*#__PURE__*/React.createElement("span",{style:{fontSize:'10px',opacity:0.85,transform:open?'rotate(180deg)':'none',transition:'transform 0.18s ease'}},'\u25BC')),open&&normalized.length>0&&/*#__PURE__*/React.createElement("div",{className:'tw-dropdown-panel '+(align==='right'?'tw-aktion-dropdown-panel-right':'tw-aktion-dropdown-panel-left'),style:panelStyle,role:"menu"},normalized.map(function(a){if(a._divider){return/*#__PURE__*/React.createElement("div",{key:a._key,style:{height:'1px',background:'var(--border-color)',margin:'3px 6px'}});}return/*#__PURE__*/React.createElement(AktionItem,{key:a.id,action:a,align:align,myId:a.id,openSubId:openSubId,setOpenSubId:setOpenSubId,onCloseAll:closeAll});})));}
+        return React.createElement(React.Fragment, null,
+            // Backdrop
+            React.createElement('div', {
+                onClick: onClose,
+                style: {
+                    position: 'fixed', inset: 0,
+                    background: 'rgba(0,0,0,0.55)',
+                    zIndex: 9998,
+                    animation: 'fadeIn 0.18s ease'
+                }
+            }),
+            // Sheet selbst
+            React.createElement('div', {
+                'data-tw-bottom-sheet': 'true',
+                'data-tw-dropdown-id': sheetId,
+                style: {
+                    position: 'fixed',
+                    bottom: 0, left: 0, right: 0,
+                    background: 'var(--bg-secondary)',
+                    borderTopLeftRadius: 'var(--radius-lg)',
+                    borderTopRightRadius: 'var(--radius-lg)',
+                    padding: '12px 12px 24px',
+                    zIndex: 9999,
+                    maxHeight: '80vh',
+                    overflowY: 'auto',
+                    boxShadow: '0 -10px 40px rgba(0,0,0,0.5)',
+                    animation: 'slideUpSheet 0.25s ease-out',
+                    borderTop: '1px solid var(--border-color)'
+                }
+            },
+                // Drag-Indikator
+                React.createElement('div', { style: {
+                    width: '40px', height: '4px',
+                    background: 'var(--text-muted)',
+                    borderRadius: '2px',
+                    margin: '0 auto 12px', opacity: 0.5
+                }}),
+                // Titel
+                title && React.createElement('div', { style: {
+                    fontFamily: 'Oswald, sans-serif',
+                    fontSize: '13px', fontWeight: '700',
+                    textTransform: 'uppercase', letterSpacing: '1px',
+                    color: 'var(--text-white)',
+                    marginBottom: '12px', padding: '0 4px'
+                }}, title),
+                // Inhalt
+                children
+            )
+        );
+    }
 
+    // ---- DESKTOP-PANEL (klassisches Dropdown) ----
+    function DesktopPanel(props) {
+        var align = props.align || 'left';
+        var children = props.children;
+        var panelId = props.panelId;
 
-    // Komponenten in den globalen Scope exportieren,
-    // damit das Bundle (App() etc.) darauf zugreifen kann.
+        var panelStyle = {
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            boxShadow: 'var(--shadow-lg)',
+            padding: '6px',
+            minWidth: '220px',
+            maxWidth: 'calc(100vw - 16px)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '3px',
+            maxHeight: '70vh',
+            overflowY: 'auto',
+            animation: 'twDropDown 0.16s ease-out'
+        };
+        if (align === 'right') {
+            panelStyle.right = 0;
+        } else {
+            panelStyle.left = 0;
+        }
+
+        return React.createElement('div', {
+            'data-tw-dropdown-panel': 'true',
+            'data-tw-dropdown-id': panelId,
+            className: 'tw-dropdown-panel',
+            style: panelStyle,
+            role: 'menu'
+        }, children);
+    }
+
+    // ============================================================
+    // === NavDropdown ============================================
+    // ============================================================
+    // Hauptmenue mit Modus-Liste. KEINE Submenues.
+    function NavDropdown(props) {
+        var currentMode = props.currentMode || 'Navigation';
+        var targets = Array.isArray(props.targets) ? props.targets : [];
+        var containerStyle = props.style || {};
+        var color = props.color === 'blue' ? 'blue' : 'red';
+
+        var palette = color === 'red' ? {
+            mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
+            mainShadow: 'rgba(196,30,30,0.30)'
+        } : {
+            mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+            mainShadow: 'rgba(30,136,229,0.30)'
+        };
+
+        var openPair = useState(false);
+        var open = openPair[0];
+        var setOpen = openPair[1];
+        var wrapperRef = useRef(null);
+        var isMobile = useIsMobile();
+        var panelIdRef = useRef('nav-' + Math.random().toString(36).slice(2, 9));
+
+        var shownTargets = targets.filter(function(t) { return t && t.label !== currentMode; });
+
+        useClickOutside(wrapperRef, open, function() { setOpen(false); });
+
+        var handleSelect = function(target) {
+            if (target.disabled) return;
+            setOpen(false);
+            if (typeof target.handler === 'function') {
+                try { target.handler(); }
+                catch(err) { console.error('NavDropdown handler:', err); }
+            }
+        };
+
+        var mainBtnStyle = {
+            padding: '8px 16px',
+            minHeight: '36px',
+            borderRadius: 'var(--radius-sm)',
+            border: 'none',
+            cursor: 'pointer',
+            background: palette.mainGrad,
+            color: '#fff',
+            fontSize: '12px',
+            fontWeight: '700',
+            fontFamily: 'Oswald, sans-serif',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            boxShadow: '0 2px 8px ' + palette.mainShadow,
+            transition: 'all 0.18s ease',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            touchAction: 'manipulation',
+            userSelect: 'none'
+        };
+
+        var renderItems = function() {
+            return shownTargets.map(function(t) {
+                return React.createElement('button', {
+                    key: t.id || t.label,
+                    type: 'button',
+                    role: 'menuitem',
+                    className: 'tw-nav-dropdown-item',
+                    disabled: !!t.disabled,
+                    onClick: function() { handleSelect(t); },
+                    onPointerDown: function(e) { e.stopPropagation(); },
+                    style: {
+                        display: 'flex', alignItems: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        padding: '10px 12px',
+                        minHeight: '42px',
+                        border: 'none',
+                        background: t.disabled ? 'rgba(120,120,120,0.12)' : 'transparent',
+                        color: t.disabled ? 'rgba(255,255,255,0.45)' : 'var(--text-primary)',
+                        fontFamily: 'Oswald, sans-serif',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        textAlign: 'left',
+                        cursor: t.disabled ? 'not-allowed' : 'pointer',
+                        borderRadius: 'var(--radius-sm)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.4px',
+                        touchAction: 'manipulation',
+                        transition: 'background 0.12s ease',
+                        opacity: t.disabled ? 0.5 : 1
+                    },
+                    onMouseOver: function(e) { if (!t.disabled) e.currentTarget.style.background = 'var(--bg-hover)'; },
+                    onMouseOut: function(e) { if (!t.disabled) e.currentTarget.style.background = 'transparent'; }
+                }, t.label);
+            });
+        };
+
+        return React.createElement('div', {
+            ref: wrapperRef,
+            'data-tw-owner-id': panelIdRef.current,
+            style: Object.assign({ position: 'relative', display: 'inline-block' }, containerStyle)
+        },
+            // Trigger-Button
+            React.createElement('button', {
+                type: 'button',
+                style: mainBtnStyle,
+                onPointerDown: function(e) { e.stopPropagation(); },
+                onClick: function() { setOpen(function(v) { return !v; }); },
+                'aria-haspopup': 'true',
+                'aria-expanded': open,
+                title: 'Navigation -- aktuell: ' + currentMode
+            },
+                React.createElement('span', null, currentMode),
+                React.createElement('span', {
+                    style: {
+                        fontSize: '9px', opacity: 0.85,
+                        transform: open ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.18s ease'
+                    }
+                }, '\u25BC')
+            ),
+            // Panel (Mobile = BottomSheet, Desktop = klassisch)
+            open && shownTargets.length > 0 && (
+                isMobile
+                    ? React.createElement(BottomSheet, {
+                        title: currentMode + ' \u2192 wechseln zu',
+                        onClose: function() { setOpen(false); },
+                        sheetId: panelIdRef.current
+                    }, renderItems())
+                    : React.createElement(DesktopPanel, {
+                        align: 'left',
+                        panelId: panelIdRef.current
+                    }, renderItems())
+            )
+        );
+    }
+
+    // ============================================================
+    // === AktionDropdown =========================================
+    // ============================================================
+    // Bearbeiten-Dropdown mit Items, Submenues (als Akkordeon!) und Dividern.
+    function AktionDropdown(props) {
+        var label = props.label || 'Bearbeiten';
+        var actions = Array.isArray(props.actions) ? props.actions : [];
+        var align = props.align || 'right';
+        var containerStyle = props.style || {};
+        var color = props.color === 'blue' ? 'blue' : 'red';
+
+        var palette = color === 'red' ? {
+            mainGrad: 'linear-gradient(135deg, #e63535, #c41e1e)',
+            mainShadow: 'rgba(196,30,30,0.30)'
+        } : {
+            mainGrad: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+            mainShadow: 'rgba(30,136,229,0.30)'
+        };
+
+        var openPair = useState(false);
+        var open = openPair[0];
+        var setOpen = openPair[1];
+        // expandedSub speichert die Sub-ID des derzeit ausgeklappten Akkordeon-Eintrags
+        var subPair = useState(null);
+        var expandedSub = subPair[0];
+        var setExpandedSub = subPair[1];
+        var wrapperRef = useRef(null);
+        var isMobile = useIsMobile();
+        var panelIdRef = useRef('akt-' + Math.random().toString(36).slice(2, 9));
+
+        // Beim Schliessen: Akkordeons mit zuruecksetzen
+        useEffect(function() {
+            if (!open) setExpandedSub(null);
+        }, [open]);
+
+        useClickOutside(wrapperRef, open, function() {
+            setOpen(false);
+            setExpandedSub(null);
+        });
+
+        // Action-Format normalisieren
+        var normalizeAction = function(a, idx) {
+            if (!a) return null;
+            if (a.type === 'divider') return { _divider: true, _key: 'div-' + idx };
+            if (a.type === 'submenu') {
+                return {
+                    id: a.id || 'sub-' + idx,
+                    label: a.label, icon: a.icon,
+                    disabled: !!a.disabled, variant: a.variant,
+                    _subItems: Array.isArray(a.items) ? a.items : []
+                };
+            }
+            return {
+                id: a.id || 'act-' + idx,
+                label: a.label, icon: a.icon,
+                disabled: !!a.disabled, destructive: !!a.destructive,
+                variant: a.variant,
+                handler: a.handler || a.onClick,
+                _subItems: Array.isArray(a.subItems) ? a.subItems : []
+            };
+        };
+        var normalized = actions.map(normalizeAction).filter(Boolean);
+
+        var closeAll = function() {
+            setOpen(false);
+            setExpandedSub(null);
+        };
+
+        var triggerHandler = function(item) {
+            if (item.disabled) return;
+            var fn = item.handler || item.onClick;
+            closeAll();
+            if (typeof fn === 'function') {
+                try { fn(); }
+                catch(e) { console.error('AktionDropdown handler:', e); }
+            }
+        };
+
+        // ---- Item-Renderer ----
+        var renderItem = function(a) {
+            if (a._divider) {
+                return React.createElement('div', {
+                    key: a._key,
+                    style: {
+                        height: '1px', background: 'var(--border-color)',
+                        margin: '4px 6px'
+                    }
+                });
+            }
+
+            var hasSub = a._subItems && a._subItems.length > 0;
+            var subOpen = hasSub && expandedSub === a.id;
+
+            // Stylevariante
+            var bg, fg, fontWeight, textTransform, letterSpacing;
+            if (a.disabled) {
+                bg = 'rgba(120,120,120,0.12)';
+                fg = 'rgba(255,255,255,0.4)';
+                fontWeight = '600'; textTransform = 'none'; letterSpacing = '0';
+            } else if (a.variant === 'red') {
+                bg = 'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';
+                fg = '#fff';
+                fontWeight = '700'; textTransform = 'uppercase'; letterSpacing = '0.4px';
+            } else if (a.destructive) {
+                bg = 'transparent';
+                fg = 'var(--accent-red-light)';
+                fontWeight = '600'; textTransform = 'none'; letterSpacing = '0';
+            } else {
+                bg = 'transparent';
+                fg = 'var(--text-primary)';
+                fontWeight = '600'; textTransform = 'none'; letterSpacing = '0';
+            }
+
+            var btnStyle = {
+                padding: '10px 12px',
+                minHeight: '42px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                cursor: a.disabled ? 'not-allowed' : 'pointer',
+                background: bg,
+                color: fg,
+                fontSize: '13px',
+                fontWeight: fontWeight,
+                fontFamily: 'Oswald, sans-serif',
+                textTransform: textTransform,
+                letterSpacing: letterSpacing,
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                opacity: a.disabled ? 0.55 : 1,
+                width: '100%',
+                boxSizing: 'border-box',
+                transition: 'background 0.12s ease, filter 0.12s ease',
+                touchAction: 'manipulation',
+                userSelect: 'none'
+            };
+
+            var handleClick = function() {
+                if (a.disabled) return;
+                if (hasSub) {
+                    setExpandedSub(subOpen ? null : a.id);
+                    return;
+                }
+                triggerHandler(a);
+            };
+
+            var btn = React.createElement('button', {
+                key: a.id,
+                type: 'button',
+                role: 'menuitem',
+                className: 'tw-aktion-dropdown-item',
+                disabled: a.disabled,
+                style: btnStyle,
+                onPointerDown: function(e) { e.stopPropagation(); },
+                onClick: handleClick,
+                onMouseOver: function(e) {
+                    if (a.disabled) return;
+                    if (a.variant === 'red') e.currentTarget.style.filter = 'brightness(1.15)';
+                    else e.currentTarget.style.background = 'var(--bg-hover)';
+                },
+                onMouseOut: function(e) {
+                    if (a.disabled) return;
+                    if (a.variant === 'red') e.currentTarget.style.filter = 'none';
+                    else e.currentTarget.style.background = bg;
+                }
+            },
+                a.icon && React.createElement('span', { style: { fontSize: '15px', minWidth: '18px' } }, a.icon),
+                React.createElement('span', { style: { flex: 1 } }, a.label),
+                hasSub && React.createElement('span', {
+                    style: {
+                        fontSize: '10px',
+                        opacity: 0.75,
+                        transform: subOpen ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.18s ease'
+                    }
+                }, '\u25BC')
+            );
+
+            // === AKKORDEON-SUB-ITEMS (Skill 9.4) ===
+            // Submenue klappt NACH UNTEN auf, im selben Container, mit Einrueckung.
+            if (hasSub && subOpen) {
+                var subItemsRendered = a._subItems.map(function(si, j) {
+                    return React.createElement('button', {
+                        key: (si.id || si.label || j),
+                        type: 'button',
+                        role: 'menuitem',
+                        className: 'tw-aktion-dropdown-subitem',
+                        disabled: !!si.disabled,
+                        onPointerDown: function(e) { e.stopPropagation(); },
+                        onClick: function() { triggerHandler(si); },
+                        style: {
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            width: '100%',
+                            padding: '8px 10px',
+                            minHeight: '38px',
+                            border: 'none',
+                            background: si.disabled ? 'rgba(120,120,120,0.10)' : 'transparent',
+                            color: si.disabled ? 'rgba(255,255,255,0.4)' : 'var(--text-primary)',
+                            fontFamily: 'Source Sans 3, sans-serif',
+                            fontSize: '13px', fontWeight: '500',
+                            textAlign: 'left',
+                            cursor: si.disabled ? 'not-allowed' : 'pointer',
+                            borderRadius: 'var(--radius-sm)',
+                            opacity: si.disabled ? 0.55 : 1,
+                            touchAction: 'manipulation',
+                            transition: 'background 0.12s ease'
+                        },
+                        onMouseOver: function(e) { if (!si.disabled) e.currentTarget.style.background = 'var(--bg-hover)'; },
+                        onMouseOut: function(e) { if (!si.disabled) e.currentTarget.style.background = 'transparent'; }
+                    },
+                        si.icon && React.createElement('span', { style: { fontSize: '14px', minWidth: '18px' } }, si.icon),
+                        React.createElement('span', { style: { flex: 1 } }, si.label)
+                    );
+                });
+
+                var subContainer = React.createElement('div', {
+                    key: a.id + '-sub',
+                    style: {
+                        paddingLeft: '14px',
+                        marginLeft: '8px',
+                        marginRight: '4px',
+                        marginTop: '2px',
+                        marginBottom: '4px',
+                        borderLeft: '2px solid var(--accent-red)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        animation: 'twAccordionDown 0.18s ease-out'
+                    }
+                }, subItemsRendered);
+
+                return React.createElement(React.Fragment, { key: a.id }, btn, subContainer);
+            }
+
+            return btn;
+        };
+
+        var mainBtnStyle = {
+            padding: '8px 16px',
+            minHeight: '36px',
+            borderRadius: 'var(--radius-sm)',
+            border: 'none',
+            cursor: 'pointer',
+            background: palette.mainGrad,
+            color: '#fff',
+            fontSize: '12px',
+            fontWeight: '700',
+            fontFamily: 'Oswald, sans-serif',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            boxShadow: '0 2px 8px ' + palette.mainShadow,
+            transition: 'all 0.18s ease',
+            whiteSpace: 'nowrap',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            touchAction: 'manipulation',
+            userSelect: 'none'
+        };
+
+        return React.createElement('div', {
+            ref: wrapperRef,
+            'data-tw-owner-id': panelIdRef.current,
+            style: Object.assign({ position: 'relative', display: 'inline-block' }, containerStyle)
+        },
+            React.createElement('button', {
+                type: 'button',
+                style: mainBtnStyle,
+                onPointerDown: function(e) { e.stopPropagation(); },
+                onClick: function() { setOpen(function(v) { return !v; }); },
+                'aria-haspopup': 'true',
+                'aria-expanded': open,
+                title: label
+            },
+                React.createElement('span', { style: { fontSize: '13px' } }, '\u270E'),
+                React.createElement('span', null, label),
+                React.createElement('span', {
+                    style: {
+                        fontSize: '9px', opacity: 0.85,
+                        transform: open ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.18s ease'
+                    }
+                }, '\u25BC')
+            ),
+            open && normalized.length > 0 && (
+                isMobile
+                    ? React.createElement(BottomSheet, {
+                        title: label,
+                        onClose: function() { closeAll(); },
+                        sheetId: panelIdRef.current
+                    }, normalized.map(renderItem))
+                    : React.createElement(DesktopPanel, {
+                        align: align,
+                        panelId: panelIdRef.current
+                    }, normalized.map(renderItem))
+            )
+        );
+    }
+
+    // ---- Globalen Scope befuellen (API-Kompat) ----
     global.NavDropdown    = NavDropdown;
     global.AktionDropdown = AktionDropdown;
-    global.AktionItem     = AktionItem;
-    global.AktionSubItem  = AktionSubItem;
+    global.TWNavDropdownsV2 = {
+        version: '2.0',
+        NavDropdown: NavDropdown,
+        AktionDropdown: AktionDropdown,
+        BottomSheet: BottomSheet,
+        DesktopPanel: DesktopPanel
+    };
 
-    console.log('%c[TW-NavDropdowns] 4 Komponenten registriert (NavDropdown, AktionSubItem, AktionItem, AktionDropdown)',
+    console.log('%c[TW-NavDropdowns V2] geladen -- Akkordeon-Submenues + Bottom-Sheet-Mobile aktiv',
                 'color: #1976D2; font-weight: bold;');
 
 })(window);
