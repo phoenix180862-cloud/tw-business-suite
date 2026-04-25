@@ -201,9 +201,12 @@
             // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
             const [page, _setPageRaw] = useState('start');
             const setPage = _trackSetter('setPage', _setPageRaw);
-            const [driveStatus, setDriveStatus] = useState('offline');
-            const [showAuth, setShowAuth] = useState(false);
-            const [loading, setLoading] = useState(false);
+            const [driveStatus, _setDriveStatusRaw] = useState('offline');
+            const setDriveStatus = _trackSetter('setDriveStatus', _setDriveStatusRaw);
+            const [showAuth, _setShowAuthRaw] = useState(false);
+            const setShowAuth = _trackSetter('setShowAuth', _setShowAuthRaw);
+            const [loading, _setLoadingRaw] = useState(false);
+            const setLoading = _trackSetter('setLoading', _setLoadingRaw);
             const [selectedKunde, _setSelectedKundeRaw] = useState(null);
             const setSelectedKunde = _trackSetter('setSelectedKunde', _setSelectedKundeRaw);
             const [selectedRaum, _setSelectedRaumRaw] = useState(null);
@@ -212,44 +215,67 @@
             const setSelectedPositions = _trackSetter('setSelectedPositions', _setSelectedPositionsRaw);
             const [fertigeRaeume, _setFertigeRaeumeRaw] = useState([]);
             const setFertigeRaeume = _trackSetter('setFertigeRaeume', _setFertigeRaeumeRaw);
-            const [lastRaumData, setLastRaumData] = useState(null);
+            const [lastRaumData, _setLastRaumDataRaw] = useState(null);
+            const setLastRaumData = _trackSetter('setLastRaumData', _setLastRaumDataRaw);
             const [gesamtliste, _setGesamtlisteRaw] = useState([]);
             const setGesamtliste = _trackSetter('setGesamtliste', _setGesamtlisteRaw);
-            const [showGesamtliste, setShowGesamtliste] = useState(false);
+            const [showGesamtliste, _setShowGesamtlisteRaw] = useState(false);
+            const setShowGesamtliste = _trackSetter('setShowGesamtliste', _setShowGesamtlisteRaw);
             const [aufmassGespeichert, _setAufmassGespeichertRaw] = useState(false);
             const setAufmassGespeichert = _trackSetter('setAufmassGespeichert', _setAufmassGespeichertRaw);
-            const [rechnungsVorwahl, setRechnungsVorwahl] = useState(null);
-            const [history, setHistory] = useState(['start']);
-            const [historyIdx, setHistoryIdx] = useState(0);
+            const [rechnungsVorwahl, _setRechnungsVorwahlRaw] = useState(null);
+            const setRechnungsVorwahl = _trackSetter('setRechnungsVorwahl', _setRechnungsVorwahlRaw);
+            const [history, _setHistoryRaw] = useState(['start']);
+            const setHistory = _trackSetter('setHistory', _setHistoryRaw);
+            const [historyIdx, _setHistoryIdxRaw] = useState(0);
+            const setHistoryIdx = _trackSetter('setHistoryIdx', _setHistoryIdxRaw);
             // ── Google Drive State ──
-            const [driveKunden, setDriveKunden] = useState([]);
-            const [isDriveMode, setIsDriveMode] = useState(false);
-            const [loadProgress, setLoadProgress] = useState('');
-            const [importResult, setImportResult] = useState(null);
-            const [kundeMode, setKundeMode] = useState('neu'); // 'neu' | 'analysiert' | 'manuell'
-            const [analyseConfig, setAnalyseConfig] = useState(null);
+            const [driveKunden, _setDriveKundenRaw] = useState([]);
+            const setDriveKunden = _trackSetter('setDriveKunden', _setDriveKundenRaw);
+            const [isDriveMode, _setIsDriveModeRaw] = useState(false);
+            const setIsDriveMode = _trackSetter('setIsDriveMode', _setIsDriveModeRaw);
+            const [loadProgress, _setLoadProgressRaw] = useState('');
+            const setLoadProgress = _trackSetter('setLoadProgress', _setLoadProgressRaw);
+            const [importResult, _setImportResultRaw] = useState(null);
+            const setImportResult = _trackSetter('setImportResult', _setImportResultRaw);
+            const [kundeMode, _setKundeModeRaw] = useState('neu'); // 'neu' | 'analysiert' | 'manuell'
+            const setKundeMode = _trackSetter('setKundeMode', _setKundeModeRaw);
+            const [analyseConfig, _setAnalyseConfigRaw] = useState(null);
+            const setAnalyseConfig = _trackSetter('setAnalyseConfig', _setAnalyseConfigRaw);
             // ── NEU: Verbindungsstatus von Startseite ──
-            const [startConnections, setStartConnections] = useState({ geminiConnected: false, driveConnected: false });
+            const [startConnections, _setStartConnectionsRaw] = useState({ geminiConnected: false, driveConnected: false });
+            const setStartConnections = _trackSetter('setStartConnections', _setStartConnectionsRaw);
             // ── KI-Ordneranalyse State ──
-            const [ordnerAnalyseMeta, setOrdnerAnalyseMeta] = useState(null);
-            const [ordnerAnalyseProgress, setOrdnerAnalyseProgress] = useState({ phase: '', message: '', current: 0, total: 0 });
-            const [isOrdnerAnalyseRunning, setIsOrdnerAnalyseRunning] = useState(false);
-            const [selectedOrdnerNr, setSelectedOrdnerNr] = useState(null);
+            const [ordnerAnalyseMeta, _setOrdnerAnalyseMetaRaw] = useState(null);
+            const setOrdnerAnalyseMeta = _trackSetter('setOrdnerAnalyseMeta', _setOrdnerAnalyseMetaRaw);
+            const [ordnerAnalyseProgress, _setOrdnerAnalyseProgressRaw] = useState({ phase: '', message: '', current: 0, total: 0 });
+            const setOrdnerAnalyseProgress = _trackSetter('setOrdnerAnalyseProgress', _setOrdnerAnalyseProgressRaw);
+            const [isOrdnerAnalyseRunning, _setIsOrdnerAnalyseRunningRaw] = useState(false);
+            const setIsOrdnerAnalyseRunning = _trackSetter('setIsOrdnerAnalyseRunning', _setIsOrdnerAnalyseRunningRaw);
+            const [selectedOrdnerNr, _setSelectedOrdnerNrRaw] = useState(null);
+            const setSelectedOrdnerNr = _trackSetter('setSelectedOrdnerNr', _setSelectedOrdnerNrRaw);
 
             // ── Akte & Speichern (WIP) ──
-            const [showAkteModal, setShowAkteModal] = useState(false);
-            const [akteData, setAkteData] = useState({ wips: [], appDateien: [] });
-            const [akteSaveToast, setAkteSaveToast] = useState(null);
+            const [showAkteModal, _setShowAkteModalRaw] = useState(false);
+            const setShowAkteModal = _trackSetter('setShowAkteModal', _setShowAkteModalRaw);
+            const [akteData, _setAkteDataRaw] = useState({ wips: [], appDateien: [] });
+            const setAkteData = _trackSetter('setAkteData', _setAkteDataRaw);
+            const [akteSaveToast, _setAkteSaveToastRaw] = useState(null);
+            const setAkteSaveToast = _trackSetter('setAkteSaveToast', _setAkteSaveToastRaw);
 
             // ── Aufmass-Vorlage (Speichern/Laden via Drive) ──
             // vorlageBusy: { action: 'save'|'list'|'load', message: '...' } waehrend I/O
-            const [vorlageBusy, setVorlageBusy] = useState(null);
+            const [vorlageBusy, _setVorlageBusyRaw] = useState(null);
+            const setVorlageBusy = _trackSetter('setVorlageBusy', _setVorlageBusyRaw);
             // vorlageToast: Erfolgsmeldung nach Speichern/Laden
-            const [vorlageToast, setVorlageToast] = useState(null);
+            const [vorlageToast, _setVorlageToastRaw] = useState(null);
+            const setVorlageToast = _trackSetter('setVorlageToast', _setVorlageToastRaw);
             // vorlageList: Array mit Drive-Vorlagen; null = Modal geschlossen, [] = leer (geoeffnet)
-            const [vorlageList, setVorlageList] = useState(null);
+            const [vorlageList, _setVorlageListRaw] = useState(null);
+            const setVorlageList = _trackSetter('setVorlageList', _setVorlageListRaw);
             // kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
-            const [kundeOpenDialog, setKundeOpenDialog] = useState(null);
+            const [kundeOpenDialog, _setKundeOpenDialogRaw] = useState(null);
+            const setKundeOpenDialog = _trackSetter('setKundeOpenDialog', _setKundeOpenDialogRaw);
 
             var PAGE_TO_MODUL = {
                 'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
@@ -2173,7 +2199,8 @@
             // Auto-Save kurz unterdrueckt, damit keine Endlosschleife
             // entsteht.
             // ══════════════════════════════════════════════════════════
-            const [autoRestoreToast, setAutoRestoreToast] = useState(null);
+            const [autoRestoreToast, _setAutoRestoreToastRaw] = useState(null);
+            const setAutoRestoreToast = _trackSetter('setAutoRestoreToast', _setAutoRestoreToastRaw);
             const _lastRestoredKundeId = React.useRef(null);
 
             useEffect(function() {
@@ -2223,13 +2250,15 @@
             //   2. Beim Online-Event (vom offline->online Wechsel)
             //   3. Periodisch alle 3 Minuten, solange Kunde offen ist
             // ══════════════════════════════════════════════════════════
-            const [fotoSyncStatus, setFotoSyncStatus] = useState(null);
+            const [fotoSyncStatus, _setFotoSyncStatusRaw] = useState(null);
+            const setFotoSyncStatus = _trackSetter('setFotoSyncStatus', _setFotoSyncStatusRaw);
 
             // ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
             // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
             // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
             // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
-            const [moduleActions, setModuleActions] = useState([]);
+            const [moduleActions, _setModuleActionsRaw] = useState([]);
+            const setModuleActions = _trackSetter('setModuleActions', _setModuleActionsRaw);
             // Aktuell registrierte Seite (fuer korrektes Unregister)
             const moduleActionsSeiteRef = useRef(null);
             useEffect(function() {

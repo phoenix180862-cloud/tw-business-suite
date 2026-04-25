@@ -226,19 +226,19 @@
          ?v= Query-String erzwingt Browser-Reload nach jedem Build.
          Bei jedem Build wird hier ein neuer Zeitstempel eingesetzt,
          damit selbst aggressivste Caches nicht stoeren. -->
-    <script src="tw-core.js?v=20260425-082352"></script>
-    <script src="tw-storage.js?v=20260425-082352"></script>
-    <script src="tw-kundendaten-parser.js?v=20260425-082352"></script>
-    <script src="tw-infrastructure.js?v=20260425-082352"></script>
-    <script src="tw-staging.js?v=20260425-082352"></script>
+    <script src="tw-core.js?v=20260425-083846"></script>
+    <script src="tw-storage.js?v=20260425-083846"></script>
+    <script src="tw-kundendaten-parser.js?v=20260425-083846"></script>
+    <script src="tw-infrastructure.js?v=20260425-083846"></script>
+    <script src="tw-staging.js?v=20260425-083846"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
 
     <!-- ═══ TW BUSINESS SUITE — DESIGN SYSTEM ═══ -->
-    <link rel="stylesheet" href="tw-design.css?v=20260425-082352">
+    <link rel="stylesheet" href="tw-design.css?v=20260425-083846">
 
 
-    <div id="root" data-build="20260425-082352"></div>
+    <div id="root" data-build="20260425-083846"></div>
 
     <!-- ═══ MEMORY-BADGE (immer sichtbar, oben rechts) ═══
          Zeigt den aktuellen JS-Heap-Verbrauch in MB.
@@ -435,7 +435,7 @@
       var panel = document.getElementById('tw-debug-panel');
       var flagList = document.getElementById('tw-debug-flag-list');
       var buildInfo = document.getElementById('tw-debug-buildinfo');
-      buildInfo.textContent = 'Build: 20260425-082352';
+      buildInfo.textContent = 'Build: 20260425-083846';
 
       function readFlags() {
         try { return JSON.parse(localStorage.getItem('twDebugFlags') || '{}'); } catch(_) { return {}; }
@@ -493,12 +493,12 @@
 
     // Build-Version in die Console — damit man auf dem Tablet in den DevTools
     // sofort sieht, ob man die neueste Version hat oder eine gecachte.
-    console.log('%c[TW Build] Version: 20260425-082352', 'color:#1E88E5;font-weight:bold');
+    console.log('%c[TW Build] Version: 20260425-083846', 'color:#1E88E5;font-weight:bold');
     </script>
 
 
     <script type="text/javascript">
-function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}window.__twSentinel={startedAt:Date.now(),built:"20260425-082352",completedModules:[]};window.__twSentinel.lastModule="tw-shared-components.jsx";const{useState,useEffect,useCallback,useRef}=React;/* ═══════════════════════════════════════════
+function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}window.__twSentinel={startedAt:Date.now(),built:"20260425-083846",completedModules:[]};window.__twSentinel.lastModule="tw-shared-components.jsx";const{useState,useEffect,useCallback,useRef}=React;/* ═══════════════════════════════════════════
            LEICA DISTO – Bluetooth Tastatur-Modus
            DISTO am Geraet auf "Text" oder "Tabelle" stellen,
            dann per Bluetooth mit Handy/Tablet koppeln.
@@ -2139,17 +2139,17 @@ return function(){clearInterval(iv);};},[refreshInfo]);if(!info)return null;var 
 // Aufrufe pro Setter. Memory-Badge zeigt die Top-Setter — damit
 // sehen wir welcher Setter die Render-Schleife dreht.
 const _trackSetter=function(name,setter){return function(v){window.__twSetterCalls=window.__twSetterCalls||{};window.__twSetterCalls[name]=(window.__twSetterCalls[name]||0)+1;return setter(v);};};// Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
-const[page,_setPageRaw]=useState('start');const setPage=_trackSetter('setPage',_setPageRaw);const[driveStatus,setDriveStatus]=useState('offline');const[showAuth,setShowAuth]=useState(false);const[loading,setLoading]=useState(false);const[selectedKunde,_setSelectedKundeRaw]=useState(null);const setSelectedKunde=_trackSetter('setSelectedKunde',_setSelectedKundeRaw);const[selectedRaum,_setSelectedRaumRaw]=useState(null);const setSelectedRaum=_trackSetter('setSelectedRaum',_setSelectedRaumRaw);const[selectedPositions,_setSelectedPositionsRaw]=useState([]);const setSelectedPositions=_trackSetter('setSelectedPositions',_setSelectedPositionsRaw);const[fertigeRaeume,_setFertigeRaeumeRaw]=useState([]);const setFertigeRaeume=_trackSetter('setFertigeRaeume',_setFertigeRaeumeRaw);const[lastRaumData,setLastRaumData]=useState(null);const[gesamtliste,_setGesamtlisteRaw]=useState([]);const setGesamtliste=_trackSetter('setGesamtliste',_setGesamtlisteRaw);const[showGesamtliste,setShowGesamtliste]=useState(false);const[aufmassGespeichert,_setAufmassGespeichertRaw]=useState(false);const setAufmassGespeichert=_trackSetter('setAufmassGespeichert',_setAufmassGespeichertRaw);const[rechnungsVorwahl,setRechnungsVorwahl]=useState(null);const[history,setHistory]=useState(['start']);const[historyIdx,setHistoryIdx]=useState(0);// ── Google Drive State ──
-const[driveKunden,setDriveKunden]=useState([]);const[isDriveMode,setIsDriveMode]=useState(false);const[loadProgress,setLoadProgress]=useState('');const[importResult,setImportResult]=useState(null);const[kundeMode,setKundeMode]=useState('neu');// 'neu' | 'analysiert' | 'manuell'
-const[analyseConfig,setAnalyseConfig]=useState(null);// ── NEU: Verbindungsstatus von Startseite ──
-const[startConnections,setStartConnections]=useState({geminiConnected:false,driveConnected:false});// ── KI-Ordneranalyse State ──
-const[ordnerAnalyseMeta,setOrdnerAnalyseMeta]=useState(null);const[ordnerAnalyseProgress,setOrdnerAnalyseProgress]=useState({phase:'',message:'',current:0,total:0});const[isOrdnerAnalyseRunning,setIsOrdnerAnalyseRunning]=useState(false);const[selectedOrdnerNr,setSelectedOrdnerNr]=useState(null);// ── Akte & Speichern (WIP) ──
-const[showAkteModal,setShowAkteModal]=useState(false);const[akteData,setAkteData]=useState({wips:[],appDateien:[]});const[akteSaveToast,setAkteSaveToast]=useState(null);// ── Aufmass-Vorlage (Speichern/Laden via Drive) ──
+const[page,_setPageRaw]=useState('start');const setPage=_trackSetter('setPage',_setPageRaw);const[driveStatus,_setDriveStatusRaw]=useState('offline');const setDriveStatus=_trackSetter('setDriveStatus',_setDriveStatusRaw);const[showAuth,_setShowAuthRaw]=useState(false);const setShowAuth=_trackSetter('setShowAuth',_setShowAuthRaw);const[loading,_setLoadingRaw]=useState(false);const setLoading=_trackSetter('setLoading',_setLoadingRaw);const[selectedKunde,_setSelectedKundeRaw]=useState(null);const setSelectedKunde=_trackSetter('setSelectedKunde',_setSelectedKundeRaw);const[selectedRaum,_setSelectedRaumRaw]=useState(null);const setSelectedRaum=_trackSetter('setSelectedRaum',_setSelectedRaumRaw);const[selectedPositions,_setSelectedPositionsRaw]=useState([]);const setSelectedPositions=_trackSetter('setSelectedPositions',_setSelectedPositionsRaw);const[fertigeRaeume,_setFertigeRaeumeRaw]=useState([]);const setFertigeRaeume=_trackSetter('setFertigeRaeume',_setFertigeRaeumeRaw);const[lastRaumData,_setLastRaumDataRaw]=useState(null);const setLastRaumData=_trackSetter('setLastRaumData',_setLastRaumDataRaw);const[gesamtliste,_setGesamtlisteRaw]=useState([]);const setGesamtliste=_trackSetter('setGesamtliste',_setGesamtlisteRaw);const[showGesamtliste,_setShowGesamtlisteRaw]=useState(false);const setShowGesamtliste=_trackSetter('setShowGesamtliste',_setShowGesamtlisteRaw);const[aufmassGespeichert,_setAufmassGespeichertRaw]=useState(false);const setAufmassGespeichert=_trackSetter('setAufmassGespeichert',_setAufmassGespeichertRaw);const[rechnungsVorwahl,_setRechnungsVorwahlRaw]=useState(null);const setRechnungsVorwahl=_trackSetter('setRechnungsVorwahl',_setRechnungsVorwahlRaw);const[history,_setHistoryRaw]=useState(['start']);const setHistory=_trackSetter('setHistory',_setHistoryRaw);const[historyIdx,_setHistoryIdxRaw]=useState(0);const setHistoryIdx=_trackSetter('setHistoryIdx',_setHistoryIdxRaw);// ── Google Drive State ──
+const[driveKunden,_setDriveKundenRaw]=useState([]);const setDriveKunden=_trackSetter('setDriveKunden',_setDriveKundenRaw);const[isDriveMode,_setIsDriveModeRaw]=useState(false);const setIsDriveMode=_trackSetter('setIsDriveMode',_setIsDriveModeRaw);const[loadProgress,_setLoadProgressRaw]=useState('');const setLoadProgress=_trackSetter('setLoadProgress',_setLoadProgressRaw);const[importResult,_setImportResultRaw]=useState(null);const setImportResult=_trackSetter('setImportResult',_setImportResultRaw);const[kundeMode,_setKundeModeRaw]=useState('neu');// 'neu' | 'analysiert' | 'manuell'
+const setKundeMode=_trackSetter('setKundeMode',_setKundeModeRaw);const[analyseConfig,_setAnalyseConfigRaw]=useState(null);const setAnalyseConfig=_trackSetter('setAnalyseConfig',_setAnalyseConfigRaw);// ── NEU: Verbindungsstatus von Startseite ──
+const[startConnections,_setStartConnectionsRaw]=useState({geminiConnected:false,driveConnected:false});const setStartConnections=_trackSetter('setStartConnections',_setStartConnectionsRaw);// ── KI-Ordneranalyse State ──
+const[ordnerAnalyseMeta,_setOrdnerAnalyseMetaRaw]=useState(null);const setOrdnerAnalyseMeta=_trackSetter('setOrdnerAnalyseMeta',_setOrdnerAnalyseMetaRaw);const[ordnerAnalyseProgress,_setOrdnerAnalyseProgressRaw]=useState({phase:'',message:'',current:0,total:0});const setOrdnerAnalyseProgress=_trackSetter('setOrdnerAnalyseProgress',_setOrdnerAnalyseProgressRaw);const[isOrdnerAnalyseRunning,_setIsOrdnerAnalyseRunningRaw]=useState(false);const setIsOrdnerAnalyseRunning=_trackSetter('setIsOrdnerAnalyseRunning',_setIsOrdnerAnalyseRunningRaw);const[selectedOrdnerNr,_setSelectedOrdnerNrRaw]=useState(null);const setSelectedOrdnerNr=_trackSetter('setSelectedOrdnerNr',_setSelectedOrdnerNrRaw);// ── Akte & Speichern (WIP) ──
+const[showAkteModal,_setShowAkteModalRaw]=useState(false);const setShowAkteModal=_trackSetter('setShowAkteModal',_setShowAkteModalRaw);const[akteData,_setAkteDataRaw]=useState({wips:[],appDateien:[]});const setAkteData=_trackSetter('setAkteData',_setAkteDataRaw);const[akteSaveToast,_setAkteSaveToastRaw]=useState(null);const setAkteSaveToast=_trackSetter('setAkteSaveToast',_setAkteSaveToastRaw);// ── Aufmass-Vorlage (Speichern/Laden via Drive) ──
 // vorlageBusy: { action: 'save'|'list'|'load', message: '...' } waehrend I/O
-const[vorlageBusy,setVorlageBusy]=useState(null);// vorlageToast: Erfolgsmeldung nach Speichern/Laden
-const[vorlageToast,setVorlageToast]=useState(null);// vorlageList: Array mit Drive-Vorlagen; null = Modal geschlossen, [] = leer (geoeffnet)
-const[vorlageList,setVorlageList]=useState(null);// kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
-const[kundeOpenDialog,setKundeOpenDialog]=useState(null);var PAGE_TO_MODUL={'raumerkennung':'aufmass','raumblatt':'aufmass','rechnung':'rechnung','ausgangsbuch':'ausgangsbuch','schriftverkehr':'schriftverkehr','baustelle':'baustelle'};var MODUL_ICONS={'aufmass':'\uD83D\uDCD0','rechnung':'\uD83D\uDCB6','schriftverkehr':'\u2709\uFE0F','ausgangsbuch':'\uD83D\uDCD2','baustelle':'\uD83D\uDCF1'};var MODUL_LABELS={'aufmass':'Aufma\u00df','rechnung':'Rechnung','schriftverkehr':'Schriftverkehr','ausgangsbuch':'Ausgangsbuch','baustelle':'Baustelle'};var MODUL_PAGES={'aufmass':'raumerkennung','rechnung':'rechnung','schriftverkehr':'schriftverkehr','ausgangsbuch':'ausgangsbuch','baustelle':'baustelle'};/* ══════════════════════════════════════════════════
+const[vorlageBusy,_setVorlageBusyRaw]=useState(null);const setVorlageBusy=_trackSetter('setVorlageBusy',_setVorlageBusyRaw);// vorlageToast: Erfolgsmeldung nach Speichern/Laden
+const[vorlageToast,_setVorlageToastRaw]=useState(null);const setVorlageToast=_trackSetter('setVorlageToast',_setVorlageToastRaw);// vorlageList: Array mit Drive-Vorlagen; null = Modal geschlossen, [] = leer (geoeffnet)
+const[vorlageList,_setVorlageListRaw]=useState(null);const setVorlageList=_trackSetter('setVorlageList',_setVorlageListRaw);// kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
+const[kundeOpenDialog,_setKundeOpenDialogRaw]=useState(null);const setKundeOpenDialog=_trackSetter('setKundeOpenDialog',_setKundeOpenDialogRaw);var PAGE_TO_MODUL={'raumerkennung':'aufmass','raumblatt':'aufmass','rechnung':'rechnung','ausgangsbuch':'ausgangsbuch','schriftverkehr':'schriftverkehr','baustelle':'baustelle'};var MODUL_ICONS={'aufmass':'\uD83D\uDCD0','rechnung':'\uD83D\uDCB6','schriftverkehr':'\u2709\uFE0F','ausgangsbuch':'\uD83D\uDCD2','baustelle':'\uD83D\uDCF1'};var MODUL_LABELS={'aufmass':'Aufma\u00df','rechnung':'Rechnung','schriftverkehr':'Schriftverkehr','ausgangsbuch':'Ausgangsbuch','baustelle':'Baustelle'};var MODUL_PAGES={'aufmass':'raumerkennung','rechnung':'rechnung','schriftverkehr':'schriftverkehr','ausgangsbuch':'ausgangsbuch','baustelle':'baustelle'};/* ══════════════════════════════════════════════════
                LOKALER SPEICHER (TWStorage / IndexedDB)
                Automatische Persistenz aller Arbeitsdaten
                ══════════════════════════════════════════════════ */// ── Beim App-Start: Letzten Arbeitsstand wiederherstellen ──
@@ -2377,7 +2377,7 @@ setTimeout(function(){if(window.TW&&window.TW.emit){TW.emit('wip:restoreState',{
 // Auto-Save kurz unterdrueckt, damit keine Endlosschleife
 // entsteht.
 // ══════════════════════════════════════════════════════════
-const[autoRestoreToast,setAutoRestoreToast]=useState(null);const _lastRestoredKundeId=React.useRef(null);useEffect(function(){if(!selectedKunde)return;var kundeId=selectedKunde._driveFolderId||selectedKunde.id||selectedKunde.name;if(!kundeId)return;if(_lastRestoredKundeId.current===kundeId)return;// schon geprueft
+const[autoRestoreToast,_setAutoRestoreToastRaw]=useState(null);const setAutoRestoreToast=_trackSetter('setAutoRestoreToast',_setAutoRestoreToastRaw);const _lastRestoredKundeId=React.useRef(null);useEffect(function(){if(!selectedKunde)return;var kundeId=selectedKunde._driveFolderId||selectedKunde.id||selectedKunde.name;if(!kundeId)return;if(_lastRestoredKundeId.current===kundeId)return;// schon geprueft
 if(!window.TWStorage||!window.TWStorage.isReady())return;_lastRestoredKundeId.current=kundeId;TWStorage.listWips(kundeId).then(function(wips){if(!wips||wips.length===0)return;// Neuesten WIP nehmen (listWips sortiert bereits absteigend)
 var latest=wips[0];if(!latest||!latest.id)return;// Vollstaendigen WIP-Datensatz mit moduleState laden
 return TWStorage.loadWip(kundeId,latest.modulName).then(function(wip){if(!wip||!wip.moduleState)return;// Waehrend des Restores Auto-Save unterdruecken
@@ -2393,11 +2393,11 @@ var savedDate=new Date(latest.savedAt);var dStr=savedDate.toLocaleString('de-DE'
 //   2. Beim Online-Event (vom offline->online Wechsel)
 //   3. Periodisch alle 3 Minuten, solange Kunde offen ist
 // ══════════════════════════════════════════════════════════
-const[fotoSyncStatus,setFotoSyncStatus]=useState(null);// ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
+const[fotoSyncStatus,_setFotoSyncStatusRaw]=useState(null);const setFotoSyncStatus=_trackSetter('setFotoSyncStatus',_setFotoSyncStatusRaw);// ETAPPE 7: Modul-spezifische Bearbeiten-Dropdown-Eintraege.
 // Module (z.B. Raumerkennung, Raumblatt) registrieren beim Mount ihre
 // Aktionen via window._setModuleActions(arr) ODER window._registerSeitenAktionen(seite, arr).
 // Das globale Bearbeiten-Dropdown nimmt sie mit auf.
-const[moduleActions,setModuleActions]=useState([]);// Aktuell registrierte Seite (fuer korrektes Unregister)
+const[moduleActions,_setModuleActionsRaw]=useState([]);const setModuleActions=_trackSetter('setModuleActions',_setModuleActionsRaw);// Aktuell registrierte Seite (fuer korrektes Unregister)
 const moduleActionsSeiteRef=useRef(null);useEffect(function(){// Altes Pattern: direktes Array setzen
 window._setModuleActions=function(arr){moduleActionsSeiteRef.current=null;setModuleActions(Array.isArray(arr)?arr:[]);};// Neues Pattern (Etappe 8): Seiten-spezifische Aktionen mit type:'submenu' Support
 window._registerSeitenAktionen=function(seite,aktionen){moduleActionsSeiteRef.current=seite||null;setModuleActions(Array.isArray(aktionen)?aktionen:[]);};// Cleanup beim Modulwechsel: Nur entfernen wenn die aufrufende Seite noch registriert ist
