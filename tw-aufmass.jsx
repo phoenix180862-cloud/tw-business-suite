@@ -5204,6 +5204,16 @@
                 { key: 'fertigstellung', label: 'Fertigstellung', subtitle: 'Nach Fliesenarbeiten', nr: 3, color: 'var(--success)' }
             ];
             const [phasenFotos, setPhasenFotos] = useState(() => {
+                // KRITISCHER FIX (25.04.2026): noFotos-Diagnose MUSS zuerst greifen.
+                // Wenn reEdit.phasenFotos im alten Format mit Base64-DataURLs ankommt,
+                // wuerde das Objekt sonst beim useState-Mount direkt in den Heap geschrieben
+                // (3-5 MB pro Foto-String) BEVOR der noFotos-Check spaeter greift.
+                // Genau dieser Pfad sprengt den V8-Heap bei ~2 GB.
+                if (window.__twNoFotos) {
+                    const initial = {};
+                    FOTO_PHASEN.forEach(phase => { initial[phase.key] = {}; });
+                    return initial;
+                }
                 if (reEdit && reEdit.phasenFotos) return reEdit.phasenFotos;
                 const initial = {};
                 FOTO_PHASEN.forEach(phase => { initial[phase.key] = {}; });
@@ -5227,6 +5237,11 @@
 
             // Objekt-Fotos: 20 Foto-Slots fuer allgemeine Gebaeude-Dokumentation
             const [objektFotos, setObjektFotos] = useState(function() {
+                // KRITISCHER FIX (25.04.2026): siehe phasenFotos oben.
+                // reEdit.objektFotos kann ein Array mit 20 vollformatigen Base64-DataURLs sein.
+                if (window.__twNoFotos) {
+                    return Array.from({length: 20}, function(_, i) { return { nr: i + 1, image: null, croppedImage: null, marked: false, zeit: '' }; });
+                }
                 if (reEdit && reEdit.objektFotos) return reEdit.objektFotos;
                 return Array.from({length: 20}, function(_, i) { return { nr: i + 1, image: null, croppedImage: null, marked: false, zeit: '' }; });
             });
