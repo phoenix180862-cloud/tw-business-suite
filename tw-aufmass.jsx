@@ -3684,30 +3684,56 @@
             const duplicates = findDuplicatePositions(lvPositionen);
 
             // ═══ ETAPPE 8: Aktionen ins globale Bearbeiten-Dropdown einschleusen ═══
+            // ╔══════════════════════════════════════════════════════════════════╗
+            // ║ MEMORY-LEAK-FIX 25.04.2026 (setModuleActions Loop, 28k/s)       ║
+            // ║ Same Pattern wie in Raumblatt: Function-Props via propsRef,     ║
+            // ║ deps auf primitive Werte reduziert. Ohne Fix feuerte der Effect ║
+            // ║ bei jedem App-Render wegen neuer Inline-Closure-Refs.           ║
+            // ╚══════════════════════════════════════════════════════════════════╝
+            var raumerkActionsRef = React.useRef({});
+            raumerkActionsRef.current.onShowGesamtliste = onShowGesamtliste;
+            raumerkActionsRef.current.lastRaumData = lastRaumData;
+            raumerkActionsRef.current.setShowManual = setShowManual;
+            raumerkActionsRef.current.setBgNr = setBgNr;
+            raumerkActionsRef.current.setBgBez = setBgBez;
+            raumerkActionsRef.current.setBgGeschoss = setBgGeschoss;
+            raumerkActionsRef.current.setBgSonstiges = setBgSonstiges;
+            raumerkActionsRef.current.setShowBaugleich = setShowBaugleich;
+            raumerkActionsRef.current.setShowSaveListe = setShowSaveListe;
+            raumerkActionsRef.current.setShowLoadListe = setShowLoadListe;
+
+            // Primitive abgeleitete Werte fuer das deps-Array
+            var reHasLast = !!lastRaumData;
+            var reGesamtlisteLen = (gesamtliste && gesamtliste.length) || 0;
+            var reSelectedPosLen = (selectedPositions && selectedPositions.length) || 0;
+            var reHasOnShow = !!onShowGesamtliste;
+
             useEffect(function() {
-                var hasLast = !!lastRaumData;
-                var hasListe = !!(gesamtliste && gesamtliste.length > 0);
-                var hasSel = !!(selectedPositions && selectedPositions.length > 0);
+                var R = raumerkActionsRef;
+                var hasLast = reHasLast;
+                var hasListe = reGesamtlisteLen > 0;
+                var hasSel = reSelectedPosLen > 0;
                 var aktionen = [
                     { label: 'Raum manuell eingeben', icon: '\u270F\uFE0F',
-                      onClick: function(){ setShowManual(true); } },
+                      onClick: function(){ R.current.setShowManual(true); } },
                     { label: 'Baugleicher Raum anlegen', icon: '\uD83D\uDCCB',
                       disabled: !hasLast,
                       onClick: function(){
-                          if (!lastRaumData) return;
-                          setBgNr(''); setBgBez('');
-                          setBgGeschoss(lastRaumData.geschoss || '');
-                          setBgSonstiges('');
-                          setShowBaugleich(true);
+                          var lrd = R.current.lastRaumData;
+                          if (!lrd) return;
+                          R.current.setBgNr(''); R.current.setBgBez('');
+                          R.current.setBgGeschoss(lrd.geschoss || '');
+                          R.current.setBgSonstiges('');
+                          R.current.setShowBaugleich(true);
                       } },
-                    { label: 'Gesamtliste' + (hasListe ? ' (' + gesamtliste.length + ')' : ''), icon: '\uD83D\uDCCB',
+                    { label: 'Gesamtliste' + (hasListe ? ' (' + reGesamtlisteLen + ')' : ''), icon: '\uD83D\uDCCB',
                       disabled: !hasListe,
-                      onClick: function(){ if (onShowGesamtliste) onShowGesamtliste(); } },
+                      onClick: function(){ if (R.current.onShowGesamtliste) R.current.onShowGesamtliste(); } },
                     { label: 'Liste speichern', icon: '\uD83D\uDCBE',
                       disabled: !hasSel,
-                      onClick: function(){ setShowSaveListe(true); } },
+                      onClick: function(){ R.current.setShowSaveListe(true); } },
                     { label: 'Liste laden', icon: '\uD83D\uDCC2',
-                      onClick: function(){ setShowLoadListe(true); } },
+                      onClick: function(){ R.current.setShowLoadListe(true); } },
                     { type: 'divider' },
                     { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
                       onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); } },
@@ -3729,7 +3755,8 @@
                     if (window._unregisterSeitenAktionen) window._unregisterSeitenAktionen('raumerkennung');
                     if (window._unregisterPrimaerAktion) window._unregisterPrimaerAktion('raumerkennung');
                 };
-            }, [lastRaumData, gesamtliste, selectedPositions, onShowGesamtliste]);
+            }, [reHasLast, reGesamtlisteLen, reSelectedPosLen, reHasOnShow]);
+            // FIX: deps reduziert auf primitive Werte. Function-Props via raumerkActionsRef.
 
             // ═══ Auto-Fill: Wenn Vorraum-Daten existieren, Höhen-Felder automatisch vorausfüllen ═══
             useEffect(() => {
@@ -7526,44 +7553,71 @@
             };
 
             // ═══ ETAPPE 8: Raumblatt-Aktionen ins globale Bearbeiten-Dropdown einschleusen ═══
+            // ╔══════════════════════════════════════════════════════════════════╗
+            // ║ MEMORY-LEAK-FIX 25.04.2026 (setModuleActions Loop, 28k/s)       ║
+            // ║ Die Inline-Closures aus App (`onShowGesamtliste={() => ...}`)   ║
+            // ║ + die nicht-memoisierten handle*-Funktionen erzeugten bei jedem ║
+            // ║ App-Render neue Function-Refs. Dieser Effect feuerte daraufhin  ║
+            // ║ permanent → setModuleActions → App rendert → neue Refs → Loop.  ║
+            // ║ FIX: Function-Props via propsRef stabilisieren, deps reduziert. ║
+            // ╚══════════════════════════════════════════════════════════════════╝
+            var raumblattActionsRef = React.useRef({});
+            raumblattActionsRef.current.onShowGesamtliste = onShowGesamtliste;
+            raumblattActionsRef.current.onFinishRaum = onFinishRaum;
+            raumblattActionsRef.current.onAufmassBeenden = onAufmassBeenden;
+            raumblattActionsRef.current.doZurueckZurRaumerkennung = doZurueckZurRaumerkennung;
+            raumblattActionsRef.current.doRaumblattFertigstellen = doRaumblattFertigstellen;
+            raumblattActionsRef.current.doAufmassFertigstellen = doAufmassFertigstellen;
+            raumblattActionsRef.current.handleTabChange = handleTabChange;
+            raumblattActionsRef.current.setCalcModalOpen = setCalcModalOpen;
+            raumblattActionsRef.current.setWandAnzahlPopupOpen = setWandAnzahlPopupOpen;
+            raumblattActionsRef.current.setMasseKopieren = setMasseKopieren;
+            raumblattActionsRef.current.masseKopieren = masseKopieren;
+
+            // Primitive abgeleitete Werte fuer das deps-Array (statt posCards-Referenz!)
+            var rbPosOkCount = posCards ? posCards.filter(function(p){ return calcPositionResult(p) > 0; }).length : 0;
+            var rbPosTotalCount = posCards ? posCards.length : 0;
+            var rbHasGesamtliste = !!onShowGesamtliste;
+            var rbHasOnFinish = !!onFinishRaum;
+            var rbHasOnBeenden = !!onAufmassBeenden;
+
             useEffect(function() {
-                var posOkCount = posCards ? posCards.filter(function(p){ return calcPositionResult(p) > 0; }).length : 0;
-                var posTotalCount = posCards ? posCards.length : 0;
+                var R = raumblattActionsRef;
 
                 // Sub-Menue "Aktionen" - die frueher roten Buttons
                 var subAktionen = [
                     { label: 'Zurueck', icon: '\u21A9',
-                      onClick: function(){ doZurueckZurRaumerkennung(); } },
+                      onClick: function(){ R.current.doZurueckZurRaumerkennung && R.current.doZurueckZurRaumerkennung(); } },
                     { label: 'Gesamtliste', icon: '\uD83D\uDCCB',
-                      disabled: !onShowGesamtliste,
-                      onClick: function(){ if (onShowGesamtliste) onShowGesamtliste(); } },
+                      disabled: !rbHasGesamtliste,
+                      onClick: function(){ if (R.current.onShowGesamtliste) R.current.onShowGesamtliste(); } },
                     { label: 'Raumblatt berechnen', icon: '\uD83D\uDCD0',
-                      onClick: function(){ setCalcModalOpen(true); } },
+                      onClick: function(){ R.current.setCalcModalOpen(true); } },
                     { label: 'Raumblatt fertigstellen', icon: '\u2714',
-                      disabled: !onFinishRaum,
-                      onClick: function(){ if (onFinishRaum) doRaumblattFertigstellen(); } },
+                      disabled: !rbHasOnFinish,
+                      onClick: function(){ if (R.current.onFinishRaum) R.current.doRaumblattFertigstellen(); } },
                     { label: 'Aufmass fertigstellen', icon: '\uD83C\uDFC1',
-                      disabled: !onAufmassBeenden,
-                      onClick: function(){ if (onAufmassBeenden) doAufmassFertigstellen(); } }
+                      disabled: !rbHasOnBeenden,
+                      onClick: function(){ if (R.current.onAufmassBeenden) R.current.doAufmassFertigstellen(); } }
                 ];
 
                 // Sub-Menue "Tabs" - die frueher blauen Tab-Buttons
                 var subTabs = [
                     { label: 'Grundriss' + (rbTab === 0 ? '  \u25CF' : ''),
-                      onClick: function(){ handleTabChange(0); } },
+                      onClick: function(){ R.current.handleTabChange(0); } },
                     { label: 'Fotos - Waende' + (rbTab === 1 ? '  \u25CF' : ''),
-                      onClick: function(){ handleTabChange(1); } },
+                      onClick: function(){ R.current.handleTabChange(1); } },
                     { label: 'Fotos Objekt' + (rbTab === 4 ? '  \u25CF' : ''),
-                      onClick: function(){ handleTabChange(4); } },
+                      onClick: function(){ R.current.handleTabChange(4); } },
                     { label: 'Oeffnungen' + (rbTab === 2 ? '  \u25CF' : ''),
-                      onClick: function(){ handleTabChange(2); } },
-                    { label: 'Pos. (' + posOkCount + '/' + posTotalCount + ')' + (rbTab === 3 ? '  \u25CF' : ''),
-                      onClick: function(){ handleTabChange(3); } },
+                      onClick: function(){ R.current.handleTabChange(2); } },
+                    { label: 'Pos. (' + rbPosOkCount + '/' + rbPosTotalCount + ')' + (rbTab === 3 ? '  \u25CF' : ''),
+                      onClick: function(){ R.current.handleTabChange(3); } },
                     { type: 'divider' },
                     { label: 'Waende: ' + wandAnzahl,
-                      onClick: function(){ setWandAnzahlPopupOpen(true); } },
+                      onClick: function(){ R.current.setWandAnzahlPopupOpen(true); } },
                     { label: 'Masse kopieren: ' + (masseKopieren ? 'JA' : 'NEIN'),
-                      onClick: function(){ setMasseKopieren(!masseKopieren); } }
+                      onClick: function(){ R.current.setMasseKopieren(!R.current.masseKopieren); } }
                 ];
 
                 var aktionen = [
@@ -7583,14 +7637,15 @@
                     window._registerPrimaerAktion('raumblatt', {
                         label: 'Raumblatt berechnen',
                         icon: '\uD83D\uDCD0',
-                        onClick: function(){ setCalcModalOpen(true); }
+                        onClick: function(){ R.current.setCalcModalOpen(true); }
                     });
                 }
                 return function() {
                     if (window._unregisterSeitenAktionen) window._unregisterSeitenAktionen('raumblatt');
                     if (window._unregisterPrimaerAktion) window._unregisterPrimaerAktion('raumblatt');
                 };
-            }, [rbTab, wandAnzahl, masseKopieren, hasUnsavedChanges, posCards, onShowGesamtliste, onFinishRaum, onAufmassBeenden]);
+            }, [rbTab, wandAnzahl, masseKopieren, rbPosOkCount, rbPosTotalCount, rbHasGesamtliste, rbHasOnFinish, rbHasOnBeenden]);
+            // FIX: deps reduziert auf primitive Werte. Function-Props via raumblattActionsRef.
 
             // ── WIP-Speicherung: Aktuellen Bildschirm-Stand einsammeln ──
             // Ref wird bei jedem Render aktualisiert, Listener selbst nur einmal registriert
