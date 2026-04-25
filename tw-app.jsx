@@ -187,19 +187,37 @@
 
 
         function App() {
+            // Diagnose: Setter-Tracker. Wrappt die haeufigsten Setter, zaehlt
+            // Aufrufe pro Setter. Memory-Badge zeigt die Top-Setter — damit
+            // sehen wir welcher Setter die Render-Schleife dreht.
+            const _trackSetter = function(name, setter) {
+                return function(v) {
+                    window.__twSetterCalls = window.__twSetterCalls || {};
+                    window.__twSetterCalls[name] = (window.__twSetterCalls[name] || 0) + 1;
+                    return setter(v);
+                };
+            };
+
             // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
-            const [page, setPage] = useState('start');
+            const [page, _setPageRaw] = useState('start');
+            const setPage = _trackSetter('setPage', _setPageRaw);
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
             const [loading, setLoading] = useState(false);
-            const [selectedKunde, setSelectedKunde] = useState(null);
-            const [selectedRaum, setSelectedRaum] = useState(null);
-            const [selectedPositions, setSelectedPositions] = useState([]);
-            const [fertigeRaeume, setFertigeRaeume] = useState([]);
+            const [selectedKunde, _setSelectedKundeRaw] = useState(null);
+            const setSelectedKunde = _trackSetter('setSelectedKunde', _setSelectedKundeRaw);
+            const [selectedRaum, _setSelectedRaumRaw] = useState(null);
+            const setSelectedRaum = _trackSetter('setSelectedRaum', _setSelectedRaumRaw);
+            const [selectedPositions, _setSelectedPositionsRaw] = useState([]);
+            const setSelectedPositions = _trackSetter('setSelectedPositions', _setSelectedPositionsRaw);
+            const [fertigeRaeume, _setFertigeRaeumeRaw] = useState([]);
+            const setFertigeRaeume = _trackSetter('setFertigeRaeume', _setFertigeRaeumeRaw);
             const [lastRaumData, setLastRaumData] = useState(null);
-            const [gesamtliste, setGesamtliste] = useState([]);
+            const [gesamtliste, _setGesamtlisteRaw] = useState([]);
+            const setGesamtliste = _trackSetter('setGesamtliste', _setGesamtlisteRaw);
             const [showGesamtliste, setShowGesamtliste] = useState(false);
-            const [aufmassGespeichert, setAufmassGespeichert] = useState(false);
+            const [aufmassGespeichert, _setAufmassGespeichertRaw] = useState(false);
+            const setAufmassGespeichert = _trackSetter('setAufmassGespeichert', _setAufmassGespeichertRaw);
             const [rechnungsVorwahl, setRechnungsVorwahl] = useState(null);
             const [history, setHistory] = useState(['start']);
             const [historyIdx, setHistoryIdx] = useState(0);

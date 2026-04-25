@@ -226,19 +226,19 @@
          ?v= Query-String erzwingt Browser-Reload nach jedem Build.
          Bei jedem Build wird hier ein neuer Zeitstempel eingesetzt,
          damit selbst aggressivste Caches nicht stoeren. -->
-    <script src="tw-core.js?v=20260425-080753"></script>
-    <script src="tw-storage.js?v=20260425-080753"></script>
-    <script src="tw-kundendaten-parser.js?v=20260425-080753"></script>
-    <script src="tw-infrastructure.js?v=20260425-080753"></script>
-    <script src="tw-staging.js?v=20260425-080753"></script>
+    <script src="tw-core.js?v=20260425-082352"></script>
+    <script src="tw-storage.js?v=20260425-082352"></script>
+    <script src="tw-kundendaten-parser.js?v=20260425-082352"></script>
+    <script src="tw-infrastructure.js?v=20260425-082352"></script>
+    <script src="tw-staging.js?v=20260425-082352"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
 
     <!-- ═══ TW BUSINESS SUITE — DESIGN SYSTEM ═══ -->
-    <link rel="stylesheet" href="tw-design.css?v=20260425-080753">
+    <link rel="stylesheet" href="tw-design.css?v=20260425-082352">
 
 
-    <div id="root" data-build="20260425-080753"></div>
+    <div id="root" data-build="20260425-082352"></div>
 
     <!-- ═══ MEMORY-BADGE (immer sichtbar, oben rechts) ═══
          Zeigt den aktuellen JS-Heap-Verbrauch in MB.
@@ -306,12 +306,12 @@
       var badgeLabel = document.getElementById('tw-memory-badge-label');
       var hasMemoryAPI = !!(window.performance && window.performance.memory);
 
-      // Verlauf der letzten 6 Messungen fuer Allokationsrate
       var memHistory = [];
-      var MEM_HISTORY_MAX = 6;  // 6 x 2s = 12s Fenster
+      var MEM_HISTORY_MAX = 6;
       var lastRenderCount = 0;
       var lastRenderTime = Date.now();
-      var lastCounters = {};   // Snapshot pro-Komponente
+      var lastCounters = {};
+      var lastSetterCalls = {};
 
       function updateMemoryBadge() {
         if (!badge) return;
@@ -320,7 +320,7 @@
         var dtSec = (now - lastRenderTime) / 1000;
         if (dtSec <= 0) dtSec = 0.001;
 
-        // Pro-Komponenten-Renders/s berechnen
+        // Pro-Komponenten-Renders/s
         var counters = window.__twRenderCounters || {};
         var perComponent = {};
         Object.keys(counters).forEach(function(name) {
@@ -329,37 +329,47 @@
           perComponent[name] = Math.round(deltaPerSec * 10) / 10;
           lastCounters[name] = counters[name];
         });
-
-        var currentRenders = window.__twAppRenderCount || 0;
-        var rendersPerSec = (currentRenders - lastRenderCount) / dtSec;
-        rendersPerSec = Math.round(rendersPerSec * 10) / 10;
-        lastRenderCount = currentRenders;
-        lastRenderTime = now;
-
-        // Top-Renderer ermitteln (sortiert)
-        var sorted = Object.keys(perComponent)
+        var sortedC = Object.keys(perComponent)
           .map(function(n) { return {name: n, rate: perComponent[n]}; })
           .sort(function(a, b) { return b.rate - a.rate; });
 
-        // Sub-Label: Wenn ein Spitzenreiter > 5/s ist, den hervorheben.
-        // Sonst die Top 2 als kompakter String.
-        var labelText = '';
-        if (sorted.length > 0) {
-          var top = sorted[0];
-          if (top.rate >= 5) {
-            // ALARM: eine Komponente rendert wahnsinnig oft
-            labelText = '⚠ ' + top.name + ': ' + top.rate + '/s';
-          } else {
-            // Kompakte Anzeige der ersten zwei
-            labelText = sorted.slice(0, 2).map(function(s) {
-              var short = s.name.substring(0, 4);
-              return short + ':' + s.rate;
-            }).join(' ');
-          }
-        } else {
-          labelText = '0 renders/s';
+        // Pro-Setter-Calls/s
+        var setters = window.__twSetterCalls || {};
+        var perSetter = {};
+        Object.keys(setters).forEach(function(name) {
+          var prev = lastSetterCalls[name] || 0;
+          var deltaPerSec = (setters[name] - prev) / dtSec;
+          perSetter[name] = Math.round(deltaPerSec * 10) / 10;
+          lastSetterCalls[name] = setters[name];
+        });
+        var sortedS = Object.keys(perSetter)
+          .map(function(n) { return {name: n, rate: perSetter[n]}; })
+          .filter(function(s) { return s.rate > 0; })
+          .sort(function(a, b) { return b.rate - a.rate; });
+
+        lastRenderTime = now;
+
+        // ─── Anzeige bauen ───
+        // Untere Zeile zeigt: Top-Renderer + Top-Setter
+        // Format Komponenten: "App:14k Raum:0"
+        // Format Setter: "→ setPage:13k"
+        var compLine = sortedC.slice(0, 2).map(function(s) {
+          var short = s.name.substring(0, 4);
+          var rate = s.rate >= 1000 ? Math.round(s.rate/1000) + 'k' : s.rate.toString();
+          return short + ':' + rate;
+        }).join(' ');
+
+        var setterLine = '';
+        if (sortedS.length > 0) {
+          var topS = sortedS[0];
+          var rate = topS.rate >= 1000 ? Math.round(topS.rate/1000) + 'k' : topS.rate.toString();
+          setterLine = '→ ' + topS.name + ':' + rate;
         }
-        if (badgeLabel) badgeLabel.textContent = labelText;
+
+        if (badgeLabel) {
+          badgeLabel.innerHTML = '<div style="font-size:9px;line-height:1.3">' + compLine + '</div>' +
+                                 (setterLine ? '<div style="font-size:9px;line-height:1.3;color:#fbbf24">' + setterLine + '</div>' : '');
+        }
 
         if (!hasMemoryAPI) {
           badgeValue.textContent = 'n/a';
@@ -396,15 +406,15 @@
         badge.style.color = fg;
 
         // Tooltip mit allen Details
-        var detail = sorted.map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n');
+        var compDetail = sortedC.map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n');
+        var setterDetail = sortedS.slice(0, 5).map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n') || '(keine)';
         badge.title = 'JS-Heap: ' + mb + ' MB von ' + limitMb + ' MB Limit\n' +
                       'Allokationsrate: ' + (rate >= 0 ? '+' : '') + rateRounded + ' MB/s\n' +
-                      'App-Renders gesamt: ' + currentRenders + '\n' +
-                      '─── Renders pro Sekunde ───\n' + detail + '\n' +
-                      'Klick fuer Debug-Panel';
+                      '─── Komponenten-Renders/s ───\n' + compDetail + '\n' +
+                      '─── Top-Setter-Calls/s ───\n' + setterDetail;
       }
       updateMemoryBadge();
-      setInterval(updateMemoryBadge, 2000);
+      setInterval(updateMemoryBadge, 1000);  // schneller fuer Live-Diagnose
 
       // ─── Flag-Status-Indicator ───
       var flagStatus = document.getElementById('tw-flag-status');
@@ -425,7 +435,7 @@
       var panel = document.getElementById('tw-debug-panel');
       var flagList = document.getElementById('tw-debug-flag-list');
       var buildInfo = document.getElementById('tw-debug-buildinfo');
-      buildInfo.textContent = 'Build: 20260425-080753';
+      buildInfo.textContent = 'Build: 20260425-082352';
 
       function readFlags() {
         try { return JSON.parse(localStorage.getItem('twDebugFlags') || '{}'); } catch(_) { return {}; }
@@ -483,12 +493,12 @@
 
     // Build-Version in die Console — damit man auf dem Tablet in den DevTools
     // sofort sieht, ob man die neueste Version hat oder eine gecachte.
-    console.log('%c[TW Build] Version: 20260425-080753', 'color:#1E88E5;font-weight:bold');
+    console.log('%c[TW Build] Version: 20260425-082352', 'color:#1E88E5;font-weight:bold');
     </script>
 
 
     <script type="text/javascript">
-function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}window.__twSentinel={startedAt:Date.now(),built:"20260425-080753",completedModules:[]};window.__twSentinel.lastModule="tw-shared-components.jsx";const{useState,useEffect,useCallback,useRef}=React;/* ═══════════════════════════════════════════
+function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}window.__twSentinel={startedAt:Date.now(),built:"20260425-082352",completedModules:[]};window.__twSentinel.lastModule="tw-shared-components.jsx";const{useState,useEffect,useCallback,useRef}=React;/* ═══════════════════════════════════════════
            LEICA DISTO – Bluetooth Tastatur-Modus
            DISTO am Geraet auf "Text" oder "Tabelle" stellen,
            dann per Bluetooth mit Handy/Tablet koppeln.
@@ -2125,8 +2135,11 @@ var tick=setInterval(function(){forceTick(function(v){return v+1;});},20000);ret
 // Farbe: gruen < 70 %, gelb 70-89 %, rot ab 90 %.
 // Refreshed sich alle 60 s.
 function StorageIndicator(){const[info,setInfo]=useState(null);const[modalOpen,setModalOpen]=useState(false);const[cleaning,setCleaning]=useState(false);const refreshInfo=React.useCallback(function(){if(!window.TWStorage||!window.TWStorage.getStorageInfo)return;window.TWStorage.getStorageInfo().then(function(x){setInfo(x);}).catch(function(){});},[]);useEffect(function(){refreshInfo();var iv=setInterval(refreshInfo,60000);// alle 60 s
-return function(){clearInterval(iv);};},[refreshInfo]);if(!info)return null;var pct=info.percentUsed||0;var label,bg,tip;if(pct>=90){label='Voll '+Math.round(pct)+'%';bg='linear-gradient(135deg, #e74c3c, #c0392b)';tip='WARNUNG: Lokaler Speicher fast voll ('+info.usageMB+' / '+info.quotaMB+' MB). Klicken zum Aufraeumen.';}else if(pct>=70){label=Math.round(pct)+'%';bg='linear-gradient(135deg, #f39c12, #e67e22)';tip='Lokaler Speicher: '+info.usageMB+' von '+info.quotaMB+' MB ('+Math.round(pct)+'%). Klicken fuer Details.';}else{label=Math.round(pct)+'%';bg='linear-gradient(135deg, #3498db, #2980b9)';tip='Lokaler Speicher: '+info.usageMB+' von '+info.quotaMB+' MB ('+Math.round(pct)+'%). Klicken fuer Details.';}const handleCleanup=function(){if(!window.TWStorage||!window.TWStorage.cleanupUploadedFotosForSpace)return;if(!confirm('Drive-gesicherte Fotos aus dem lokalen Cache entfernen, um Platz zu schaffen?\n\nDie Originale bleiben sicher im Google Drive-Archiv.'))return;setCleaning(true);window.TWStorage.cleanupUploadedFotosForSpace(50*1024*1024).then(function(res){setCleaning(false);refreshInfo();alert('Aufgeraeumt: '+(res.geloescht||0)+' Fotos entfernt, '+Math.round((res.freigabeBytes||0)/1024/1024*10)/10+' MB frei.');}).catch(function(e){setCleaning(false);alert('Cleanup-Fehler: '+e.message);});};return/*#__PURE__*/React.createElement(React.Fragment,null,/*#__PURE__*/React.createElement("div",{title:tip,onClick:function(){setModalOpen(true);refreshInfo();},style:{flex:'0 0 auto',padding:'6px 10px',minWidth:'48px',borderRadius:'var(--radius-sm)',border:'none',background:bg,color:'#fff',fontSize:'11px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.3px',textShadow:'0 1px 2px rgba(0,0,0,0.3)',userSelect:'none',whiteSpace:'nowrap',cursor:'pointer'}},'\uD83D\uDCBE'," ",label),modalOpen&&/*#__PURE__*/React.createElement("div",{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.65)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'},onClick:function(){setModalOpen(false);}},/*#__PURE__*/React.createElement("div",{onClick:function(e){e.stopPropagation();},style:{maxWidth:'380px',width:'100%',background:'var(--bg-primary)',border:'1px solid var(--border-subtle)',borderRadius:'14px',padding:'18px',fontFamily:'Source Sans 3, sans-serif'}},/*#__PURE__*/React.createElement("div",{style:{fontFamily:'Oswald, sans-serif',fontWeight:700,fontSize:'16px',textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-white)',marginBottom:'14px'}},'\uD83D\uDCBE'," Lokaler Speicher"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'13px',lineHeight:1.5,color:'var(--text-primary)',marginBottom:'12px'}},/*#__PURE__*/React.createElement("div",null,"Belegt: ",/*#__PURE__*/React.createElement("strong",null,info.usageMB," MB")),/*#__PURE__*/React.createElement("div",null,"Verfuegbar: ",/*#__PURE__*/React.createElement("strong",null,info.quotaMB," MB")," (",info.quotaGB," GB)"),/*#__PURE__*/React.createElement("div",null,"Auslastung: ",/*#__PURE__*/React.createElement("strong",null,Math.round(pct*10)/10," %"))),/*#__PURE__*/React.createElement("div",{style:{height:'12px',background:'var(--bg-tertiary)',borderRadius:'6px',overflow:'hidden',marginBottom:'14px'}},/*#__PURE__*/React.createElement("div",{style:{height:'100%',width:Math.min(100,pct)+'%',background:bg,transition:'width 0.3s'}})),/*#__PURE__*/React.createElement("div",{style:{fontSize:'11px',color:'var(--text-muted)',marginBottom:'14px',lineHeight:1.5}},"Lokale Fotos werden nach erfolgreichem Drive-Upload als \"gesichert\" markiert. Diese koennen bei Bedarf entfernt werden, um Platz zu schaffen \u2014 die Originale bleiben im Google Drive-Archiv."),/*#__PURE__*/React.createElement("div",{style:{display:'flex',gap:'8px'}},/*#__PURE__*/React.createElement("button",{onClick:handleCleanup,disabled:cleaning,style:{flex:1,padding:'10px',borderRadius:'8px',border:'none',cursor:cleaning?'wait':'pointer',background:cleaning?'#7f8c8d':'linear-gradient(135deg, #1E88E5, #1565C0)',boxShadow:cleaning?'none':'0 3px 10px rgba(30,136,229,0.3)',color:'#fff',fontSize:'12px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}},cleaning?'Raeume auf...':'Aufraeumen'),/*#__PURE__*/React.createElement("button",{onClick:function(){setModalOpen(false);},style:{flex:1,padding:'10px',borderRadius:'8px',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-primary)',fontSize:'12px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px',cursor:'pointer'}},"Schliessen")))));}function App(){// Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
-const[page,setPage]=useState('start');const[driveStatus,setDriveStatus]=useState('offline');const[showAuth,setShowAuth]=useState(false);const[loading,setLoading]=useState(false);const[selectedKunde,setSelectedKunde]=useState(null);const[selectedRaum,setSelectedRaum]=useState(null);const[selectedPositions,setSelectedPositions]=useState([]);const[fertigeRaeume,setFertigeRaeume]=useState([]);const[lastRaumData,setLastRaumData]=useState(null);const[gesamtliste,setGesamtliste]=useState([]);const[showGesamtliste,setShowGesamtliste]=useState(false);const[aufmassGespeichert,setAufmassGespeichert]=useState(false);const[rechnungsVorwahl,setRechnungsVorwahl]=useState(null);const[history,setHistory]=useState(['start']);const[historyIdx,setHistoryIdx]=useState(0);// ── Google Drive State ──
+return function(){clearInterval(iv);};},[refreshInfo]);if(!info)return null;var pct=info.percentUsed||0;var label,bg,tip;if(pct>=90){label='Voll '+Math.round(pct)+'%';bg='linear-gradient(135deg, #e74c3c, #c0392b)';tip='WARNUNG: Lokaler Speicher fast voll ('+info.usageMB+' / '+info.quotaMB+' MB). Klicken zum Aufraeumen.';}else if(pct>=70){label=Math.round(pct)+'%';bg='linear-gradient(135deg, #f39c12, #e67e22)';tip='Lokaler Speicher: '+info.usageMB+' von '+info.quotaMB+' MB ('+Math.round(pct)+'%). Klicken fuer Details.';}else{label=Math.round(pct)+'%';bg='linear-gradient(135deg, #3498db, #2980b9)';tip='Lokaler Speicher: '+info.usageMB+' von '+info.quotaMB+' MB ('+Math.round(pct)+'%). Klicken fuer Details.';}const handleCleanup=function(){if(!window.TWStorage||!window.TWStorage.cleanupUploadedFotosForSpace)return;if(!confirm('Drive-gesicherte Fotos aus dem lokalen Cache entfernen, um Platz zu schaffen?\n\nDie Originale bleiben sicher im Google Drive-Archiv.'))return;setCleaning(true);window.TWStorage.cleanupUploadedFotosForSpace(50*1024*1024).then(function(res){setCleaning(false);refreshInfo();alert('Aufgeraeumt: '+(res.geloescht||0)+' Fotos entfernt, '+Math.round((res.freigabeBytes||0)/1024/1024*10)/10+' MB frei.');}).catch(function(e){setCleaning(false);alert('Cleanup-Fehler: '+e.message);});};return/*#__PURE__*/React.createElement(React.Fragment,null,/*#__PURE__*/React.createElement("div",{title:tip,onClick:function(){setModalOpen(true);refreshInfo();},style:{flex:'0 0 auto',padding:'6px 10px',minWidth:'48px',borderRadius:'var(--radius-sm)',border:'none',background:bg,color:'#fff',fontSize:'11px',fontWeight:'700',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.3px',textShadow:'0 1px 2px rgba(0,0,0,0.3)',userSelect:'none',whiteSpace:'nowrap',cursor:'pointer'}},'\uD83D\uDCBE'," ",label),modalOpen&&/*#__PURE__*/React.createElement("div",{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.65)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'},onClick:function(){setModalOpen(false);}},/*#__PURE__*/React.createElement("div",{onClick:function(e){e.stopPropagation();},style:{maxWidth:'380px',width:'100%',background:'var(--bg-primary)',border:'1px solid var(--border-subtle)',borderRadius:'14px',padding:'18px',fontFamily:'Source Sans 3, sans-serif'}},/*#__PURE__*/React.createElement("div",{style:{fontFamily:'Oswald, sans-serif',fontWeight:700,fontSize:'16px',textTransform:'uppercase',letterSpacing:'0.5px',color:'var(--text-white)',marginBottom:'14px'}},'\uD83D\uDCBE'," Lokaler Speicher"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'13px',lineHeight:1.5,color:'var(--text-primary)',marginBottom:'12px'}},/*#__PURE__*/React.createElement("div",null,"Belegt: ",/*#__PURE__*/React.createElement("strong",null,info.usageMB," MB")),/*#__PURE__*/React.createElement("div",null,"Verfuegbar: ",/*#__PURE__*/React.createElement("strong",null,info.quotaMB," MB")," (",info.quotaGB," GB)"),/*#__PURE__*/React.createElement("div",null,"Auslastung: ",/*#__PURE__*/React.createElement("strong",null,Math.round(pct*10)/10," %"))),/*#__PURE__*/React.createElement("div",{style:{height:'12px',background:'var(--bg-tertiary)',borderRadius:'6px',overflow:'hidden',marginBottom:'14px'}},/*#__PURE__*/React.createElement("div",{style:{height:'100%',width:Math.min(100,pct)+'%',background:bg,transition:'width 0.3s'}})),/*#__PURE__*/React.createElement("div",{style:{fontSize:'11px',color:'var(--text-muted)',marginBottom:'14px',lineHeight:1.5}},"Lokale Fotos werden nach erfolgreichem Drive-Upload als \"gesichert\" markiert. Diese koennen bei Bedarf entfernt werden, um Platz zu schaffen \u2014 die Originale bleiben im Google Drive-Archiv."),/*#__PURE__*/React.createElement("div",{style:{display:'flex',gap:'8px'}},/*#__PURE__*/React.createElement("button",{onClick:handleCleanup,disabled:cleaning,style:{flex:1,padding:'10px',borderRadius:'8px',border:'none',cursor:cleaning?'wait':'pointer',background:cleaning?'#7f8c8d':'linear-gradient(135deg, #1E88E5, #1565C0)',boxShadow:cleaning?'none':'0 3px 10px rgba(30,136,229,0.3)',color:'#fff',fontSize:'12px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px'}},cleaning?'Raeume auf...':'Aufraeumen'),/*#__PURE__*/React.createElement("button",{onClick:function(){setModalOpen(false);},style:{flex:1,padding:'10px',borderRadius:'8px',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-primary)',fontSize:'12px',fontWeight:700,fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px',cursor:'pointer'}},"Schliessen")))));}function App(){// Diagnose: Setter-Tracker. Wrappt die haeufigsten Setter, zaehlt
+// Aufrufe pro Setter. Memory-Badge zeigt die Top-Setter — damit
+// sehen wir welcher Setter die Render-Schleife dreht.
+const _trackSetter=function(name,setter){return function(v){window.__twSetterCalls=window.__twSetterCalls||{};window.__twSetterCalls[name]=(window.__twSetterCalls[name]||0)+1;return setter(v);};};// Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
+const[page,_setPageRaw]=useState('start');const setPage=_trackSetter('setPage',_setPageRaw);const[driveStatus,setDriveStatus]=useState('offline');const[showAuth,setShowAuth]=useState(false);const[loading,setLoading]=useState(false);const[selectedKunde,_setSelectedKundeRaw]=useState(null);const setSelectedKunde=_trackSetter('setSelectedKunde',_setSelectedKundeRaw);const[selectedRaum,_setSelectedRaumRaw]=useState(null);const setSelectedRaum=_trackSetter('setSelectedRaum',_setSelectedRaumRaw);const[selectedPositions,_setSelectedPositionsRaw]=useState([]);const setSelectedPositions=_trackSetter('setSelectedPositions',_setSelectedPositionsRaw);const[fertigeRaeume,_setFertigeRaeumeRaw]=useState([]);const setFertigeRaeume=_trackSetter('setFertigeRaeume',_setFertigeRaeumeRaw);const[lastRaumData,setLastRaumData]=useState(null);const[gesamtliste,_setGesamtlisteRaw]=useState([]);const setGesamtliste=_trackSetter('setGesamtliste',_setGesamtlisteRaw);const[showGesamtliste,setShowGesamtliste]=useState(false);const[aufmassGespeichert,_setAufmassGespeichertRaw]=useState(false);const setAufmassGespeichert=_trackSetter('setAufmassGespeichert',_setAufmassGespeichertRaw);const[rechnungsVorwahl,setRechnungsVorwahl]=useState(null);const[history,setHistory]=useState(['start']);const[historyIdx,setHistoryIdx]=useState(0);// ── Google Drive State ──
 const[driveKunden,setDriveKunden]=useState([]);const[isDriveMode,setIsDriveMode]=useState(false);const[loadProgress,setLoadProgress]=useState('');const[importResult,setImportResult]=useState(null);const[kundeMode,setKundeMode]=useState('neu');// 'neu' | 'analysiert' | 'manuell'
 const[analyseConfig,setAnalyseConfig]=useState(null);// ── NEU: Verbindungsstatus von Startseite ──
 const[startConnections,setStartConnections]=useState({geminiConnected:false,driveConnected:false});// ── KI-Ordneranalyse State ──

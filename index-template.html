@@ -306,12 +306,12 @@
       var badgeLabel = document.getElementById('tw-memory-badge-label');
       var hasMemoryAPI = !!(window.performance && window.performance.memory);
 
-      // Verlauf der letzten 6 Messungen fuer Allokationsrate
       var memHistory = [];
-      var MEM_HISTORY_MAX = 6;  // 6 x 2s = 12s Fenster
+      var MEM_HISTORY_MAX = 6;
       var lastRenderCount = 0;
       var lastRenderTime = Date.now();
-      var lastCounters = {};   // Snapshot pro-Komponente
+      var lastCounters = {};
+      var lastSetterCalls = {};
 
       function updateMemoryBadge() {
         if (!badge) return;
@@ -320,7 +320,7 @@
         var dtSec = (now - lastRenderTime) / 1000;
         if (dtSec <= 0) dtSec = 0.001;
 
-        // Pro-Komponenten-Renders/s berechnen
+        // Pro-Komponenten-Renders/s
         var counters = window.__twRenderCounters || {};
         var perComponent = {};
         Object.keys(counters).forEach(function(name) {
@@ -329,37 +329,47 @@
           perComponent[name] = Math.round(deltaPerSec * 10) / 10;
           lastCounters[name] = counters[name];
         });
-
-        var currentRenders = window.__twAppRenderCount || 0;
-        var rendersPerSec = (currentRenders - lastRenderCount) / dtSec;
-        rendersPerSec = Math.round(rendersPerSec * 10) / 10;
-        lastRenderCount = currentRenders;
-        lastRenderTime = now;
-
-        // Top-Renderer ermitteln (sortiert)
-        var sorted = Object.keys(perComponent)
+        var sortedC = Object.keys(perComponent)
           .map(function(n) { return {name: n, rate: perComponent[n]}; })
           .sort(function(a, b) { return b.rate - a.rate; });
 
-        // Sub-Label: Wenn ein Spitzenreiter > 5/s ist, den hervorheben.
-        // Sonst die Top 2 als kompakter String.
-        var labelText = '';
-        if (sorted.length > 0) {
-          var top = sorted[0];
-          if (top.rate >= 5) {
-            // ALARM: eine Komponente rendert wahnsinnig oft
-            labelText = '⚠ ' + top.name + ': ' + top.rate + '/s';
-          } else {
-            // Kompakte Anzeige der ersten zwei
-            labelText = sorted.slice(0, 2).map(function(s) {
-              var short = s.name.substring(0, 4);
-              return short + ':' + s.rate;
-            }).join(' ');
-          }
-        } else {
-          labelText = '0 renders/s';
+        // Pro-Setter-Calls/s
+        var setters = window.__twSetterCalls || {};
+        var perSetter = {};
+        Object.keys(setters).forEach(function(name) {
+          var prev = lastSetterCalls[name] || 0;
+          var deltaPerSec = (setters[name] - prev) / dtSec;
+          perSetter[name] = Math.round(deltaPerSec * 10) / 10;
+          lastSetterCalls[name] = setters[name];
+        });
+        var sortedS = Object.keys(perSetter)
+          .map(function(n) { return {name: n, rate: perSetter[n]}; })
+          .filter(function(s) { return s.rate > 0; })
+          .sort(function(a, b) { return b.rate - a.rate; });
+
+        lastRenderTime = now;
+
+        // ─── Anzeige bauen ───
+        // Untere Zeile zeigt: Top-Renderer + Top-Setter
+        // Format Komponenten: "App:14k Raum:0"
+        // Format Setter: "→ setPage:13k"
+        var compLine = sortedC.slice(0, 2).map(function(s) {
+          var short = s.name.substring(0, 4);
+          var rate = s.rate >= 1000 ? Math.round(s.rate/1000) + 'k' : s.rate.toString();
+          return short + ':' + rate;
+        }).join(' ');
+
+        var setterLine = '';
+        if (sortedS.length > 0) {
+          var topS = sortedS[0];
+          var rate = topS.rate >= 1000 ? Math.round(topS.rate/1000) + 'k' : topS.rate.toString();
+          setterLine = '→ ' + topS.name + ':' + rate;
         }
-        if (badgeLabel) badgeLabel.textContent = labelText;
+
+        if (badgeLabel) {
+          badgeLabel.innerHTML = '<div style="font-size:9px;line-height:1.3">' + compLine + '</div>' +
+                                 (setterLine ? '<div style="font-size:9px;line-height:1.3;color:#fbbf24">' + setterLine + '</div>' : '');
+        }
 
         if (!hasMemoryAPI) {
           badgeValue.textContent = 'n/a';
@@ -396,15 +406,15 @@
         badge.style.color = fg;
 
         // Tooltip mit allen Details
-        var detail = sorted.map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n');
+        var compDetail = sortedC.map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n');
+        var setterDetail = sortedS.slice(0, 5).map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n') || '(keine)';
         badge.title = 'JS-Heap: ' + mb + ' MB von ' + limitMb + ' MB Limit\n' +
                       'Allokationsrate: ' + (rate >= 0 ? '+' : '') + rateRounded + ' MB/s\n' +
-                      'App-Renders gesamt: ' + currentRenders + '\n' +
-                      '─── Renders pro Sekunde ───\n' + detail + '\n' +
-                      'Klick fuer Debug-Panel';
+                      '─── Komponenten-Renders/s ───\n' + compDetail + '\n' +
+                      '─── Top-Setter-Calls/s ───\n' + setterDetail;
       }
       updateMemoryBadge();
-      setInterval(updateMemoryBadge, 2000);
+      setInterval(updateMemoryBadge, 1000);  // schneller fuer Live-Diagnose
 
       // ─── Flag-Status-Indicator ───
       var flagStatus = document.getElementById('tw-flag-status');
