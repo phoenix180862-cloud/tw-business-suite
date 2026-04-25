@@ -189,6 +189,11 @@
         function App() {
             // Pages: 'start' | 'kundenModus' | 'auswahl' | 'akte' | 'geladen' | 'datenUebersicht' | 'modulwahl' | 'manuellEingabe' | 'raumerkennung' | 'raumblatt' | 'rechnung' | 'ausgangsbuch' | 'schriftverkehr' | 'baustelle' | 'ordnerAnalyse' | 'ordnerAnalyseDetail' | 'ordnerBrowser' | 'lokalKundenListe' | 'lokalOrdnerBrowser'
             const [page, setPage] = useState('start');
+            // HOTFIX 25.04.2026: Wenn das Pos-Auswahl-Modal in tw-aufmass.jsx offen ist, kann
+            // es JSX-Elemente in die globale App-Toolbar einspeisen (ueber window.__twSetPosModalToolbar).
+            // So ist alles in EINER Leiste, die Dropdowns AUFMASS/BEARBEITEN bleiben frei.
+            const [posModalToolbar, setPosModalToolbar] = useState(null);
+            useEffect(function(){ window.__twSetPosModalToolbar = setPosModalToolbar; }, []);
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
             const [loading, setLoading] = useState(false);
@@ -2895,6 +2900,15 @@
                                     );
                                 })()}
                             </div>
+                            {/* HOTFIX 25.04.2026: Mittlerer Bereich fuer kontextabhaengige Aktionen.
+                                Aktuell: Aktions-Buttons aus dem Pos-Auswahl-Modal (tw-aufmass.jsx),
+                                wenn dieses offen ist. So gibt es nur EINE Toolbar, und die Dropdowns
+                                AUFMASS/BEARBEITEN klappen ohne Ueberlagerung auf. */}
+                            {posModalToolbar && (
+                                <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap'}}>
+                                    {posModalToolbar}
+                                </div>
+                            )}
                             {/* Rechte Gruppe: AutoSave + FotoSync + Speicher + Memory-Badge - kompakt in der Ecke */}
                             {/* Memory-Badge (Etappe B, 25.04.2026): zeigt Queue-Status und oeffnet bei Klick das Storage-Health-Dashboard */}
                             <div style={{display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto'}}>

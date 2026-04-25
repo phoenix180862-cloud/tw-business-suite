@@ -2526,7 +2526,14 @@
 
         .pos-modal-overlay {
             position: fixed;
-            top: 100px;
+            /* HOTFIX 25.04.2026: top von 100px auf 160px erhoeht.
+               Die globale App-Toolbar ist position:sticky top:60px mit flexWrap:wrap.
+               Bei vielen Buttons (Zurueck/Vor/Aufmass-Dropdown/Bearbeiten-Dropdown)
+               bricht sie auf zwei Zeilen um und wird ~150px hoch. Das Modal-Overlay
+               bei top:100px hat dann die untere Toolbar-Zeile mit den Dropdowns
+               ueberlagert -> Dropdowns liessen sich nicht mehr aufklappen.
+               160px gibt der Toolbar Luft plus etwas Puffer fuer die Dropdown-Klappe. */
+            top: 160px;
             left: 0;
             right: 0;
             bottom: 0;

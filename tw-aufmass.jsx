@@ -4070,6 +4070,113 @@
                 handleWeiterZumRaumblatt, handleManualSubmit
             };
 
+            // HOTFIX 25.04.2026: Wenn das Pos-Auswahl-Modal offen ist, speisen wir die
+            // Aktions-Buttons (Speichern/Laden/Beginn/Direkt/Abbrechen) plus Status-Pillen
+            // (Raum, Pos-Anzahl) in die GLOBALE App-Toolbar ein, statt eine eigene Toolbar
+            // im Modal zu rendern. Damit gibt es nur eine Leiste, AUFMASS/BEARBEITEN-Dropdowns
+            // bleiben frei, und die Positionsliste hat maximalen Platz.
+            useEffect(function() {
+                var setter = window.__twSetPosModalToolbar;
+                if (typeof setter !== 'function') return;
+                if (!(showPosModal && activeRaum)) {
+                    setter(null);
+                    return;
+                }
+                var raumLabel = (activeRaum.bez || 'Raum') + (activeRaum.nr ? ' (' + activeRaum.nr + ')' : '');
+                setter(<React.Fragment>
+                    <ToolbarButton
+                        icon={'\uD83D\uDCBE'}
+                        label="Speichern"
+                        color="red"
+                        disabled={!selectedPositions || selectedPositions.length === 0}
+                        title={(!selectedPositions || selectedPositions.length === 0) ? 'Erst Positionen auswaehlen' : 'Aktuelle Auswahl als wiederverwendbare Liste speichern'}
+                        onClick={function() {
+                            var rk = activeRaum.nr || activeRaum.id;
+                            if (rk) setSaveListRaumIds({[rk]: true});
+                            setShowSaveListe(true);
+                        }}
+                    />
+                    <ToolbarButton
+                        icon={'\uD83D\uDCC2'}
+                        label="Laden"
+                        color="red"
+                        title="Gespeicherte Positionsliste laden"
+                        onClick={function() { setShowLoadListe(true); }}
+                    />
+                    <ToolbarButton
+                        icon={!lastRaumData ? '\uD83C\uDFD7\uFE0F' : '\uD83D\uDCCB'}
+                        label={!lastRaumData ? 'Beginn des Aufmasses' : 'Positionen Raumblatt'}
+                        color="orange"
+                        disabled={selectedPositions.length === 0}
+                        title={
+                            selectedPositions.length === 0
+                                ? 'Erst Positionen auswaehlen'
+                                : (!lastRaumData
+                                    ? selectedPositions.length + ' Position(en), Raumblatt oeffnen'
+                                    : selectedPositions.length + ' Position(en), Raumblatt oeffnen (Einstellungen vom Vorraum uebernommen)')
+                        }
+                        onClick={handleWeiterZumRaumblatt}
+                    />
+                    <ToolbarButton
+                        icon={'\uD83D\uDCD0'}
+                        label="Direktes Aufmass"
+                        color="blue"
+                        title={activeRaum
+                            ? ('Raum ' + (activeRaum.bez || activeRaum.nr || '') + ' uebernehmen, ohne Positionsauswahl')
+                            : 'Ohne Raumauswahl und Positionsauswahl direkt ins Raumblatt'}
+                        onClick={function() {
+                            if (activeRaum) {
+                                var raumUebernehmen = activeRaum;
+                                setShowPosModal(false);
+                                setActiveRaum(null);
+                                onSelectRaum(raumUebernehmen, []);
+                                return;
+                            }
+                            var direktRaum = {
+                                nr: '',
+                                geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
+                                bez: '',
+                                quelle: 'Direkt',
+                                waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
+                                abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
+                                sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
+                                fliesenUmlaufend: true,
+                                abdichtungUmlaufend: true,
+                                manuell: true,
+                            };
+                            setShowPosModal(false);
+                            setActiveRaum(null);
+                            onSelectRaum(direktRaum, []);
+                        }}
+                    />
+                    <StatusPill
+                        text={raumLabel}
+                        color="info"
+                        title={'Aktiver Raum: ' + raumLabel}
+                    />
+                    <StatusPill
+                        text={selectedPositions.length + ' POS.'}
+                        color={selectedPositions.length > 0 ? 'success' : 'muted'}
+                        title={selectedPositions.length + ' Positionen ausgewaehlt'}
+                    />
+                    <ToolbarButton
+                        icon={'\u2715'}
+                        label="Abbrechen"
+                        color="red"
+                        title="Modal schliessen, ohne Aenderungen zu uebernehmen"
+                        onClick={function() { setShowPosModal(false); setActiveRaum(null); }}
+                    />
+                </React.Fragment>);
+                return function() {
+                    if (typeof window.__twSetPosModalToolbar === 'function') {
+                        window.__twSetPosModalToolbar(null);
+                    }
+                };
+            });
+
             return (
                 <div className="page-container">
                     <div className="breadcrumb">
@@ -4644,110 +4751,12 @@
                     {/* ═══ POSITIONSAUSWAHL MODAL ═══ */}
                     {showPosModal && activeRaum && (
                         <div className="pos-modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setShowPosModal(false); setActiveRaum(null); } }}>
-                            {/* HOTFIX 25.04.2026 (Bild 16:38 Uhr + Folgemandat):
-                                Frueher: Roter pos-modal-header-Balken oben PLUS dicker Footer-
-                                Block unten mit drei Querbalken-Buttons (Beginn/Direkt/Abbrechen).
-                                Beides verbrauchte zusammen ~230 px vertikal.
-                                Jetzt: ALLES in einer einzigen kompakten Toolbar-Zeile oben.
-                                Speichern, Laden, Beginn, Direkt-Start als Buttons links;
-                                Raum-Pille, Pos-Pille, Abbrechen rechts. Maximaler Platz fuer
-                                die Positionsliste, alle Aktionen mit einem Blick erfassbar. */}
-                            <ToolbarRow
-                                sticky={false}
-                                left={
-                                    <React.Fragment>
-                                        <ToolbarButton
-                                            icon={'\uD83D\uDCBE'}
-                                            label="Speichern"
-                                            color="red"
-                                            disabled={!selectedPositions || selectedPositions.length === 0}
-                                            title={(!selectedPositions || selectedPositions.length === 0) ? 'Erst Positionen auswaehlen' : 'Aktuelle Auswahl als wiederverwendbare Liste speichern'}
-                                            onClick={() => {
-                                                var rk = activeRaum.nr || activeRaum.id;
-                                                if (rk) setSaveListRaumIds({[rk]: true});
-                                                setShowSaveListe(true);
-                                            }}
-                                        />
-                                        <ToolbarButton
-                                            icon={'\uD83D\uDCC2'}
-                                            label="Laden"
-                                            color="red"
-                                            title="Gespeicherte Positionsliste laden"
-                                            onClick={() => setShowLoadListe(true)}
-                                        />
-                                        <ToolbarButton
-                                            icon={!lastRaumData ? '\uD83C\uDFD7\uFE0F' : '\uD83D\uDCCB'}
-                                            label={!lastRaumData ? 'Beginn' : 'Raumblatt'}
-                                            color="orange"
-                                            disabled={selectedPositions.length === 0}
-                                            title={
-                                                selectedPositions.length === 0
-                                                    ? 'Erst Positionen auswaehlen'
-                                                    : (!lastRaumData
-                                                        ? selectedPositions.length + ' Position(en), Raumblatt oeffnen'
-                                                        : selectedPositions.length + ' Position(en), Raumblatt oeffnen (Einstellungen vom Vorraum uebernommen)')
-                                            }
-                                            onClick={handleWeiterZumRaumblatt}
-                                        />
-                                        <ToolbarButton
-                                            icon={'\uD83D\uDCD0'}
-                                            label="Direkt"
-                                            color="blue"
-                                            title={activeRaum
-                                                ? ('Raum ' + (activeRaum.bez || activeRaum.nr || '') + ' uebernehmen, ohne Positionsauswahl')
-                                                : 'Ohne Raumauswahl und Positionsauswahl direkt ins Raumblatt'}
-                                            onClick={function() {
-                                                if (activeRaum) {
-                                                    var raumUebernehmen = activeRaum;
-                                                    setShowPosModal(false);
-                                                    setActiveRaum(null);
-                                                    onSelectRaum(raumUebernehmen, []);
-                                                    return;
-                                                }
-                                                var direktRaum = {
-                                                    nr: '',
-                                                    geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
-                                                    bez: '',
-                                                    quelle: 'Direkt',
-                                                    waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
-                                                    hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
-                                                    fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
-                                                    raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
-                                                    abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
-                                                    sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
-                                                    fliesenUmlaufend: true,
-                                                    abdichtungUmlaufend: true,
-                                                    manuell: true,
-                                                };
-                                                setShowPosModal(false);
-                                                setActiveRaum(null);
-                                                onSelectRaum(direktRaum, []);
-                                            }}
-                                        />
-                                    </React.Fragment>
-                                }
-                                right={
-                                    <React.Fragment>
-                                        <StatusPill
-                                            text={(activeRaum.bez || 'Raum') + (activeRaum.nr ? ' (' + activeRaum.nr + ')' : '')}
-                                            color="info"
-                                            title={'Aktiver Raum: ' + (activeRaum.bez || '') + (activeRaum.nr ? ' (' + activeRaum.nr + ')' : '')}
-                                        />
-                                        <StatusPill
-                                            text={selectedPositions.length + ' POS.'}
-                                            color={selectedPositions.length > 0 ? 'success' : 'muted'}
-                                            title={selectedPositions.length + ' Positionen ausgew\u00e4hlt'}
-                                        />
-                                        <ToolbarButton
-                                            icon={'\u2715'}
-                                            label="Abbrechen"
-                                            color="red"
-                                            title="Modal schliessen, ohne Aenderungen zu uebernehmen"
-                                            onClick={function() { setShowPosModal(false); setActiveRaum(null); }}
-                                        />
-                                    </React.Fragment>
-                                }
-                            />
+                            {/* HOTFIX 25.04.2026 (alles in EINE Leiste):
+                                Pos-Modal hat KEINE eigene Toolbar mehr. Die Aktions-Buttons
+                                (Speichern/Laden/Beginn/Direkt/Abbrechen) plus Status-Pillen
+                                (Raum, Pos-Anzahl) werden via useEffect in die globale App-Toolbar
+                                eingespeist (siehe useEffect weiter oben in dieser Komponente).
+                                Damit gibt es nur EINE Toolbar, AUFMASS/BEARBEITEN-Dropdowns frei. */}
 
                             <div className="pos-modal-body">
                                 {/* Empfohlene Positionen */}
