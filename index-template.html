@@ -249,7 +249,7 @@
          font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
          font-weight:bold;border:1px solid rgba(255,255,255,0.12);
          box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;
-         min-width:100px;text-align:center;user-select:none;
+         min-width:140px;text-align:center;user-select:none;
          transition:opacity 0.15s">
       <div id="tw-memory-badge-value" style="font-size:13px">– MB</div>
       <div id="tw-memory-badge-label" style="font-size:9px;opacity:0.6;margin-top:1px">RAM</div>
@@ -311,23 +311,60 @@
       var MEM_HISTORY_MAX = 6;  // 6 x 2s = 12s Fenster
       var lastRenderCount = 0;
       var lastRenderTime = Date.now();
+      var lastCounters = {};   // Snapshot pro-Komponente
 
       function updateMemoryBadge() {
         if (!badge) return;
 
-        // Render-Counter (App rendert haeufig? = Render-Schleife)
         var now = Date.now();
-        var currentRenders = window.__twAppRenderCount || 0;
         var dtSec = (now - lastRenderTime) / 1000;
-        var rendersPerSec = dtSec > 0 ? Math.round(((currentRenders - lastRenderCount) / dtSec) * 10) / 10 : 0;
+        if (dtSec <= 0) dtSec = 0.001;
+
+        // Pro-Komponenten-Renders/s berechnen
+        var counters = window.__twRenderCounters || {};
+        var perComponent = {};
+        Object.keys(counters).forEach(function(name) {
+          var prev = lastCounters[name] || 0;
+          var deltaPerSec = (counters[name] - prev) / dtSec;
+          perComponent[name] = Math.round(deltaPerSec * 10) / 10;
+          lastCounters[name] = counters[name];
+        });
+
+        var currentRenders = window.__twAppRenderCount || 0;
+        var rendersPerSec = (currentRenders - lastRenderCount) / dtSec;
+        rendersPerSec = Math.round(rendersPerSec * 10) / 10;
         lastRenderCount = currentRenders;
         lastRenderTime = now;
+
+        // Top-Renderer ermitteln (sortiert)
+        var sorted = Object.keys(perComponent)
+          .map(function(n) { return {name: n, rate: perComponent[n]}; })
+          .sort(function(a, b) { return b.rate - a.rate; });
+
+        // Sub-Label: Wenn ein Spitzenreiter > 5/s ist, den hervorheben.
+        // Sonst die Top 2 als kompakter String.
+        var labelText = '';
+        if (sorted.length > 0) {
+          var top = sorted[0];
+          if (top.rate >= 5) {
+            // ALARM: eine Komponente rendert wahnsinnig oft
+            labelText = '⚠ ' + top.name + ': ' + top.rate + '/s';
+          } else {
+            // Kompakte Anzeige der ersten zwei
+            labelText = sorted.slice(0, 2).map(function(s) {
+              var short = s.name.substring(0, 4);
+              return short + ':' + s.rate;
+            }).join(' ');
+          }
+        } else {
+          labelText = '0 renders/s';
+        }
+        if (badgeLabel) badgeLabel.textContent = labelText;
 
         if (!hasMemoryAPI) {
           badgeValue.textContent = 'n/a';
           badge.style.background = 'rgba(60,60,60,0.92)';
           badge.title = 'performance.memory nur in Chrome verfuegbar';
-          if (badgeLabel) badgeLabel.textContent = rendersPerSec + ' r/s';
           return;
         }
         var mb = Math.round(window.performance.memory.usedJSHeapSize / 1048576);
@@ -335,7 +372,6 @@
         memHistory.push({mb: mb, t: now});
         if (memHistory.length > MEM_HISTORY_MAX) memHistory.shift();
 
-        // Allokationsrate ueber das gesamte Fenster (MB pro Sekunde)
         var rate = 0;
         if (memHistory.length >= 2) {
           var first = memHistory[0];
@@ -344,20 +380,12 @@
           if (dt > 0) rate = (last.mb - first.mb) / dt;
         }
 
-        // Hauptanzeige: aktuelle MB, dazu kleiner Pfeil mit Rate wenn klar steigend/fallend
         var rateRounded = Math.round(rate * 10) / 10;
         var rateLabel = '';
         if (rate >= 1)        rateLabel = ' ↑' + rateRounded.toFixed(1);
         else if (rate <= -1)  rateLabel = ' ↓' + Math.abs(rateRounded).toFixed(1);
         badgeValue.textContent = mb + ' MB' + rateLabel;
 
-        // Sub-Label zeigt Render-Frequenz
-        if (badgeLabel) {
-          badgeLabel.textContent = rendersPerSec + ' renders/s';
-        }
-
-        // Farbcode: gruen < 150, orange 150-250, rot > 250
-        // ZUSAETZLICH: Bei Wachstum > 5 MB/s sofort orange (Frueh-Warnung)
         var bg, fg;
         if (rate > 5 && mb > 80)        { bg = 'rgba(230,126,34,0.92)'; fg = '#fff'; }
         else if (rate > 15)             { bg = 'rgba(218,54,51,0.95)';  fg = '#fff'; }
@@ -366,9 +394,13 @@
         else                            { bg = 'rgba(218,54,51,0.95)';  fg = '#fff'; }
         badge.style.background = bg;
         badge.style.color = fg;
+
+        // Tooltip mit allen Details
+        var detail = sorted.map(function(s) { return s.name + ': ' + s.rate + '/s'; }).join('\n');
         badge.title = 'JS-Heap: ' + mb + ' MB von ' + limitMb + ' MB Limit\n' +
                       'Allokationsrate: ' + (rate >= 0 ? '+' : '') + rateRounded + ' MB/s\n' +
-                      'App-Renders: ' + rendersPerSec + '/s (gesamt: ' + currentRenders + ')\n' +
+                      'App-Renders gesamt: ' + currentRenders + '\n' +
+                      '─── Renders pro Sekunde ───\n' + detail + '\n' +
                       'Klick fuer Debug-Panel';
       }
       updateMemoryBadge();

@@ -2733,11 +2733,14 @@
                 }
             };
 
-            // ── Diagnose: App-Render-Counter (Memory-Badge liest das aus) ──
-            // Pro Render: globaler Counter +1. Damit kann das Memory-Badge die
-            // Render-Frequenz anzeigen — ein hoher Wert (>5/s) signalisiert eine
-            // Re-Render-Schleife.
+            // ── Diagnose: Render-Counter pro Komponente ──
+            // Pro Render: globaler Counter +1. Memory-Badge liest aus.
+            // Plus: Pro-Komponenten-Tracker damit wir sehen welche Komponente
+            // in der Render-Schleife steckt (App rendert vielleicht nur 1x,
+            // aber Raumblatt 60x — das war bisher unsichtbar).
             window.__twAppRenderCount = (window.__twAppRenderCount || 0) + 1;
+            window.__twRenderCounters = window.__twRenderCounters || {};
+            window.__twRenderCounters.App = (window.__twRenderCounters.App || 0) + 1;
 
             // ── State-Ref fuer den globalen Enter-Handler synchron halten ──
             globalEnterStateRef.current = {

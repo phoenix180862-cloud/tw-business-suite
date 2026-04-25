@@ -3518,6 +3518,10 @@
            RAUMERKENNUNG COMPONENT (mit Positionsauswahl)
            ═══════════════════════════════════════════ */
         function Raumerkennung({ kunde, onSelectRaum, fertigeRaeume, lastRaumData, gesamtliste, onShowGesamtliste }) {
+            // Diagnose: Render-Counter
+            window.__twRenderCounters = window.__twRenderCounters || {};
+            window.__twRenderCounters.Raumerkennung = (window.__twRenderCounters.Raumerkennung || 0) + 1;
+
             const [showManual, setShowManual] = useState(false);
             const [manualNr, setManualNr] = useState('');
             const [manualGeschoss, setManualGeschoss] = useState('');
@@ -5172,6 +5176,10 @@
            RAUMBLATT COMPONENT (mit Positions-Karten)
            ═══════════════════════════════════════════ */
         function Raumblatt({ kunde, raum, onFinishRaum, onBack, selectedPositions: initPositions, lastRaumData, gesamtliste, onShowGesamtliste, onAufmassBeenden }) {
+            // Diagnose: Render-Counter
+            window.__twRenderCounters = window.__twRenderCounters || {};
+            window.__twRenderCounters.Raumblatt = (window.__twRenderCounters.Raumblatt || 0) + 1;
+
             const hasData = raum && !raum.manuell && raum.waende && raum.waende.length > 0;
             const reEdit = (raum && raum.reEditState) || null;
 
