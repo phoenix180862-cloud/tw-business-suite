@@ -641,10 +641,10 @@
                                     onTouchEnd={function(e){ if(!m.disabled){ e.preventDefault(); onSelectModus(m.id); } }}
                                     onClick={function(){ if(!m.disabled) onSelectModus(m.id); }}
                                     style={{
-                                        width:'100%', padding:'20px', borderRadius:'var(--radius-lg)', border:'1px solid ' + (m.disabled ? 'var(--border-color)' : 'transparent'),
+                                        width:'100%', padding:'12px 14px', borderRadius:'var(--radius-lg)', border:'1px solid ' + (m.disabled ? 'var(--border-color)' : 'transparent'),
                                         cursor: m.disabled ? 'not-allowed' : 'pointer',
                                         background: m.disabled ? 'var(--bg-secondary)' : m.gradient, color: m.disabled ? 'var(--text-muted)' : '#fff',
-                                        display:'flex', alignItems:'flex-start', gap:'16px', textAlign:'left',
+                                        display:'flex', alignItems:'flex-start', gap:'10px', textAlign:'left',
                                         boxShadow: m.disabled ? 'none' : '0 6px 20px ' + m.shadow,
                                         opacity: m.disabled ? 0.4 : 1,
                                         transition:'all 0.25s ease',
@@ -657,17 +657,17 @@
                                             {m.badge}
                                         </div>
                                     )}
-                                    <span style={{fontSize:'32px', marginTop:'2px'}}>{m.icon}</span>
+                                    <span style={{fontSize:'26px', marginTop:'2px'}}>{m.icon}</span>
                                     <div style={{flex:1}}>
-                                        <div style={{fontSize:'16px', fontWeight:'600', marginBottom:'4px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>{m.title}</div>
-                                        <div style={{fontSize:'12px', opacity: m.disabled ? 0.7 : 0.9, lineHeight:'1.5', fontFamily:'Source Sans 3, sans-serif'}}>{m.desc}</div>
+                                        <div style={{fontSize:'14px', fontWeight:'600', marginBottom:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>{m.title}</div>
+                                        <div style={{fontSize:'11px', opacity: m.disabled ? 0.7 : 0.9, lineHeight:'1.5', fontFamily:'Source Sans 3, sans-serif'}}>{m.desc}</div>
                                         {m.disabled && m.disabledHint && (
                                             <div style={{fontSize:'10px', marginTop:'6px', padding:'3px 8px', background:'rgba(30,136,229,0.12)', borderRadius:'var(--radius-sm)', display:'inline-block', color:'#1E88E5', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
                                                 {'\u26A0'} {m.disabledHint}
                                             </div>
                                         )}
                                     </div>
-                                    {!m.disabled && <span style={{fontSize:'20px', opacity:0.7, marginTop:'4px'}}>{'\u2192'}</span>}
+                                    {!m.disabled && <span style={{fontSize:'16px', opacity:0.7, marginTop:'2px'}}>{'\u2192'}</span>}
                                 </button>
                             );
                         })}
@@ -679,9 +679,9 @@
                             onTouchEnd={function(e){ e.preventDefault(); onBack(); }}
                             onClick={onBack}
                             style={{
-                                padding:'12px 32px', borderRadius:'var(--radius-md)', border:'none',
+                                padding:'10px 24px', borderRadius:'var(--radius-md)', border:'none',
                                 background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', cursor:'pointer',
-                                fontSize:'14px', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px',
+                                fontSize:'13px', fontWeight:'600', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px',
                                 boxShadow:'0 4px 15px rgba(196, 30, 30, 0.3)',
                                 transition:'all 0.25s ease',
                         }}>
@@ -9825,23 +9825,24 @@
                         <MicButton fieldKey="rb_raumName" size="small" onResult={function(t){ setRaumName((raumName||'') + (raumName?' ':'') + t); }} />
                     </div>
 
-                    {/* Material-Info */}
+                    {/* PHASE-2-SPRINT-B (Skill 2.2 + Konsolidierung):
+                        Vorher 1: Material-Banner als 100%-Querbalken (Skill 2.2 Verbot).
+                        Vorher 2: Eine LEERE Sticky-Wrapper-Box (Etappe-8-Geist) verbrauchte
+                                  vertikalen Platz und einen Trennstrich, ohne Inhalt.
+                        Nachher: Eine schlanke ToolbarRow mit StatusPill nur wenn Material
+                                 vorliegt, sonst gar nichts. */}
                     {(raum && raum.material) && (
-                        <div className="raumerkennung-info" style={{background:'rgba(230,126,34,0.06)', borderColor:'rgba(230,126,34,0.2)', color:'var(--accent-orange)', marginBottom:'12px'}}>
-                            <span style={{fontSize:'16px'}}>🧱</span>
-                            <span>{raum.material}</span>
-                        </div>
+                        <ToolbarRow
+                            sticky={false}
+                            right={
+                                <StatusPill
+                                    text={raum.material}
+                                    color="warn"
+                                    title={'Material laut Raumerkennung: ' + raum.material}
+                                />
+                            }
+                        />
                     )}
-
-                    {/* ═══ STICKY WRAPPER fuer beide Leisten ═══ */}
-                    <div style={{position:'sticky', top:'95px', zIndex:98, background:'var(--bg-primary)', paddingBottom:'4px', borderBottom:'1px solid var(--border-subtle)'}}>
-
-                    {/* ═══ ETAPPE 8: Die beiden frueheren Leisten (rote Aktionen + blaue Tabs)
-                        wurden in die globale ActionsBar verschoben:
-                        - Bearbeiten-Dropdown enthaelt Sub-Menues "Aktionen" und "Tabs"
-                        - Primaer-Aktion "Raumblatt berechnen" ist der gruene Button rechts.
-                        Die sticky Wrapper-Box bleibt fuer die darunter liegenden Inhalte leer sichtbar. ═══ */}
-                    </div>{/* Ende Sticky Wrapper */}
 
                     {/* Save-Status Toast */}
                     {saveStatus !== 'idle' && (

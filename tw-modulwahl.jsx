@@ -7,7 +7,7 @@
                 { id: 'baustelle', name: 'Baustellen-App', desc: 'Admin-Panel f\u00fcr Mitarbeiter', gradient: 'linear-gradient(135deg, #1E88E5, #1565C0)', shadow: 'rgba(30,136,229,0.30)', ready: true },
             ];
             var renderIcon = function(id) {
-                var s = {width:'32px',height:'32px',flexShrink:0};
+                var s = {width:'26px',height:'26px',flexShrink:0};
                 if (id === 'aufmass') return React.createElement('svg',Object.assign({viewBox:'0 0 32 32',fill:'none',xmlns:'http://www.w3.org/2000/svg'},s),
                     React.createElement('rect',{x:'4',y:'4',width:'24',height:'24',rx:'3',stroke:'white',strokeWidth:'2',fill:'none'}),
                     React.createElement('line',{x1:'4',y1:'16',x2:'28',y2:'16',stroke:'white',strokeWidth:'1.5',strokeDasharray:'3 2'}),
@@ -66,7 +66,7 @@
                                 <button key={m.id} onClick={function() { if (m.ready) onSelectModul(m.id); }}
                                     style={{
                                         width:'100%',
-                                        padding:'18px 16px',
+                                        padding:'12px 14px',
                                         borderRadius:'var(--radius-lg)',
                                         border:'1px solid transparent',
                                         cursor: m.ready ? 'pointer' : 'not-allowed',
@@ -75,7 +75,7 @@
                                         opacity: m.ready ? 1 : 0.4,
                                         display:'flex',
                                         alignItems:'center',
-                                        gap:'14px',
+                                        gap:'10px',
                                         textAlign:'left',
                                         boxShadow: m.ready ? ('0 6px 20px ' + m.shadow) : 'none',
                                         transition:'all 0.25s ease',
@@ -85,14 +85,14 @@
                                     }}>
                                     {renderIcon(m.id)}
                                     <div style={{flex:1}}>
-                                        <div style={{fontSize:'16px', fontWeight:'600', marginBottom:'3px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        <div style={{fontSize:'14px', fontWeight:'600', marginBottom:'2px', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
                                             {m.name}
                                         </div>
-                                        <div style={{fontSize:'12px', opacity:0.85, lineHeight:'1.4', fontFamily:'Source Sans 3, sans-serif'}}>
+                                        <div style={{fontSize:'11px', opacity:0.85, lineHeight:'1.4', fontFamily:'Source Sans 3, sans-serif'}}>
                                             {m.desc}
                                         </div>
                                     </div>
-                                    <span style={{fontSize:'20px', opacity:0.7}}>{'\u2192'}</span>
+                                    <span style={{fontSize:'16px', opacity:0.7}}>{'\u2192'}</span>
                                 </button>
                             );
                         })}
