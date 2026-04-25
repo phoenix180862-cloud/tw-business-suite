@@ -249,7 +249,7 @@
          font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
          font-weight:bold;border:1px solid rgba(255,255,255,0.12);
          box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;
-         min-width:78px;text-align:center;user-select:none;
+         min-width:100px;text-align:center;user-select:none;
          transition:opacity 0.15s">
       <div id="tw-memory-badge-value" style="font-size:13px">– MB</div>
       <div id="tw-memory-badge-label" style="font-size:9px;opacity:0.6;margin-top:1px">RAM</div>
@@ -305,6 +305,10 @@
       var badgeValue = document.getElementById('tw-memory-badge-value');
       var hasMemoryAPI = !!(window.performance && window.performance.memory);
 
+      // Verlauf der letzten 6 Messungen fuer Allokationsrate
+      var memHistory = [];
+      var MEM_HISTORY_MAX = 6;  // 6 x 2s = 12s Fenster
+
       function updateMemoryBadge() {
         if (!badge) return;
         if (!hasMemoryAPI) {
@@ -315,15 +319,39 @@
         }
         var mb = Math.round(window.performance.memory.usedJSHeapSize / 1048576);
         var limitMb = Math.round(window.performance.memory.jsHeapSizeLimit / 1048576);
-        badgeValue.textContent = mb + ' MB';
+        var now = Date.now();
+        memHistory.push({mb: mb, t: now});
+        if (memHistory.length > MEM_HISTORY_MAX) memHistory.shift();
+
+        // Allokationsrate ueber das gesamte Fenster (MB pro Sekunde)
+        var rate = 0;
+        if (memHistory.length >= 2) {
+          var first = memHistory[0];
+          var last = memHistory[memHistory.length - 1];
+          var dtSec = (last.t - first.t) / 1000;
+          if (dtSec > 0) rate = (last.mb - first.mb) / dtSec;
+        }
+
+        // Hauptanzeige: aktuelle MB, dazu kleiner Pfeil mit Rate wenn klar steigend/fallend
+        var rateRounded = Math.round(rate * 10) / 10;
+        var rateLabel = '';
+        if (rate >= 1)        rateLabel = ' ↑' + rateRounded.toFixed(1);
+        else if (rate <= -1)  rateLabel = ' ↓' + Math.abs(rateRounded).toFixed(1);
+        badgeValue.textContent = mb + ' MB' + rateLabel;
+
         // Farbcode: gruen < 150, orange 150-250, rot > 250
+        // ZUSAETZLICH: Bei Wachstum > 5 MB/s sofort orange (Frueh-Warnung)
         var bg, fg;
-        if (mb < 150)      { bg = 'rgba(46,160,67,0.92)';  fg = '#fff'; }
-        else if (mb < 250) { bg = 'rgba(230,126,34,0.92)'; fg = '#fff'; }
-        else               { bg = 'rgba(218,54,51,0.95)';  fg = '#fff'; }
+        if (rate > 5 && mb > 80)        { bg = 'rgba(230,126,34,0.92)'; fg = '#fff'; }
+        else if (rate > 15)             { bg = 'rgba(218,54,51,0.95)';  fg = '#fff'; }
+        else if (mb < 150)              { bg = 'rgba(46,160,67,0.92)';  fg = '#fff'; }
+        else if (mb < 250)              { bg = 'rgba(230,126,34,0.92)'; fg = '#fff'; }
+        else                            { bg = 'rgba(218,54,51,0.95)';  fg = '#fff'; }
         badge.style.background = bg;
         badge.style.color = fg;
-        badge.title = 'JS-Heap: ' + mb + ' MB / Limit: ' + limitMb + ' MB — Klick fuer Debug-Panel';
+        badge.title = 'JS-Heap: ' + mb + ' MB von ' + limitMb + ' MB Limit\n' +
+                      'Allokationsrate: ' + (rate >= 0 ? '+' : '') + rateRounded + ' MB/s\n' +
+                      'Klick fuer Debug-Panel';
       }
       updateMemoryBadge();
       setInterval(updateMemoryBadge, 2000);

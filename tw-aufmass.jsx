@@ -3537,20 +3537,29 @@
             const nrRef = useRef(null);
 
             // ── Globaler Enter-Key Handler für Raumerkennung ──
+            // KRITISCHER FIX (25.04.2026): Vorher war dieser useEffect OHNE Dep-Array,
+            // d.h. er lief bei JEDEM Re-Render. Jeder Render erzeugte eine neue
+            // handleEnter-Closure, die alle State- und Prop-Variablen hielt
+            // (inkl. gesamtliste/lastRaumData — potenziell gross). Bei haeufigen
+            // Re-Renders (z.B. durch Uhr-Tick im NavHeader) wuchs der Heap pro
+            // Sekunde. Loesung: Effekt laeuft nur einmal beim Mount, der Handler
+            // liest aktuelle Werte ueber eine Ref.
+            const enterStateRef = useRef({});
             useEffect(() => {
                 const handleEnter = (e) => {
                     if (e.key !== 'Enter') return;
                     if (e.target.tagName === 'TEXTAREA') return;
+                    const s = enterStateRef.current;
 
                     // ── Positionsauswahl-Modal: Enter = Weiter zum Raumblatt ──
-                    if (showPosModal && activeRaum && selectedPositions.length > 0) {
+                    if (s.showPosModal && s.activeRaum && s.selectedPositions && s.selectedPositions.length > 0) {
                         e.preventDefault();
-                        handleWeiterZumRaumblatt();
+                        if (s.handleWeiterZumRaumblatt) s.handleWeiterZumRaumblatt();
                         return;
                     }
 
                     // ── Baugleich-Dialog: Enter = Submit ──
-                    if (showBaugleich && bgNr) {
+                    if (s.showBaugleich && s.bgNr) {
                         // Falls im Input, erst zum nächsten springen
                         if (e.target.tagName === 'INPUT') {
                             const modal = e.target.closest('.modal');
@@ -3573,7 +3582,7 @@
                     }
 
                     // ── Manueller Raum-Dialog: Enter durch alle Felder navigieren ──
-                    if (showManual && e.target.tagName === 'INPUT') {
+                    if (s.showManual && e.target.tagName === 'INPUT') {
                         const card = e.target.closest('.manual-raum-card');
                         if (card) {
                             const allInputs = [...card.querySelectorAll('input[type="text"], input[type="number"], input[inputMode="decimal"]')];
@@ -3585,23 +3594,23 @@
                                 return;
                             }
                             // Letztes Feld → Submit wenn Raumnummer vorhanden
-                            if (manualNr) {
+                            if (s.manualNr) {
                                 e.preventDefault();
-                                handleManualSubmit();
+                                if (s.handleManualSubmit) s.handleManualSubmit();
                                 return;
                             }
                         }
                     }
 
                     // ── Duplikat-Modal: Enter = Erste Option wählen ──
-                    if (showDupModal) {
+                    if (s.showDupModal) {
                         e.preventDefault();
                         return;
                     }
                 };
                 window.addEventListener('keydown', handleEnter);
                 return () => window.removeEventListener('keydown', handleEnter);
-            });
+            }, []);
 
             // Raumauswahl State
             const [activeRaum, setActiveRaum] = useState(null);
@@ -4022,6 +4031,17 @@
                 if (!grouped[g]) grouped[g] = [];
                 grouped[g].push(r);
             });
+
+            // State-Ref fuer den globalen Enter-Handler synchron halten —
+            // statt bei jedem Render eine neue Closure zu erzeugen, lesen wir
+            // die aktuellen Werte beim Tastendruck aus der stabilen Ref.
+            enterStateRef.current = {
+                showPosModal, activeRaum, selectedPositions,
+                showBaugleich, bgNr,
+                showManual, manualNr,
+                showDupModal,
+                handleWeiterZumRaumblatt, handleManualSubmit
+            };
 
             return (
                 <div className="page-container">
