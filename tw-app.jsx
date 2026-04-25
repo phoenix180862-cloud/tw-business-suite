@@ -377,31 +377,34 @@
             }, [page, showGesamtliste, showAuth]);
 
             // ── 2. Enter-Navigation: Enter = naechstes Eingabefeld auf der aktuellen Seite ──
+            // KRITISCHER FIX (25.04.2026): Vorher OHNE Dep-Array — der Effekt lief
+            // bei JEDEM Re-Render der App-Komponente und registrierte ein neues
+            // handleGlobalEnter mit page/handleKundeNeu/handleStartAufmass etc. in
+            // der Closure. Pro Render fielen dafuer KB bis MB an, GC kam nicht hinterher.
+            // Loesung: Effekt einmal beim Mount, Werte ueber Ref.
+            const globalEnterStateRef = useRef({});
             useEffect(function() {
                 var handleGlobalEnter = function(e) {
                     if (e.key !== 'Enter') return;
-                    // Wenn ein Komponenten-Handler das Event bereits behandelt hat → ueberspringen
                     if (e.defaultPrevented) return;
 
                     var el = e.target;
                     var tag = el.tagName;
 
-                    // Nur fuer Eingabefelder (nicht Textareas = Mehrzeiler, nicht Buttons)
                     if (tag === 'TEXTAREA') return;
                     if (tag === 'BUTTON') return;
 
+                    var s = globalEnterStateRef.current;
+
                     // ── FALL A: Wir sind in einem Eingabefeld (INPUT/SELECT) ──
                     if (tag === 'INPUT' || tag === 'SELECT') {
-                        // Checkboxen, Radios, File-Inputs → ignorieren
                         if (el.type === 'checkbox' || el.type === 'radio' || el.type === 'file') return;
 
                         e.preventDefault();
 
-                        // Container bestimmen: Modal → Seite → Root
                         var container = el.closest('.modal-overlay') || el.closest('.modal') || el.closest('.manual-raum-card') || el.closest('.page-container') || document.getElementById('root');
                         if (!container) return;
 
-                        // Alle sichtbaren, nicht-deaktivierten Eingabefelder im Container sammeln
                         var allInputs = [];
                         var candidates = container.querySelectorAll(
                             'input:not([disabled]):not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([readonly]),' +
@@ -409,7 +412,6 @@
                             'select:not([disabled])'
                         );
                         for (var i = 0; i < candidates.length; i++) {
-                            // Nur sichtbare Elemente (offsetParent !== null fuer sichtbare, ODER in fixed/sticky Position)
                             if (candidates[i].offsetParent !== null || candidates[i].offsetWidth > 0) {
                                 allInputs.push(candidates[i]);
                             }
@@ -417,18 +419,16 @@
 
                         var idx = allInputs.indexOf(el);
                         if (idx >= 0 && idx < allInputs.length - 1) {
-                            // Naechstes Feld fokussieren
                             allInputs[idx + 1].focus();
                             if (allInputs[idx + 1].select) allInputs[idx + 1].select();
                         } else {
-                            // Letztes Feld → Aktion je nach Seite
                             el.blur();
-                            switch(page) {
+                            switch(s.page) {
                                 case 'akte':
-                                    if (!loading) handleLoadAkte();
+                                    if (!s.loading && s.handleLoadAkte) s.handleLoadAkte();
                                     break;
                                 case 'geladen':
-                                    handleStartAufmass();
+                                    if (s.handleStartAufmass) s.handleStartAufmass();
                                     break;
                             }
                         }
@@ -436,19 +436,19 @@
                     }
 
                     // ── FALL B: Kein Eingabefeld fokussiert → Seiten-Aktion ausloesen ──
-                    switch(page) {
+                    switch(s.page) {
                         case 'start':
-                            if (!showAuth) { e.preventDefault(); handleKundeNeu(); }
+                            if (!s.showAuth && s.handleKundeNeu) { e.preventDefault(); s.handleKundeNeu(); }
                             break;
                         case 'geladen':
                             e.preventDefault();
-                            navigateTo('modulwahl');
+                            if (s.navigateTo) s.navigateTo('modulwahl');
                             break;
                     }
                 };
                 window.addEventListener('keydown', handleGlobalEnter);
                 return function() { window.removeEventListener('keydown', handleGlobalEnter); };
-            });
+            }, []);  // ← einmal beim Mount
 
             const navigateTo = useCallback((newPage) => {
                 setPage(newPage);
@@ -2037,15 +2037,21 @@
             };
 
             // AutoSaveManager mit dieser Funktion verdrahten
+            // KRITISCHER FIX (25.04.2026): Vorher OHNE Dep-Array — bei JEDEM Render
+            // wurde eine neue Closure mit allen App-States in den AutoSaveManager
+            // geschrieben. Heap-waechst-pro-Sekunde (~25 MB/s im Aufmass-Modul).
+            // Loesung: setSaveFunction nur EINMAL registrieren, Aufruf geht ueber
+            // Ref auf die aktuelle _collectAndSaveWip-Funktion.
+            const collectSaveRef = useRef();
+            collectSaveRef.current = _collectAndSaveWip;
             useEffect(function() {
                 if (window.TW && window.TW.AutoSave) {
-                    window.TW.AutoSave.setSaveFunction(function() {
-                        return _collectAndSaveWip();
+                    window.TW.AutoSave.setSaveFunction(function(payload) {
+                        var fn = collectSaveRef.current;
+                        return fn ? fn() : Promise.resolve(null);
                     });
                 }
-                // Kein Cleanup noetig: die Funktion wird bei jedem Render
-                // neu registriert und referenziert die aktuellen State-Closures.
-            });
+            }, []);  // ← nur einmal beim Mount
 
             // Auto-Save-Trigger: Bei JEDER relevanten State-Aenderung wird
             // der Debounce-Timer neu gestartet (nach 1.5 s Ruhe wird gespeichert).
@@ -2725,6 +2731,23 @@
                     default:
                         return <Startseite onKundenauswahl={handleKundenauswahl} onKundeNeu={handleKundeNeu} onKundeAnalysiert={handleKundeAnalysiert} onKundeManuell={handleKundeManuell} onDriveStatusChange={function(status){ setDriveStatus(status); if(status === 'online') setIsDriveMode(true); }} />;
                 }
+            };
+
+            // ── Diagnose: App-Render-Counter (Memory-Badge liest das aus) ──
+            // Pro Render: globaler Counter +1. Damit kann das Memory-Badge die
+            // Render-Frequenz anzeigen — ein hoher Wert (>5/s) signalisiert eine
+            // Re-Render-Schleife.
+            window.__twAppRenderCount = (window.__twAppRenderCount || 0) + 1;
+
+            // ── State-Ref fuer den globalen Enter-Handler synchron halten ──
+            globalEnterStateRef.current = {
+                page: page,
+                showAuth: showAuth,
+                loading: loading,
+                handleKundeNeu: handleKundeNeu,
+                handleStartAufmass: handleStartAufmass,
+                handleLoadAkte: handleLoadAkte,
+                navigateTo: navigateTo
             };
 
             return (

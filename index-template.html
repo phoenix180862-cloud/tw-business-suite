@@ -303,23 +303,35 @@
       // ─── Memory-Badge ───
       var badge = document.getElementById('tw-memory-badge');
       var badgeValue = document.getElementById('tw-memory-badge-value');
+      var badgeLabel = document.getElementById('tw-memory-badge-label');
       var hasMemoryAPI = !!(window.performance && window.performance.memory);
 
       // Verlauf der letzten 6 Messungen fuer Allokationsrate
       var memHistory = [];
       var MEM_HISTORY_MAX = 6;  // 6 x 2s = 12s Fenster
+      var lastRenderCount = 0;
+      var lastRenderTime = Date.now();
 
       function updateMemoryBadge() {
         if (!badge) return;
+
+        // Render-Counter (App rendert haeufig? = Render-Schleife)
+        var now = Date.now();
+        var currentRenders = window.__twAppRenderCount || 0;
+        var dtSec = (now - lastRenderTime) / 1000;
+        var rendersPerSec = dtSec > 0 ? Math.round(((currentRenders - lastRenderCount) / dtSec) * 10) / 10 : 0;
+        lastRenderCount = currentRenders;
+        lastRenderTime = now;
+
         if (!hasMemoryAPI) {
           badgeValue.textContent = 'n/a';
           badge.style.background = 'rgba(60,60,60,0.92)';
           badge.title = 'performance.memory nur in Chrome verfuegbar';
+          if (badgeLabel) badgeLabel.textContent = rendersPerSec + ' r/s';
           return;
         }
         var mb = Math.round(window.performance.memory.usedJSHeapSize / 1048576);
         var limitMb = Math.round(window.performance.memory.jsHeapSizeLimit / 1048576);
-        var now = Date.now();
         memHistory.push({mb: mb, t: now});
         if (memHistory.length > MEM_HISTORY_MAX) memHistory.shift();
 
@@ -328,8 +340,8 @@
         if (memHistory.length >= 2) {
           var first = memHistory[0];
           var last = memHistory[memHistory.length - 1];
-          var dtSec = (last.t - first.t) / 1000;
-          if (dtSec > 0) rate = (last.mb - first.mb) / dtSec;
+          var dt = (last.t - first.t) / 1000;
+          if (dt > 0) rate = (last.mb - first.mb) / dt;
         }
 
         // Hauptanzeige: aktuelle MB, dazu kleiner Pfeil mit Rate wenn klar steigend/fallend
@@ -338,6 +350,11 @@
         if (rate >= 1)        rateLabel = ' ↑' + rateRounded.toFixed(1);
         else if (rate <= -1)  rateLabel = ' ↓' + Math.abs(rateRounded).toFixed(1);
         badgeValue.textContent = mb + ' MB' + rateLabel;
+
+        // Sub-Label zeigt Render-Frequenz
+        if (badgeLabel) {
+          badgeLabel.textContent = rendersPerSec + ' renders/s';
+        }
 
         // Farbcode: gruen < 150, orange 150-250, rot > 250
         // ZUSAETZLICH: Bei Wachstum > 5 MB/s sofort orange (Frueh-Warnung)
@@ -351,6 +368,7 @@
         badge.style.color = fg;
         badge.title = 'JS-Heap: ' + mb + ' MB von ' + limitMb + ' MB Limit\n' +
                       'Allokationsrate: ' + (rate >= 0 ? '+' : '') + rateRounded + ' MB/s\n' +
+                      'App-Renders: ' + rendersPerSec + '/s (gesamt: ' + currentRenders + ')\n' +
                       'Klick fuer Debug-Panel';
       }
       updateMemoryBadge();
