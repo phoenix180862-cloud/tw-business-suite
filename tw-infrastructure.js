@@ -519,8 +519,21 @@
         },
 
         // ── API-Helfer ──
-        async _fetch(url, options) {
+        // _isRetry: interne Flag, verhindert Endlos-Retry bei dauerhaftem 401
+        async _fetch(url, options, _isRetry) {
             if (!this.accessToken) throw new Error('Nicht authentifiziert');
+
+            // Pre-emptiver Refresh: Token ist abgelaufen oder laeuft in <60s ab.
+            // So vermeiden wir 401-Fehler komplett, statt sie reparieren zu muessen.
+            if (!_isRetry && this.tokenExpiresAt && Date.now() + 60000 >= this.tokenExpiresAt) {
+                try {
+                    await this._silentRefresh();
+                } catch (refreshErr) {
+                    this._clearStoredToken();
+                    throw new Error('Google Drive Verbindung abgelaufen. Bitte auf der Startseite neu mit Google Drive verbinden.');
+                }
+            }
+
             const resp = await fetch(url, {
                 ...options,
                 headers: {
@@ -528,6 +541,21 @@
                     ...((options && options.headers) || {}),
                 },
             });
+
+            // 401 = Token serverseitig ungueltig (von Google revoked, vorzeitig
+            // abgelaufen, oder Scope geaendert). Einmaliger Silent-Refresh + Retry.
+            // Bei zweitem 401 -> Aufgeben mit User-freundlicher Meldung.
+            if (resp.status === 401 && !_isRetry) {
+                try {
+                    await this._silentRefresh();
+                } catch (refreshErr) {
+                    this._clearStoredToken();
+                    throw new Error('Google Drive Verbindung abgelaufen. Bitte auf der Startseite neu mit Google Drive verbinden.');
+                }
+                // Mit frischem Token nochmal versuchen
+                return this._fetch(url, options, true);
+            }
+
             if (!resp.ok) {
                 const err = await resp.text();
                 throw new Error('Drive API Fehler: ' + resp.status + ' ' + err);
