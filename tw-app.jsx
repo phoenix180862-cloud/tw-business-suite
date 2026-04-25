@@ -223,6 +223,9 @@
             const [akteData, setAkteData] = useState({ wips: [], appDateien: [] });
             const [akteSaveToast, setAkteSaveToast] = useState(null);
 
+            // ── Storage-Health-Dashboard (Punkt 6 aus Architektur-Plan, 25.04.2026) ──
+            const [showStorageHealth, setShowStorageHealth] = useState(false);
+
             // ── Aufmass-Vorlage (Speichern/Laden via Drive) ──
             // vorlageBusy: { action: 'save'|'list'|'load', message: '...' } waehrend I/O
             const [vorlageBusy, setVorlageBusy] = useState(null);
@@ -2095,6 +2098,13 @@
                 });
             };
 
+            // ── Storage-Health-Dashboard Handler ──
+            // (Punkt 6 aus Architektur-Plan, 25.04.2026)
+            // Aufruf von ueberall: window._openStorageHealth()
+            window._openStorageHealth = function() {
+                setShowStorageHealth(true);
+            };
+
             // ── WIP wiederherstellen (aus Akte heraus) ──
             // WICHTIG: listWips() liefert aus Performance-Gruenden NUR Metadaten
             // ohne moduleState. Daher muss hier erst der volle Record nachgeladen
@@ -3042,6 +3052,13 @@
                             <span style={{fontSize:'18px'}}>\u2713</span> {akteSaveToast}
                         </div>
                     )}
+
+                    {/* Storage-Health-Dashboard (Punkt 6 aus Architektur-Plan, 25.04.2026)
+                        Aufruf: window._openStorageHealth() von ueberall */}
+                    <StorageHealthDashboard
+                        open={showStorageHealth}
+                        onClose={function(){ setShowStorageHealth(false); }}
+                    />
 
                     {/* ═══ AUTO-WIEDERHERSTELLUNG TOAST ═══ */}
                     {autoRestoreToast && (

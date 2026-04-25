@@ -2056,25 +2056,349 @@
             );
         }
 
-
-        /* ═══════════════════════════════════════════════════════════════════
-           HOTFIX (24.04.2026, ueberschrieben 25.04.2026):
-           NavDropdown + AktionDropdown wurden urspruenglich nur in der alten
-           index.html definiert und beim Modularisieren nicht in eine JSX-
-           Quelldatei uebertragen. Nach Rebuild fehlten die Komponenten und
-           die App crashte mit "ReferenceError: NavDropdown is not defined".
-           Folgender Block ist der bereits vorkompilierte React.createElement-
-           Code aus der alten index.html. Babel laesst ihn unveraendert durch.
-           Siehe: LIESMICH-HOTFIX-NAVDROPDOWN.md
-           ═══════════════════════════════════════════════════════════════════ */
-
-function NavDropdown(props){var currentMode=props.currentMode||'Navigation';var targets=Array.isArray(props.targets)?props.targets:[];var containerStyle=props.style||{};var color=props.color==='blue'?'blue':'red';var palette=color==='red'?{mainGrad:'linear-gradient(135deg, #e63535, #c41e1e)',mainShadow:'rgba(196,30,30,0.30)',itemGrad:'linear-gradient(135deg, rgba(230,53,53,0.75), rgba(196,30,30,0.75))'}:{mainGrad:'linear-gradient(135deg, #1E88E5, #1565C0)',mainShadow:'rgba(30,136,229,0.30)',itemGrad:'linear-gradient(135deg, rgba(30,136,229,0.75), rgba(21,101,192,0.75))'};var[open,setOpen]=useState(false);var[focusIdx,setFocusIdx]=useState(-1);var wrapperRef=useRef(null);var shownTargets=targets.filter(function(t){return t&&t.label!==currentMode;});useEffect(function(){if(!open)return undefined;var handler=function(e){if(wrapperRef.current&&!wrapperRef.current.contains(e.target)){setOpen(false);}};var keyHandler=function(e){if(e.key==='Escape'){setOpen(false);setFocusIdx(-1);}else if(e.key==='ArrowDown'){e.preventDefault();setFocusIdx(function(i){return Math.min(i+1,shownTargets.length-1);});}else if(e.key==='ArrowUp'){e.preventDefault();setFocusIdx(function(i){return Math.max(i-1,0);});}};document.addEventListener('mousedown',handler);document.addEventListener('touchstart',handler);document.addEventListener('keydown',keyHandler);return function(){document.removeEventListener('mousedown',handler);document.removeEventListener('touchstart',handler);document.removeEventListener('keydown',keyHandler);};},[open,shownTargets.length]);useEffect(function(){if(!open||focusIdx<0||!wrapperRef.current)return;var btns=wrapperRef.current.querySelectorAll('.tw-nav-dropdown-item');if(btns&&btns[focusIdx]){try{btns[focusIdx].focus();}catch(e){}}},[focusIdx,open]);var mainBtnStyle={padding:'10px 20px',minHeight:'44px',borderRadius:'8px',border:'none',cursor:'pointer',background:palette.mainGrad,color:'#fff',fontSize:'13px',fontWeight:'700',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px',boxShadow:'0 3px 10px '+palette.mainShadow,transition:'all 0.2s ease',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:'8px'};var panelStyle={position:'absolute',top:'calc(100% + 6px)',left:'0',background:'var(--bg-secondary)',border:'1px solid var(--border-color)',borderRadius:'10px',boxShadow:'0 8px 16px rgba(0,0,0,0.4)',padding:'6px',minWidth:'180px',maxWidth:'calc(100vw - 16px)',zIndex:1000,animation:'tw-nav-drop-in-left 140ms ease-out',display:'flex',flexDirection:'column',gap:'4px'};var itemStyle=function(disabled){return{padding:'10px 14px',minHeight:'42px',borderRadius:'7px',border:'none',cursor:disabled?'not-allowed':'pointer',background:disabled?'rgba(120,120,120,0.18)':palette.itemGrad,color:disabled?'rgba(255,255,255,0.45)':'#fff',fontSize:'12px',fontWeight:'700',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.4px',textAlign:'left',transition:'all 0.15s ease',opacity:disabled?0.5:1};};var handleSelect=function(target){if(target.disabled)return;setOpen(false);setFocusIdx(-1);if(typeof target.handler==='function'){try{target.handler();}catch(err){console.error('NavDropdown handler:',err);}}};return/*#__PURE__*/React.createElement("div",{ref:wrapperRef,style:Object.assign({position:'relative',display:'inline-block'},containerStyle)},/*#__PURE__*/React.createElement("button",{type:"button",style:mainBtnStyle,onClick:function(){setOpen(function(v){return!v;});},"aria-haspopup":"true","aria-expanded":open,title:'Navigation -- aktuell: '+currentMode},/*#__PURE__*/React.createElement("span",null,currentMode),/*#__PURE__*/React.createElement("span",{style:{fontSize:'10px',opacity:0.85,transform:open?'rotate(180deg)':'none',transition:'transform 0.18s ease'}},'\u25BC')),open&&shownTargets.length>0&&/*#__PURE__*/React.createElement("div",{className:"tw-dropdown-panel tw-nav-dropdown-panel-center",style:panelStyle,role:"menu"},shownTargets.map(function(t){return/*#__PURE__*/React.createElement("button",{key:t.id||t.label,type:"button",role:"menuitem",className:"tw-nav-dropdown-item",disabled:!!t.disabled,style:itemStyle(t.disabled),onClick:function(){handleSelect(t);}},t.label);})));}
-function AktionSubItem(props){var si=props.item;var onClose=props.onClose;var disabled=!!si.disabled;var baseStyle={padding:'10px 12px',minHeight:'42px',borderRadius:'7px',border:'none',cursor:disabled?'not-allowed':'pointer',background:'transparent',color:disabled?'rgba(255,255,255,0.4)':'var(--text-primary)',fontSize:'13px',fontWeight:'600',fontFamily:'Oswald, sans-serif',textAlign:'left',display:'flex',alignItems:'center',gap:'10px',opacity:disabled?0.55:1,width:'100%',boxSizing:'border-box',transition:'background 0.12s ease'};var handleClick=function(){if(disabled)return;onClose();var fn=si.onClick||si.handler;if(typeof fn==='function'){try{fn();}catch(e){console.error('SubItem:',e);}}};return/*#__PURE__*/React.createElement("button",{type:"button",role:"menuitem",className:"tw-aktion-dropdown-item",disabled:disabled,style:baseStyle,onClick:handleClick,onMouseOver:function(e){if(!disabled)e.currentTarget.style.background='var(--bg-hover)';},onMouseOut:function(e){if(!disabled)e.currentTarget.style.background='transparent';}},si.icon&&/*#__PURE__*/React.createElement("span",{style:{fontSize:'14px',minWidth:'18px'}},si.icon),/*#__PURE__*/React.createElement("span",{style:{flex:1}},si.label));}
-function AktionItem(props){var a=props.action;var align=props.align||'right';var onCloseAll=props.onCloseAll;var myId=props.myId;var openSubId=props.openSubId;var setOpenSubId=props.setOpenSubId;var disabled=!!a.disabled;var subItems=a._subItems||[];var hasSub=subItems.length>0;var subOpen=hasSub&&openSubId===myId;var btnRef=useRef(null);var[subPos,setSubPos]=useState(null);/* Position des Sub-Panels berechnen wenn es oeffnet, + bei Resize/Scroll updaten */useEffect(function(){if(!subOpen||!btnRef.current){setSubPos(null);return undefined;}var calcPos=function(){if(!btnRef.current)return;var r=btnRef.current.getBoundingClientRect();var vw=window.innerWidth;var vh=window.innerHeight;var panelW=240;// geschaetzte Breite
-var gap=6;var pos={top:r.top};/* Position: vorzugsweise auf der gegenueberliegenden Seite des Haupt-Panels */if(align==='right'){/* Haupt-Panel rechts-ausgerichtet -> Sub nach links */var leftSide=r.left-panelW-gap;if(leftSide<8){/* Nicht genug Platz links -> rechts oeffnen */pos.left=r.right+gap;}else{pos.left=leftSide;}}else{/* Haupt-Panel links-ausgerichtet -> Sub nach rechts */var rightSide=r.right+gap;if(rightSide+panelW>vw-8){/* Nicht genug Platz rechts -> links oeffnen */pos.left=Math.max(8,r.left-panelW-gap);}else{pos.left=rightSide;}}/* Vertikale Begrenzung: nicht unter den Viewport */var maxHeight=vh-pos.top-16;pos.maxHeight=Math.max(160,maxHeight);setSubPos(pos);};calcPos();window.addEventListener('resize',calcPos);window.addEventListener('scroll',calcPos,true);return function(){window.removeEventListener('resize',calcPos);window.removeEventListener('scroll',calcPos,true);};},[subOpen,align]);var getBg=function(){if(disabled)return'rgba(120,120,120,0.15)';if(a.destructive)return'transparent';if(a.variant==='red')return'linear-gradient(135deg, rgba(230,53,53,0.85), rgba(196,30,30,0.85))';return'transparent';};var getColor=function(){if(disabled)return'rgba(255,255,255,0.4)';if(a.destructive)return'var(--accent-red-light)';if(a.variant==='red')return'#fff';return'var(--text-primary)';};var btnStyle={padding:'10px 12px',minHeight:'42px',borderRadius:'7px',border:'none',cursor:disabled?'not-allowed':'pointer',background:getBg(),color:getColor(),fontSize:'13px',fontWeight:a.variant==='red'?'700':'600',fontFamily:'Oswald, sans-serif',textTransform:a.variant==='red'?'uppercase':'none',letterSpacing:a.variant==='red'?'0.4px':'0',textAlign:'left',display:'flex',alignItems:'center',gap:'10px',opacity:disabled?0.55:1,width:'100%',boxSizing:'border-box',transition:'background 0.12s ease, filter 0.12s ease'};var subPanelStyle=subPos?{position:'fixed',top:subPos.top+'px',left:subPos.left+'px',background:'var(--bg-tertiary)',border:'1px solid var(--border-color)',borderRadius:'10px',boxShadow:'0 8px 24px rgba(0,0,0,0.65)',padding:'6px',minWidth:'220px',maxWidth:'calc(100vw - 16px)',maxHeight:subPos.maxHeight+'px',overflowY:'auto',zIndex:10000,display:'flex',flexDirection:'column',gap:'3px'}:null;var handleClick=function(){if(disabled)return;if(hasSub){setOpenSubId(subOpen?null:myId);return;}onCloseAll();if(typeof a.handler==='function'){try{a.handler();}catch(e){console.error('AktionItem:',e);}}};var handleSubClose=function(){setOpenSubId(null);onCloseAll();};return/*#__PURE__*/React.createElement("div",{style:{position:'relative'}},/*#__PURE__*/React.createElement("button",{ref:btnRef,type:"button",role:"menuitem",className:"tw-aktion-dropdown-item",disabled:disabled,style:btnStyle,onClick:handleClick,onMouseOver:function(e){if(disabled)return;if(a.variant==='red'){e.currentTarget.style.filter='brightness(1.15)';}else{e.currentTarget.style.background='var(--bg-hover)';}},onMouseOut:function(e){if(disabled)return;if(a.variant==='red'){e.currentTarget.style.filter='none';}else{e.currentTarget.style.background=getBg();}}},a.icon&&/*#__PURE__*/React.createElement("span",{style:{fontSize:'15px',minWidth:'18px'}},a.icon),/*#__PURE__*/React.createElement("span",{style:{flex:1}},a.label),hasSub&&/*#__PURE__*/React.createElement("span",{style:{fontSize:'11px',opacity:0.75,transform:subOpen?'rotate(90deg)':'none',transition:'transform 0.15s ease'}},'\u25B6')),hasSub&&subOpen&&subPanelStyle&&typeof document!=='undefined'&&ReactDOM.createPortal(/*#__PURE__*/React.createElement("div",{"data-tw-aktion-sub":"true",className:"tw-dropdown-panel tw-aktion-sub-panel",style:subPanelStyle,role:"menu"},subItems.map(function(si,i){return/*#__PURE__*/React.createElement(AktionSubItem,{key:si.id||si.label||i,item:si,onClose:handleSubClose});})),document.body));}
-function AktionDropdown(props){var label=props.label||'Bearbeiten';var actions=Array.isArray(props.actions)?props.actions:[];var align=props.align||'right';var containerStyle=props.style||{};var color=props.color==='blue'?'blue':'red';var palette=color==='red'?{mainGrad:'linear-gradient(135deg, #e63535, #c41e1e)',mainShadow:'rgba(196,30,30,0.30)'}:{mainGrad:'linear-gradient(135deg, #1E88E5, #1565C0)',mainShadow:'rgba(30,136,229,0.30)'};var[open,setOpen]=useState(false);var[openSubId,setOpenSubId]=useState(null);var wrapperRef=useRef(null);var closeAll=function(){setOpen(false);setOpenSubId(null);};/* Reset Sub-State wenn Haupt-Dropdown geschlossen wird */useEffect(function(){if(!open)setOpenSubId(null);},[open]);useEffect(function(){if(!open)return undefined;var handler=function(e){if(!wrapperRef.current)return;/* Klick innerhalb des Haupt-Wrappers -> nix tun */if(wrapperRef.current.contains(e.target))return;/* Klick im Sub-Panel-Portal -> ebenfalls nix tun */if(e.target&&e.target.closest&&e.target.closest('[data-tw-aktion-sub]'))return;setOpen(false);};var keyHandler=function(e){if(e.key==='Escape'){setOpen(false);}};document.addEventListener('mousedown',handler);document.addEventListener('touchstart',handler);document.addEventListener('keydown',keyHandler);return function(){document.removeEventListener('mousedown',handler);document.removeEventListener('touchstart',handler);document.removeEventListener('keydown',keyHandler);};},[open]);/* Normalisiert beide Action-Formate */var normalizeAction=function(a,idx){if(!a)return null;if(a.type==='divider')return{_divider:true,_key:'div-'+idx};if(a.type==='submenu'){return{id:a.id||'sub-'+idx,label:a.label,icon:a.icon,disabled:!!a.disabled,variant:a.variant,_subItems:Array.isArray(a.items)?a.items:[]};}return{id:a.id||'act-'+idx,label:a.label,icon:a.icon,disabled:!!a.disabled,destructive:!!a.destructive,variant:a.variant,handler:a.handler||a.onClick,_subItems:Array.isArray(a.subItems)?a.subItems:[]};};var normalized=actions.map(normalizeAction).filter(Boolean);var mainBtnStyle={padding:'10px 18px',minHeight:'44px',borderRadius:'8px',border:'none',cursor:'pointer',background:palette.mainGrad,color:'#fff',fontSize:'13px',fontWeight:'700',fontFamily:'Oswald, sans-serif',textTransform:'uppercase',letterSpacing:'0.5px',boxShadow:'0 3px 10px '+palette.mainShadow,transition:'all 0.2s ease',whiteSpace:'nowrap',display:'inline-flex',alignItems:'center',gap:'8px'};var panelStyle=Object.assign({position:'absolute',top:'calc(100% + 6px)',background:'var(--bg-secondary)',border:'1px solid var(--border-color)',borderRadius:'10px',boxShadow:'0 8px 16px rgba(0,0,0,0.4)',padding:'6px',minWidth:'220px',maxWidth:'calc(100vw - 16px)',zIndex:1000,animation:'tw-nav-drop-in-left 140ms ease-out',display:'flex',flexDirection:'column',gap:'3px'},align==='left'?{left:0}:{right:0});return/*#__PURE__*/React.createElement("div",{ref:wrapperRef,style:Object.assign({position:'relative',display:'inline-block'},containerStyle)},/*#__PURE__*/React.createElement("button",{type:"button",style:mainBtnStyle,onClick:function(){setOpen(function(v){return!v;});},"aria-haspopup":"true","aria-expanded":open,title:label},/*#__PURE__*/React.createElement("span",{style:{fontSize:'14px'}},'\u270E'),/*#__PURE__*/React.createElement("span",null,label),/*#__PURE__*/React.createElement("span",{style:{fontSize:'10px',opacity:0.85,transform:open?'rotate(180deg)':'none',transition:'transform 0.18s ease'}},'\u25BC')),open&&normalized.length>0&&/*#__PURE__*/React.createElement("div",{className:'tw-dropdown-panel '+(align==='right'?'tw-aktion-dropdown-panel-right':'tw-aktion-dropdown-panel-left'),style:panelStyle,role:"menu"},normalized.map(function(a){if(a._divider){return/*#__PURE__*/React.createElement("div",{key:a._key,style:{height:'1px',background:'var(--border-color)',margin:'3px 6px'}});}return/*#__PURE__*/React.createElement(AktionItem,{key:a.id,action:a,align:align,myId:a.id,openSubId:openSubId,setOpenSubId:setOpenSubId,onCloseAll:closeAll});})));}
-
         /* ═══════════════════════════════════════════
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
 
+        /* ===========================================================
+           STORAGE-HEALTH-DASHBOARD (Punkt 6 aus Architektur-Plan)
+           Stand: 25.04.2026
+
+           Zeigt:
+           - IndexedDB-Belegung pro Kunde
+           - Anzahl ungesyncte Fotos / appDateien
+           - Letzten Drive-Sync-Zeitpunkt pro Kunde
+           - Schema-Version
+           - Drive-Upload-Queue-Status
+
+           Aufruf: window._openStorageHealth() (von ueberall)
+                   oder ueber die Memory-Badge im Top-Right.
+
+           Diese Komponente ist eine Modal-Overlay-Komponente.
+           Sie wird in tw-app.jsx in den App-State gemountet.
+           =========================================================== */
+        function StorageHealthDashboard({ open, onClose }) {
+            const [info, setInfo] = React.useState(null);
+            const [queueStatus, setQueueStatus] = React.useState(null);
+            const [refreshTick, setRefreshTick] = React.useState(0);
+
+            React.useEffect(function() {
+                if (!open) return;
+                let cancelled = false;
+                async function load() {
+                    try {
+                        if (!window.TWStorage || !window.TWStorage.isReady()) {
+                            setInfo({ error: 'TWStorage nicht bereit' });
+                            return;
+                        }
+                        const storage = await window.TWStorage.getStorageInfo();
+                        const counts  = await window.TWStorage.getRecordCounts();
+                        const kunden  = await window.TWStorage.listKunden();
+                        // Pro Kunde: ungesyncte Fotos + appDateien
+                        const perKunde = [];
+                        for (let i = 0; i < kunden.length; i++) {
+                            const k = kunden[i];
+                            const kid = k.id;
+                            let unsyncedFotos = 0, unsyncedAppDateien = 0, lastSync = null;
+                            try {
+                                const fotos = await window.TWStorage.getByIndex('fotos', 'kundeId', String(kid));
+                                unsyncedFotos = (fotos || []).filter(function(f) { return !f.driveUploaded; }).length;
+                            } catch(e) { /* still */ }
+                            try {
+                                const ad = await window.TWStorage.getByIndex('appDateien', 'kundeId', kid);
+                                unsyncedAppDateien = (ad || []).filter(function(a) { return a.syncStatus === 'pending'; }).length;
+                            } catch(e) { /* still */ }
+                            try {
+                                lastSync = await window.TWStorage.DriveUploadSync.getLastSyncTime(kid);
+                            } catch(e) { /* still */ }
+                            perKunde.push({
+                                id: kid,
+                                name: k.name || k.bauvorhaben || kid,
+                                unsyncedFotos: unsyncedFotos,
+                                unsyncedAppDateien: unsyncedAppDateien,
+                                lastSync: lastSync
+                            });
+                        }
+                        const schemaInfo = window.TWSchema && window.TWSchema.getDiagnostics ?
+                                           window.TWSchema.getDiagnostics() : null;
+                        if (cancelled) return;
+                        setInfo({
+                            storage: storage,
+                            counts: counts,
+                            perKunde: perKunde,
+                            dbVersion: window.TWStorage.DB_VERSION,
+                            schema: schemaInfo,
+                            apiAvailable: !!window.TWStorageAPI
+                        });
+                    } catch(err) {
+                        if (!cancelled) setInfo({ error: err.message });
+                    }
+                }
+                load();
+                // Queue-Status abonnieren
+                let unsubQueue = null;
+                if (window.TWStorageAPI && window.TWStorageAPI.queue) {
+                    setQueueStatus(window.TWStorageAPI.queue.status());
+                    unsubQueue = window.TWStorageAPI.queue.subscribe(function(s) {
+                        setQueueStatus(s);
+                    });
+                }
+                return function() {
+                    cancelled = true;
+                    if (unsubQueue) unsubQueue();
+                };
+            }, [open, refreshTick]);
+
+            if (!open) return null;
+
+            const fmtBytes = function(b) {
+                if (!b || b < 1024) return (b || 0) + ' B';
+                if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+                if (b < 1024*1024*1024) return (b/(1024*1024)).toFixed(1) + ' MB';
+                return (b/(1024*1024*1024)).toFixed(2) + ' GB';
+            };
+            const fmtTime = function(iso) {
+                if (!iso) return 'nie';
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleString('de-DE', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                } catch(e) { return iso; }
+            };
+
+            return React.createElement('div', {
+                style: {
+                    position: 'fixed', inset: 0, zIndex: 9000,
+                    background: 'rgba(10,15,25,0.78)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '20px'
+                },
+                onClick: function(e) { if (e.target === e.currentTarget) onClose && onClose(); }
+            },
+                React.createElement('div', {
+                    style: {
+                        background: 'var(--bg-elevated, #1a2030)',
+                        color: 'var(--text-primary, #fff)',
+                        borderRadius: '14px',
+                        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+                        maxWidth: '900px', width: '100%',
+                        maxHeight: '85vh', overflow: 'auto',
+                        padding: '24px'
+                    }
+                },
+                    React.createElement('div', {
+                        style: {
+                            display: 'flex', justifyContent: 'space-between',
+                            alignItems: 'center', marginBottom: '16px',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            paddingBottom: '12px'
+                        }
+                    },
+                        React.createElement('h2', {
+                            style: { margin: 0, fontSize: '20px', fontWeight: 600 }
+                        }, 'Storage-Health-Dashboard'),
+                        React.createElement('div', { style: { display: 'flex', gap: '8px' } },
+                            React.createElement('button', {
+                                onClick: function() { setRefreshTick(refreshTick + 1); },
+                                style: {
+                                    background: 'rgba(33,150,243,0.2)', color: '#90CAF9',
+                                    border: '1px solid rgba(33,150,243,0.4)',
+                                    padding: '6px 14px', borderRadius: '6px',
+                                    cursor: 'pointer', fontSize: '13px'
+                                }
+                            }, 'Aktualisieren'),
+                            React.createElement('button', {
+                                onClick: onClose,
+                                style: {
+                                    background: 'rgba(244,67,54,0.2)', color: '#EF9A9A',
+                                    border: '1px solid rgba(244,67,54,0.4)',
+                                    padding: '6px 14px', borderRadius: '6px',
+                                    cursor: 'pointer', fontSize: '13px'
+                                }
+                            }, 'Schliessen')
+                        )
+                    ),
+
+                    !info && React.createElement('div', {
+                        style: { padding: '40px', textAlign: 'center', opacity: 0.6 }
+                    }, 'Daten werden geladen...'),
+
+                    info && info.error && React.createElement('div', {
+                        style: {
+                            padding: '20px', background: 'rgba(244,67,54,0.15)',
+                            borderRadius: '8px', color: '#EF9A9A'
+                        }
+                    }, 'Fehler: ' + info.error),
+
+                    info && !info.error && React.createElement('div', null,
+                        // Block 1: System-Status
+                        React.createElement('div', { style: { marginBottom: '20px' } },
+                            React.createElement('h3', {
+                                style: { fontSize: '14px', textTransform: 'uppercase',
+                                         letterSpacing: '1px', opacity: 0.7,
+                                         margin: '0 0 10px' }
+                            }, 'System'),
+                            React.createElement('div', {
+                                style: {
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                                    gap: '10px'
+                                }
+                            },
+                                React.createElement(_HealthCard, {
+                                    label: 'IDB belegt',
+                                    value: fmtBytes(info.storage && info.storage.usage),
+                                    hint: 'von ' + fmtBytes(info.storage && info.storage.quota)
+                                }),
+                                React.createElement(_HealthCard, {
+                                    label: 'DB-Version',
+                                    value: 'v' + info.dbVersion,
+                                    hint: 'Schema: ' + (info.schema ? info.schema.storeCount + ' Stores' : '?')
+                                }),
+                                React.createElement(_HealthCard, {
+                                    label: 'Kunden',
+                                    value: (info.counts && info.counts.kunden) || 0,
+                                    hint: (info.counts && info.counts.aufmass || 0) + ' Aufmasse'
+                                }),
+                                React.createElement(_HealthCard, {
+                                    label: 'Storage-API',
+                                    value: info.apiAvailable ? 'aktiv' : 'fehlt',
+                                    hint: info.apiAvailable ? 'TWStorageAPI bereit' : 'nicht geladen',
+                                    accent: info.apiAvailable ? '#4CAF50' : '#F44336'
+                                })
+                            )
+                        ),
+
+                        // Block 2: Drive-Upload-Queue
+                        queueStatus && React.createElement('div', { style: { marginBottom: '20px' } },
+                            React.createElement('h3', {
+                                style: { fontSize: '14px', textTransform: 'uppercase',
+                                         letterSpacing: '1px', opacity: 0.7,
+                                         margin: '0 0 10px' }
+                            }, 'Drive-Upload-Queue'),
+                            React.createElement('div', {
+                                style: {
+                                    background: 'rgba(255,255,255,0.04)',
+                                    padding: '14px', borderRadius: '10px',
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                                    gap: '10px'
+                                }
+                            },
+                                React.createElement(_HealthCard, {
+                                    label: 'Pending',
+                                    value: queueStatus.queueLength,
+                                    hint: queueStatus.processing ? 'wird abgearbeitet' : 'wartet'
+                                }),
+                                React.createElement(_HealthCard, {
+                                    label: 'Hochgeladen',
+                                    value: queueStatus.stats.uploaded,
+                                    hint: 'seit App-Start',
+                                    accent: '#4CAF50'
+                                }),
+                                React.createElement(_HealthCard, {
+                                    label: 'Retried',
+                                    value: queueStatus.stats.retried,
+                                    hint: 'auto. Wiederholungen',
+                                    accent: '#FF9800'
+                                }),
+                                React.createElement(_HealthCard, {
+                                    label: 'Failed',
+                                    value: queueStatus.stats.failed,
+                                    hint: 'final fehlgeschlagen',
+                                    accent: queueStatus.stats.failed > 0 ? '#F44336' : '#666'
+                                })
+                            ),
+                            queueStatus.stats.failed > 0 && React.createElement('button', {
+                                onClick: function() {
+                                    if (window.TWStorageAPI && window.TWStorageAPI.queue) {
+                                        window.TWStorageAPI.queue.retry();
+                                    }
+                                },
+                                style: {
+                                    marginTop: '10px',
+                                    background: 'rgba(255,152,0,0.2)', color: '#FFB74D',
+                                    border: '1px solid rgba(255,152,0,0.4)',
+                                    padding: '6px 14px', borderRadius: '6px',
+                                    cursor: 'pointer', fontSize: '12px'
+                                }
+                            }, 'Failed neu versuchen')
+                        ),
+
+                        // Block 3: Pro Kunde
+                        info.perKunde && info.perKunde.length > 0 &&
+                        React.createElement('div', null,
+                            React.createElement('h3', {
+                                style: { fontSize: '14px', textTransform: 'uppercase',
+                                         letterSpacing: '1px', opacity: 0.7,
+                                         margin: '0 0 10px' }
+                            }, 'Pro Kunde'),
+                            React.createElement('div', {
+                                style: {
+                                    background: 'rgba(255,255,255,0.04)',
+                                    borderRadius: '10px', overflow: 'hidden'
+                                }
+                            },
+                                info.perKunde.slice(0, 10).map(function(k, idx) {
+                                    return React.createElement('div', {
+                                        key: k.id,
+                                        style: {
+                                            padding: '12px 14px',
+                                            display: 'grid',
+                                            gridTemplateColumns: '2fr 1fr 1fr 1.5fr',
+                                            gap: '8px', fontSize: '13px',
+                                            borderBottom: idx < info.perKunde.length - 1 ?
+                                                '1px solid rgba(255,255,255,0.04)' : 'none'
+                                        }
+                                    },
+                                        React.createElement('div', {
+                                            style: { fontWeight: 500 }
+                                        }, k.name),
+                                        React.createElement('div', {
+                                            style: {
+                                                color: k.unsyncedFotos > 0 ? '#FFB74D' : '#888'
+                                            }
+                                        }, (k.unsyncedFotos || 0) + ' Fotos pending'),
+                                        React.createElement('div', {
+                                            style: {
+                                                color: k.unsyncedAppDateien > 0 ? '#FFB74D' : '#888'
+                                            }
+                                        }, (k.unsyncedAppDateien || 0) + ' Docs pending'),
+                                        React.createElement('div', {
+                                            style: { opacity: 0.7, fontSize: '11px' }
+                                        }, 'Sync: ' + fmtTime(k.lastSync))
+                                    );
+                                })
+                            )
+                        )
+                    )
+                )
+            );
+        }
+
+        // Hilfs-Karten-Komponente
+        function _HealthCard({ label, value, hint, accent }) {
+            return React.createElement('div', {
+                style: {
+                    background: 'rgba(255,255,255,0.04)',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    borderLeft: '3px solid ' + (accent || '#1E88E5')
+                }
+            },
+                React.createElement('div', {
+                    style: { fontSize: '11px', opacity: 0.6,
+                             textTransform: 'uppercase', letterSpacing: '0.5px',
+                             marginBottom: '4px' }
+                }, label),
+                React.createElement('div', {
+                    style: { fontSize: '20px', fontWeight: 600,
+                             color: accent || '#90CAF9', marginBottom: '2px' }
+                }, value),
+                hint && React.createElement('div', {
+                    style: { fontSize: '11px', opacity: 0.5 }
+                }, hint)
+            );
+        }

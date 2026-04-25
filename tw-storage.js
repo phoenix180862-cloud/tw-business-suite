@@ -17,7 +17,43 @@
     'use strict';
 
     var DB_NAME = 'TWBusinessSuite';
-    var DB_VERSION = 7;
+    var DB_VERSION = 8;
+    // ---- Migrations-Tabelle (Punkt 2 aus Architektur-Plan, 25.04.2026) ----
+    // Pro DB-Version eine Funktion. Wird bei onupgradeneeded ab oldVersion+1
+    // bis DB_VERSION durchlaufen. Index-/Store-Aenderungen kommen hier rein.
+    // WICHTIG: Innerhalb einer Migration nur sync-IndexedDB-Aufrufe nutzen
+    // (die Transaction des onupgradeneeded ist die einzige Schreibchance).
+    var MIGRATIONS = {
+        8: function(db, transaction) {
+            // v8 (25.04.2026): fotos-Store -- 'kontext'-Index nachruesten
+            // (war vorher nicht im Schema; wird nun als Such-Index gebraucht).
+            try {
+                if (db.objectStoreNames.contains('fotos')) {
+                    var store = transaction.objectStore('fotos');
+                    if (!store.indexNames.contains('kontext')) {
+                        store.createIndex('kontext', 'kontext', { unique: false });
+                        console.log('[TW-Storage Migration v8] Index "kontext" auf fotos angelegt');
+                    }
+                }
+            } catch(e) {
+                console.warn('[TW-Storage Migration v8] kontext-Index:', e);
+            }
+            // v8: appDateien -- 'syncStatus'-Index fuer schnelle Pending-Suche
+            try {
+                if (db.objectStoreNames.contains('appDateien')) {
+                    var store2 = transaction.objectStore('appDateien');
+                    if (!store2.indexNames.contains('syncStatus')) {
+                        store2.createIndex('syncStatus', 'syncStatus', { unique: false });
+                        console.log('[TW-Storage Migration v8] Index "syncStatus" auf appDateien angelegt');
+                    }
+                }
+            } catch(e) {
+                console.warn('[TW-Storage Migration v8] syncStatus-Index:', e);
+            }
+        }
+        // Zukuenftige Versionen einfach hier ergaenzen:
+        // 9: function(db, transaction) { ... },
+    };
     var _db = null;
     var _ready = false;
     var _readyCallbacks = [];
@@ -93,7 +129,9 @@
             };
             request.onupgradeneeded = function(event) {
                 var db = event.target.result;
+                var transaction = event.target.transaction;
                 console.log('[TW-Storage] Datenbank-Upgrade von v' + event.oldVersion + ' auf v' + event.newVersion);
+                // 1) Stores anlegen, die noch fehlen (ist idempotent)
                 Object.keys(STORES).forEach(function(storeName) {
                     var cfg = STORES[storeName];
                     if (!db.objectStoreNames.contains(storeName)) {
@@ -107,6 +145,20 @@
                         console.log('[TW-Storage] Store erstellt: ' + storeName);
                     }
                 });
+                // 2) Migrations ab oldVersion+1 durchlaufen.
+                //    Damit werden Index-/Schema-Aenderungen an bestehenden
+                //    Stores nachgezogen (siehe MIGRATIONS-Tabelle oben).
+                for (var v = (event.oldVersion + 1); v <= event.newVersion; v++) {
+                    var migrate = MIGRATIONS[v];
+                    if (typeof migrate === 'function') {
+                        try {
+                            console.log('[TW-Storage] Migration v' + v + ' wird ausgefuehrt');
+                            migrate(db, transaction);
+                        } catch(e) {
+                            console.error('[TW-Storage] Migration v' + v + ' fehlgeschlagen:', e);
+                        }
+                    }
+                }
             };
             request.onsuccess = function(event) {
                 _db = event.target.result;
