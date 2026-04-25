@@ -12,22 +12,82 @@
     <meta http-equiv="Expires" content="0">
 
     <script>
-    // ═══ URL-DEBUG-FLAGS ═══
-    // Diagnose-Flags die per URL-Parameter aktiviert werden.
-    // Beispiele: ?noFotos=1, ?noFotos=1&noSync=1
+    // ═══ DEBUG-FLAGS (URL + localStorage) ═══
+    // Flags koennen ueber drei Wege aktiviert werden:
+    //   1. URL-Parameter:    ?noFotos=1&noSync=1
+    //   2. localStorage:     ueber das Debug-Toggle-Panel oben links
+    //   3. Special-URL:      ?debug=1 zeigt das Toggle-Panel; ?clearDebug=1 leert alles
+    //
+    // WICHTIG: Wir setzen BEIDE Schemas damit alter und neuer Code beides lesen kann:
+    //   - window.__twNoFotos / __twNoAlarm / __twNoSync / __twNoClock  (von tw-aufmass.jsx)
+    //   - window.__twDebugFlags = {noFotos, noAlarm, noSync, noClock} (von tw-app.jsx)
     (function() {
         try {
             var params = new URLSearchParams(window.location.search);
-            window.__twNoFotos = params.get('noFotos') === '1';
-            window.__twNoAlarm = params.get('noAlarm') === '1';
-            window.__twNoSync = params.get('noSync') === '1';
-            window.__twNoClock = params.get('noClock') === '1';
-            window.__twMinimal = params.get('minimal') === '1';
-            if (window.__twMinimal) {
-                window.__twNoAlarm = true;
-                window.__twNoSync = true;
-                window.__twNoClock = true;
+
+            // ?clearDebug=1 → alle gespeicherten Flags loeschen und reload
+            if (params.get('clearDebug') === '1') {
+                try { localStorage.removeItem('twDebugFlags'); } catch(_){}
+                var u = new URL(window.location.href);
+                u.searchParams.delete('clearDebug');
+                window.location.replace(u.toString());
+                return;
             }
+
+            // localStorage als Persistenz-Schicht laden (Defaults wenn nicht vorhanden)
+            var stored = {};
+            try {
+                var raw = localStorage.getItem('twDebugFlags');
+                if (raw) stored = JSON.parse(raw) || {};
+            } catch(_){}
+
+            // URL-Parameter ueberschreiben localStorage einmalig (und schreiben zurueck)
+            var urlSet = function(name) {
+                if (params.has(name)) {
+                    stored[name] = params.get(name) === '1';
+                    return true;
+                }
+                return false;
+            };
+            var urlChanged = false;
+            urlChanged |= urlSet('noFotos');
+            urlChanged |= urlSet('noAlarm');
+            urlChanged |= urlSet('noSync');
+            urlChanged |= urlSet('noClock');
+            urlChanged |= urlSet('showDebug');
+
+            // Minimal-Modus = alles aus
+            if (params.get('minimal') === '1') {
+                stored.noAlarm = true;
+                stored.noSync = true;
+                stored.noClock = true;
+                urlChanged = true;
+            }
+
+            // Debug-Panel sichtbar machen mit ?debug=1 (persistent)
+            if (params.get('debug') === '1') {
+                stored.showDebug = true;
+                urlChanged = true;
+            }
+
+            // Falls URL Flags geaendert hat: in localStorage zurueckschreiben
+            if (urlChanged) {
+                try { localStorage.setItem('twDebugFlags', JSON.stringify(stored)); } catch(_){}
+            }
+
+            // BEIDE Schemas am window-Objekt setzen (Backwards-Compat + neues Schema)
+            window.__twNoFotos = !!stored.noFotos;
+            window.__twNoAlarm = !!stored.noAlarm;
+            window.__twNoSync = !!stored.noSync;
+            window.__twNoClock = !!stored.noClock;
+            window.__twShowDebug = !!stored.showDebug;
+            window.__twDebugFlags = {
+                noFotos: !!stored.noFotos,
+                noAlarm: !!stored.noAlarm,
+                noSync: !!stored.noSync,
+                noClock: !!stored.noClock
+            };
+
             var flags = [];
             if (window.__twNoFotos) flags.push('noFotos');
             if (window.__twNoAlarm) flags.push('noAlarm');
@@ -179,9 +239,172 @@
 
 
     <div id="root" data-build="CACHEBUST_PLACEHOLDER"></div>
+
+    <!-- ═══ MEMORY-BADGE (immer sichtbar, oben rechts) ═══
+         Zeigt den aktuellen JS-Heap-Verbrauch in MB.
+         Farbcode: gruen (<150MB) / orange (150-250MB) / rot (>250MB).
+         Klick: Versteckt das Badge bis zum naechsten Reload. -->
+    <div id="tw-memory-badge" style="position:fixed;top:8px;right:8px;z-index:99998;
+         background:rgba(13,17,23,0.92);color:#e6edf3;padding:6px 10px;border-radius:8px;
+         font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+         font-weight:bold;border:1px solid rgba(255,255,255,0.12);
+         box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;
+         min-width:78px;text-align:center;user-select:none;
+         transition:opacity 0.15s">
+      <div id="tw-memory-badge-value" style="font-size:13px">– MB</div>
+      <div id="tw-memory-badge-label" style="font-size:9px;opacity:0.6;margin-top:1px">RAM</div>
+    </div>
+
+    <!-- ═══ FLAG-STATUS (zeigt aktive Debug-Flags, oben links) ═══
+         Nur sichtbar wenn mindestens ein Flag aktiv ist. -->
+    <div id="tw-flag-status" style="position:fixed;top:8px;left:8px;z-index:99998;
+         background:rgba(230,126,34,0.95);color:#fff;padding:6px 10px;border-radius:8px;
+         font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;
+         font-weight:bold;border:1px solid rgba(255,255,255,0.2);
+         box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;display:none;
+         user-select:none">
+      <span id="tw-flag-status-text">⚠ Debug</span>
+    </div>
+
+    <!-- ═══ DEBUG-TOGGLE-PANEL (versteckt; oeffnet via Klick auf Memory-Badge oder Flag-Status) ═══
+         Buttons schalten Flags in localStorage ein/aus, dann Reload. -->
+    <div id="tw-debug-panel" style="position:fixed;top:48px;right:8px;z-index:99999;
+         background:rgba(13,17,23,0.97);color:#e6edf3;padding:14px;border-radius:10px;
+         font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+         border:1px solid rgba(255,255,255,0.18);box-shadow:0 6px 20px rgba(0,0,0,0.5);
+         display:none;min-width:240px;max-width:300px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:bold;color:#58a6ff;font-size:13px">Debug-Panel</div>
+        <button id="tw-debug-close" style="background:#30363d;color:#e6edf3;border:none;
+          border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px">✕</button>
+      </div>
+      <div id="tw-debug-flag-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div style="border-top:1px solid rgba(255,255,255,0.1);margin-top:10px;padding-top:10px;
+           display:flex;flex-direction:column;gap:6px">
+        <button id="tw-debug-reset" style="background:#30363d;color:#e6edf3;border:none;
+          border-radius:6px;padding:7px;cursor:pointer;font-size:11px;font-weight:bold">
+          🗑 Alle Flags loeschen + Reload
+        </button>
+        <div id="tw-debug-buildinfo" style="font-size:10px;color:#7a8a9e;text-align:center;
+             padding-top:4px"></div>
+      </div>
+    </div>
+
     <script>
-      // Build-Version in die Console — damit man auf dem Tablet in den DevTools
-      // sofort sieht, ob man die neueste Version hat oder eine gecachte.
-      console.log('%c[TW Build] Version: CACHEBUST_PLACEHOLDER', 'color:#1E88E5;font-weight:bold');
+    // ═══ MEMORY-BADGE + DEBUG-PANEL: Boot-Logik ═══
+    (function() {
+      var FLAG_DEFS = [
+        {key:'noFotos', label:'Keine Fotos laden', desc:'Fotoseite + Rehydrierung aus'},
+        {key:'noAlarm', label:'Kein Alarm-Listener', desc:'Firebase-Alarm aus'},
+        {key:'noSync',  label:'Kein Auto-Sync',     desc:'Drive-Sync aus'},
+        {key:'noClock', label:'Keine Uhr',          desc:'Uhrzeit-Update aus'}
+      ];
+
+      // ─── Memory-Badge ───
+      var badge = document.getElementById('tw-memory-badge');
+      var badgeValue = document.getElementById('tw-memory-badge-value');
+      var hasMemoryAPI = !!(window.performance && window.performance.memory);
+
+      function updateMemoryBadge() {
+        if (!badge) return;
+        if (!hasMemoryAPI) {
+          badgeValue.textContent = 'n/a';
+          badge.style.background = 'rgba(60,60,60,0.92)';
+          badge.title = 'performance.memory nur in Chrome verfuegbar';
+          return;
+        }
+        var mb = Math.round(window.performance.memory.usedJSHeapSize / 1048576);
+        var limitMb = Math.round(window.performance.memory.jsHeapSizeLimit / 1048576);
+        badgeValue.textContent = mb + ' MB';
+        // Farbcode: gruen < 150, orange 150-250, rot > 250
+        var bg, fg;
+        if (mb < 150)      { bg = 'rgba(46,160,67,0.92)';  fg = '#fff'; }
+        else if (mb < 250) { bg = 'rgba(230,126,34,0.92)'; fg = '#fff'; }
+        else               { bg = 'rgba(218,54,51,0.95)';  fg = '#fff'; }
+        badge.style.background = bg;
+        badge.style.color = fg;
+        badge.title = 'JS-Heap: ' + mb + ' MB / Limit: ' + limitMb + ' MB — Klick fuer Debug-Panel';
+      }
+      updateMemoryBadge();
+      setInterval(updateMemoryBadge, 2000);
+
+      // ─── Flag-Status-Indicator ───
+      var flagStatus = document.getElementById('tw-flag-status');
+      var flagStatusText = document.getElementById('tw-flag-status-text');
+      function updateFlagStatus() {
+        var active = FLAG_DEFS.filter(function(f) { return window.__twDebugFlags && window.__twDebugFlags[f.key]; });
+        if (active.length === 0) {
+          flagStatus.style.display = 'none';
+        } else {
+          flagStatus.style.display = 'block';
+          flagStatusText.textContent = '⚠ ' + active.map(function(f){return f.key;}).join(' · ');
+          flagStatus.title = 'Aktive Flags: ' + active.map(function(f){return f.label;}).join(', ');
+        }
+      }
+      updateFlagStatus();
+
+      // ─── Debug-Panel Toggle ───
+      var panel = document.getElementById('tw-debug-panel');
+      var flagList = document.getElementById('tw-debug-flag-list');
+      var buildInfo = document.getElementById('tw-debug-buildinfo');
+      buildInfo.textContent = 'Build: CACHEBUST_PLACEHOLDER';
+
+      function readFlags() {
+        try { return JSON.parse(localStorage.getItem('twDebugFlags') || '{}'); } catch(_) { return {}; }
+      }
+      function writeFlags(f) {
+        try { localStorage.setItem('twDebugFlags', JSON.stringify(f)); } catch(_){}
+      }
+      function renderFlagButtons() {
+        var current = readFlags();
+        flagList.innerHTML = '';
+        FLAG_DEFS.forEach(function(def) {
+          var on = !!current[def.key];
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;' +
+                              'padding:7px 9px;border-radius:6px;background:' +
+                              (on ? 'rgba(218,54,51,0.18)' : 'rgba(46,160,67,0.10)') +
+                              ';border:1px solid ' + (on ? 'rgba(218,54,51,0.4)' : 'rgba(46,160,67,0.25)');
+          var labelDiv = document.createElement('div');
+          labelDiv.style.cssText = 'flex:1;min-width:0';
+          labelDiv.innerHTML = '<div style="font-weight:bold;font-size:11px">' + def.label + '</div>' +
+                               '<div style="font-size:9px;opacity:0.7;margin-top:1px">' + def.desc + '</div>';
+          var btn = document.createElement('button');
+          btn.textContent = on ? 'AN' : 'aus';
+          btn.style.cssText = 'background:' + (on ? '#da3633' : '#30363d') +
+                              ';color:#fff;border:none;border-radius:5px;padding:5px 10px;' +
+                              'cursor:pointer;font-weight:bold;font-size:11px;min-width:48px';
+          btn.onclick = function() {
+            var f = readFlags();
+            f[def.key] = !on;
+            writeFlags(f);
+            // Reload mit Cache-Bypass
+            window.location.reload();
+          };
+          row.appendChild(labelDiv);
+          row.appendChild(btn);
+          flagList.appendChild(row);
+        });
+      }
+      function openPanel()  { panel.style.display = 'block'; renderFlagButtons(); }
+      function closePanel() { panel.style.display = 'none'; }
+
+      badge.addEventListener('click', function() {
+        if (panel.style.display === 'block') closePanel(); else openPanel();
+      });
+      flagStatus.addEventListener('click', openPanel);
+      document.getElementById('tw-debug-close').addEventListener('click', closePanel);
+      document.getElementById('tw-debug-reset').addEventListener('click', function() {
+        try { localStorage.removeItem('twDebugFlags'); } catch(_){}
+        window.location.reload();
+      });
+
+      // Wenn ?debug=1 in URL: Panel automatisch oeffnen
+      if (window.__twShowDebug) openPanel();
+    })();
+
+    // Build-Version in die Console — damit man auf dem Tablet in den DevTools
+    // sofort sieht, ob man die neueste Version hat oder eine gecachte.
+    console.log('%c[TW Build] Version: CACHEBUST_PLACEHOLDER', 'color:#1E88E5;font-weight:bold');
     </script>
 
