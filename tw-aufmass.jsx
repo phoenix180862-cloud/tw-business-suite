@@ -62,16 +62,33 @@
                 })();
             }, []);
 
+            // Detail-Fehlermeldung fuer Test-Diagnose (nur sichtbar wenn Test fehlschlaegt)
+            const [geminiTestDetail, setGeminiTestDetail] = useState('');
+
             var testGeminiKey = async function() {
-                if (!geminiKey) return;
+                if (!geminiKey) {
+                    setGeminiStatus('error');
+                    setGeminiTestDetail('Kein API-Key eingegeben.');
+                    return;
+                }
                 setGeminiStatus('testing');
-                // Fallback-Reihenfolge: stabile Modelle zuerst. 3.1 Pro Preview wird
-                // bewusst NICHT automatisch als Default gesetzt (Preview-Risiko).
-                // Fuer Preview-Nutzung: User waehlt manuell ueber die Model-Buttons.
-                var modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+                setGeminiTestDetail('');
+
+                // Reihenfolge: User-Auswahl ZUERST testen, dann Fallbacks. Damit sehen wir
+                // bei Fehler, was mit dem WIRKLICH gewuenschten Modell ist (nicht nur ob
+                // irgendein Fallback funktioniert hat).
+                var userChoice = (GEMINI_CONFIG.MODELS && GEMINI_CONFIG.MODELS[geminiModelPref])
+                    ? GEMINI_CONFIG.MODELS[geminiModelPref].id
+                    : 'gemini-2.5-pro';
+                var modelsToTry = [userChoice];
+                ['gemini-2.5-pro', 'gemini-2.5-flash'].forEach(function(m) {
+                    if (modelsToTry.indexOf(m) === -1) modelsToTry.push(m);
+                });
+
+                var lastDiagnosis = '';
                 for (var mi = 0; mi < modelsToTry.length; mi++) {
+                    var testModel = modelsToTry[mi];
                     try {
-                        var testModel = modelsToTry[mi];
                         var res = await (window.fetchWithTimeout || fetch)(
                             GEMINI_CONFIG.BASE_URL + '/models/' + testModel + ':generateContent?key=' + geminiKey,
                             { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -81,6 +98,7 @@
                         if (res.ok) {
                             GEMINI_CONFIG.MODEL = testModel;
                             setGeminiStatus('ok');
+                            setGeminiTestDetail('');
                             setGeminiConnected(true);
                             localStorage.setItem('gemini_api_key', geminiKey);
                             localStorage.setItem('gemini_model', testModel);
@@ -88,9 +106,37 @@
                             window._kiDisabled = false;
                             return;
                         }
-                    } catch(e) {}
+                        // HTTP-Fehler -> Body lesen und in lesbare Diagnose verwandeln
+                        var bodyText = '';
+                        try { bodyText = await res.text(); } catch(_) {}
+                        var apiMsg = '';
+                        try {
+                            var parsed = JSON.parse(bodyText);
+                            apiMsg = (parsed && parsed.error && parsed.error.message) ? parsed.error.message : '';
+                        } catch(_) {
+                            apiMsg = (bodyText || '').substring(0, 200);
+                        }
+                        var hint = '';
+                        if (res.status === 400) hint = 'Anfrage fehlerhaft (z.B. ungueltiger Modellname)';
+                        else if (res.status === 401) hint = 'Key ungueltig oder abgelaufen';
+                        else if (res.status === 403) hint = 'Zugriff verweigert -- Generative Language API im Google-Projekt aktivieren oder Key-Restrictions pruefen';
+                        else if (res.status === 404) hint = 'Modell nicht gefunden -- ggf. abgekuendigt';
+                        else if (res.status === 429) hint = 'Quota/Rate-Limit erreicht -- spaeter erneut versuchen';
+                        else if (res.status >= 500) hint = 'Google-Server-Fehler -- spaeter erneut versuchen';
+                        else hint = 'HTTP ' + res.status;
+                        lastDiagnosis = '[' + testModel + '] HTTP ' + res.status + ' -- ' + hint
+                            + (apiMsg ? ' || ' + apiMsg : '');
+                        console.warn('[Gemini-Test]', lastDiagnosis);
+                    } catch(netErr) {
+                        // Netzwerk- oder Timeout-Fehler
+                        var em = (netErr && netErr.message) ? netErr.message : String(netErr);
+                        lastDiagnosis = '[' + testModel + '] Netzwerk/Timeout: ' + em
+                            + ' || Pruefe Internet, Firewall oder API-URL-Erreichbarkeit';
+                        console.warn('[Gemini-Test]', lastDiagnosis);
+                    }
                 }
                 setGeminiStatus('error');
+                setGeminiTestDetail(lastDiagnosis || 'Unbekannter Fehler -- siehe Browser-Konsole');
             };
 
             var saveGeminiKey = function() {
@@ -526,7 +572,41 @@
                             </div>
                             {geminiStatus === 'testing' && <div style={{marginTop:'8px', fontSize:'12px', color:'#f39c12', textAlign:'center'}}>Verbindung wird getestet...</div>}
                             {geminiStatus === 'ok' && <div style={{marginTop:'8px', fontSize:'12px', color:'#2ecc71', textAlign:'center'}}>Gemini verbunden! Modell: {GEMINI_CONFIG.MODEL}</div>}
-                            {geminiStatus === 'error' && <div style={{marginTop:'8px', fontSize:'12px', color:'#e74c3c', textAlign:'center'}}>Verbindung fehlgeschlagen</div>}
+                            {geminiStatus === 'error' && (
+                                <div style={{marginTop:'8px', display:'flex', flexDirection:'column', gap:'6px'}}>
+                                    <div style={{fontSize:'12px', color:'#e74c3c', textAlign:'center', fontWeight:600}}>Verbindung fehlgeschlagen</div>
+                                    {geminiTestDetail && (
+                                        <div style={{
+                                            fontSize:'11px', color:'#fbbf77', background:'rgba(231,76,60,0.08)',
+                                            border:'1px solid rgba(231,76,60,0.25)', borderRadius:'6px',
+                                            padding:'8px 10px', fontFamily:'Source Code Pro, monospace',
+                                            whiteSpace:'pre-wrap', wordBreak:'break-word', lineHeight:1.4
+                                        }}>
+                                            {geminiTestDetail}
+                                        </div>
+                                    )}
+                                    {geminiTestDetail && (
+                                        <button
+                                            onClick={function(){
+                                                try {
+                                                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                                                        navigator.clipboard.writeText(geminiTestDetail);
+                                                    }
+                                                } catch(_) {}
+                                            }}
+                                            style={{
+                                                fontSize:'10px', padding:'4px 10px', borderRadius:'6px',
+                                                border:'1px solid rgba(231,76,60,0.35)', cursor:'pointer',
+                                                background:'transparent', color:'#fbbf77',
+                                                fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px',
+                                                alignSelf:'center'
+                                            }}
+                                        >
+                                            Fehler kopieren
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Modellauswahl */}
                             <div style={{marginTop:'12px', paddingTop:'10px', borderTop:'1px solid var(--border-color)'}}>
