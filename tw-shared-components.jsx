@@ -2056,227 +2056,133 @@
             );
         }
 
-        /* ═══════════════════════════════════════════
-           MODULWAHL -- Dashboard nach Kundenauswahl
-           ═══════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════════════════════
+           PLATZOPTIMIERUNG-TOOLBAR -- Komponenten (Skill-Implementierung)
+           Ergaenzt 25.04.2026: Behebt ReferenceError "ToolbarRow is not defined"
+           in tw-aufmass.jsx (Raumerkennung + Raumblatt + Pos-Modal-Toolbar).
+           Specs: SKILL-platzoptimierung-toolbar.md (Abschnitte 5,6,7)
+           ═══════════════════════════════════════════════════════════ */
 
-        /* ═══════════════════════════════════════════════════════════════════
-           PLATZOPTIMIERUNG-TOOLBAR -- Bausteine fuer App-weite Migration
-           Stand: 25.04.2026
-           Skill:  SKILL-platzoptimierung-toolbar.md (Teil B + Teil F)
-           ───────────────────────────────────────────────────────────────────
-           Diese Komponenten werden in den seitenweisen Migrations-Sprints
-           verwendet, um Querbalken-Buttons und Status-Banner durch eine
-           kompakte Toolbar-Zeile zu ersetzen. Sie erfuellen die Skill-
-           Vorgaben aus Teil B (Toolbar-System) und Teil F (Status-Pill-
-           Wortlaut).
-           ═══════════════════════════════════════════════════════════════════ */
-
-        // === ToolbarRow ===========================================
-        // Sticky horizontale Toolbar-Zeile, scrollbar bei Bedarf,
-        // bricht NIE auf 2 Zeilen um (Skill 5).
-        // Props:
-        //   left:  React-Knoten fuer linke Gruppe (Dropdowns, Action-Buttons)
-        //   right: React-Knoten fuer rechte Gruppe (Status-Pills)
-        //   stickyTop: Pixel-Wert fuer position:sticky.top (default 60)
-        //   sticky:    boolean (default true). Auf false setzen fuer
-        //              Verwendung in Modals oder anderen Scroll-Containern.
-        //   children: Falls weder left noch right uebergeben werden, wird
-        //             children direkt eingefuegt (freies Layout)
-        function ToolbarRow({ left, right, stickyTop, sticky, children }) {
-            var topPx = (typeof stickyTop === 'number') ? stickyTop : 60;
-            var isSticky = (sticky !== false); // default true
-            var posStyle = isSticky
-                ? { position: 'sticky', top: topPx + 'px', zIndex: 95 }
-                : { position: 'relative' };
-            return (
-                <div
-                    className="tw-toolbar-row"
-                    style={Object.assign({
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '6px 12px',
-                        background: 'var(--bg-secondary)',
-                        borderBottom: '1px solid var(--border-color)',
-                        overflowX: 'auto',
-                        overflowY: 'visible',
-                        flexWrap: 'nowrap',
-                        minHeight: '44px',
-                        scrollbarWidth: 'thin'
-                    }, posStyle)}
-                >
-                    {children}
-                    {left && (
-                        <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'nowrap'}}>
-                            {left}
-                        </div>
-                    )}
-                    {(left || right) && <div style={{flex: 1, minWidth: '4px'}} />}
-                    {right && (
-                        <div style={{display:'flex', alignItems:'center', gap:'5px', flexWrap:'nowrap'}}>
-                            {right}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        // === ToolbarButton ========================================
-        // Kompakter Action-Button fuer die Toolbar (Icon + 1-2 Worte).
-        // Skill Kapitel 4.2 + 6.
-        // Props:
-        //   icon:    Emoji oder kurzer String
-        //   label:   Aktions-Bezeichnung (Oswald uppercase)
-        //   onClick: Klick-Handler
-        //   color:   'red' (default), 'blue', 'orange', 'green'
-        //   disabled: optional
-        //   title:   optional title-Attribut fuer Hover-Tooltip
-        function ToolbarButton({ icon, label, onClick, color, disabled, title }) {
-            var col = color || 'red';
-            var grad;
-            if (col === 'blue')        grad = 'linear-gradient(135deg, #4da6ff, #1565C0)';
-            else if (col === 'orange') grad = 'linear-gradient(135deg, var(--accent-orange-light), var(--accent-orange))';
-            else if (col === 'green')  grad = 'linear-gradient(135deg, #2ecc71, #27ae60)';
-            else                       grad = 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))';
+        function ToolbarButton(props) {
+            var icon = props.icon;
+            var label = props.label;
+            var onClick = props.onClick;
+            var color = props.color || 'red';
+            var disabled = !!props.disabled;
+            var title = props.title;
+            var grad = ({
+                red:    'linear-gradient(135deg, var(--accent-red-light, #ff6b6b), var(--accent-red, #c41e1e))',
+                blue:   'linear-gradient(135deg, #4da6ff, #1565C0)',
+                orange: 'linear-gradient(135deg, var(--accent-orange-light, #f5b041), var(--accent-orange, #e67e22))',
+                green:  'linear-gradient(135deg, #2ecc71, #27ae60)'
+            })[color] || 'linear-gradient(135deg, #ff6b6b, #c41e1e)';
             return (
                 <button
-                    type="button"
                     onClick={disabled ? undefined : onClick}
-                    onPointerDown={function(e){ e.stopPropagation(); }}
-                    disabled={!!disabled}
-                    title={title || label}
+                    disabled={disabled}
+                    title={title}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
                         padding: '7px 12px',
-                        borderRadius: 'var(--radius-sm)',
+                        borderRadius: 'var(--radius-sm, 6px)',
                         border: 'none',
-                        background: disabled ? 'rgba(120,120,120,0.20)' : grad,
-                        color: disabled ? 'rgba(255,255,255,0.55)' : '#fff',
+                        background: grad,
+                        color: '#fff',
                         fontFamily: 'Oswald, sans-serif',
                         fontSize: '11px',
                         fontWeight: '600',
                         letterSpacing: '0.5px',
                         textTransform: 'uppercase',
                         cursor: disabled ? 'not-allowed' : 'pointer',
+                        opacity: disabled ? 0.55 : 1,
                         whiteSpace: 'nowrap',
                         touchAction: 'manipulation',
-                        userSelect: 'none',
                         minHeight: '32px',
-                        opacity: disabled ? 0.55 : 1,
-                        transition: 'transform 0.15s ease, filter 0.15s ease'
+                        transition: 'transform 0.15s ease'
                     }}
                 >
-                    {icon && <span style={{fontSize:'13px'}}>{icon}</span>}
+                    {icon ? <span style={{fontSize:'13px'}}>{icon}</span> : null}
                     <span>{label}</span>
                 </button>
             );
         }
 
-        // === StatusPill ===========================================
-        // Anzeige-Pille (NICHT klickbar) fuer Zaehler und Stati.
-        // Skill Kapitel 4.3 + 7 + 19.
-        // Props:
-        //   text:  String (z.B. "7 RAEUME", "OK 32s")
-        //   color: 'success' | 'info' | 'warn' | 'muted'
-        //   title: optional Tooltip
-        function StatusPill({ text, color, title }) {
-            var col = color || 'info';
-            var palette;
-            if (col === 'success')      palette = { bg:'rgba(39,174,96,0.15)',  border:'rgba(39,174,96,0.45)',  fg:'#27ae60' };
-            else if (col === 'warn')    palette = { bg:'rgba(230,126,34,0.15)', border:'rgba(230,126,34,0.45)', fg:'#e67e22' };
-            else if (col === 'muted')   palette = { bg:'rgba(184,196,212,0.10)',border:'rgba(184,196,212,0.30)',fg:'#b8c4d4' };
-            else                        palette = { bg:'rgba(77,166,255,0.15)', border:'rgba(77,166,255,0.45)', fg:'#4da6ff' };
+        function StatusPill(props) {
+            var text = props.text;
+            var color = props.color || 'info';
+            var title = props.title;
+            var palette = ({
+                success: { bg:'rgba(39,174,96,0.15)',  border:'rgba(39,174,96,0.45)',  fg:'#27ae60' },
+                info:    { bg:'rgba(77,166,255,0.15)', border:'rgba(77,166,255,0.45)', fg:'#4da6ff' },
+                warn:    { bg:'rgba(230,126,34,0.15)', border:'rgba(230,126,34,0.45)', fg:'#e67e22' },
+                muted:   { bg:'rgba(184,196,212,0.10)', border:'rgba(184,196,212,0.30)', fg:'#b8c4d4' }
+            })[color] || { bg:'rgba(77,166,255,0.15)', border:'rgba(77,166,255,0.45)', fg:'#4da6ff' };
             return (
-                <div
-                    title={title || text}
-                    style={{
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        background: palette.bg,
-                        border: '1px solid ' + palette.border,
-                        color: palette.fg,
-                        fontSize: '10px',
-                        fontWeight: '700',
-                        fontFamily: 'Oswald, sans-serif',
-                        letterSpacing: '0.3px',
-                        textTransform: 'uppercase',
-                        whiteSpace: 'nowrap',
-                        userSelect: 'none',
-                        minHeight: '24px',
-                        display: 'inline-flex',
-                        alignItems: 'center'
-                    }}
-                >
+                <div title={title} style={{
+                    padding: '4px 10px',
+                    borderRadius: '999px',
+                    background: palette.bg,
+                    border: '1px solid ' + palette.border,
+                    color: palette.fg,
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    fontFamily: 'Oswald, sans-serif',
+                    letterSpacing: '0.3px',
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                    userSelect: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center'
+                }}>
                     {text}
                 </div>
             );
         }
 
-        // === BottomSheetJSX =======================================
-        // JSX-Variante des Bottom-Sheets fuer Module, die direkt eines
-        // brauchen (etwa fuer Form-Auswahl auf Mobile).
-        // Die Dropdown-Komponenten in tw-nav-dropdowns.js bringen ihren
-        // eigenen Bottom-Sheet bereits mit -- diese hier ist die Standalone-
-        // Version fuer freie Verwendung.
-        // Props: title, onClose, children
-        function BottomSheetJSX({ title, onClose, children }) {
-            React.useEffect(function() {
-                var prev = document.body.style.overflow;
-                document.body.style.overflow = 'hidden';
-                return function() { document.body.style.overflow = prev; };
-            }, []);
+        /* ToolbarRow:
+           Schlanker Container fuer linke + rechte Inhalte (Buttons / Pills).
+           Props:
+             - left:      JSX (linker Block, optional)
+             - right:     JSX (rechter Block, optional)
+             - children:  alternativ direkt Inhalte (werden gleichmaessig verteilt)
+             - sticky:    boolean -- wenn true: position:sticky unterhalb Header
+        */
+        function ToolbarRow(props) {
+            var left = props.left;
+            var right = props.right;
+            var children = props.children;
+            var sticky = !!props.sticky;
+            var stickyStyle = sticky ? { position:'sticky', top:'60px', zIndex:95 } : {};
             return (
-                <React.Fragment>
-                    <div onClick={onClose}
-                        style={{
-                            position:'fixed', inset:0,
-                            background:'rgba(0,0,0,0.55)',
-                            zIndex:9998,
-                            animation:'fadeIn 0.18s ease'
-                        }} />
-                    <div data-tw-bottom-sheet="true"
-                        style={{
-                            position:'fixed', bottom:0, left:0, right:0,
-                            background:'var(--bg-secondary)',
-                            borderTopLeftRadius:'var(--radius-lg)',
-                            borderTopRightRadius:'var(--radius-lg)',
-                            padding:'12px 12px 24px',
-                            zIndex:9999,
-                            maxHeight:'80vh',
-                            overflowY:'auto',
-                            boxShadow:'0 -10px 40px rgba(0,0,0,0.5)',
-                            animation:'slideUpSheet 0.25s ease-out',
-                            borderTop:'1px solid var(--border-color)'
-                        }}>
-                        <div style={{
-                            width:'40px', height:'4px',
-                            background:'var(--text-muted)',
-                            borderRadius:'2px',
-                            margin:'0 auto 12px', opacity:0.5
-                        }} />
-                        {title && (
-                            <div style={{
-                                fontFamily:'Oswald, sans-serif',
-                                fontSize:'13px', fontWeight:'700',
-                                textTransform:'uppercase', letterSpacing:'1px',
-                                color:'var(--text-white)',
-                                marginBottom:'12px', padding:'0 4px'
-                            }}>{title}</div>
-                        )}
-                        {children}
-                    </div>
-                </React.Fragment>
+                <div style={Object.assign({
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 8px',
+                    margin: '6px 0',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: 'var(--radius-sm, 6px)',
+                    flexWrap: 'nowrap',
+                    minHeight: '40px'
+                }, stickyStyle)}>
+                    {left ? <div style={{display:'flex', alignItems:'center', gap:'6px'}}>{left}</div> : null}
+                    <div style={{flex:1}} />
+                    {right ? <div style={{display:'flex', alignItems:'center', gap:'6px'}}>{right}</div> : null}
+                    {children}
+                </div>
             );
         }
 
-        // Globaler Export fuer Code-Stellen, die ausserhalb des Bundles
-        // (z.B. in tw-nav-dropdowns.js oder per window-Referenz) zugreifen.
+        // Global verfuegbar machen, damit alle Module sie sehen (Build-Reihenfolge: shared-components zuerst)
         if (typeof window !== 'undefined') {
-            window.ToolbarRow     = ToolbarRow;
-            window.ToolbarButton  = ToolbarButton;
-            window.StatusPill     = StatusPill;
-            window.BottomSheetJSX = BottomSheetJSX;
+            window.ToolbarButton = ToolbarButton;
+            window.StatusPill = StatusPill;
+            window.ToolbarRow = ToolbarRow;
         }
+
+        /* ═══════════════════════════════════════════
+           MODULWAHL -- Dashboard nach Kundenauswahl
+           ═══════════════════════════════════════════ */
