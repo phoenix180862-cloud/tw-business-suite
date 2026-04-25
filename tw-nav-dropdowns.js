@@ -174,7 +174,11 @@
             padding: '6px',
             minWidth: '220px',
             maxWidth: 'calc(100vw - 16px)',
-            zIndex: 1000,
+            // z-index 2600: liegt ueber pos-modal-overlay (300), calc-modal (2000),
+            // archiv-modal (9500/2001) -- aber UNTER den echten Vollscreen-Lightboxen
+            // (10000+). Garantiert, dass das Aufmass-/Bearbeiten-Dropdown immer
+            // klickbar bleibt, egal welches Modal gerade offen ist.
+            zIndex: 2600,
             display: 'flex',
             flexDirection: 'column',
             gap: '3px',

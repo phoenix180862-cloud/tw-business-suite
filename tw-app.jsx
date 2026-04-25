@@ -2762,7 +2762,7 @@
                         als Eintraege im Bearbeiten-Dropdown (nicht mehr als eigene rote Leiste).
                         NavDropdown-Farbe (blau/rot) abhaengig von der aktuellen Seite. */}
                     {(true) && (
-                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:99, flexWrap:'wrap'}}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:350, flexWrap:'wrap'}}>
                             {/* Linke Gruppe: NavDropdown + ggf. Bearbeiten-Dropdown */}
                             <div style={{display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}}>
                                 <NavDropdown
