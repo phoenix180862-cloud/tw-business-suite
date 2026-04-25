@@ -1,10 +1,17 @@
 @echo off
 REM ================================================================
-REM  TW Business Suite - Build (V3, Pre-Compile + Pre-Flight-Checks)
-REM  Stand: 25.04.2026
+REM  TW Business Suite - Build (V3.1, Pre-Compile + Pre-Flight-Checks)
+REM  Stand: 25.04.2026 - Etappe A
 REM ================================================================
 REM
-REM NEU IN V3 (25.04.2026):
+REM NEU IN V3.1 (25.04.2026, Etappe A):
+REM   - NavDropdown/AktionDropdown-Sanity-Check erkennt jetzt auch
+REM     externe tw-nav-dropdowns.js (separate Skript-Datei vor Bundle)
+REM   - Pflicht-Check fuer StorageHealthDashboard und MemoryBadge
+REM     (verhindert, dass Komponenten nur im Build, nicht in Quellen
+REM     existieren - das war 25.04.2026 ein Live-Bombe-Szenario)
+REM
+REM AUS V3 (25.04.2026):
 REM   - Pre-Flight-Checks VOR Babel: doppelte Konstanten, Umlaute in
 REM     JSX-Kommentaren, doppelte Hyphen-Sequenzen, Bundle-Vergleich
 REM   - Sanity-Checks erweitert (mehr kritische Komponenten geprueft)
@@ -212,13 +219,52 @@ if not errorlevel 1 (
 )
 findstr /c:"function NavDropdown" index.html >nul
 if errorlevel 1 (
-    echo      FEHLER: NavDropdown fehlt im Bundle!
-    pause
-    exit /b 1
+    REM Pruefen ob Komponente alternativ in separat geladenem Skript ist
+    if exist "tw-nav-dropdowns.js" (
+        findstr /c:"function NavDropdown" tw-nav-dropdowns.js >nul
+        if errorlevel 1 (
+            echo      FEHLER: NavDropdown weder im Bundle noch in tw-nav-dropdowns.js!
+            pause
+            exit /b 1
+        ) else (
+            echo      NavDropdown gefunden in tw-nav-dropdowns.js ^(separates Skript^)
+        )
+    ) else (
+        echo      FEHLER: NavDropdown fehlt im Bundle!
+        pause
+        exit /b 1
+    )
 )
 findstr /c:"function AktionDropdown" index.html >nul
 if errorlevel 1 (
-    echo      FEHLER: AktionDropdown fehlt im Bundle!
+    REM Pruefen ob Komponente alternativ in separat geladenem Skript ist
+    if exist "tw-nav-dropdowns.js" (
+        findstr /c:"function AktionDropdown" tw-nav-dropdowns.js >nul
+        if errorlevel 1 (
+            echo      FEHLER: AktionDropdown weder im Bundle noch in tw-nav-dropdowns.js!
+            pause
+            exit /b 1
+        ) else (
+            echo      AktionDropdown gefunden in tw-nav-dropdowns.js ^(separates Skript^)
+        )
+    ) else (
+        echo      FEHLER: AktionDropdown fehlt im Bundle!
+        pause
+        exit /b 1
+    )
+)
+REM ---- Storage-Health-Dashboard Pflicht-Check ^(neu V3.1, 25.04.2026^) ----
+findstr /c:"function StorageHealthDashboard" index.html >nul
+if errorlevel 1 (
+    echo      FEHLER: StorageHealthDashboard fehlt im Bundle!
+    echo      Loesung: Komponente in tw-shared-components.jsx ergaenzen.
+    pause
+    exit /b 1
+)
+findstr /c:"function MemoryBadge" index.html >nul
+if errorlevel 1 (
+    echo      FEHLER: MemoryBadge fehlt im Bundle!
+    echo      Loesung: Komponente in tw-shared-components.jsx ergaenzen.
     pause
     exit /b 1
 )

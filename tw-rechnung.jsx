@@ -131,7 +131,75 @@
             var kontoSumme=kontozahlungen.filter(function(k){return k.aufgefuehrt;}).reduce(function(s,k){return s+(parseFloat(k.betrag)||0);},0);
             var addNachtragsPositionen=function(){if(rechnungsTyp!=='nachtrag'||aktivePosn.length===0)return;var kid=kunde._driveFolderId||kunde.id||kunde.name;var key='lv_positionen_'+kid;var best=[];try{best=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}aktivePosn.forEach(function(np){best.push({pos:np.pos,posNr:np.pos,bez:'[NT] '+(np.bez||''),einheit:np.einheit,menge:np.menge,einzelpreis:np.einzelpreis,ep:np.einzelpreis,quelle:'nachtrag',nachtragsNr:nachtragsNr,erstelltAm:new Date().toISOString()});});localStorage.setItem(key,JSON.stringify(best));if(typeof LV_POSITIONEN!=='undefined')LV_POSITIONEN[kid]=best;};
             var getDateiname=function(){var pf=rechnungsTyp==='abschlag'?'Abschlagsrechnung':rechnungsTyp==='schluss'?'Schlussrechnung':rechnungsTyp==='einzel'?'Rechnung':rechnungsTyp==='nachtrag'?'Nachtrag':rechnungsTyp==='aufmass'?'Aufmass':'Angebot';return pf+'_'+getDokumentNr()+'_'+(kunde.name||'Kunde').replace(/[^a-zA-Z0-9_-]/g,'_')+'_'+rechnungsDatum.replace(/-/g,'')+'.pdf';};
-            var saveToGoogleDrive=async function(){var svc=window.GoogleDriveService;if(!svc||!svc.accessToken||!kunde._driveFolderId)return;var zo=istRechnung?'Rechnung-A.Kontozahlung':rechnungsTyp==='aufmass'?'Aufmass':'Angebote-Nachtraege-Leistungsverzeichnis';try{var c=await svc.listFolderContents(kunde._driveFolderId);var tf=(c.folders||[]).find(function(f){return f.name===zo;});if(tf)console.log('PDF fuer Drive: '+zo+'/'+getDateiname());}catch(e){}};
+            // ── PDF-Blob-Cache fuer Speicher-Funktion (Etappe C, 25.04.2026) ──
+            // generatePDF schreibt den letzten erzeugten Blob hier rein,
+            // damit saveToGoogleDrive ihn ohne Re-Generierung speichern kann.
+            var lastPdfBlob = null;
+            var saveToGoogleDrive = async function() {
+                // Fallback: PDF noch nicht generiert -> jetzt generieren
+                if (!lastPdfBlob) {
+                    try { generatePDF(); } catch(e) { console.warn('generatePDF im Save-Pfad:', e); }
+                }
+                if (!lastPdfBlob || !kunde) {
+                    if (window._showToast) window._showToast('Kein PDF zum Speichern vorhanden', 'error');
+                    return;
+                }
+                var zo = istRechnung ? 'Rechnung-A.Kontozahlung'
+                       : rechnungsTyp === 'aufmass' ? 'Aufmass'
+                       : 'Angebote-Nachtraege-Leistungsverzeichnis';
+                var name = getDateiname();
+                var docType = istRechnung ? 'rechnung'
+                            : rechnungsTyp === 'aufmass' ? 'aufmass'
+                            : 'angebot';
+                // Primaer-Pfad: Storage-API mit Konflikt-Check (Etappe D, 25.04.2026)
+                if (window.TWStorageAPI && window.TWStorageAPI.saveDocumentWithConflictCheck) {
+                    try {
+                        var kid = kunde._driveFolderId || kunde.id || kunde.name;
+                        var result = await window.TWStorageAPI.saveDocumentWithConflictCheck(
+                            kid, zo, name, 'application/pdf', lastPdfBlob, { docType: docType }
+                        );
+                        if (result.saved) {
+                            if (window._showToast) window._showToast('PDF gespeichert: ' + zo + '/' + name, 'success');
+                        } else if (result.action === 'drive') {
+                            if (window._showToast) window._showToast('Drive-Version uebernommen, lokale Version verworfen', 'info');
+                        } else if (result.action === 'vergleich') {
+                            if (window._showToast) window._showToast('Drive-Version zum Vergleich geoeffnet', 'info');
+                        } else if (result.action === 'abbrechen') {
+                            if (window._showToast) window._showToast('Speichern abgebrochen', 'info');
+                        } else {
+                            if (window._showToast) window._showToast('Speichern fehlgeschlagen: ' + (result.error || result.action), 'error');
+                        }
+                        return;
+                    } catch (e) {
+                        console.warn('[tw-rechnung] saveDocumentWithConflictCheck fehlgeschlagen, Fallback:', e);
+                    }
+                }
+                // Fallback 1: Storage-API ohne Konflikt-Check
+                if (window.TWStorageAPI && window.TWStorageAPI.saveDocument) {
+                    try {
+                        var kid2 = kunde._driveFolderId || kunde.id || kunde.name;
+                        await window.TWStorageAPI.saveDocument(kid2, zo, name, 'application/pdf', lastPdfBlob, { docType: docType });
+                        if (window._showToast) window._showToast('PDF gespeichert: ' + zo + '/' + name, 'success');
+                        return;
+                    } catch (e) {
+                        console.warn('[tw-rechnung] TWStorageAPI.saveDocument fehlgeschlagen, Fallback auf direkten Drive-Upload:', e);
+                    }
+                }
+                // Fallback-Pfad: direkter Drive-Upload (alter Stub-Pfad)
+                var svc = window.GoogleDriveService;
+                if (!svc || !svc.accessToken || !kunde._driveFolderId) {
+                    if (window._showToast) window._showToast('Drive nicht verbunden - PDF nur lokal verfuegbar', 'info');
+                    return;
+                }
+                try {
+                    var folderId = await svc.findOrCreateFolder(kunde._driveFolderId, zo);
+                    await svc.uploadFile(folderId, name, 'application/pdf', lastPdfBlob);
+                    if (window._showToast) window._showToast('PDF gespeichert (direkt): ' + name, 'success');
+                } catch (e) {
+                    console.error('[tw-rechnung] Drive-Upload fehlgeschlagen:', e);
+                    if (window._showToast) window._showToast('Drive-Upload fehlgeschlagen: ' + (e.message||e), 'error');
+                }
+            };
             var noSpinnerCSS='<style>input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}input[type=number]{-moz-appearance:textfield;}</style>';
             var inputStyle={width:'100%',padding:'8px 10px',borderRadius:'8px',border:'1px solid var(--border-color)',background:'var(--bg-tertiary)',fontSize:'13px',color:'var(--text-primary)',boxSizing:'border-box'};
             var smallInputStyle=Object.assign({},inputStyle,{padding:'6px 8px',fontSize:'12px',textAlign:'right'});
@@ -460,6 +528,7 @@
                 // 60s automatisch freigegeben, sonst akkumuliert sich
                 // bei jeder Vorschau ein MB-grosser Leak.
                 var blob=doc.output('blob');var url=URL.createObjectURL(blob);
+                lastPdfBlob = blob; // Cache fuer saveToGoogleDrive (Etappe C, 25.04.2026)
                 var pdfWin=window.open(url,'_blank');
                 setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
                 saveToGoogleDrive();

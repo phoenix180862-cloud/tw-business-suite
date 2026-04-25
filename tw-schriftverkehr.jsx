@@ -239,6 +239,40 @@
             var handleDrucken = function() { generatePDF(); };
 
             // -- Gmail-API Versand (mit HTML-Mail fuer bessere Darstellung) --
+            // ── Helper: PDF speichern (Etappe C, 25.04.2026) ──
+            // Nutzt zuerst TWStorageAPI (mit Queue/Retry/Audit), fallback
+            // auf direkten Drive-Upload. Damit die MemoryBadge ueber alle
+            // Schriftverkehrs-PDFs Bescheid weiss.
+            var _uploadPdfViaApi = async function(svc, kundeId, ordnerName, fileName, pdfBlob) {
+                if (window.TWStorageAPI && window.TWStorageAPI.saveDocument) {
+                    try {
+                        await window.TWStorageAPI.saveDocument(
+                            kundeId, ordnerName, fileName, 'application/pdf',
+                            pdfBlob, { docType: 'schriftverkehr' }
+                        );
+                        return { ok: true, via: 'api' };
+                    } catch(e) {
+                        console.warn('[tw-schriftverkehr] TWStorageAPI fehlgeschlagen, Fallback Drive:', e);
+                    }
+                }
+                // Fallback: direkter Drive-Upload mit dem alten Pfad
+                if (svc && svc.accessToken && kundeId) {
+                    try {
+                        var sOId = await svc.findOrCreateFolder(kundeId,
+                            (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'
+                        );
+                        var subF = ordnerName.indexOf('/') >= 0 ? ordnerName.split('/')[1] : ordnerName;
+                        var uOId = await svc.findOrCreateFolder(sOId, subF);
+                        await svc.uploadFile(uOId, fileName, 'application/pdf', pdfBlob);
+                        return { ok: true, via: 'drive-direct' };
+                    } catch(e) {
+                        console.error('[tw-schriftverkehr] Drive-Upload fehlgeschlagen:', e);
+                        return { ok: false, error: e.message || String(e) };
+                    }
+                }
+                return { ok: false, error: 'Drive nicht verbunden' };
+            };
+
             var handleSenden = async function() {
                 if (!empfEmail && !mailAdresse) { alert('Bitte eine E-Mail-Adresse eingeben!'); return; }
                 var zielEmail = mailAdresse || empfEmail;
@@ -252,14 +286,14 @@
                     var rawParts = ['From: ' + GMAIL_CONFIG.ABSENDER_EMAIL, 'To: ' + zielEmail, 'Subject: =?UTF-8?B?' + btoa(unescape(encodeURIComponent(vollBetreff))) + '?=', 'MIME-Version: 1.0', 'Content-Type: multipart/alternative; boundary="' + boundary + '"', '', '--' + boundary, 'Content-Type: text/plain; charset=UTF-8', '', anrede + '\n\n' + textBody + '\n\n' + grussformel + '\n\nThomas Willwacher\nFliesenlegermeister e.K.', '', '--' + boundary, 'Content-Type: text/html; charset=UTF-8', '', htmlMail, '', '--' + boundary + '--'];
                     var encoded = btoa(unescape(encodeURIComponent(rawParts.join('\r\n')))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
                     var resp = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', { method: 'POST', headers: { 'Authorization': 'Bearer ' + service.accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ raw: encoded }) });
-                    if (resp.ok) { setSendStatus('sent'); try { if (service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var mOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var pdfBlob = generatePDF(); await service.uploadFile(mOId, (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf', 'application/pdf', pdfBlob); } } catch(aE){console.warn('Archivierung:',aE);} }
+                    if (resp.ok) { setSendStatus('sent'); try { if (service.isConnected() && kunde && kunde._driveFolderId) { var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var pdfBlob = generatePDF(); var subOrdner = versandKanal === 'mail' ? 'Mail' : 'Briefe'; var fileName = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; await _uploadPdfViaApi(service, kunde._driveFolderId, subOrdner, fileName, pdfBlob); } } catch(aE){console.warn('Archivierung:',aE);} }
                     else { window.location.href = 'mailto:' + encodeURIComponent(zielEmail) + '?subject=' + encodeURIComponent(vollBetreff) + '&body=' + encodeURIComponent(anrede+'\n\n'+textBody+'\n\n'+grussformel); setSendStatus('sent'); }
                 } catch(err) { console.error('Sende-Fehler:', err); window.location.href = 'mailto:' + encodeURIComponent(mailAdresse||empfEmail) + '?subject=' + encodeURIComponent(betreff||'Schreiben') + '&body=' + encodeURIComponent(anrede+'\n\n'+textBody+'\n\n'+grussformel); setSendStatus('sent'); }
                 setTimeout(function() { setSendStatus(null); }, 4000);
             };
 
             var handleDriveSpeichern = async function() {
-                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var sOId = await service.findOrCreateFolder(kunde._driveFolderId, (window.DRIVE_ORDNER && window.DRIVE_ORDNER.schriftverkehr) || 'Schriftverkehr-Mail-Protokolle-Bauzeitenplan'); var uOId = await service.findOrCreateFolder(sOId, versandKanal === 'mail' ? 'Mail' : 'Briefe'); var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; var pdfBlob = generatePDF(); await service.uploadFile(uOId, fN, 'application/pdf', pdfBlob); alert('\u2705 PDF gespeichert in Schriftverkehr/' + (versandKanal==='mail'?'Mail':'Briefe') + '/'); } else {
+                try { var service = window.GoogleDriveService; if (service && service.isConnected() && kunde && kunde._driveFolderId) { var dF = new Date().toISOString().slice(0,10).replace(/-/g,''); var bK = (betreff||'Schreiben').substring(0,25).replace(/[^a-zA-Z0-9\- ]/g,'').replace(/ /g,'_'); var fN = (versandKanal==='mail'?'Mail':'Brief')+'_'+dF+'_'+bK+'.pdf'; var pdfBlob = generatePDF(); var subOrdner = versandKanal === 'mail' ? 'Mail' : 'Briefe'; var result = await _uploadPdfViaApi(service, kunde._driveFolderId, subOrdner, fN, pdfBlob); if (result.ok) { alert('\u2705 PDF gespeichert in Schriftverkehr/' + subOrdner + '/' + (result.via === 'api' ? ' (mit Sync-Queue)' : '')); } else { alert('\u26A0\uFE0F Speichern fehlgeschlagen: ' + (result.error||'unbekannt')); } } else {
                     // BLOCK B / FIX B1 — Fallback-Download: Blob-URL nach Click sofort freigeben
                     var pdfBlob2 = generatePDF();
                     var dlUrl = URL.createObjectURL(pdfBlob2);

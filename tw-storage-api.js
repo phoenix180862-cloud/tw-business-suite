@@ -401,12 +401,61 @@
     // letzter bekannter Stand. Falls ja: Conflict-Info zurueckgeben,
     // damit das Modul einen Dialog zeigen kann.
     //
+    // ETAPPE D (25.04.2026): Erweitert um Hash-Snapshot-Vergleich.
+    // Module koennen beim Laden eines Records `rememberHash` aufrufen,
+    // dann ueberprueft `detectConflict` zusaetzlich, ob der gespeicherte
+    // Hash mit dem aktuellen Drive-Hash uebereinstimmt. Damit werden
+    // auch Konflikte erkannt, bei denen die Modtime nicht ausschlaggebend
+    // ist (z.B. wenn beide Geraete im selben 30s-Fenster gespeichert haben).
+    //
     // ACHTUNG: Diese Funktion ist eine Best-Effort-Pruefung. Bei
     // schlechter Verbindung gibt sie {ok: true} zurueck und laesst den
     // Save laufen, statt zu blockieren.
     // =================================================================
-    function detectConflict(storeName, recordId, localLoadedAt) {
+
+    // ---- Hash-Snapshot-Speicher ----
+    // Pro recordId merken wir uns einen Hash beim Laden.
+    // Beim Save vergleichen wir, ob der Drive-Hash noch derselbe ist.
+    var _hashSnapshots = {};
+
+    function rememberHash(storeName, recordId, hash) {
+        var k = storeName + ':' + recordId;
+        _hashSnapshots[k] = { hash: hash, at: new Date().toISOString() };
+    }
+
+    function getRememberedHash(storeName, recordId) {
+        var k = storeName + ':' + recordId;
+        return _hashSnapshots[k] || null;
+    }
+
+    /**
+     * Berechnet einen einfachen, schnellen Content-Hash (FNV-1a 32bit).
+     * Reicht fuer Konflikt-Erkennung; nicht kryptographisch.
+     * Akzeptiert string oder ArrayBuffer.
+     */
+    function computeHash(content) {
+        if (content === null || content === undefined) return '0';
+        var str;
+        if (typeof content === 'string') {
+            str = content;
+        } else if (typeof content === 'object') {
+            try { str = JSON.stringify(content); }
+            catch(e) { str = String(content); }
+        } else {
+            str = String(content);
+        }
+        // FNV-1a 32-bit
+        var hash = 0x811c9dc5;
+        for (var i = 0; i < str.length; i++) {
+            hash ^= str.charCodeAt(i);
+            hash = (hash * 0x01000193) >>> 0;
+        }
+        return ('00000000' + hash.toString(16)).slice(-8);
+    }
+
+    function detectConflict(storeName, recordId, localLoadedAt, options) {
         _requireDeps();
+        options = options || {};
         // Nur sinnvoll wenn Drive verfuegbar
         if (!global.GoogleDriveService || !global.GoogleDriveService.accessToken) {
             return Promise.resolve({ ok: true, reason: 'no-drive' });
@@ -432,21 +481,108 @@
                 return global.TWStorage.DriveUploadSync.checkDriveNewerThan(
                     kunde._driveFolderId, localLoadedAt
                 ).then(function(check) {
-                    if (check.newer) {
+                    // ---- Hash-Vergleich (Etappe D) ----
+                    // Wenn der Aufrufer einen lokalen Hash mitliefert,
+                    // pruefen wir VORRANG ueber den Hash, nicht ueber die Modtime.
+                    // Damit wird die Pruefung robuster.
+                    var snapshot = getRememberedHash(storeName, recordId);
+                    var hashUsed = !!(options.localHash || snapshot);
+                    var hashMatch = true;
+                    if (hashUsed && check.driveContentHash && (options.localHash || (snapshot && snapshot.hash))) {
+                        var expected = options.localHash || snapshot.hash;
+                        hashMatch = (expected === check.driveContentHash);
+                    }
+                    if (check.newer || (hashUsed && !hashMatch)) {
                         return {
                             ok: false,
                             conflict: true,
                             anzahlGeaendert: check.anzahlGeaenderter,
                             geaenderteDateien: check.geaenderteDateien || [],
-                            neuesteAenderung: check.neuesteAenderung
+                            neuesteAenderung: check.neuesteAenderung,
+                            hashMismatch: hashUsed && !hashMatch,
+                            // Info, die der KonfliktDialog braucht:
+                            kundeId: rec.kundeId,
+                            titel: rec.name || rec.bezeichnung || recordId,
+                            ordnerName: rec.ordnerName,
+                            driveFileId: rec.driveFileId
                         };
                     }
-                    return { ok: true };
+                    return { ok: true, hashUsed: hashUsed };
                 });
             });
         }).catch(function(err) {
             console.warn('[TWStorageAPI] detectConflict-Fehler:', err);
             return { ok: true, reason: 'check-failed', error: err.message };
+        });
+    }
+
+    // =================================================================
+    // SAVE-WITH-CONFLICT-CHECK (Etappe D, 25.04.2026)
+    // =================================================================
+    // Convenience-Wrapper, der saveDocument + detectConflict kombiniert.
+    // Wenn ein Konflikt erkannt wird, wird der globale KonfliktDialog
+    // ueber window._showKonfliktDialog angezeigt und - je nach User-
+    // Entscheidung - der Save fortgesetzt, abgebrochen, oder neu geladen.
+    //
+    // Rueckgabe: Promise<{ saved: bool, action: string, record?: ... }>
+    // =================================================================
+    function saveDocumentWithConflictCheck(kundeId, ordnerName, name, mimeType, blob, options) {
+        options = options || {};
+        var recordId = 'app_' + kundeId + '_' + ordnerName + '_' +
+                       String(name).replace(/[^a-zA-Z0-9._-]/g, '_');
+        // Lokalen Hash berechnen (aus Blob falls moeglich)
+        var hashPromise;
+        if (blob && typeof blob.text === 'function') {
+            hashPromise = blob.text().then(function(t) { return computeHash(t); });
+        } else {
+            hashPromise = Promise.resolve(computeHash(name + '|' + (blob && blob.size) + '|' + Date.now()));
+        }
+        return hashPromise.then(function(localHash) {
+            return detectConflict('appDateien', recordId,
+                options.loadedAt || new Date(0).toISOString(),
+                { localHash: localHash }
+            ).then(function(check) {
+                if (check.ok) {
+                    // Kein Konflikt -> direkt speichern
+                    return saveDocument(kundeId, ordnerName, name, mimeType, blob, options)
+                        .then(function(rec) {
+                            // Hash fuer naechstes Mal merken
+                            rememberHash('appDateien', recordId, localHash);
+                            return { saved: true, action: 'no-conflict', record: rec };
+                        });
+                }
+                // Konflikt - User entscheiden lassen
+                if (typeof global._showKonfliktDialog !== 'function') {
+                    // Kein Dialog vorhanden - sicherheitshalber NICHT speichern
+                    console.warn('[TWStorageAPI] Konflikt erkannt, aber kein KonfliktDialog verfuegbar');
+                    return { saved: false, action: 'no-dialog', conflict: check };
+                }
+                return new Promise(function(resolve) {
+                    global._showKonfliktDialog({
+                        titel: name,
+                        ordnerName: ordnerName,
+                        kundeId: kundeId,
+                        driveFileId: check.driveFileId,
+                        anzahlGeaendert: check.anzahlGeaendert,
+                        neuesteAenderung: check.neuesteAenderung
+                    }, function(action) {
+                        if (action === 'lokal') {
+                            // Lokale Version speichern -> Drive ueberschreiben
+                            saveDocument(kundeId, ordnerName, name, mimeType, blob, options)
+                                .then(function(rec) {
+                                    rememberHash('appDateien', recordId, localHash);
+                                    resolve({ saved: true, action: 'lokal', record: rec });
+                                })
+                                .catch(function(err) {
+                                    resolve({ saved: false, action: 'lokal', error: err.message });
+                                });
+                        } else {
+                            // 'drive' / 'vergleich' / 'abbrechen' -> NICHT speichern
+                            resolve({ saved: false, action: action });
+                        }
+                    });
+                });
+            });
         });
     }
 
@@ -487,8 +623,12 @@
         savePhoto:          savePhoto,
         saveCustomerData:   saveCustomerData,
 
-        // Konflikt-Pruefung
+        // Konflikt-Pruefung (Etappe D, 25.04.2026)
         detectConflict:     detectConflict,
+        rememberHash:       rememberHash,
+        getRememberedHash:  getRememberedHash,
+        computeHash:        computeHash,
+        saveDocumentWithConflictCheck: saveDocumentWithConflictCheck,
 
         // Drive-Upload-Queue
         queue: {
@@ -508,5 +648,55 @@
 
     console.log('%c[TW-StorageAPI] Storage-API bereit (Wrapper mit Queue + Konflikt-Check)',
                 'color: #00897B; font-weight: bold;');
+
+    // =================================================================
+    // AUTO-HOOK fuer bestehende TWStorage.saveFoto-Aufrufe
+    // (Etappe C, 25.04.2026)
+    // =================================================================
+    // Patcht die globale TWStorage.saveFoto so, dass jeder Aufruf
+    // automatisch durchs Audit-Log und durch den Event-Bus laeuft -
+    // ohne dass die Module ihre Aufrufe aendern muessen.
+    // Damit profitiert auch tw-aufmass.jsx (3 saveFoto-Aufrufe) sofort
+    // von der MemoryBadge-Anzeige und den queue/photo:saved-Events.
+    //
+    // Wenn TWStorage noch nicht bereit ist, wird kurz gewartet.
+    // Patcht idempotent (nur einmal).
+    // =================================================================
+    function _installSaveFotoHook() {
+        if (!global.TWStorage || typeof global.TWStorage.saveFoto !== 'function') {
+            // Storage noch nicht bereit - in 500ms nochmal versuchen
+            setTimeout(_installSaveFotoHook, 500);
+            return;
+        }
+        if (global.TWStorage.__savePhotoHooked) {
+            return; // Bereits gepatched
+        }
+        var _origSaveFoto = global.TWStorage.saveFoto;
+        global.TWStorage.saveFoto = function(kundeId, kontext, raumKey, subKey, dataUrlOrBlob, meta) {
+            // Original-Funktion aufrufen
+            var promise = _origSaveFoto.call(global.TWStorage,
+                kundeId, kontext, raumKey, subKey, dataUrlOrBlob, meta
+            );
+            // Audit-Log + Event-Bus draufschalten (best-effort)
+            if (promise && typeof promise.then === 'function') {
+                promise.then(function(rec) {
+                    try {
+                        _log(kundeId, 'savePhoto', 'fotos', rec && rec.id,
+                             kontext + '/' + raumKey);
+                        _emit('photo:saved', {
+                            kundeId: kundeId, kontext: kontext,
+                            raumKey: raumKey, id: rec && rec.id,
+                            via: 'auto-hook'
+                        });
+                    } catch(e) { /* still */ }
+                });
+            }
+            return promise;
+        };
+        global.TWStorage.__savePhotoHooked = true;
+        console.log('%c[TW-StorageAPI] saveFoto-Auto-Hook installiert (alle Foto-Saves laufen jetzt durchs Audit-Log)',
+                    'color: #00897B;');
+    }
+    setTimeout(_installSaveFotoHook, 200);
 
 })(window);

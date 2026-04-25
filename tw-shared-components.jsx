@@ -2060,23 +2060,13 @@
            MODULWAHL -- Dashboard nach Kundenauswahl
            ═══════════════════════════════════════════ */
 
-        /* ===========================================================
-           STORAGE-HEALTH-DASHBOARD (Punkt 6 aus Architektur-Plan)
-           Stand: 25.04.2026
-
-           Zeigt:
-           - IndexedDB-Belegung pro Kunde
-           - Anzahl ungesyncte Fotos / appDateien
-           - Letzten Drive-Sync-Zeitpunkt pro Kunde
-           - Schema-Version
-           - Drive-Upload-Queue-Status
-
-           Aufruf: window._openStorageHealth() (von ueberall)
-                   oder ueber die Memory-Badge im Top-Right.
-
-           Diese Komponente ist eine Modal-Overlay-Komponente.
-           Sie wird in tw-app.jsx in den App-State gemountet.
-           =========================================================== */
+        /* ═══════════════════════════════════════════════════════════════
+           STORAGE-HEALTH-DASHBOARD (Punkt 6 aus Architektur-Plan, 25.04.2026)
+           Modal-Dashboard mit IDB-Belegung, Queue-Status, pro-Kunde-Sync.
+           Aufruf: window._openStorageHealth() von ueberall.
+           Quellsync (Etappe A, 25.04.2026): zurueck in JSX-Quellen ueber-
+           fuehrt (war zuvor nur im Live-Build).
+           ═══════════════════════════════════════════════════════════════ */
         function StorageHealthDashboard({ open, onClose }) {
             const [info, setInfo] = React.useState(null);
             const [queueStatus, setQueueStatus] = React.useState(null);
@@ -2094,7 +2084,7 @@
                         const storage = await window.TWStorage.getStorageInfo();
                         const counts  = await window.TWStorage.getRecordCounts();
                         const kunden  = await window.TWStorage.listKunden();
-                        // Pro Kunde: ungesyncte Fotos + appDateien
+                        // Pro Kunde: ungesyncte Fotos + appDateien + letzter Sync
                         const perKunde = [];
                         for (let i = 0; i < kunden.length; i++) {
                             const k = kunden[i];
@@ -2103,14 +2093,16 @@
                             try {
                                 const fotos = await window.TWStorage.getByIndex('fotos', 'kundeId', String(kid));
                                 unsyncedFotos = (fotos || []).filter(function(f) { return !f.driveUploaded; }).length;
-                            } catch(e) { /* still */ }
+                            } catch (e) { /* still */ }
                             try {
                                 const ad = await window.TWStorage.getByIndex('appDateien', 'kundeId', kid);
                                 unsyncedAppDateien = (ad || []).filter(function(a) { return a.syncStatus === 'pending'; }).length;
-                            } catch(e) { /* still */ }
+                            } catch (e) { /* still */ }
                             try {
-                                lastSync = await window.TWStorage.DriveUploadSync.getLastSyncTime(kid);
-                            } catch(e) { /* still */ }
+                                if (window.TWStorage.DriveUploadSync && window.TWStorage.DriveUploadSync.getLastSyncTime) {
+                                    lastSync = await window.TWStorage.DriveUploadSync.getLastSyncTime(kid);
+                                }
+                            } catch (e) { /* still */ }
                             perKunde.push({
                                 id: kid,
                                 name: k.name || k.bauvorhaben || kid,
@@ -2119,8 +2111,8 @@
                                 lastSync: lastSync
                             });
                         }
-                        const schemaInfo = window.TWSchema && window.TWSchema.getDiagnostics ?
-                                           window.TWSchema.getDiagnostics() : null;
+                        const schemaInfo = window.TWSchema && window.TWSchema.getDiagnostics
+                            ? window.TWSchema.getDiagnostics() : null;
                         if (cancelled) return;
                         setInfo({
                             storage: storage,
@@ -2130,7 +2122,7 @@
                             schema: schemaInfo,
                             apiAvailable: !!window.TWStorageAPI
                         });
-                    } catch(err) {
+                    } catch (err) {
                         if (!cancelled) setInfo({ error: err.message });
                     }
                 }
@@ -2165,240 +2157,502 @@
                         day: '2-digit', month: '2-digit', year: 'numeric',
                         hour: '2-digit', minute: '2-digit'
                     });
-                } catch(e) { return iso; }
+                } catch (e) { return iso; }
             };
 
-            return React.createElement('div', {
-                style: {
-                    position: 'fixed', inset: 0, zIndex: 9000,
-                    background: 'rgba(10,15,25,0.78)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: '20px'
-                },
-                onClick: function(e) { if (e.target === e.currentTarget) onClose && onClose(); }
-            },
-                React.createElement('div', {
-                    style: {
-                        background: 'var(--bg-elevated, #1a2030)',
-                        color: 'var(--text-primary, #fff)',
-                        borderRadius: '14px',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-                        maxWidth: '900px', width: '100%',
-                        maxHeight: '85vh', overflow: 'auto',
-                        padding: '24px'
-                    }
-                },
-                    React.createElement('div', {
-                        style: {
-                            display: 'flex', justifyContent: 'space-between',
-                            alignItems: 'center', marginBottom: '16px',
-                            borderBottom: '1px solid rgba(255,255,255,0.1)',
-                            paddingBottom: '12px'
-                        }
-                    },
-                        React.createElement('h2', {
-                            style: { margin: 0, fontSize: '20px', fontWeight: 600 }
-                        }, 'Storage-Health-Dashboard'),
-                        React.createElement('div', { style: { display: 'flex', gap: '8px' } },
-                            React.createElement('button', {
-                                onClick: function() { setRefreshTick(refreshTick + 1); },
-                                style: {
-                                    background: 'rgba(33,150,243,0.2)', color: '#90CAF9',
-                                    border: '1px solid rgba(33,150,243,0.4)',
-                                    padding: '6px 14px', borderRadius: '6px',
-                                    cursor: 'pointer', fontSize: '13px'
-                                }
-                            }, 'Aktualisieren'),
-                            React.createElement('button', {
-                                onClick: onClose,
-                                style: {
-                                    background: 'rgba(244,67,54,0.2)', color: '#EF9A9A',
-                                    border: '1px solid rgba(244,67,54,0.4)',
-                                    padding: '6px 14px', borderRadius: '6px',
-                                    cursor: 'pointer', fontSize: '13px'
-                                }
-                            }, 'Schliessen')
-                        )
-                    ),
+            return (
+                <div style={{position:'fixed', inset:0, zIndex:9000, background:'rgba(10,15,25,0.78)',
+                             display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
+                     onClick={function(e) { if (e.target === e.currentTarget) onClose && onClose(); }}>
+                    <div style={{background:'var(--bg-elevated, #1a2030)', color:'var(--text-primary, #fff)',
+                                 borderRadius:'14px', boxShadow:'0 20px 60px rgba(0,0,0,0.6)',
+                                 maxWidth:'900px', width:'100%', maxHeight:'85vh', overflow:'auto', padding:'24px'}}>
+                        {/* Kopfzeile */}
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center',
+                                     marginBottom:'16px', borderBottom:'1px solid rgba(255,255,255,0.1)',
+                                     paddingBottom:'12px'}}>
+                            <h2 style={{margin:0, fontSize:'20px', fontWeight:600}}>
+                                Storage-Health-Dashboard
+                            </h2>
+                            <div style={{display:'flex', gap:'8px'}}>
+                                <button onClick={function() { setRefreshTick(refreshTick + 1); }}
+                                        style={{background:'rgba(33,150,243,0.2)', color:'#90CAF9',
+                                                border:'1px solid rgba(33,150,243,0.4)', padding:'6px 14px',
+                                                borderRadius:'6px', cursor:'pointer', fontSize:'13px'}}>
+                                    Aktualisieren
+                                </button>
+                                <button onClick={onClose}
+                                        style={{background:'rgba(244,67,54,0.2)', color:'#EF9A9A',
+                                                border:'1px solid rgba(244,67,54,0.4)', padding:'6px 14px',
+                                                borderRadius:'6px', cursor:'pointer', fontSize:'13px'}}>
+                                    Schliessen
+                                </button>
+                            </div>
+                        </div>
 
-                    !info && React.createElement('div', {
-                        style: { padding: '40px', textAlign: 'center', opacity: 0.6 }
-                    }, 'Daten werden geladen...'),
+                        {/* Lade- und Fehler-Status */}
+                        {!info && (
+                            <div style={{padding:'40px', textAlign:'center', opacity:0.6}}>
+                                Daten werden geladen...
+                            </div>
+                        )}
+                        {info && info.error && (
+                            <div style={{padding:'20px', background:'rgba(244,67,54,0.15)',
+                                         border:'1px solid rgba(244,67,54,0.4)', borderRadius:'8px',
+                                         color:'#EF9A9A'}}>
+                                Fehler: {info.error}
+                            </div>
+                        )}
 
-                    info && info.error && React.createElement('div', {
-                        style: {
-                            padding: '20px', background: 'rgba(244,67,54,0.15)',
-                            borderRadius: '8px', color: '#EF9A9A'
-                        }
-                    }, 'Fehler: ' + info.error),
+                        {/* Block 1: System */}
+                        {info && !info.error && (
+                            <div style={{marginBottom:'20px'}}>
+                                <h3 style={{fontSize:'14px', textTransform:'uppercase',
+                                            letterSpacing:'1px', opacity:0.7, margin:'0 0 10px'}}>
+                                    System
+                                </h3>
+                                <div style={{display:'grid',
+                                             gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))',
+                                             gap:'10px'}}>
+                                    <_HealthCard
+                                        label="IDB belegt"
+                                        value={fmtBytes(info.storage && info.storage.usage)}
+                                        hint={'von ' + fmtBytes(info.storage && info.storage.quota)} />
+                                    <_HealthCard
+                                        label="DB-Version"
+                                        value={'v' + info.dbVersion}
+                                        hint={'Schema: ' + (info.schema ? info.schema.storeCount + ' Stores' : '?')} />
+                                    <_HealthCard
+                                        label="Kunden"
+                                        value={info.counts && info.counts.kunden || 0}
+                                        hint={(info.counts && info.counts.aufmass || 0) + ' Aufmasse'} />
+                                    <_HealthCard
+                                        label="Storage-API"
+                                        value={info.apiAvailable ? 'aktiv' : 'fehlt'}
+                                        hint={info.apiAvailable ? 'TWStorageAPI bereit' : 'nicht geladen'}
+                                        accent={info.apiAvailable ? '#4CAF50' : '#F44336'} />
+                                </div>
+                            </div>
+                        )}
 
-                    info && !info.error && React.createElement('div', null,
-                        // Block 1: System-Status
-                        React.createElement('div', { style: { marginBottom: '20px' } },
-                            React.createElement('h3', {
-                                style: { fontSize: '14px', textTransform: 'uppercase',
-                                         letterSpacing: '1px', opacity: 0.7,
-                                         margin: '0 0 10px' }
-                            }, 'System'),
-                            React.createElement('div', {
-                                style: {
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                                    gap: '10px'
-                                }
-                            },
-                                React.createElement(_HealthCard, {
-                                    label: 'IDB belegt',
-                                    value: fmtBytes(info.storage && info.storage.usage),
-                                    hint: 'von ' + fmtBytes(info.storage && info.storage.quota)
-                                }),
-                                React.createElement(_HealthCard, {
-                                    label: 'DB-Version',
-                                    value: 'v' + info.dbVersion,
-                                    hint: 'Schema: ' + (info.schema ? info.schema.storeCount + ' Stores' : '?')
-                                }),
-                                React.createElement(_HealthCard, {
-                                    label: 'Kunden',
-                                    value: (info.counts && info.counts.kunden) || 0,
-                                    hint: (info.counts && info.counts.aufmass || 0) + ' Aufmasse'
-                                }),
-                                React.createElement(_HealthCard, {
-                                    label: 'Storage-API',
-                                    value: info.apiAvailable ? 'aktiv' : 'fehlt',
-                                    hint: info.apiAvailable ? 'TWStorageAPI bereit' : 'nicht geladen',
-                                    accent: info.apiAvailable ? '#4CAF50' : '#F44336'
-                                })
-                            )
-                        ),
-
-                        // Block 2: Drive-Upload-Queue
-                        queueStatus && React.createElement('div', { style: { marginBottom: '20px' } },
-                            React.createElement('h3', {
-                                style: { fontSize: '14px', textTransform: 'uppercase',
-                                         letterSpacing: '1px', opacity: 0.7,
-                                         margin: '0 0 10px' }
-                            }, 'Drive-Upload-Queue'),
-                            React.createElement('div', {
-                                style: {
-                                    background: 'rgba(255,255,255,0.04)',
-                                    padding: '14px', borderRadius: '10px',
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                                    gap: '10px'
-                                }
-                            },
-                                React.createElement(_HealthCard, {
-                                    label: 'Pending',
-                                    value: queueStatus.queueLength,
-                                    hint: queueStatus.processing ? 'wird abgearbeitet' : 'wartet'
-                                }),
-                                React.createElement(_HealthCard, {
-                                    label: 'Hochgeladen',
-                                    value: queueStatus.stats.uploaded,
-                                    hint: 'seit App-Start',
-                                    accent: '#4CAF50'
-                                }),
-                                React.createElement(_HealthCard, {
-                                    label: 'Retried',
-                                    value: queueStatus.stats.retried,
-                                    hint: 'auto. Wiederholungen',
-                                    accent: '#FF9800'
-                                }),
-                                React.createElement(_HealthCard, {
-                                    label: 'Failed',
-                                    value: queueStatus.stats.failed,
-                                    hint: 'final fehlgeschlagen',
-                                    accent: queueStatus.stats.failed > 0 ? '#F44336' : '#666'
-                                })
-                            ),
-                            queueStatus.stats.failed > 0 && React.createElement('button', {
-                                onClick: function() {
-                                    if (window.TWStorageAPI && window.TWStorageAPI.queue) {
-                                        window.TWStorageAPI.queue.retry();
-                                    }
-                                },
-                                style: {
-                                    marginTop: '10px',
-                                    background: 'rgba(255,152,0,0.2)', color: '#FFB74D',
-                                    border: '1px solid rgba(255,152,0,0.4)',
-                                    padding: '6px 14px', borderRadius: '6px',
-                                    cursor: 'pointer', fontSize: '12px'
-                                }
-                            }, 'Failed neu versuchen')
-                        ),
-
-                        // Block 3: Pro Kunde
-                        info.perKunde && info.perKunde.length > 0 &&
-                        React.createElement('div', null,
-                            React.createElement('h3', {
-                                style: { fontSize: '14px', textTransform: 'uppercase',
-                                         letterSpacing: '1px', opacity: 0.7,
-                                         margin: '0 0 10px' }
-                            }, 'Pro Kunde'),
-                            React.createElement('div', {
-                                style: {
-                                    background: 'rgba(255,255,255,0.04)',
-                                    borderRadius: '10px', overflow: 'hidden'
-                                }
-                            },
-                                info.perKunde.slice(0, 10).map(function(k, idx) {
-                                    return React.createElement('div', {
-                                        key: k.id,
-                                        style: {
-                                            padding: '12px 14px',
-                                            display: 'grid',
-                                            gridTemplateColumns: '2fr 1fr 1fr 1.5fr',
-                                            gap: '8px', fontSize: '13px',
-                                            borderBottom: idx < info.perKunde.length - 1 ?
-                                                '1px solid rgba(255,255,255,0.04)' : 'none'
+                        {/* Block 2: Drive-Upload-Queue */}
+                        {info && !info.error && queueStatus && (
+                            <div style={{marginBottom:'20px'}}>
+                                <h3 style={{fontSize:'14px', textTransform:'uppercase',
+                                            letterSpacing:'1px', opacity:0.7, margin:'0 0 10px'}}>
+                                    Drive-Upload-Queue
+                                </h3>
+                                <div style={{background:'rgba(255,255,255,0.04)', padding:'14px',
+                                             borderRadius:'10px', display:'grid',
+                                             gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))',
+                                             gap:'10px'}}>
+                                    <_HealthCard
+                                        label="Pending"
+                                        value={queueStatus.queueLength}
+                                        hint={queueStatus.processing ? 'wird abgearbeitet' : 'wartet'} />
+                                    <_HealthCard
+                                        label="Hochgeladen"
+                                        value={queueStatus.stats.uploaded}
+                                        hint="seit App-Start"
+                                        accent="#4CAF50" />
+                                    <_HealthCard
+                                        label="Retried"
+                                        value={queueStatus.stats.retried}
+                                        hint="auto. Wiederholungen"
+                                        accent="#FF9800" />
+                                    <_HealthCard
+                                        label="Failed"
+                                        value={queueStatus.stats.failed}
+                                        hint="final fehlgeschlagen"
+                                        accent={queueStatus.stats.failed > 0 ? '#F44336' : '#666'} />
+                                </div>
+                                {queueStatus.stats.failed > 0 && (
+                                    <button onClick={function() {
+                                        if (window.TWStorageAPI && window.TWStorageAPI.queue) {
+                                            window.TWStorageAPI.queue.retry();
                                         }
-                                    },
-                                        React.createElement('div', {
-                                            style: { fontWeight: 500 }
-                                        }, k.name),
-                                        React.createElement('div', {
-                                            style: {
-                                                color: k.unsyncedFotos > 0 ? '#FFB74D' : '#888'
-                                            }
-                                        }, (k.unsyncedFotos || 0) + ' Fotos pending'),
-                                        React.createElement('div', {
-                                            style: {
-                                                color: k.unsyncedAppDateien > 0 ? '#FFB74D' : '#888'
-                                            }
-                                        }, (k.unsyncedAppDateien || 0) + ' Docs pending'),
-                                        React.createElement('div', {
-                                            style: { opacity: 0.7, fontSize: '11px' }
-                                        }, 'Sync: ' + fmtTime(k.lastSync))
-                                    );
-                                })
-                            )
-                        )
-                    )
-                )
+                                    }}
+                                    style={{marginTop:'10px', background:'rgba(255,152,0,0.2)',
+                                            color:'#FFB74D', border:'1px solid rgba(255,152,0,0.4)',
+                                            padding:'6px 14px', borderRadius:'6px', cursor:'pointer',
+                                            fontSize:'12px'}}>
+                                        Failed neu versuchen
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Block 3: Pro Kunde */}
+                        {info && !info.error && info.perKunde && info.perKunde.length > 0 && (
+                            <div>
+                                <h3 style={{fontSize:'14px', textTransform:'uppercase',
+                                            letterSpacing:'1px', opacity:0.7, margin:'0 0 10px'}}>
+                                    Pro Kunde
+                                </h3>
+                                <div style={{background:'rgba(255,255,255,0.04)', borderRadius:'10px',
+                                             overflow:'hidden'}}>
+                                    {info.perKunde.slice(0, 10).map(function(k, idx) {
+                                        return (
+                                            <div key={k.id}
+                                                 style={{padding:'12px 14px', display:'grid',
+                                                         gridTemplateColumns:'2fr 1fr 1fr 1.5fr',
+                                                         gap:'8px', fontSize:'13px',
+                                                         borderBottom: idx < info.perKunde.length - 1
+                                                             ? '1px solid rgba(255,255,255,0.04)' : 'none'}}>
+                                                <div style={{fontWeight:500}}>{k.name}</div>
+                                                <div style={{color: k.unsyncedFotos > 0 ? '#FFB74D' : '#888'}}>
+                                                    {(k.unsyncedFotos || 0) + ' Fotos pending'}
+                                                </div>
+                                                <div style={{color: k.unsyncedAppDateien > 0 ? '#FFB74D' : '#888'}}>
+                                                    {(k.unsyncedAppDateien || 0) + ' Docs pending'}
+                                                </div>
+                                                <div style={{opacity:0.7, fontSize:'11px'}}>
+                                                    {'Sync: ' + fmtTime(k.lastSync)}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
             );
         }
 
-        // Hilfs-Karten-Komponente
+        /* Hilfs-Komponente fuer die Karten im Dashboard */
         function _HealthCard({ label, value, hint, accent }) {
-            return React.createElement('div', {
-                style: {
-                    background: 'rgba(255,255,255,0.04)',
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    borderLeft: '3px solid ' + (accent || '#1E88E5')
-                }
-            },
-                React.createElement('div', {
-                    style: { fontSize: '11px', opacity: 0.6,
-                             textTransform: 'uppercase', letterSpacing: '0.5px',
-                             marginBottom: '4px' }
-                }, label),
-                React.createElement('div', {
-                    style: { fontSize: '20px', fontWeight: 600,
-                             color: accent || '#90CAF9', marginBottom: '2px' }
-                }, value),
-                hint && React.createElement('div', {
-                    style: { fontSize: '11px', opacity: 0.5 }
-                }, hint)
+            return (
+                <div style={{background:'rgba(255,255,255,0.04)', padding:'12px 14px',
+                             borderRadius:'8px', borderLeft:'3px solid ' + (accent || '#1E88E5')}}>
+                    <div style={{fontSize:'11px', opacity:0.6, textTransform:'uppercase',
+                                 letterSpacing:'0.5px', marginBottom:'4px'}}>
+                        {label}
+                    </div>
+                    <div style={{fontSize:'20px', fontWeight:600, color: accent || '#90CAF9',
+                                 marginBottom:'2px'}}>
+                        {value}
+                    </div>
+                    {hint && (
+                        <div style={{fontSize:'11px', opacity:0.5}}>
+                            {hint}
+                        </div>
+                    )}
+                </div>
             );
         }
+
+        /* ═══════════════════════════════════════════════════════════════
+           MEMORY-BADGE (Etappe B, 25.04.2026)
+           Floating-Pille oben rechts, dezent.
+           Zeigt: Pending-Uploads-Zahl + Status-Punkt.
+           Klick oeffnet das Storage-Health-Dashboard.
+           Faerbt sich rot bei failed > 0.
+           ═══════════════════════════════════════════════════════════════ */
+        function MemoryBadge() {
+            const [pending, setPending] = React.useState(0);
+            const [failed, setFailed] = React.useState(0);
+            const [processing, setProcessing] = React.useState(false);
+
+            React.useEffect(function() {
+                // Initial-Snapshot + Subscription auf Queue-Status
+                if (!window.TWStorageAPI || !window.TWStorageAPI.queue) return;
+                const apply = function(s) {
+                    if (!s) return;
+                    setPending(s.queueLength || 0);
+                    setFailed(s.stats && s.stats.failed || 0);
+                    setProcessing(!!s.processing);
+                };
+                apply(window.TWStorageAPI.queue.status());
+                const unsub = window.TWStorageAPI.queue.subscribe(apply);
+                // Periodischer Refresh (alle 5s) als Fallback
+                const tick = setInterval(function() {
+                    if (window.TWStorageAPI && window.TWStorageAPI.queue) {
+                        apply(window.TWStorageAPI.queue.status());
+                    }
+                }, 5000);
+                return function() {
+                    if (typeof unsub === 'function') unsub();
+                    clearInterval(tick);
+                };
+            }, []);
+
+            const handleClick = function() {
+                if (typeof window._openStorageHealth === 'function') {
+                    window._openStorageHealth();
+                }
+            };
+
+            // Farb-Logik: rot wenn Failed, orange wenn Pending, gruen sonst
+            const dotColor = failed > 0 ? '#F44336'
+                           : pending > 0 ? '#FF9800'
+                           : '#4CAF50';
+            const bgColor  = failed > 0 ? 'rgba(244,67,54,0.18)'
+                           : pending > 0 ? 'rgba(255,152,0,0.15)'
+                           : 'rgba(76,175,80,0.12)';
+            const borderC  = failed > 0 ? 'rgba(244,67,54,0.45)'
+                           : pending > 0 ? 'rgba(255,152,0,0.4)'
+                           : 'rgba(76,175,80,0.35)';
+            const labelTxt = failed > 0 ? (failed + ' fehler')
+                           : pending > 0 ? (pending + ' pending')
+                           : 'OK';
+            const titleTxt = failed > 0 ? ('Storage-Health: ' + failed + ' fehlgeschlagene Uploads')
+                           : pending > 0 ? ('Storage-Health: ' + pending + ' Uploads in der Queue')
+                           : 'Storage-Health: alles synchron';
+
+            return (
+                <button type="button"
+                        onClick={handleClick}
+                        title={titleTxt}
+                        style={{
+                            display:'inline-flex', alignItems:'center', gap:'6px',
+                            padding:'4px 10px', minHeight:'28px',
+                            borderRadius:'14px', border:'1px solid ' + borderC,
+                            background: bgColor, cursor:'pointer',
+                            fontSize:'11px', fontWeight:600,
+                            fontFamily:'Oswald, sans-serif',
+                            letterSpacing:'0.4px', textTransform:'uppercase',
+                            color:'var(--text-secondary, #aaa)',
+                            transition:'all 0.15s ease'
+                        }}>
+                    <span style={{
+                        width:'8px', height:'8px', borderRadius:'50%',
+                        background: dotColor,
+                        boxShadow:'0 0 6px ' + dotColor,
+                        animation: processing ? 'tw-mem-pulse 1.2s ease-in-out infinite' : 'none'
+                    }} />
+                    <span style={{whiteSpace:'nowrap'}}>{labelTxt}</span>
+                </button>
+            );
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           Globale Exports der neuen Komponenten
+           (damit tw-app.jsx sie referenzieren kann)
+           ═══════════════════════════════════════════════════════════════ */
+        if (typeof window !== 'undefined') {
+            window.StorageHealthDashboard = StorageHealthDashboard;
+            window.MemoryBadge = MemoryBadge;
+        }
+
+
+        /* ═══════════════════════════════════════════════════════════════
+           KONFLIKT-DIALOG (Etappe D, 25.04.2026)
+           Wird angezeigt wenn TWStorageAPI.detectConflict einen Konflikt
+           zwischen lokalem und Drive-Stand meldet. Der User entscheidet:
+            - Lokal behalten   = Drive ueberschreiben (wir sind die Wahrheit)
+            - Drive uebernehmen= lokale Aenderung verwerfen
+            - Vergleichen      = Drive-Datei in neuem Tab oeffnen, manuell mergen
+           Aufruf von ueberall:
+             window._showKonfliktDialog(info, function(action) { ... });
+           Wo info = {
+             titel:           "Rechnung_RE_2026_001 ..."
+             ordnerName:      "Rechnung-A.Kontozahlung"
+             kundeId:         "..."
+             driveFileId:     ""  (optional, fuer Vergleich-Link)
+             anzahlGeaendert: 3
+             neuesteAenderung: ISO-String
+           }
+           und action = "lokal" | "drive" | "vergleich" | "abbrechen"
+           ═══════════════════════════════════════════════════════════════ */
+        function KonfliktDialog({ info, onChoice, onClose }) {
+            if (!info) return null;
+            const handle = function(action) {
+                try {
+                    if (typeof onChoice === 'function') onChoice(action);
+                } finally {
+                    if (typeof onClose === 'function') onClose();
+                }
+            };
+            const driveLink = info.driveFileId
+                ? ('https://drive.google.com/file/d/' + info.driveFileId + '/view')
+                : null;
+            return (
+                <div style={{position:'fixed', inset:0, zIndex:9500,
+                             background:'rgba(10,15,25,0.82)',
+                             display:'flex', alignItems:'center', justifyContent:'center',
+                             padding:'20px'}}
+                     onClick={function(e){ if (e.target === e.currentTarget) handle('abbrechen'); }}>
+                    <div style={{background:'var(--bg-elevated, #1a2030)',
+                                 color:'var(--text-primary, #fff)',
+                                 borderRadius:'14px',
+                                 boxShadow:'0 20px 60px rgba(0,0,0,0.7)',
+                                 maxWidth:'520px', width:'100%',
+                                 padding:'24px',
+                                 borderTop:'4px solid #FF9800'}}>
+                        {/* Kopf */}
+                        <div style={{display:'flex', alignItems:'center', gap:'12px',
+                                     marginBottom:'16px'}}>
+                            <div style={{fontSize:'32px'}}>{'\u26A0\uFE0F'}</div>
+                            <div>
+                                <h2 style={{margin:0, fontSize:'18px', fontWeight:600,
+                                            fontFamily:'Oswald, sans-serif',
+                                            textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                    Konflikt erkannt
+                                </h2>
+                                <div style={{fontSize:'12px', opacity:0.7, marginTop:'2px'}}>
+                                    Ein anderes Geraet hat denselben Datensatz bearbeitet.
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detail-Box */}
+                        <div style={{background:'rgba(255,152,0,0.08)',
+                                     border:'1px solid rgba(255,152,0,0.3)',
+                                     borderRadius:'10px',
+                                     padding:'12px 14px', marginBottom:'18px',
+                                     fontSize:'13px', lineHeight:'1.6'}}>
+                            <div><strong>Datei:</strong> {info.titel || '(unbenannt)'}</div>
+                            {info.ordnerName && (
+                                <div><strong>Ordner:</strong> {info.ordnerName}</div>
+                            )}
+                            {info.anzahlGeaendert > 0 && (
+                                <div><strong>Auf Drive geaendert:</strong>{' '}
+                                    {info.anzahlGeaendert} {info.anzahlGeaendert === 1 ? 'Datei' : 'Dateien'}
+                                </div>
+                            )}
+                            {info.neuesteAenderung && (
+                                <div><strong>Letzte Drive-Aenderung:</strong>{' '}
+                                    {(function(){
+                                        try { return new Date(info.neuesteAenderung).toLocaleString('de-DE'); }
+                                        catch(e) { return info.neuesteAenderung; }
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Frage */}
+                        <div style={{fontSize:'14px', marginBottom:'16px',
+                                     fontWeight:500}}>
+                            Wie soll der Konflikt geloest werden?
+                        </div>
+
+                        {/* Optionen */}
+                        <div style={{display:'flex', flexDirection:'column', gap:'8px',
+                                     marginBottom:'18px'}}>
+                            {/* Option 1: Lokal behalten */}
+                            <button type="button"
+                                    onClick={function(){ handle('lokal'); }}
+                                    style={{padding:'14px 16px',
+                                            background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                            color:'#fff', border:'none', borderRadius:'10px',
+                                            cursor:'pointer', textAlign:'left',
+                                            fontFamily:'Oswald, sans-serif',
+                                            display:'flex', alignItems:'center', gap:'12px'}}>
+                                <span style={{fontSize:'22px'}}>{'\uD83D\uDCBE'}</span>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:'14px', fontWeight:600,
+                                                 textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        Lokal behalten
+                                    </div>
+                                    <div style={{fontSize:'11px', opacity:0.85, marginTop:'2px',
+                                                 fontFamily:'Source Sans 3, sans-serif',
+                                                 textTransform:'none', letterSpacing:0}}>
+                                        Drive-Version wird ueberschrieben. Nutze das wenn DEINE Aenderung
+                                        die richtige ist.
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Option 2: Drive übernehmen */}
+                            <button type="button"
+                                    onClick={function(){ handle('drive'); }}
+                                    style={{padding:'14px 16px',
+                                            background:'linear-gradient(135deg, #27ae60, #1e8449)',
+                                            color:'#fff', border:'none', borderRadius:'10px',
+                                            cursor:'pointer', textAlign:'left',
+                                            fontFamily:'Oswald, sans-serif',
+                                            display:'flex', alignItems:'center', gap:'12px'}}>
+                                <span style={{fontSize:'22px'}}>{'\u2601\uFE0F'}</span>
+                                <div style={{flex:1}}>
+                                    <div style={{fontSize:'14px', fontWeight:600,
+                                                 textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        Drive uebernehmen
+                                    </div>
+                                    <div style={{fontSize:'11px', opacity:0.85, marginTop:'2px',
+                                                 fontFamily:'Source Sans 3, sans-serif',
+                                                 textTransform:'none', letterSpacing:0}}>
+                                        Deine lokale Aenderung wird verworfen. Nutze das wenn das andere
+                                        Geraet die richtige Version hat.
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Option 3: Vergleichen (nur wenn Drive-Link existiert) */}
+                            {driveLink && (
+                                <button type="button"
+                                        onClick={function(){
+                                            try { window.open(driveLink, '_blank'); } catch(e) {}
+                                            handle('vergleich');
+                                        }}
+                                        style={{padding:'14px 16px',
+                                                background:'linear-gradient(135deg, #8e44ad, #6c3483)',
+                                                color:'#fff', border:'none', borderRadius:'10px',
+                                                cursor:'pointer', textAlign:'left',
+                                                fontFamily:'Oswald, sans-serif',
+                                                display:'flex', alignItems:'center', gap:'12px'}}>
+                                    <span style={{fontSize:'22px'}}>{'\uD83D\uDD0D'}</span>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontSize:'14px', fontWeight:600,
+                                                     textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                            Erst vergleichen
+                                        </div>
+                                        <div style={{fontSize:'11px', opacity:0.85, marginTop:'2px',
+                                                     fontFamily:'Source Sans 3, sans-serif',
+                                                     textTransform:'none', letterSpacing:0}}>
+                                            Drive-Version in neuem Tab oeffnen. Dann manuell entscheiden
+                                            und Save erneut starten.
+                                        </div>
+                                    </div>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Abbrechen */}
+                        <button type="button"
+                                onClick={function(){ handle('abbrechen'); }}
+                                style={{width:'100%', padding:'10px',
+                                        background:'transparent',
+                                        color:'var(--text-secondary, #aaa)',
+                                        border:'1px solid var(--border-color, rgba(255,255,255,0.1))',
+                                        borderRadius:'8px', cursor:'pointer',
+                                        fontFamily:'Oswald, sans-serif',
+                                        fontSize:'12px', textTransform:'uppercase',
+                                        letterSpacing:'0.5px'}}>
+                            Abbrechen (nichts tun)
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           KonfliktDialog-Host: Stateful-Wrapper, der window._showKonfliktDialog
+           bereitstellt. Wird einmal in tw-app.jsx gerendert.
+           ═══════════════════════════════════════════════════════════════ */
+        function KonfliktDialogHost() {
+            const [state, setState] = React.useState(null); // {info, callback} oder null
+            React.useEffect(function() {
+                window._showKonfliktDialog = function(info, callback) {
+                    setState({ info: info, callback: callback || function(){} });
+                };
+                return function() { delete window._showKonfliktDialog; };
+            }, []);
+            if (!state) return null;
+            return (
+                <KonfliktDialog
+                    info={state.info}
+                    onChoice={function(action) {
+                        try { state.callback(action); }
+                        catch(e) { console.warn('[KonfliktDialog] callback:', e); }
+                    }}
+                    onClose={function() { setState(null); }} />
+            );
+        }
+
+        /* Globale Exports der Konflikt-Dialog-Komponenten */
+        if (typeof window !== 'undefined') {
+            window.KonfliktDialog = KonfliktDialog;
+            window.KonfliktDialogHost = KonfliktDialogHost;
+        }
+

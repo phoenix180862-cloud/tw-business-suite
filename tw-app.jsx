@@ -2895,11 +2895,13 @@
                                     );
                                 })()}
                             </div>
-                            {/* Rechte Gruppe: AutoSave + FotoSync + Speicher - kompakt in der Ecke */}
+                            {/* Rechte Gruppe: AutoSave + FotoSync + Speicher + Memory-Badge - kompakt in der Ecke */}
+                            {/* Memory-Badge (Etappe B, 25.04.2026): zeigt Queue-Status und oeffnet bei Klick das Storage-Health-Dashboard */}
                             <div style={{display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto'}}>
                                 <AutoSaveStatusIndicator />
                                 <FotoSyncIndicator status={fotoSyncStatus} />
                                 <StorageIndicator />
+                                <MemoryBadge />
                             </div>
                         </div>
                     )}
@@ -3059,6 +3061,10 @@
                         open={showStorageHealth}
                         onClose={function(){ setShowStorageHealth(false); }}
                     />
+
+                    {/* Konflikt-Dialog-Host (Etappe D, 25.04.2026)
+                        Stellt window._showKonfliktDialog(info, callback) global bereit */}
+                    <KonfliktDialogHost />
 
                     {/* ═══ AUTO-WIEDERHERSTELLUNG TOAST ═══ */}
                     {autoRestoreToast && (
