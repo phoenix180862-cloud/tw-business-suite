@@ -268,42 +268,26 @@
                ══════════════════════════════════════════════════ */
 
             // ── Beim App-Start: Letzten Arbeitsstand wiederherstellen ──
+            // ══════════════════════════════════════════════════════════
+            // APP-START: IMMER Startseite (Aenderung 25.04.2026)
+            // ══════════════════════════════════════════════════════════
+            // Frueher wurde beim App-Start automatisch der zuletzt aktive
+            // Kunde wiederhergestellt. Das fuehrte dazu, dass die App
+            // mitten in Aufmass / Rechnung / etc. landete statt auf der
+            // Startseite. Auf ausdruecklichen Wunsch von Thomas (25.04.2026)
+            // entfernt: Beim App-Neustart kommt IMMER zuerst die Startseite.
+            //
+            // Das Akte-Resume-System bleibt davon UNBERUEHRT: Sobald der
+            // User einen Kunden aus der Kundenauswahl oeffnet, wird der
+            // letzte Bearbeitungsstand fuer DIESEN Kunden weiterhin
+            // automatisch wiederhergestellt (siehe Auto-Restore-Effect
+            // weiter unten, der auf [selectedKunde] reagiert).
+            //
+            // 'lastKundeId' wird weiterhin geschrieben (fuer Caching/
+            // Statistik), aber beim Start nicht mehr automatisch geladen.
+            // ══════════════════════════════════════════════════════════
             useEffect(function() {
-                if (!window.TWStorage || !window.TWStorage.isReady()) {
-                    // Warten bis Storage bereit
-                    var checkReady = setInterval(function() {
-                        if (window.TWStorage && window.TWStorage.isReady()) {
-                            clearInterval(checkReady);
-                            restoreLastSession();
-                        }
-                    }, 200);
-                    var timeout = setTimeout(function() { clearInterval(checkReady); }, 5000);
-                    return function() { clearInterval(checkReady); clearTimeout(timeout); };
-                } else {
-                    restoreLastSession();
-                }
-
-                function restoreLastSession() {
-                    // Letzten aktiven Kunden wiederherstellen
-                    TWStorage.loadAppState('lastKundeId').then(function(kundeId) {
-                        if (!kundeId) return;
-                        return TWStorage.loadKunde(kundeId).then(function(kunde) {
-                            if (kunde) {
-                                console.log('[TW-Storage] Letzten Kunden wiederhergestellt:', kunde.name || kundeId);
-                                setSelectedKunde(kunde);
-                                // Gesamtliste laden
-                                return TWStorage.loadGesamtliste(kundeId).then(function(gl) {
-                                    if (gl && gl.length > 0) {
-                                        setGesamtliste(gl);
-                                        console.log('[TW-Storage] Gesamtliste wiederhergestellt:', gl.length, 'Positionen');
-                                    }
-                                });
-                            }
-                        });
-                    }).catch(function(e) {
-                        console.warn('[TW-Storage] Session-Restore fehlgeschlagen:', e);
-                    });
-                }
+                console.log('[TW-Storage] App-Start: Startseite wird angezeigt (kein Auto-Restore beim Mount).');
             }, []);
 
             // ── Auto-Save: Kunde bei jeder Aenderung speichern ──
