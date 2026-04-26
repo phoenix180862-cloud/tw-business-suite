@@ -2526,16 +2526,16 @@
 
         .pos-modal-overlay {
             position: fixed;
-            /* HOTFIX 26.04.2026 (19:50): top von 160px auf 0 verlegt.
-               Vorher: Modal startete bei 160px unter dem oberen Bildrand, was als
-               "schwarzer Balken" erschien und die erste Pos-Listenposition haengte
-               hinter der globalen Toolbar fest. Loesung: Modal deckt jetzt den
-               kompletten Bildschirm ab. Die globale Toolbar liegt mit z-index:350
-               UEBER dem Modal (z-index:300) und bleibt sichtbar+klickbar.
-               Der Top-Padding wird im .pos-modal-body weiter unten gesetzt
-               (nicht hier!), damit die zentrierten Speicher-/Lade-Dialoge
-               (gleiche Klasse, andere Inhalte) korrekt mittig sitzen bleiben. */
-            top: 0;
+            /* HOTFIX 26.04.2026 (20:10): Saubere Loesung —
+               Overlay startet UNTERHALB der globalen App-Toolbar (App-Header 60px
+               + Toolbar ~50px = 110px). Damit bleiben Zurueck/Vor-Buttons,
+               TW BUSINESS SUITE-Titel und Status-Pills oben rechts voll sichtbar
+               und klickbar. Die Pos-Liste startet sauber darunter, der erste
+               Eintrag wird nicht von der Toolbar verdeckt.
+
+               (Vorherige Versuche: top:160 hatte schwarzen Balken und versteckte
+               erste Position. top:0 versteckte den ganzen App-Header.) */
+            top: 110px;
             left: 0;
             right: 0;
             bottom: 0;
@@ -2592,10 +2592,6 @@
             overflow-y: auto;
             padding: 16px;
             -webkit-overflow-scrolling: touch;
-            /* HOTFIX 26.04.2026 (19:50): Top-Padding 110px,
-               damit der erste Listeneintrag nicht hinter der globalen App-Toolbar
-               verschwindet (App-Header 60px + Toolbar ~50px). */
-            padding-top: 110px;
         }
 
         .pos-section-label {

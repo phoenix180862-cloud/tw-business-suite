@@ -1158,7 +1158,7 @@
                                 jetzt direkt auf dem Korpus statt auf separatem Plaettchen.
                                 Liegt vorne ueber der Motorhaube (rechts vor der Frontscheibe),
                                 kollidiert NICHT mit dem THOMAS-Schriftzug auf der Karosserie. */}
-                            <g transform="translate(75, 66)">
+                            <g transform="translate(75, 60)">
                                 {/* Halterungs-Riemen unter dem Element (laenger + dicker) */}
                                 <rect x="-3" y="14" width="62" height="3" rx="1.2" fill="#3e2723" stroke="#1a1a1a" strokeWidth="0.4"/>
                                 <line x1="6" y1="13" x2="6" y2="20" stroke="#1a1a1a" strokeWidth="0.9"/>
@@ -1209,15 +1209,17 @@
                                 <line x1="109" y1="112" x2="121" y2="112" stroke="#1a1a1a" strokeWidth="0.6"/>
                             </g>
 
-                            {/* GROSSER THOMAS-Schriftzug auf der Heck-Seite der Karosserie.
-                                Sitzt auf der hinteren Tuer/Seitenwand, sichtbar wie ein Boss-Truck-Branding.
-                                Position so gewaehlt, dass er nicht mit der Kalaschnikow auf der Motorhaube kollidiert. */}
-                            <rect x="20" y="93" width="48" height="14" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.6" rx="1.5"/>
-                            <text x="44" y="104" textAnchor="middle" fill="#c0392b" fontSize="11" fontWeight="900" fontFamily="Arial Black, sans-serif" letterSpacing="1">THOMAS</text>
+                            {/* GROSSER THOMAS-Schriftzug auf der Karosserie-Tuer.
+                                26.04.2026 v2: Schild verbreitert auf 88px, Schrift auf 14px erhoeht,
+                                Letter-Spacing reduziert damit alle 6 Buchstaben klar ausgeschrieben sind
+                                ("T" und "S" wurden vorher abgeschnitten). Mittig zentriert ueber die
+                                gesamte Karosseriebreite zwischen den Reifen. */}
+                            <rect x="15" y="89" width="88" height="15" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.7" rx="2"/>
+                            <text x="59" y="100.5" textAnchor="middle" fill="#c0392b" fontSize="14" fontWeight="900" fontFamily="Arial Black, sans-serif" letterSpacing="0.5">THOMAS</text>
 
-                            {/* TW-Logo-Sticker zusaetzlich auf der Tuer (rechts neben dem THOMAS-Schriftzug) */}
-                            <rect x="75" y="98" width="20" height="9" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.4"/>
-                            <text x="85" y="105" textAnchor="middle" fill="#c0392b" fontSize="6" fontWeight="900" fontFamily="Arial Black, sans-serif">TW</text>
+                            {/* TW-Logo-Sticker zusaetzlich auf der vorderen Tuer (rechts vom THOMAS-Schriftzug) */}
+                            <rect x="118" y="94" width="20" height="9" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.4" rx="1"/>
+                            <text x="128" y="101" textAnchor="middle" fill="#c0392b" fontSize="6" fontWeight="900" fontFamily="Arial Black, sans-serif">TW</text>
                         </svg>
                     </div>
                 </div>
