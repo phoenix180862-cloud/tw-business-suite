@@ -261,6 +261,132 @@
         }
 
         /* ═══════════════════════════════════════════
+           TOOLBAR-KOMPONENTEN — HOTFIX 26.04.2026
+           ═══════════════════════════════════════════
+           Diese drei Komponenten waren laut LIESMICH-Platzoptimierung-Phase1.md
+           Teil von "Phase 1+2A" und werden seit langem von tw-aufmass.jsx
+           verwendet (Pos-Modal-Toolbar, Raumerkennungs-Toolbar). Sie haben
+           jedoch nie ihren Weg in die Code-Basis gefunden, was zu einem
+           ReferenceError fuehrte, sobald die Raumerkennungs-Seite die globale
+           Toolbar einspeiste. Nachgereicht hier am 26.04.2026 19:00.
+
+           - StatusPill: Anzeige-Pille (nicht klickbar) fuer Zaehler/Stati
+           - ToolbarButton: Kompakter Action-Button (Icon + Label, ~32 px hoch)
+           - ToolbarRow: Sticky horizontale Toolbar-Zeile mit linker/rechter Gruppe
+        */
+
+        /* ---- StatusPill ---- */
+        function StatusPill({ text, color, title, onClick }) {
+            // Farb-Schema: success (gruen), info (blau), warning (orange), danger (rot), muted (grau)
+            const colorMap = {
+                success: { bg: 'rgba(46,160,67,0.18)', border: 'rgba(46,160,67,0.45)', text: '#3fb950' },
+                info:    { bg: 'rgba(30,136,229,0.18)', border: 'rgba(30,136,229,0.45)', text: '#58a6ff' },
+                warning: { bg: 'rgba(243,156,18,0.18)', border: 'rgba(243,156,18,0.45)', text: '#f0a84a' },
+                danger:  { bg: 'rgba(196,30,30,0.18)', border: 'rgba(196,30,30,0.45)', text: '#ff6b6b' },
+                muted:   { bg: 'rgba(120,120,120,0.18)', border: 'rgba(160,160,160,0.35)', text: '#c8c8c8' },
+            };
+            const c = colorMap[color] || colorMap.muted;
+            return (
+                <span
+                    title={title || ''}
+                    onClick={onClick}
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        background: c.bg,
+                        border: '1px solid ' + c.border,
+                        color: c.text,
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        fontFamily: 'Oswald, sans-serif',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.6px',
+                        whiteSpace: 'nowrap',
+                        cursor: onClick ? 'pointer' : 'default',
+                        userSelect: 'none',
+                    }}
+                >{text}</span>
+            );
+        }
+
+        /* ---- ToolbarButton ---- */
+        function ToolbarButton({ icon, label, color, onClick, disabled, title }) {
+            // Farb-Schema fuer Buttons: red (default Aktion), blue (positive Aktion), orange (Auswahl), green (Bestaetigen)
+            const colorMap = {
+                red:    { bg: 'linear-gradient(135deg, #e84040, #c42323)',  shadow: 'rgba(196,30,30,0.35)' },
+                blue:   { bg: 'linear-gradient(135deg, #4a90e2, #1e6fc4)',  shadow: 'rgba(30,136,229,0.35)' },
+                orange: { bg: 'linear-gradient(135deg, #f39c12, #d35400)',  shadow: 'rgba(211,84,0,0.35)' },
+                green:  { bg: 'linear-gradient(135deg, #2ecc71, #1e8449)',  shadow: 'rgba(39,174,96,0.35)' },
+                grey:   { bg: 'linear-gradient(135deg, #5d6d7e, #34495e)',  shadow: 'rgba(52,73,94,0.35)' },
+            };
+            const c = colorMap[color] || colorMap.red;
+            return (
+                <button
+                    onClick={disabled ? undefined : onClick}
+                    title={title || label || ''}
+                    disabled={!!disabled}
+                    style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '6px 11px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: 'none',
+                        background: disabled ? 'rgba(120,120,120,0.22)' : c.bg,
+                        color: disabled ? 'rgba(255,255,255,0.4)' : '#ffffff',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        fontFamily: 'Oswald, sans-serif',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.6px',
+                        boxShadow: disabled ? 'none' : ('0 2px 8px ' + c.shadow),
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                    }}
+                >
+                    {icon && <span style={{ fontSize: '14px', lineHeight: 1 }}>{icon}</span>}
+                    {label && <span>{label}</span>}
+                </button>
+            );
+        }
+
+        /* ---- ToolbarRow ---- */
+        function ToolbarRow({ left, right, sticky, stickyTop }) {
+            const stickyStyle = sticky === false ? {} : {
+                position: 'sticky',
+                top: (typeof stickyTop === 'number' ? stickyTop : 60) + 'px',
+                zIndex: 340,
+            };
+            return (
+                <div
+                    className="tw-toolbar-row"
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '6px 10px',
+                        background: 'var(--bg-primary)',
+                        borderBottom: '1px solid var(--border-color)',
+                        flexWrap: 'wrap',
+                        ...stickyStyle,
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {left}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {right}
+                    </div>
+                </div>
+            );
+        }
+
+        /* ═══════════════════════════════════════════
            FIRMENLOGO COMPONENT
            ═══════════════════════════════════════════ */
         function FirmenLogo({ size = 'large' }) {
