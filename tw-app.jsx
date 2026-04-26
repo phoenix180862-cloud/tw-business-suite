@@ -2746,13 +2746,45 @@
 
             return (
                 <React.Fragment>
-                    <NavHeader
-                        page={page}
-                        onBack={goBack}
-                        onForward={goForward}
-                        canBack={historyIdx > 0}
-                        canForward={historyIdx < history.length - 1}
-                    />
+                    {/* PHASE-3 (26.04.2026): Auf der Startseite KEIN NavHeader und KEINE
+                        globale Toolbar mehr — der schwarze Querbalken hatte das Logo verdeckt
+                        (siehe Foto vom 26.04.2026 18:02). Stattdessen schweben die 4 Status-
+                        Indikatoren als kompakte Pills oben rechts, ohne den Logo-Bereich zu beruehren. */}
+                    {page !== 'start' && (
+                        <NavHeader
+                            page={page}
+                            onBack={goBack}
+                            onForward={goForward}
+                            canBack={historyIdx > 0}
+                            canForward={historyIdx < history.length - 1}
+                        />
+                    )}
+
+                    {/* Floating Status-Indicators NUR auf der Startseite (oben rechts).
+                        AutoSave / FotoSync / Storage / Memory bleiben sichtbar, damit man
+                        Sync-Status auch auf der Startseite ueberblickt — ohne breiten Balken. */}
+                    {page === 'start' && (
+                        <div style={{
+                            position:'fixed',
+                            top:'10px',
+                            right:'10px',
+                            display:'flex',
+                            alignItems:'center',
+                            gap:'6px',
+                            padding:'6px 8px',
+                            background:'rgba(20,28,40,0.78)',
+                            border:'1px solid rgba(255,255,255,0.08)',
+                            borderRadius:'14px',
+                            backdropFilter:'blur(8px)',
+                            zIndex:500,
+                            boxShadow:'0 4px 14px rgba(0,0,0,0.35)'
+                        }}>
+                            <AutoSaveStatusIndicator />
+                            <FotoSyncIndicator status={fotoSyncStatus} />
+                            <StorageIndicator />
+                            <MemoryBadge />
+                        </div>
+                    )}
 
                     {/* ETAPPE 7: Die frueheren roten "Aufmass Vorlage speichern/laden"-Buttons
                         sind jetzt als Eintraege im Bearbeiten-Dropdown verfuegbar (nur auf
@@ -2761,7 +2793,7 @@
                     {/* ETAPPE 7: Einheitliche Top-Leiste. Aufmass-Vorlage-Buttons sind jetzt
                         als Eintraege im Bearbeiten-Dropdown (nicht mehr als eigene rote Leiste).
                         NavDropdown-Farbe (blau/rot) abhaengig von der aktuellen Seite. */}
-                    {(true) && (
+                    {page !== 'start' && (
                         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:'8px', padding:'8px 10px', background:'var(--bg-primary)', borderBottom:'1px solid var(--border-color)', position:'sticky', top:'60px', zIndex:350, flexWrap:'wrap'}}>
                             {/* Linke Gruppe: NavDropdown + ggf. Bearbeiten-Dropdown */}
                             <div style={{display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}}>

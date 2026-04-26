@@ -804,39 +804,45 @@
                                 <stop offset="1" stopColor="#b7950b"/>
                             </linearGradient>
                         </defs>
+                        {/* SILKE-MAKEOVER 26.04.2026:
+                            - Pferdeschwanz (frueherer langer Haar-Path entlang der Beine) entfernt
+                            - Statur korpulenter: Jacke breiter (29..61 statt 31..59),
+                              Hose ebenfalls breiter, Beine an verbreiterte Hueftpartie angepasst
+                            - Frisur: kompakter Bob-Cut (Helm umrahmend, kurz auf Kragenhoehe) */}
                         <g className="tw-leg-l">
-                            <path d="M 39,98 Q 38,130 37,155 L 43,155 Q 44,130 44,98 Z" fill="url(#hoseSilke)"/>
-                            <ellipse cx="40" cy="157" rx="6" ry="3.5" fill="#1a1a1a"/>
+                            <path d="M 36,98 Q 35,130 34,155 L 42,155 Q 43,130 44,98 Z" fill="url(#hoseSilke)"/>
+                            <ellipse cx="38" cy="157" rx="7" ry="3.5" fill="#1a1a1a"/>
                         </g>
                         <g className="tw-leg-r">
-                            <path d="M 47,98 Q 48,130 49,155 L 55,155 Q 54,130 51,98 Z" fill="url(#hoseSilke)"/>
-                            <ellipse cx="51" cy="157" rx="6" ry="3.5" fill="#1a1a1a"/>
+                            <path d="M 46,98 Q 47,130 48,155 L 56,155 Q 55,130 54,98 Z" fill="url(#hoseSilke)"/>
+                            <ellipse cx="52" cy="157" rx="7" ry="3.5" fill="#1a1a1a"/>
                         </g>
                         <g>
-                            <path d="M 32,55 Q 30,65 31,78 Q 29,85 31,98 L 59,98 Q 61,85 59,78 Q 60,65 58,55 Z" fill="url(#jackeSilke)"/>
-                            <line x1="45" y1="58" x2="45" y2="95" stroke="#5d4037" strokeWidth="0.6"/>
-                            <rect x="31" y="92" width="28" height="4" fill="#5d4037"/>
-                            <rect x="43" y="91" width="4" height="6" fill="#f1c40f"/>
+                            {/* Korpulentere Jacke: 29..61 mit ausgepraegterer Bauchpartie */}
+                            <path d="M 29,55 Q 26,68 27,82 Q 25,92 28,99 L 62,99 Q 65,92 63,82 Q 64,68 61,55 Z" fill="url(#jackeSilke)"/>
+                            <line x1="45" y1="58" x2="45" y2="97" stroke="#5d4037" strokeWidth="0.6"/>
+                            <rect x="28" y="93" width="34" height="4.5" fill="#5d4037"/>
+                            <rect x="43" y="92" width="4" height="6.5" fill="#f1c40f"/>
                             <g>
-                                <path d="M 27,56 L 34,55 L 64,95 L 60,100 Z" fill="url(#schaerpeSilke)" stroke="#7d6608" strokeWidth="0.5"/>
-                                <path d="M 27,56 L 34,55" stroke="#ffd700" strokeWidth="1"/>
+                                <path d="M 25,56 L 33,55 L 65,96 L 60,101 Z" fill="url(#schaerpeSilke)" stroke="#7d6608" strokeWidth="0.5"/>
+                                <path d="M 25,56 L 33,55" stroke="#ffd700" strokeWidth="1"/>
                                 <text x="45" y="74" textAnchor="middle" fill="#4a0e0a" fontSize="7" fontWeight="900" fontFamily="Arial Black, sans-serif" transform="rotate(52 45 74)">BIG BOSS</text>
-                                <circle cx="60" cy="100" r="2.5" fill="#f1c40f" stroke="#7d6608" strokeWidth="0.3"/>
-                                <line x1="60" y1="102" x2="59" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
-                                <line x1="61" y1="102" x2="61" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
-                                <line x1="62" y1="102" x2="63" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                                <circle cx="60" cy="101" r="2.5" fill="#f1c40f" stroke="#7d6608" strokeWidth="0.3"/>
+                                <line x1="60" y1="103" x2="59" y2="107" stroke="#b7950b" strokeWidth="0.5"/>
+                                <line x1="61" y1="103" x2="61" y2="107" stroke="#b7950b" strokeWidth="0.5"/>
+                                <line x1="62" y1="103" x2="63" y2="107" stroke="#b7950b" strokeWidth="0.5"/>
                             </g>
-                            <rect x="30" y="84" width="30" height="8" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <rect x="28" y="84" width="34" height="8" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
                             <text x="45" y="90.5" textAnchor="middle" fill="#1a1a1a" fontSize="6.5" fontWeight="900" fontFamily="Arial Black, sans-serif">SILKE</text>
                         </g>
                         <g className="tw-arm-l">
-                            <path d="M 30,58 Q 26,73 24,92 L 29,93 Q 32,73 34,58 Z" fill="url(#jackeSilke)"/>
-                            <circle cx="27" cy="93" r="4.5" fill="url(#hautSilke)"/>
+                            <path d="M 28,58 Q 23,73 21,92 L 27,93 Q 30,73 32,58 Z" fill="url(#jackeSilke)"/>
+                            <circle cx="24" cy="93" r="4.5" fill="url(#hautSilke)"/>
                         </g>
                         <g className="tw-arm-r">
-                            <path d="M 60,58 Q 64,73 66,92 L 61,93 Q 58,73 56,58 Z" fill="url(#jackeSilke)"/>
-                            <circle cx="63" cy="93" r="4.5" fill="url(#hautSilke)"/>
-                            <g transform="translate(63,97)">
+                            <path d="M 62,58 Q 67,73 69,92 L 63,93 Q 60,73 58,58 Z" fill="url(#jackeSilke)"/>
+                            <circle cx="66" cy="93" r="4.5" fill="url(#hautSilke)"/>
+                            <g transform="translate(66,97)">
                                 <rect x="-6" y="-3" width="16" height="20" fill="#8b4513" stroke="#5d4037" strokeWidth="0.5"/>
                                 <rect x="-5" y="-1" width="14" height="17" fill="#ffffff"/>
                                 <line x1="-3" y1="3" x2="7" y2="3" stroke="#95a5a6" strokeWidth="0.4"/>
@@ -847,17 +853,15 @@
                                 <text x="3" y="15.5" textAnchor="middle" fill="#c0392b" fontSize="3.5" fontWeight="900" fontFamily="Arial Black, sans-serif">BOSS</text>
                             </g>
                         </g>
-                        <g>
-                            <path d="M 35,33 Q 22,45 20,62 Q 19,78 22,90 Q 24,95 27,92 Q 25,78 26,62 Q 28,48 38,38 Z" fill="url(#haareSilke)" stroke="#7d6608" strokeWidth="0.3"/>
-                            <path d="M 28,45 Q 26,60 27,75" stroke="#f4d03f" strokeWidth="0.8" fill="none" opacity="0.7"/>
-                            <path d="M 32,42 Q 30,55 31,70" stroke="#f4d03f" strokeWidth="0.6" fill="none" opacity="0.5"/>
-                            <ellipse cx="30" cy="35" rx="3" ry="2" fill="#c2185b"/>
-                        </g>
+                        {/* SCHWEIF ENTFERNT: Frueherer langer Pferdeschwanz wurde geloescht.
+                            An seine Stelle tritt unten ein kompakter Bob-Cut, der den Helm umrahmt. */}
                         <g>
                             <rect x="41" y="48" width="8" height="7" fill="url(#hautSilke)"/>
                             <ellipse cx="45" cy="40" rx="10" ry="12" fill="url(#hautSilke)"/>
-                            <path d="M 36,35 Q 34,42 36,50 L 38,50 Q 37,42 38,35 Z" fill="url(#haareSilke)"/>
-                            <path d="M 54,35 Q 56,42 54,50 L 52,50 Q 53,42 52,35 Z" fill="url(#haareSilke)"/>
+                            {/* Bob-Cut: kurze Haarpartie links + rechts neben dem Gesicht, endet auf Kragen-Hoehe */}
+                            <path d="M 33,33 Q 30,42 32,52 Q 33,55 36,55 L 38,55 Q 36,46 38,36 Z" fill="url(#haareSilke)" stroke="#7d6608" strokeWidth="0.3"/>
+                            <path d="M 57,33 Q 60,42 58,52 Q 57,55 54,55 L 52,55 Q 54,46 52,36 Z" fill="url(#haareSilke)" stroke="#7d6608" strokeWidth="0.3"/>
+                            {/* Stirnpony unter dem Helm */}
                             <path d="M 37,34 Q 45,30 53,34 L 53,37 L 37,37 Z" fill="url(#haareSilke)"/>
                             <circle cx="38" cy="42" r="2.5" fill="#e91e63" opacity="0.25"/>
                             <circle cx="52" cy="42" r="2.5" fill="#e91e63" opacity="0.25"/>
@@ -887,6 +891,197 @@
             );
         }
 
+        /* ---- Figur 8: THOMAS — Chef im roten PKW (26.04.2026) ----
+           Die Boss-Figur faehrt zwischen den Bauteam-Gruppen mit. Statt zu laufen
+           rollt Thomas in einem roten PKW (oben rausguckend) ueber den Bildschirm.
+           Eine Sprechblase ueber dem Auto blendet rhythmisch ein/aus. */
+        function FigurThomas() {
+            // Wichtig: KEIN tw-figure / tw-leg / tw-arm — Thomas faehrt, er laeuft nicht.
+            // Eigene Klasse tw-pkw bekommt im Animation-CSS ein anderes Bewegungsprofil.
+            return (
+                <div className="tw-pkw-wrap" style={{position:'relative', width:'150px', height:'170px'}}>
+                    {/* Sprechblase ueber dem Auto — pulsiert via twSpeechBubble */}
+                    <div className="tw-speech-bubble" style={{
+                        position:'absolute', top:'2px', left:'45px',
+                        background:'#ffffff',
+                        border:'2px solid #1a1a1a',
+                        borderRadius:'14px',
+                        padding:'5px 10px',
+                        fontSize:'11px',
+                        fontWeight:'900',
+                        color:'#c0392b',
+                        fontFamily:'Oswald, Arial Black, sans-serif',
+                        whiteSpace:'nowrap',
+                        boxShadow:'2px 2px 6px rgba(0,0,0,0.35)',
+                        textTransform:'uppercase',
+                        letterSpacing:'0.5px'
+                    }}>
+                        Yallah, Yallah!
+                        {/* Sprechblasen-Schwanz nach unten */}
+                        <div style={{
+                            position:'absolute', bottom:'-8px', left:'18px',
+                            width:0, height:0,
+                            borderLeft:'7px solid transparent',
+                            borderRight:'7px solid transparent',
+                            borderTop:'8px solid #1a1a1a'
+                        }} />
+                        <div style={{
+                            position:'absolute', bottom:'-5px', left:'19px',
+                            width:0, height:0,
+                            borderLeft:'6px solid transparent',
+                            borderRight:'6px solid transparent',
+                            borderTop:'7px solid #ffffff'
+                        }} />
+                    </div>
+
+                    <div className="tw-pkw" style={{position:'absolute', bottom:'0', left:'0'}}>
+                        <svg viewBox="0 0 150 130" width="150" height="130">
+                            <defs>
+                                <linearGradient id="pkwBody" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0" stopColor="#e74c3c"/>
+                                    <stop offset="0.5" stopColor="#c0392b"/>
+                                    <stop offset="1" stopColor="#7b241c"/>
+                                </linearGradient>
+                                <linearGradient id="pkwDach" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0" stopColor="#a93226"/>
+                                    <stop offset="1" stopColor="#641e16"/>
+                                </linearGradient>
+                                <radialGradient id="pkwScheibe" cx="0.3" cy="0.3">
+                                    <stop offset="0" stopColor="#aed6f1"/>
+                                    <stop offset="1" stopColor="#5dade2"/>
+                                </radialGradient>
+                                <radialGradient id="hautThomas" cx="0.4" cy="0.4">
+                                    <stop offset="0" stopColor="#fdebd0"/>
+                                    <stop offset="1" stopColor="#dc7633"/>
+                                </radialGradient>
+                                <radialGradient id="helmThomas" cx="0.3" cy="0.3">
+                                    <stop offset="0" stopColor="#ffffff"/>
+                                    <stop offset="1" stopColor="#bdc3c7"/>
+                                </radialGradient>
+                                <radialGradient id="reifenGrad" cx="0.5" cy="0.5">
+                                    <stop offset="0" stopColor="#34495e"/>
+                                    <stop offset="0.7" stopColor="#1a1a1a"/>
+                                    <stop offset="1" stopColor="#000000"/>
+                                </radialGradient>
+                            </defs>
+
+                            {/* Schatten unter dem Auto */}
+                            <ellipse cx="75" cy="120" rx="60" ry="5" fill="rgba(0,0,0,0.45)" opacity="0.6"/>
+
+                            {/* PKW-Karosserie unten (Body) */}
+                            <path d="M 12,95 Q 14,80 22,75 L 50,72 Q 60,55 75,53 L 105,55 Q 118,72 128,80 L 138,82 Q 142,85 142,95 L 142,108 Q 142,112 138,112 L 14,112 Q 10,112 10,108 Z" fill="url(#pkwBody)" stroke="#641e16" strokeWidth="1"/>
+
+                            {/* Dach (Ueber-Karosserie-Linie) */}
+                            <path d="M 50,72 Q 60,55 75,53 L 105,55 Q 118,72 118,72" fill="url(#pkwDach)" stroke="#641e16" strokeWidth="0.8"/>
+
+                            {/* Frontscheibe (Fahrerseite) */}
+                            <path d="M 53,72 Q 62,60 75,58 L 90,58 L 100,72 Z" fill="url(#pkwScheibe)" stroke="#1a1a1a" strokeWidth="0.6" opacity="0.85"/>
+                            {/* Heckscheibe / hinten */}
+                            <path d="M 100,72 L 90,58 L 105,60 Q 113,68 116,72 Z" fill="url(#pkwScheibe)" stroke="#1a1a1a" strokeWidth="0.6" opacity="0.7"/>
+                            {/* Glanzlicht auf der Scheibe */}
+                            <path d="M 60,68 L 68,62" stroke="#ffffff" strokeWidth="1.3" opacity="0.85"/>
+
+                            {/* THOMAS guckt aus dem Cabrio/Schiebedach raus —
+                                Kopf+Schultern oberhalb der Scheibe sichtbar */}
+                            <g>
+                                {/* Schultern in dezentem Boss-Anzug */}
+                                <path d="M 62,68 Q 68,62 75,61 L 90,62 Q 95,66 96,72 L 62,72 Z" fill="#2c3e50" stroke="#1a1a1a" strokeWidth="0.4"/>
+                                {/* Roter Krawatten-Stub */}
+                                <path d="M 77,66 L 80,72 L 79,68 L 81,72 L 80,66 Z" fill="#c0392b"/>
+                                {/* Hals */}
+                                <rect x="76" y="55" width="6" height="6" fill="url(#hautThomas)"/>
+                                {/* Kopf */}
+                                <ellipse cx="79" cy="48" rx="9" ry="11" fill="url(#hautThomas)"/>
+                                {/* Augen */}
+                                <circle cx="76" cy="46" r="0.9" fill="#1a1a1a"/>
+                                <circle cx="82" cy="46" r="0.9" fill="#1a1a1a"/>
+                                {/* Augenbrauen — entschlossen */}
+                                <path d="M 74,43 Q 76,42 78,43" stroke="#3e2723" strokeWidth="0.9" fill="none"/>
+                                <path d="M 80,43 Q 82,42 84,43" stroke="#3e2723" strokeWidth="0.9" fill="none"/>
+                                {/* Nase */}
+                                <path d="M 79,47 L 78,50 L 80,50" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                                {/* Mund — laechelt */}
+                                <path d="M 76,53 Q 79,55 82,53" fill="none" stroke="#7b241c" strokeWidth="0.9"/>
+                                {/* Weisser Boss-Helm */}
+                                <path d="M 70,40 Q 79,30 88,40 L 88,42 L 70,42 Z" fill="url(#helmThomas)" stroke="#7f8c8d" strokeWidth="0.5"/>
+                                <ellipse cx="79" cy="39" rx="9" ry="2.5" fill="#ecf0f1"/>
+                                {/* Helm-Glanz */}
+                                <path d="M 73,36 Q 76,32 79,31" stroke="#ffffff" strokeWidth="1.3" fill="none" opacity="0.85"/>
+                                {/* Boss-Schild auf Helm */}
+                                <rect x="74" y="36" width="10" height="3" fill="#c0392b" stroke="#7b241c" strokeWidth="0.3"/>
+                                <text x="79" y="38.5" textAnchor="middle" fill="#ffffff" fontSize="2.3" fontWeight="900" fontFamily="Arial Black, sans-serif">CHEF</text>
+                                {/* Namensschild auf der Brust */}
+                                <rect x="65" y="68" width="22" height="5" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.3"/>
+                                <text x="76" y="71.8" textAnchor="middle" fill="#1a1a1a" fontSize="4" fontWeight="900" fontFamily="Arial Black, sans-serif">THOMAS</text>
+                            </g>
+
+                            {/* Tuergriffe + Seitenlinie */}
+                            <line x1="20" y1="92" x2="135" y2="92" stroke="#641e16" strokeWidth="0.6"/>
+                            <rect x="42" y="86" width="6" height="2" rx="1" fill="#1a1a1a"/>
+                            <rect x="108" y="86" width="6" height="2" rx="1" fill="#1a1a1a"/>
+
+                            {/* Scheinwerfer vorne */}
+                            <ellipse cx="135" cy="98" rx="4" ry="3" fill="#f9e79f" stroke="#b7950b" strokeWidth="0.5"/>
+                            <ellipse cx="135" cy="98" rx="2" ry="1.5" fill="#fffacd"/>
+                            {/* Rueckleuchten hinten */}
+                            <ellipse cx="15" cy="98" rx="3" ry="2.5" fill="#922b21" stroke="#641e16" strokeWidth="0.5"/>
+
+                            {/* Stossstange */}
+                            <rect x="10" y="105" width="132" height="4" rx="2" fill="#7f8c8d" stroke="#34495e" strokeWidth="0.4"/>
+
+                            {/* === BOSS-ACCESSOIRE auf der Motorhaube (Cartoon, Lego-Stil) === */}
+                            {/* Liegt VOR der Frontscheibe, festgezurrt mit zwei kleinen Riemen.
+                                Stilisiert wie die anderen SVG-Elemente (Bauteam) — keine fotorealistische Darstellung. */}
+                            <g transform="translate(108, 80)">
+                                {/* Halterung / Riemen unter dem Element */}
+                                <rect x="-2" y="9" width="32" height="2" rx="1" fill="#3e2723" stroke="#1a1a1a" strokeWidth="0.3"/>
+                                <line x1="3" y1="8" x2="3" y2="13" stroke="#1a1a1a" strokeWidth="0.6"/>
+                                <line x1="25" y1="8" x2="25" y2="13" stroke="#1a1a1a" strokeWidth="0.6"/>
+                                {/* Holz-Schaft (hinten, abgerundet) */}
+                                <path d="M -1,5 Q -2,9 1,10 L 8,10 L 8,5 Z" fill="#6e2c00" stroke="#3e2723" strokeWidth="0.4"/>
+                                <line x1="2" y1="6" x2="6" y2="9" stroke="#3e2723" strokeWidth="0.3" opacity="0.6"/>
+                                {/* Korpus / Mittelteil */}
+                                <rect x="8" y="5" width="13" height="5" fill="#2c3e50" stroke="#1a1a1a" strokeWidth="0.4"/>
+                                <rect x="9" y="6" width="11" height="1" fill="#34495e"/>
+                                {/* Charakteristisches gebogenes Magazin nach unten */}
+                                <path d="M 11,10 Q 11,15 14,17 L 18,17 Q 19,14 18,10 Z" fill="#34495e" stroke="#1a1a1a" strokeWidth="0.4"/>
+                                <line x1="13" y1="11" x2="17" y2="11" stroke="#1a1a1a" strokeWidth="0.2" opacity="0.7"/>
+                                <line x1="13" y1="13" x2="17" y2="13" stroke="#1a1a1a" strokeWidth="0.2" opacity="0.7"/>
+                                <line x1="13" y1="15" x2="17" y2="15" stroke="#1a1a1a" strokeWidth="0.2" opacity="0.7"/>
+                                {/* Lauf (vorne) */}
+                                <rect x="21" y="6.5" width="9" height="2" fill="#1a1a1a" stroke="#000000" strokeWidth="0.3"/>
+                                {/* Visier-Kimme oben */}
+                                <rect x="14" y="3.5" width="2" height="1.5" fill="#1a1a1a"/>
+                                {/* Korn vorne */}
+                                <rect x="28" y="5.5" width="1" height="1.5" fill="#1a1a1a"/>
+                                {/* Beschriftung "KALASCHNIKOW" auf einem Plaettchen */}
+                                <rect x="2" y="0" width="20" height="3.5" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.3" rx="0.5"/>
+                                <text x="12" y="2.6" textAnchor="middle" fill="#c0392b" fontSize="2.6" fontWeight="900" fontFamily="Arial Black, sans-serif">KALASCHNIKOW</text>
+                            </g>
+
+                            {/* Reifen — drehen sich via tw-pkw-wheel */}
+                            <g className="tw-pkw-wheel" style={{transformOrigin:'35px 112px'}}>
+                                <circle cx="35" cy="112" r="11" fill="url(#reifenGrad)" stroke="#000000" strokeWidth="0.8"/>
+                                <circle cx="35" cy="112" r="5" fill="#7f8c8d" stroke="#34495e" strokeWidth="0.5"/>
+                                <line x1="35" y1="106" x2="35" y2="118" stroke="#1a1a1a" strokeWidth="0.6"/>
+                                <line x1="29" y1="112" x2="41" y2="112" stroke="#1a1a1a" strokeWidth="0.6"/>
+                            </g>
+                            <g className="tw-pkw-wheel" style={{transformOrigin:'115px 112px'}}>
+                                <circle cx="115" cy="112" r="11" fill="url(#reifenGrad)" stroke="#000000" strokeWidth="0.8"/>
+                                <circle cx="115" cy="112" r="5" fill="#7f8c8d" stroke="#34495e" strokeWidth="0.5"/>
+                                <line x1="115" y1="106" x2="115" y2="118" stroke="#1a1a1a" strokeWidth="0.6"/>
+                                <line x1="109" y1="112" x2="121" y2="112" stroke="#1a1a1a" strokeWidth="0.6"/>
+                            </g>
+
+                            {/* TW-Logo-Sticker auf der Tuer */}
+                            <rect x="65" y="95" width="20" height="10" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <text x="75" y="102.5" textAnchor="middle" fill="#c0392b" fontSize="6" fontWeight="900" fontFamily="Arial Black, sans-serif">TW</text>
+                        </svg>
+                    </div>
+                </div>
+            );
+        }
+
         /* ---- HAUPT-KOMPONENTE: BauteamAnimation mit 3 Gruppen ---- */
         function BauteamAnimation() {
             // Gesamtzyklus 45s, je 15s pro Gruppe
@@ -902,22 +1097,25 @@
                     <div style={{position:'absolute', bottom:'20px', left:0, right:0, height:'2px',
                                  background:'linear-gradient(90deg, transparent 3%, rgba(149,165,166,0.4) 15%, rgba(149,165,166,0.5) 50%, rgba(149,165,166,0.4) 85%, transparent 97%)'}} />
 
-                    {/* Gruppe 1: Ivan, Michal, Iurii */}
+                    {/* Gruppe 1: Ivan, Michal, THOMAS (PKW), Iurii */}
                     <div className="tw-group tw-group-1" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
                         <div className="tw-fig-wrap tw-fig-1"><FigurIvan /></div>
                         <div className="tw-fig-wrap tw-fig-2"><FigurMichal /></div>
+                        <div className="tw-fig-wrap tw-fig-thomas tw-fig-thomas-1"><FigurThomas /></div>
                         <div className="tw-fig-wrap tw-fig-3"><FigurIurii /></div>
                     </div>
 
-                    {/* Gruppe 2: Peter, Luca (AM s.r.o.) */}
+                    {/* Gruppe 2: Peter, THOMAS (PKW), Luca (AM s.r.o.) */}
                     <div className="tw-group tw-group-2" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
                         <div className="tw-fig-wrap tw-fig-4"><FigurPeter /></div>
+                        <div className="tw-fig-wrap tw-fig-thomas tw-fig-thomas-2"><FigurThomas /></div>
                         <div className="tw-fig-wrap tw-fig-5"><FigurLucaAM /></div>
                     </div>
 
-                    {/* Gruppe 3: Luca, Silke (BIG BOSS) */}
+                    {/* Gruppe 3: Luca, THOMAS (PKW), Silke (BIG BOSS) */}
                     <div className="tw-group tw-group-3" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
                         <div className="tw-fig-wrap tw-fig-6"><FigurLuca2 /></div>
+                        <div className="tw-fig-wrap tw-fig-thomas tw-fig-thomas-3"><FigurThomas /></div>
                         <div className="tw-fig-wrap tw-fig-7"><FigurSilke /></div>
                     </div>
 
@@ -1010,6 +1208,49 @@
 .tw-fig-7 .tw-leg-l, .tw-fig-7 .tw-leg-r,
 .tw-fig-7 .tw-arm-l, .tw-fig-7 .tw-arm-r { animation-duration: 1.1s; animation-delay: -0.5s; }
 .tw-fig-7 .tw-figure { animation-duration: 0.55s; animation-delay: -0.25s; }
+
+/* ─────────────────────────────────────────────────────────────
+   THOMAS-PKW (26.04.2026): Eigene Bewegungs-Charakteristik —
+   kein twBodyBob (Laufzyklus), sondern sanftes "Federn" wie ein
+   rollendes Auto. Reifen drehen sich. Sprechblase pulsiert.
+   ───────────────────────────────────────────────────────────── */
+.tw-pkw {
+    animation: twPkwBounce 1.4s ease-in-out infinite;
+    transform-origin: center bottom;
+}
+@keyframes twPkwBounce {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25%      { transform: translateY(-1.5px) rotate(-0.4deg); }
+    50%      { transform: translateY(0) rotate(0deg); }
+    75%      { transform: translateY(-1px) rotate(0.4deg); }
+}
+.tw-pkw-wheel {
+    animation: twWheelSpin 0.6s linear infinite;
+}
+@keyframes twWheelSpin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* Sprechblase blendet rhythmisch ein/aus —
+   3.6s Zyklus: 0.0-0.4 Erscheinen, 0.4-2.4 sichtbar, 2.4-2.8 Ausblenden, 2.8-3.6 unsichtbar */
+.tw-speech-bubble {
+    animation: twSpeechBubble 3.6s ease-in-out infinite;
+    transform-origin: bottom left;
+}
+@keyframes twSpeechBubble {
+    0%   { opacity: 0; transform: scale(0.6) translateY(6px); }
+    11%  { opacity: 1; transform: scale(1) translateY(0); }
+    66%  { opacity: 1; transform: scale(1) translateY(0); }
+    78%  { opacity: 0; transform: scale(0.6) translateY(6px); }
+    100% { opacity: 0; transform: scale(0.6) translateY(6px); }
+}
+/* Pro-Gruppe-Phasenversatz, damit Thomas in jeder Gruppe leicht anders schwingt */
+.tw-fig-thomas-1 .tw-pkw { animation-duration: 1.4s; animation-delay: -0.2s; }
+.tw-fig-thomas-2 .tw-pkw { animation-duration: 1.55s; animation-delay: -0.6s; }
+.tw-fig-thomas-3 .tw-pkw { animation-duration: 1.3s; animation-delay: -0.4s; }
+.tw-fig-thomas-1 .tw-speech-bubble { animation-delay: 0s; }
+.tw-fig-thomas-2 .tw-speech-bubble { animation-delay: -1.2s; }
+.tw-fig-thomas-3 .tw-speech-bubble { animation-delay: -2.4s; }
 
 .tw-group {
     left: -400px;
@@ -2054,133 +2295,6 @@
                     )}
                 </div>
             );
-        }
-
-        /* ═══════════════════════════════════════════════════════════
-           PLATZOPTIMIERUNG-TOOLBAR -- Komponenten (Skill-Implementierung)
-           Ergaenzt 25.04.2026: Behebt ReferenceError "ToolbarRow is not defined"
-           in tw-aufmass.jsx (Raumerkennung + Raumblatt + Pos-Modal-Toolbar).
-           Specs: SKILL-platzoptimierung-toolbar.md (Abschnitte 5,6,7)
-           ═══════════════════════════════════════════════════════════ */
-
-        function ToolbarButton(props) {
-            var icon = props.icon;
-            var label = props.label;
-            var onClick = props.onClick;
-            var color = props.color || 'red';
-            var disabled = !!props.disabled;
-            var title = props.title;
-            var grad = ({
-                red:    'linear-gradient(135deg, var(--accent-red-light, #ff6b6b), var(--accent-red, #c41e1e))',
-                blue:   'linear-gradient(135deg, #4da6ff, #1565C0)',
-                orange: 'linear-gradient(135deg, var(--accent-orange-light, #f5b041), var(--accent-orange, #e67e22))',
-                green:  'linear-gradient(135deg, #2ecc71, #27ae60)'
-            })[color] || 'linear-gradient(135deg, #ff6b6b, #c41e1e)';
-            return (
-                <button
-                    onClick={disabled ? undefined : onClick}
-                    disabled={disabled}
-                    title={title}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '7px 12px',
-                        borderRadius: 'var(--radius-sm, 6px)',
-                        border: 'none',
-                        background: grad,
-                        color: '#fff',
-                        fontFamily: 'Oswald, sans-serif',
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        letterSpacing: '0.5px',
-                        textTransform: 'uppercase',
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        opacity: disabled ? 0.55 : 1,
-                        whiteSpace: 'nowrap',
-                        touchAction: 'manipulation',
-                        minHeight: '32px',
-                        transition: 'transform 0.15s ease'
-                    }}
-                >
-                    {icon ? <span style={{fontSize:'13px'}}>{icon}</span> : null}
-                    <span>{label}</span>
-                </button>
-            );
-        }
-
-        function StatusPill(props) {
-            var text = props.text;
-            var color = props.color || 'info';
-            var title = props.title;
-            var palette = ({
-                success: { bg:'rgba(39,174,96,0.15)',  border:'rgba(39,174,96,0.45)',  fg:'#27ae60' },
-                info:    { bg:'rgba(77,166,255,0.15)', border:'rgba(77,166,255,0.45)', fg:'#4da6ff' },
-                warn:    { bg:'rgba(230,126,34,0.15)', border:'rgba(230,126,34,0.45)', fg:'#e67e22' },
-                muted:   { bg:'rgba(184,196,212,0.10)', border:'rgba(184,196,212,0.30)', fg:'#b8c4d4' }
-            })[color] || { bg:'rgba(77,166,255,0.15)', border:'rgba(77,166,255,0.45)', fg:'#4da6ff' };
-            return (
-                <div title={title} style={{
-                    padding: '4px 10px',
-                    borderRadius: '999px',
-                    background: palette.bg,
-                    border: '1px solid ' + palette.border,
-                    color: palette.fg,
-                    fontSize: '10px',
-                    fontWeight: '700',
-                    fontFamily: 'Oswald, sans-serif',
-                    letterSpacing: '0.3px',
-                    textTransform: 'uppercase',
-                    whiteSpace: 'nowrap',
-                    userSelect: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center'
-                }}>
-                    {text}
-                </div>
-            );
-        }
-
-        /* ToolbarRow:
-           Schlanker Container fuer linke + rechte Inhalte (Buttons / Pills).
-           Props:
-             - left:      JSX (linker Block, optional)
-             - right:     JSX (rechter Block, optional)
-             - children:  alternativ direkt Inhalte (werden gleichmaessig verteilt)
-             - sticky:    boolean -- wenn true: position:sticky unterhalb Header
-        */
-        function ToolbarRow(props) {
-            var left = props.left;
-            var right = props.right;
-            var children = props.children;
-            var sticky = !!props.sticky;
-            var stickyStyle = sticky ? { position:'sticky', top:'60px', zIndex:95 } : {};
-            return (
-                <div style={Object.assign({
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '6px 8px',
-                    margin: '6px 0',
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: 'var(--radius-sm, 6px)',
-                    flexWrap: 'nowrap',
-                    minHeight: '40px'
-                }, stickyStyle)}>
-                    {left ? <div style={{display:'flex', alignItems:'center', gap:'6px'}}>{left}</div> : null}
-                    <div style={{flex:1}} />
-                    {right ? <div style={{display:'flex', alignItems:'center', gap:'6px'}}>{right}</div> : null}
-                    {children}
-                </div>
-            );
-        }
-
-        // Global verfuegbar machen, damit alle Module sie sehen (Build-Reihenfolge: shared-components zuerst)
-        if (typeof window !== 'undefined') {
-            window.ToolbarButton = ToolbarButton;
-            window.StatusPill = StatusPill;
-            window.ToolbarRow = ToolbarRow;
         }
 
         /* ═══════════════════════════════════════════

@@ -3141,7 +3141,7 @@
                     else if (loadProgress.indexOf('Lade') >= 0) progressPhase = 'PDF wird geladen';
                 }
 
-                // ── Wechselnde lustige Sprüche (alle 3 Sekunden) ──
+                // ── Wechselnde lustige Sprueche (alle 3 Sekunden) ──
                 var funMessages = [
                     '🧱 Die KI verlegt gerade virtuelle Fliesen...',
                     '📐 Maße werden mit Lasergenauigkeit geprüft...',
@@ -3616,7 +3616,7 @@
             const [manualAbdichtungUmlaufend, setManualAbdichtungUmlaufend] = useState(true);
             const nrRef = useRef(null);
 
-            // ── Globaler Enter-Key Handler für Raumerkennung ──
+            // ── Globaler Enter-Key Handler fuer Raumerkennung ──
             // KRITISCHER FIX (25.04.2026): Vorher war dieser useEffect OHNE Dep-Array,
             // d.h. er lief bei JEDEM Re-Render. Jeder Render erzeugte eine neue
             // handleEnter-Closure, die alle State- und Prop-Variablen hielt
@@ -3640,7 +3640,7 @@
 
                     // ── Baugleich-Dialog: Enter = Submit ──
                     if (s.showBaugleich && s.bgNr) {
-                        // Falls im Input, erst zum nächsten springen
+                        // Falls im Input, erst zum naechsten springen
                         if (e.target.tagName === 'INPUT') {
                             const modal = e.target.closest('.modal');
                             if (modal) {
@@ -3682,7 +3682,7 @@
                         }
                     }
 
-                    // ── Duplikat-Modal: Enter = Erste Option wählen ──
+                    // ── Duplikat-Modal: Enter = Erste Option waehlen ──
                     if (s.showDupModal) {
                         e.preventDefault();
                         return;
@@ -3740,7 +3740,7 @@
             const [showBgCustomGeschoss, setShowBgCustomGeschoss] = useState(false);
             const [bgCustomGeschoss, setBgCustomGeschoss] = useState('');
 
-            // PAKET C: Formular-State für Speicher-Dialog + Auswahlfrage
+            // PAKET C: Formular-State fuer Speicher-Dialog + Auswahlfrage
             const [saveListBezeichner, setSaveListBezeichner] = useState('');
             const [saveListRaumIds, setSaveListRaumIds] = useState({});
             const [saveListOhneRaum, setSaveListOhneRaum] = useState(false);
@@ -3834,7 +3834,7 @@
             }, [reHasLast, reGesamtlisteLen, reSelectedPosLen, reHasOnShow]);
             // FIX: deps reduziert auf primitive Werte. Function-Props via raumerkActionsRef.
 
-            // ═══ Auto-Fill: Wenn Vorraum-Daten existieren, Höhen-Felder automatisch vorausfüllen ═══
+            // ═══ Auto-Fill: Wenn Vorraum-Daten existieren, Hoehen-Felder automatisch vorausfuellen ═══
             useEffect(() => {
                 if (!lastRaumData) return;
                 if (lastRaumData.hoehe) setManualHoehe(formatMass(lastRaumData.hoehe));
@@ -3885,7 +3885,7 @@
 
             const handleCopyLastRoom = () => {
                 if (!lastRaumData) return;
-                // Nur Einstellungen kopieren, NICHT Wände (die sind raumspezifisch)
+                // Nur Einstellungen kopieren, NICHT Waende (die sind raumspezifisch)
                 if (lastRaumData.hoehe) setManualHoehe(formatMass(lastRaumData.hoehe));
                 if (lastRaumData.raumhoehe) setManualRaumhoehe(formatMass(lastRaumData.raumhoehe));
                 if (lastRaumData.abdichtungshoehe) setManualAbdichtungshoehe(formatMass(lastRaumData.abdichtungshoehe));
@@ -3895,9 +3895,9 @@
                 if (lastRaumData.geschoss) setManualGeschoss(lastRaumData.geschoss);
             };
 
-            // ═══ Einstellungen vom Vorraum auf erkannten Raum übernehmen ═══
-            // PRIORITÄT: Raummaße (Wände, Türen, Fenster) → aus ZEICHNUNG des neuen Raums
-            //            Einstellungen (Höhen, Schalter, Defaults) → aus VORRAUM (lastRaumData)
+            // ═══ Einstellungen vom Vorraum auf erkannten Raum uebernehmen ═══
+            // PRIORITAET: Raummasse (Waende, Tueren, Fenster) → aus ZEICHNUNG des neuen Raums
+            //            Einstellungen (Hoehen, Schalter, Defaults) → aus VORRAUM (lastRaumData)
             const handleCopyToRecognized = (raum) => {
                 if (!lastRaumData) return raum;
                 const updated = { ...raum };
@@ -3985,7 +3985,7 @@
                     manuell: filledWaende.length === 0,
                 };
                 setActiveRaum(manualRaum);
-                // Positionen vom Vorraum vorauswählen (wenn vorhanden)
+                // Positionen vom Vorraum vorauswaehlen (wenn vorhanden)
                 if ((lastRaumData && lastRaumData.positionen) && lastRaumData.positionen.length > 0) {
                     setSelectedPositions([...lastRaumData.positionen]);
                 } else {
@@ -4004,7 +4004,7 @@
 
             const isDone = (nr) => fertigeRaeume.includes(nr);
 
-            // Raum auswählen → Positionsauswahl öffnen
+            // Raum auswaehlen → Positionsauswahl oeffnen
             // PAKET C: Wenn der Raum eine vorbereitete Liste hat, erst fragen.
             const handleRaumClick = (raum) => {
                 if (isDone(raum.nr)) return;
@@ -4051,22 +4051,22 @@
                 const isManuell = pos.manuell;
                 const alreadySelected = selectedPositions.find(p => p.pos === pos.pos && (isManuell ? p.manuell : !p.manuell));
                 if (alreadySelected) {
-                    // Abwählen (nicht löschen!)
+                    // Abwaehlen (nicht loeschen!)
                     setSelectedPositions(prev => prev.filter(p => !(p.pos === pos.pos && (isManuell ? p.manuell : !p.manuell))));
                 } else {
-                    // Auswählen - sofort hinzufügen
+                    // Auswaehlen - sofort hinzufuegen
                     setSelectedPositions(prev => [...prev, pos]);
-                    // Wenn Duplikat (nur LV): zusätzlich Hinweis-Dialog zeigen (nicht blockierend)
+                    // Wenn Duplikat (nur LV): zusaetzlich Hinweis-Dialog zeigen (nicht blockierend)
                     if (!isManuell && duplicates[pos.pos] && duplicates[pos.pos].length > 0) {
                         setShowDupModal({ pos, duplicates: [pos, ...duplicates[pos.pos]] });
                     }
                 }
             };
 
-            // Duplikat-Auswahl: tausche die gewählte Position gegen die alternative Pos-Nr
+            // Duplikat-Auswahl: tausche die gewaehlte Position gegen die alternative Pos-Nr
             const confirmDuplicate = (chosenPos) => {
                 setSelectedPositions(prev => {
-                    // Entferne alle Duplikate dieser Bezeichnung, füge die gewählte ein
+                    // Entferne alle Duplikate dieser Bezeichnung, fuege die gewaehlte ein
                     const dupGroup = [showDupModal.pos, ...showDupModal.duplicates].map(d => d.pos);
                     const filtered = prev.filter(p => !dupGroup.includes(p.pos));
                     return [...filtered, chosenPos];
@@ -4074,7 +4074,7 @@
                 setShowDupModal(null);
             };
 
-            // Manuelle Position hinzufügen
+            // Manuelle Position hinzufuegen
             const addManualPosition = () => {
                 if (!manualPosNr.trim() || !manualPosBez.trim()) return;
                 const newPos = {
@@ -4089,9 +4089,9 @@
                 };
                 // Dauerhaft in die manuelle Positionsliste aufnehmen
                 setManuellePositionen(prev => [...prev, newPos]);
-                // Direkt in die Auswahl übernehmen (vorausgewählt)
+                // Direkt in die Auswahl uebernehmen (vorausgewaehlt)
                 setSelectedPositions(prev => [...prev, newPos]);
-                // Formular zurücksetzen
+                // Formular zuruecksetzen
                 setManualPosNr('');
                 setManualPosBez('');
                 setManualPosEinheit('m²');
@@ -4100,7 +4100,7 @@
                 setShowManualPos(false);
             };
 
-            // Manuelle Position dauerhaft löschen
+            // Manuelle Position dauerhaft loeschen
             const deleteManualPosition = (posNr) => {
                 setManuellePositionen(prev => prev.filter(p => p.pos !== posNr));
                 setSelectedPositions(prev => prev.filter(p => !(p.manuell && p.pos === posNr)));
@@ -4126,7 +4126,7 @@
                 onSelectRaum(activeRaum, selectedPositions);
             };
 
-            // Sortierte Positionen für aktiven Raum
+            // Sortierte Positionen fuer aktiven Raum
             const sortedPositions = activeRaum ? sortPositionenForRaum(lvPositionen, activeRaum) : [];
             const empfohlene = sortedPositions.filter(p => p.empfohlen && !hiddenLvPositionen.includes(p.pos));
             const sonstige = sortedPositions.filter(p => !p.empfohlen && !hiddenLvPositionen.includes(p.pos));
@@ -4257,61 +4257,74 @@
                 };
             });
 
+            // ═══ PHASE 3 PLATZOPTIMIERUNG (26.04.2026, Bild Raumerkennung) ═══
+            // Wie auf der Pos-Auswahl-Seite: Direkt-Start-Button, RAEUME-Pill und
+            // Seitentitel "Raumerkennung" wandern in die globale App-Toolbar.
+            // Breadcrumb + page-title + page-subtitle entfernt (Doppelung mit
+            // dem globalen Kundennamen-Streifen oberhalb). Spart ~150px = 2-3
+            // zusaetzliche Raumzeilen sichtbar ohne Scrollen.
+            useEffect(function() {
+                var setter = window.__twSetPosModalToolbar;
+                if (typeof setter !== 'function') return;
+                // Wenn das Pos-Modal offen ist, hat es bereits Vorrang in der Toolbar
+                if (showPosModal && activeRaum) return;
+                setter(<React.Fragment>
+                    <ToolbarButton
+                        icon={'\uD83D\uDCD0'}
+                        label="Direkt-Start"
+                        color="blue"
+                        title="Aufmass direkt starten -- ohne Raumauswahl und Positionsauswahl"
+                        onClick={function() {
+                            var direktRaum = {
+                                nr: '',
+                                geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
+                                bez: '',
+                                quelle: 'Direkt',
+                                waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
+                                hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
+                                raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
+                                abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
+                                sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
+                                fliesenUmlaufend: true,
+                                abdichtungUmlaufend: true,
+                                manuell: true,
+                            };
+                            onSelectRaum(direktRaum, []);
+                        }}
+                    />
+                    <StatusPill
+                        text="RAUMERKENNUNG"
+                        color="info"
+                        title="Raeume aus Zeichnungen, LV und Raumbuch ermittelt"
+                    />
+                    {erkannteRaeume.length > 0 && (
+                        <StatusPill
+                            text={erkannteRaeume.length + ' R\u00C4UME'}
+                            color="success"
+                            title={erkannteRaeume.length + ' R\u00e4ume erkannt \u2014 Raum antippen \u2192 Positionen ausw\u00e4hlen \u2192 Aufmass starten'}
+                        />
+                    )}
+                </React.Fragment>);
+                return function() {
+                    if (typeof window.__twSetPosModalToolbar === 'function') {
+                        // Nur leeren wenn nicht das Pos-Modal die Toolbar in der Zwischenzeit uebernommen hat
+                        if (!(showPosModal && activeRaum)) {
+                            window.__twSetPosModalToolbar(null);
+                        }
+                    }
+                };
+            }, [erkannteRaeume.length, lastRaumData, showPosModal, activeRaum, onSelectRaum]);
+
             return (
                 <div className="page-container">
-                    <div className="breadcrumb">
-                        <span>{kunde.name.split(' – ')[0]}</span>
-                        <span>›</span>
-                        <span className="breadcrumb-active">Raumerkennung</span>
-                    </div>
-
-                    <div className="page-title">Raumerkennung</div>
-                    <div className="page-subtitle">Räume aus Zeichnungen, LV und Raumbuch ermittelt</div>
-
                     {/* ═══ ETAPPE 8: Die frueheren 5 roten Aktions-Buttons (Raum manuell / Baugleich /
                         Gesamtliste / Liste speichern / Liste laden) wurden in die globale ActionsBar
                         (Bearbeiten-Dropdown oberhalb der Schnellnavi) verschoben. ═══ */}
-
-                    {/* PHASE-2-PLATZOPTIMIERUNG (Skill 2.1+2.2, Bild 3 vom 25.04.):
-                        Banner "X Raeume erkannt..." und Querbalken "Aufmass direkt starten"
-                        wandern in eine kompakte ToolbarRow. Banner wird StatusPill mit Tooltip.
-                        Querbalken wird ToolbarButton (blau). Spart ~110px vertikalen Platz. */}
-                    <ToolbarRow
-                        sticky={false}
-                        left={
-                            <ToolbarButton
-                                icon={'\uD83D\uDCD0'}
-                                label="Direkt-Start"
-                                color="blue"
-                                title="Aufmass direkt starten -- ohne Raumauswahl und Positionsauswahl"
-                                onClick={function() {
-                                    var direktRaum = {
-                                        nr: '',
-                                        geschoss: (lastRaumData && lastRaumData.geschoss) || 'EG',
-                                        bez: '',
-                                        quelle: 'Direkt',
-                                        waende: [{id:'A',l:''},{id:'B',l:''},{id:'C',l:''},{id:'D',l:''}],
-                                        hoehe: (lastRaumData && lastRaumData.hoehe) || 0,
-                                        fliesenhoehe: (lastRaumData && lastRaumData.hoehe) || 0,
-                                        raumhoehe: (lastRaumData && lastRaumData.raumhoehe) || 0,
-                                        abdichtungshoehe: (lastRaumData && lastRaumData.abdichtungshoehe) || 0,
-                                        sockelhoehe: (lastRaumData && lastRaumData.sockelhoehe) || 0,
-                                        fliesenUmlaufend: true,
-                                        abdichtungUmlaufend: true,
-                                        manuell: true,
-                                    };
-                                    onSelectRaum(direktRaum, []);
-                                }}
-                            />
-                        }
-                        right={erkannteRaeume.length > 0 ? (
-                            <StatusPill
-                                text={erkannteRaeume.length + ' R\u00C4UME'}
-                                color="success"
-                                title={erkannteRaeume.length + ' R\u00e4ume erkannt \u2014 Raum antippen \u2192 Positionen ausw\u00e4hlen \u2192 Aufmass starten'}
-                            />
-                        ) : null}
-                    />
+                    {/* ═══ PHASE 3 (26.04.2026): Breadcrumb, page-title, page-subtitle und
+                        die Inline-ToolbarRow wurden entfernt. Direkt-Start, RAUMERKENNUNG-Pill
+                        und RAEUME-Pill leben jetzt in der globalen App-Toolbar
+                        (per __twSetPosModalToolbar) — gleich wie auf der Pos-Auswahl-Seite. ═══ */}
 
                     {Object.entries(grouped).map(([geschoss, raeume]) => (
                         <React.Fragment key={geschoss}>
@@ -4540,7 +4553,7 @@
                                                 sonstigeDefaults: lastRaumData.sonstigeDefaults || null,
                                                 tuerenEntries: lastRaumData.tuerenEntries || null,
                                                 fensterEntries: lastRaumData.fensterEntries || null,
-                                                // Komplette Masse für Länge/Breite/Höhen-Übernahme
+                                                // Komplette Masse fuer Laenge/Breite/Hoehen-Uebernahme
                                                 _masse: lastRaumData.masse || null,
                                             };
                                             setShowBaugleich(false);
