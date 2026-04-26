@@ -1010,9 +1010,7 @@
                                 {/* Boss-Schild auf Helm */}
                                 <rect x="74" y="36" width="10" height="3" fill="#c0392b" stroke="#7b241c" strokeWidth="0.3"/>
                                 <text x="79" y="38.5" textAnchor="middle" fill="#ffffff" fontSize="2.3" fontWeight="900" fontFamily="Arial Black, sans-serif">CHEF</text>
-                                {/* Namensschild auf der Brust */}
-                                <rect x="65" y="68" width="22" height="5" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.3"/>
-                                <text x="76" y="71.8" textAnchor="middle" fill="#1a1a1a" fontSize="4" fontWeight="900" fontFamily="Arial Black, sans-serif">THOMAS</text>
+                                {/* Brust-Namensschild entfernt -- THOMAS prangt jetzt gross auf der Karosserie */}
                             </g>
 
                             {/* Tuergriffe + Seitenlinie */}
@@ -1030,33 +1028,45 @@
                             <rect x="10" y="105" width="132" height="4" rx="2" fill="#7f8c8d" stroke="#34495e" strokeWidth="0.4"/>
 
                             {/* === BOSS-ACCESSOIRE auf der Motorhaube (Cartoon, Lego-Stil) === */}
-                            {/* Liegt VOR der Frontscheibe, festgezurrt mit zwei kleinen Riemen.
-                                Stilisiert wie die anderen SVG-Elemente (Bauteam) — keine fotorealistische Darstellung. */}
-                            <g transform="translate(108, 80)">
-                                {/* Halterung / Riemen unter dem Element */}
-                                <rect x="-2" y="9" width="32" height="2" rx="1" fill="#3e2723" stroke="#1a1a1a" strokeWidth="0.3"/>
-                                <line x1="3" y1="8" x2="3" y2="13" stroke="#1a1a1a" strokeWidth="0.6"/>
-                                <line x1="25" y1="8" x2="25" y2="13" stroke="#1a1a1a" strokeWidth="0.6"/>
-                                {/* Holz-Schaft (hinten, abgerundet) */}
-                                <path d="M -1,5 Q -2,9 1,10 L 8,10 L 8,5 Z" fill="#6e2c00" stroke="#3e2723" strokeWidth="0.4"/>
-                                <line x1="2" y1="6" x2="6" y2="9" stroke="#3e2723" strokeWidth="0.3" opacity="0.6"/>
-                                {/* Korpus / Mittelteil */}
-                                <rect x="8" y="5" width="13" height="5" fill="#2c3e50" stroke="#1a1a1a" strokeWidth="0.4"/>
-                                <rect x="9" y="6" width="11" height="1" fill="#34495e"/>
-                                {/* Charakteristisches gebogenes Magazin nach unten */}
-                                <path d="M 11,10 Q 11,15 14,17 L 18,17 Q 19,14 18,10 Z" fill="#34495e" stroke="#1a1a1a" strokeWidth="0.4"/>
-                                <line x1="13" y1="11" x2="17" y2="11" stroke="#1a1a1a" strokeWidth="0.2" opacity="0.7"/>
-                                <line x1="13" y1="13" x2="17" y2="13" stroke="#1a1a1a" strokeWidth="0.2" opacity="0.7"/>
-                                <line x1="13" y1="15" x2="17" y2="15" stroke="#1a1a1a" strokeWidth="0.2" opacity="0.7"/>
-                                {/* Lauf (vorne) */}
-                                <rect x="21" y="6.5" width="9" height="2" fill="#1a1a1a" stroke="#000000" strokeWidth="0.3"/>
+                            {/* 26.04.2026 v3: Deutlich groesser. Beschriftung "KALASCHNIKOW"
+                                jetzt direkt auf dem Korpus statt auf separatem Plaettchen.
+                                Liegt vorne ueber der Motorhaube (rechts vor der Frontscheibe),
+                                kollidiert NICHT mit dem THOMAS-Schriftzug auf der Karosserie. */}
+                            <g transform="translate(75, 66)">
+                                {/* Halterungs-Riemen unter dem Element (laenger + dicker) */}
+                                <rect x="-3" y="14" width="62" height="3" rx="1.2" fill="#3e2723" stroke="#1a1a1a" strokeWidth="0.4"/>
+                                <line x1="6" y1="13" x2="6" y2="20" stroke="#1a1a1a" strokeWidth="0.9"/>
+                                <line x1="50" y1="13" x2="50" y2="20" stroke="#1a1a1a" strokeWidth="0.9"/>
+                                {/* Holz-Schaft (hinten, abgerundet, deutlich groesser) */}
+                                <path d="M -2,7 Q -4,14 2,16 L 14,16 L 14,7 Z" fill="#6e2c00" stroke="#3e2723" strokeWidth="0.5"/>
+                                {/* Holzmaserung */}
+                                <line x1="2" y1="9" x2="12" y2="14" stroke="#3e2723" strokeWidth="0.4" opacity="0.6"/>
+                                <line x1="3" y1="11" x2="11" y2="15" stroke="#3e2723" strokeWidth="0.3" opacity="0.5"/>
+                                {/* Korpus / Mittelteil — gross genug fuer Aufdruck */}
+                                <rect x="14" y="6" width="32" height="10" fill="#2c3e50" stroke="#1a1a1a" strokeWidth="0.5"/>
+                                <rect x="15" y="7" width="30" height="2" fill="#34495e"/>
+                                {/* KALASCHNIKOW direkt auf den Korpus aufgedruckt */}
+                                <text x="30" y="13.5" textAnchor="middle" fill="#f1c40f" fontSize="4" fontWeight="900" fontFamily="Arial Black, sans-serif" letterSpacing="0.2">KALASCHNIKOW</text>
+                                {/* Charakteristisches gebogenes Magazin nach unten (groesser) */}
+                                <path d="M 20,16 Q 19,24 24,28 L 32,28 Q 34,22 32,16 Z" fill="#34495e" stroke="#1a1a1a" strokeWidth="0.5"/>
+                                <line x1="22" y1="18" x2="32" y2="18" stroke="#1a1a1a" strokeWidth="0.3" opacity="0.7"/>
+                                <line x1="22" y1="21" x2="32" y2="21" stroke="#1a1a1a" strokeWidth="0.3" opacity="0.7"/>
+                                <line x1="23" y1="24" x2="31" y2="24" stroke="#1a1a1a" strokeWidth="0.3" opacity="0.7"/>
+                                <line x1="24" y1="27" x2="30" y2="27" stroke="#1a1a1a" strokeWidth="0.3" opacity="0.7"/>
+                                {/* Lauf (vorne, deutlich laenger) */}
+                                <rect x="46" y="9" width="20" height="3" fill="#1a1a1a" stroke="#000000" strokeWidth="0.4"/>
+                                {/* Muendungsfeuerschutz */}
+                                <rect x="64" y="8" width="3" height="5" fill="#000000" stroke="#1a1a1a" strokeWidth="0.3"/>
+                                {/* Gasrohr oberhalb des Laufs */}
+                                <rect x="46" y="6.5" width="14" height="2" fill="#1a1a1a" stroke="#000000" strokeWidth="0.3"/>
                                 {/* Visier-Kimme oben */}
-                                <rect x="14" y="3.5" width="2" height="1.5" fill="#1a1a1a"/>
+                                <rect x="22" y="3" width="3" height="3" fill="#1a1a1a"/>
                                 {/* Korn vorne */}
-                                <rect x="28" y="5.5" width="1" height="1.5" fill="#1a1a1a"/>
-                                {/* Beschriftung "KALASCHNIKOW" auf einem Plaettchen */}
-                                <rect x="2" y="0" width="20" height="3.5" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.3" rx="0.5"/>
-                                <text x="12" y="2.6" textAnchor="middle" fill="#c0392b" fontSize="2.6" fontWeight="900" fontFamily="Arial Black, sans-serif">KALASCHNIKOW</text>
+                                <rect x="58" y="4.5" width="2" height="2.5" fill="#1a1a1a"/>
+                                {/* Pistolengriff hinten unten */}
+                                <path d="M 14,16 L 17,22 L 20,22 L 20,16 Z" fill="#3e2723" stroke="#1a1a1a" strokeWidth="0.4"/>
+                                {/* Abzug + Abzugsbuegel */}
+                                <path d="M 19,16 Q 19,20 23,20 L 23,18 Q 21,18 21,16 Z" fill="none" stroke="#1a1a1a" strokeWidth="0.5"/>
                             </g>
 
                             {/* Reifen — drehen sich via tw-pkw-wheel */}
@@ -1073,9 +1083,15 @@
                                 <line x1="109" y1="112" x2="121" y2="112" stroke="#1a1a1a" strokeWidth="0.6"/>
                             </g>
 
-                            {/* TW-Logo-Sticker auf der Tuer */}
-                            <rect x="65" y="95" width="20" height="10" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.4"/>
-                            <text x="75" y="102.5" textAnchor="middle" fill="#c0392b" fontSize="6" fontWeight="900" fontFamily="Arial Black, sans-serif">TW</text>
+                            {/* GROSSER THOMAS-Schriftzug auf der Heck-Seite der Karosserie.
+                                Sitzt auf der hinteren Tuer/Seitenwand, sichtbar wie ein Boss-Truck-Branding.
+                                Position so gewaehlt, dass er nicht mit der Kalaschnikow auf der Motorhaube kollidiert. */}
+                            <rect x="20" y="93" width="48" height="14" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.6" rx="1.5"/>
+                            <text x="44" y="104" textAnchor="middle" fill="#c0392b" fontSize="11" fontWeight="900" fontFamily="Arial Black, sans-serif" letterSpacing="1">THOMAS</text>
+
+                            {/* TW-Logo-Sticker zusaetzlich auf der Tuer (rechts neben dem THOMAS-Schriftzug) */}
+                            <rect x="75" y="98" width="20" height="9" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <text x="85" y="105" textAnchor="middle" fill="#c0392b" fontSize="6" fontWeight="900" fontFamily="Arial Black, sans-serif">TW</text>
                         </svg>
                     </div>
                 </div>
