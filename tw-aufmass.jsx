@@ -5777,6 +5777,10 @@
             const [speechRecognitionInst, setSpeechRecognitionInst] = useState(null);
 
             const handleTabChange = (tabIdx) => {
+                // ── 27.04.2026: Tab 2 (frueher Oeffnungen) wurde entfernt; Inhalt lebt jetzt
+                //    auf Tab 0. Falls aus altem State/Persist noch tabIdx===2 reinkommt:
+                //    sicher auf Tab 0 umlenken, damit nichts blank rendert.
+                if (tabIdx === 2) tabIdx = 0;
                 setRbTab(tabIdx);
                 if (tabIdx === 1) setFotoModus('waende');
                 else if (tabIdx === 4) setFotoModus('objekt');
@@ -7652,28 +7656,12 @@
                       onClick: function(){ if (R.current.onAufmassBeenden) R.current.doAufmassFertigstellen(); } }
                 ];
 
-                // Sub-Menue "Tabs" - die frueher blauen Tab-Buttons
-                var subTabs = [
-                    { label: 'Grundriss' + (rbTab === 0 ? '  \u25CF' : ''),
-                      onClick: function(){ R.current.handleTabChange(0); } },
-                    { label: 'Fotos - Waende' + (rbTab === 1 ? '  \u25CF' : ''),
-                      onClick: function(){ R.current.handleTabChange(1); } },
-                    { label: 'Fotos Objekt' + (rbTab === 4 ? '  \u25CF' : ''),
-                      onClick: function(){ R.current.handleTabChange(4); } },
-                    { label: 'Oeffnungen' + (rbTab === 2 ? '  \u25CF' : ''),
-                      onClick: function(){ R.current.handleTabChange(2); } },
-                    { label: 'Pos. (' + rbPosOkCount + '/' + rbPosTotalCount + ')' + (rbTab === 3 ? '  \u25CF' : ''),
-                      onClick: function(){ R.current.handleTabChange(3); } },
-                    { type: 'divider' },
-                    { label: 'Waende: ' + wandAnzahl,
-                      onClick: function(){ R.current.setWandAnzahlPopupOpen(true); } },
-                    { label: 'Masse kopieren: ' + (masseKopieren ? 'JA' : 'NEIN'),
-                      onClick: function(){ R.current.setMasseKopieren(!R.current.masseKopieren); } }
-                ];
+                // ── ENTFERNT 27.04.2026: subTabs-Submenue und Toggles fuer Wandanzahl/Masse-kopieren ──
+                // Diese Funktionen sind jetzt in der blauen Quick-Toolbar oben auf Tab 0+3
+                // direkt als Buttons verfuegbar (siehe RaumblattQuickToolbar weiter unten).
 
                 var aktionen = [
                     { type: 'submenu', label: 'Aktionen', icon: '\u2699', items: subAktionen },
-                    { type: 'submenu', label: 'Tabs', icon: '\uD83D\uDDC2', items: subTabs },
                     { type: 'divider' },
                     { label: 'Aufmassvorlage speichern', icon: '\uD83D\uDCE4',
                       onClick: function(){ if (window._saveAufmassVorlageHandler) window._saveAufmassVorlageHandler(); } },
@@ -10019,6 +10007,133 @@
                         </div>
                     )}
 
+                    {/* ═══════════════════════════════════════════════════════════════════ */}
+                    {/* QUICK-TOOLBAR (NEU 27.04.2026): blaue Schnellzugriffs-Leiste oben     */}
+                    {/* Sichtbar NUR auf Tab 0 (Grundriss) + Tab 3 (Positionen).             */}
+                    {/* Ersetzt das frueher im Bearbeiten-Dropdown verschachtelte "Tabs"-    */}
+                    {/* Submenue. Inhalt: Grundriss / Wand-Fotos / Objekte / Positionen +    */}
+                    {/* Wandanzahl-Toggle + Masse-kopieren-Toggle.                            */}
+                    {/* "Oeffnungen" wurde bewusst entfernt, da der Inhalt auf Tab 0 wandert.*/}
+                    {/* ═══════════════════════════════════════════════════════════════════ */}
+                    {(rbTab === 0 || rbTab === 3) && (
+                        <div className="raumblatt-quick-toolbar" style={{
+                            position:'sticky', top:'120px', zIndex:98,
+                            background:'var(--bg-primary)',
+                            paddingTop:'4px', paddingBottom:'6px',
+                            marginBottom:'4px'
+                        }}>
+                            <div style={{
+                                display:'flex', gap:'3px', flexWrap:'wrap',
+                                background:'var(--bg-tertiary)',
+                                borderRadius:'10px', padding:'3px'
+                            }}>
+                                {/* Tab-Wechsler (4 blaue Buttons) */}
+                                <button className={'rb-quick-btn ' + (rbTab === 0 ? 'active' : '')}
+                                    onClick={function(){ handleTabChange(0); }}
+                                    title="Grundriss & Raummasse"
+                                    style={{
+                                        flex:'1 1 auto', minWidth:'72px',
+                                        padding:'7px 8px', border:'none', borderRadius:'7px',
+                                        background: rbTab === 0 ? 'var(--accent-blue)' : 'rgba(30,136,229,0.18)',
+                                        color: rbTab === 0 ? '#fff' : 'var(--accent-blue)',
+                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                        textTransform:'uppercase', letterSpacing:'0.4px',
+                                        cursor:'pointer', whiteSpace:'nowrap',
+                                        boxShadow: rbTab === 0 ? '0 2px 6px rgba(30,136,229,0.35)' : 'none',
+                                        transition:'all 0.18s ease'
+                                    }}>
+                                    Grundriss
+                                </button>
+                                <button className={'rb-quick-btn ' + (rbTab === 1 ? 'active' : '')}
+                                    onClick={function(){ handleTabChange(1); }}
+                                    title="Wand-Fotos & KI-Erkennung"
+                                    style={{
+                                        flex:'1 1 auto', minWidth:'82px',
+                                        padding:'7px 8px', border:'none', borderRadius:'7px',
+                                        background: rbTab === 1 ? 'var(--accent-blue)' : 'rgba(30,136,229,0.18)',
+                                        color: rbTab === 1 ? '#fff' : 'var(--accent-blue)',
+                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                        textTransform:'uppercase', letterSpacing:'0.4px',
+                                        cursor:'pointer', whiteSpace:'nowrap',
+                                        boxShadow: rbTab === 1 ? '0 2px 6px rgba(30,136,229,0.35)' : 'none',
+                                        transition:'all 0.18s ease'
+                                    }}>
+                                    Wand-Fotos
+                                </button>
+                                <button className={'rb-quick-btn ' + (rbTab === 4 ? 'active' : '')}
+                                    onClick={function(){ handleTabChange(4); }}
+                                    title="Objekte (20 Slots)"
+                                    style={{
+                                        flex:'1 1 auto', minWidth:'70px',
+                                        padding:'7px 8px', border:'none', borderRadius:'7px',
+                                        background: rbTab === 4 ? 'var(--accent-blue)' : 'rgba(30,136,229,0.18)',
+                                        color: rbTab === 4 ? '#fff' : 'var(--accent-blue)',
+                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                        textTransform:'uppercase', letterSpacing:'0.4px',
+                                        cursor:'pointer', whiteSpace:'nowrap',
+                                        boxShadow: rbTab === 4 ? '0 2px 6px rgba(30,136,229,0.35)' : 'none',
+                                        transition:'all 0.18s ease'
+                                    }}>
+                                    Objekte
+                                </button>
+                                <button className={'rb-quick-btn ' + (rbTab === 3 ? 'active' : '')}
+                                    onClick={function(){ handleTabChange(3); }}
+                                    title="Positionen"
+                                    style={{
+                                        flex:'1 1 auto', minWidth:'82px',
+                                        padding:'7px 8px', border:'none', borderRadius:'7px',
+                                        background: rbTab === 3 ? 'var(--accent-blue)' : 'rgba(30,136,229,0.18)',
+                                        color: rbTab === 3 ? '#fff' : 'var(--accent-blue)',
+                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                        textTransform:'uppercase', letterSpacing:'0.4px',
+                                        cursor:'pointer', whiteSpace:'nowrap',
+                                        boxShadow: rbTab === 3 ? '0 2px 6px rgba(30,136,229,0.35)' : 'none',
+                                        transition:'all 0.18s ease'
+                                    }}>
+                                    Pos.&nbsp;{rbPosOkCount}/{rbPosTotalCount}
+                                </button>
+
+                                {/* Wand-Anzahl-Toggle (oeffnet Popup) */}
+                                <button className="rb-quick-btn"
+                                    onClick={function(){ setWandAnzahlPopupOpen(true); }}
+                                    title="Wandanzahl einstellen"
+                                    style={{
+                                        flex:'1 1 auto', minWidth:'80px',
+                                        padding:'7px 8px', border:'1px solid var(--accent-blue)',
+                                        borderRadius:'7px',
+                                        background:'rgba(30,136,229,0.10)',
+                                        color:'var(--accent-blue)',
+                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                        textTransform:'uppercase', letterSpacing:'0.4px',
+                                        cursor:'pointer', whiteSpace:'nowrap',
+                                        transition:'all 0.18s ease'
+                                    }}>
+                                    Waende:&nbsp;<span style={{fontSize:'13px', fontWeight:800}}>{wandAnzahl}</span>
+                                </button>
+
+                                {/* Masse-kopieren-Toggle (direktes Umschalten) */}
+                                <button className="rb-quick-btn"
+                                    onClick={function(){ setMasseKopieren(!masseKopieren); }}
+                                    title={masseKopieren ? 'Masse kopieren ist AN (A->C, B->D)' : 'Masse kopieren ist AUS'}
+                                    style={{
+                                        flex:'1 1 auto', minWidth:'92px',
+                                        padding:'7px 8px',
+                                        border: masseKopieren ? 'none' : '1px solid var(--accent-blue)',
+                                        borderRadius:'7px',
+                                        background: masseKopieren ? 'var(--accent-blue)' : 'rgba(30,136,229,0.10)',
+                                        color: masseKopieren ? '#fff' : 'var(--accent-blue)',
+                                        fontFamily:'Oswald', fontSize:'11px', fontWeight:700,
+                                        textTransform:'uppercase', letterSpacing:'0.4px',
+                                        cursor:'pointer', whiteSpace:'nowrap',
+                                        boxShadow: masseKopieren ? '0 2px 6px rgba(30,136,229,0.35)' : 'none',
+                                        transition:'all 0.18s ease'
+                                    }}>
+                                    Kopieren:&nbsp;<span style={{fontSize:'12px', fontWeight:800}}>{masseKopieren ? 'AN' : 'AUS'}</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ═══ TAB 0: GRUNDRISS & RAUMMASZE ═══ */}
                     {rbTab === 0 && (<React.Fragment>
 
@@ -10845,6 +10960,497 @@
                         )}
                     </div>
 
+
+                    {/* ═══════════════════════════════════════════════════════════════════ */}
+                    {/* OEFFNUNGEN — VERSCHOBEN 27.04.2026 von Tab 2 hierher (auf Tab 0).   */}
+                    {/* Tab 2 wurde komplett entfernt. Inhalt: Tueren / Fenster /            */}
+                    {/* Sonstige Bauteile - alle Funktionen 1:1 erhalten.                    */}
+                    {/* ═══════════════════════════════════════════════════════════════════ */}
+
+
+                    {/* ═══ TUEREN (eigene Sektion, aufklappbar) ═══ */}
+                    <div className="masse-section">
+                        <div className="masse-section-title">🚪 Türen ({tueren.length})</div>
+                        {tueren.map(t => {
+                            const bVal = parseMass(t.breite); const hVal = parseMass(t.hoehe);
+                            const fl = bVal * hVal;
+                            return (
+                                <div key={t.id} className={`oeffnung-card ${t.expanded ? 'expanded' : ''}`}>
+                                    <div className="oeffnung-header" onClick={() => updateTuer(t.id, 'expanded', !t.expanded)}>
+                                        <span className="oeffnung-icon">🚪</span>
+                                        <div className="oeffnung-title">{t.name}</div>
+                                        {fl > 0 && <span className="oeffnung-result">{fmtDe(fl)} m²</span>}
+                                        <span className="pos-card-arrow">{t.expanded ? '▲' : '▼'}</span>
+                                    </div>
+                                    {t.expanded && (
+                                        <div className="oeffnung-body">
+                                            <div className="masse-field" style={{marginBottom:'8px'}}>
+                                                <span className="masse-label">Bezeichnung</span>
+                                                <input className="masse-input" type="text" value={t.name}
+                                                    onChange={e => updateTuer(t.id, 'name', e.target.value)} />
+                                            </div>
+                                            {/* Anzahl-Multiplikator */}
+                                            <div className="masse-field" style={{marginBottom:'8px'}}>
+                                                <span className="masse-label">Anzahl (gleiche Türen)</span>
+                                                <div className="masse-input-wrap">
+                                                    <input className="masse-input" type="text" inputMode="numeric"
+                                                        value={t.anzahl || 1}
+                                                        onChange={e => updateTuer(t.id, 'anzahl', parseInt(e.target.value) || 1)}
+                                                        style={{textAlign:'center', fontWeight:'700', color:'var(--accent-blue)'}} />
+                                                    <span className="masse-unit">Stk</span>
+                                                </div>
+                                            </div>
+                                            {/* DIN Tuer-Groessen Button */}
+                                            <div style={{marginBottom:'10px'}}>
+                                                <button className="din-tuer-btn" onClick={() => setDinTuerOpen(dinTuerOpen === t.id ? null : t.id)}>
+                                                    📐 DIN Tür-Größen
+                                                </button>
+                                            </div>
+                                            <div className="masse-grid">
+                                                <div className="masse-field">
+                                                    <span className="masse-label">Breite (m)</span>
+                                                    <div className="masse-input-wrap">
+                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
+                                                            value={t.breite} onChange={e => updateTuer(t.id, 'breite', e.target.value)}
+                                                            onBlur={() => { if (t.breite) updateTuer(t.id, 'breite', formatMass(t.breite)); }}
+                                                            autoFocus={t.id === lastAddedTuerId}
+                                                            onFocus={() => { if (t.id === lastAddedTuerId) setLastAddedTuerId(null); }}
+                                                            />
+                                                        <span className="masse-unit">m</span>
+                                                    </div>
+                                                </div>
+                                                <div className="masse-field">
+                                                    <span className="masse-label">Höhe (m)</span>
+                                                    <div className="masse-input-wrap">
+                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
+                                                            value={t.hoehe} onChange={e => updateTuer(t.id, 'hoehe', e.target.value)}
+                                                            onBlur={() => { if (t.hoehe) updateTuer(t.id, 'hoehe', formatMass(t.hoehe)); }} />
+                                                        <span className="masse-unit">m</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Laibung */}
+                                            <div className="oeffnung-toggle" style={{marginTop:'10px'}}>
+                                                <label className="toggle-row">
+                                                    <span>Laibung</span>
+                                                    <div className={`toggle-switch ${t.hatLaibung ? 'active' : ''}`}
+                                                        onClick={() => updateTuer(t.id, 'hatLaibung', !t.hatLaibung)}>
+                                                        <div className="toggle-knob" />
+                                                    </div>
+                                                </label>
+                                                {t.hatLaibung && (
+                                                    <div className="masse-field" style={{marginTop:'8px'}}>
+                                                        <span className="masse-label">Laibungstiefe (m)</span>
+                                                        <div className="masse-input-wrap">
+                                                            <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
+                                                                value={t.tiefe} onChange={e => updateTuer(t.id, 'tiefe', e.target.value)}
+                                                                onBlur={() => { if (t.tiefe) updateTuer(t.id, 'tiefe', formatMass(t.tiefe)); }}
+                                                                autoFocus={!t.tiefe} />
+                                                            <span className="masse-unit">m</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* ── Neue Schalter: Gefliest ── */}
+                                            {t.hatLaibung && (
+                                                <div style={{marginTop:'10px', padding:'10px', background:'rgba(230,126,34,0.04)', borderRadius:'var(--radius-sm)', border:'1px solid rgba(230,126,34,0.12)'}}>
+                                                    <div style={{fontSize:'11px', color:'var(--accent-orange)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'8px'}}>🧱 Gefliest</div>
+                                                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                            <span className="umlaufend-label">Leibung Wand</span>
+                                                            <div className="ja-nein-btns">
+                                                                <button className={`ja-nein-btn ${t.leibungWandGefliest ? 'active ja' : ''}`}
+                                                                    onClick={() => updateTuer(t.id, 'leibungWandGefliest', true)}>Ja</button>
+                                                                <button className={`ja-nein-btn ${!t.leibungWandGefliest ? 'active nein' : ''}`}
+                                                                    onClick={() => updateTuer(t.id, 'leibungWandGefliest', false)}>Nein</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                            <span className="umlaufend-label">Leibung Boden</span>
+                                                            <div className="ja-nein-btns">
+                                                                <button className={`ja-nein-btn ${t.leibungBodenGefliest ? 'active ja' : ''}`}
+                                                                    onClick={() => updateTuer(t.id, 'leibungBodenGefliest', true)}>Ja</button>
+                                                                <button className={`ja-nein-btn ${!t.leibungBodenGefliest ? 'active nein' : ''}`}
+                                                                    onClick={() => updateTuer(t.id, 'leibungBodenGefliest', false)}>Nein</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                            <span className="umlaufend-label">Türsturz</span>
+                                                            <div className="ja-nein-btns">
+                                                                <button className={`ja-nein-btn ${t.sturzGefliest ? 'active ja' : ''}`}
+                                                                    onClick={() => updateTuer(t.id, 'sturzGefliest', true)}>Ja</button>
+                                                                <button className={`ja-nein-btn ${!t.sturzGefliest ? 'active nein' : ''}`}
+                                                                    onClick={() => updateTuer(t.id, 'sturzGefliest', false)}>Nein</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Abdichtung (nur wenn Abdichtungs-Position vorhanden) */}
+                                                    {hatWandabdichtung && (
+                                                        <React.Fragment>
+                                                            <div style={{fontSize:'11px', color:'var(--accent-blue)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'10px', marginBottom:'8px'}}>💧 Abgedichtet</div>
+                                                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                                    <span className="umlaufend-label">Leibung Wand</span>
+                                                                    <div className="ja-nein-btns">
+                                                                        <button className={`ja-nein-btn ${t.leibungWandAbgedichtet ? 'active ja' : ''}`}
+                                                                            onClick={() => updateTuer(t.id, 'leibungWandAbgedichtet', true)}>Ja</button>
+                                                                        <button className={`ja-nein-btn ${!t.leibungWandAbgedichtet ? 'active nein' : ''}`}
+                                                                            onClick={() => updateTuer(t.id, 'leibungWandAbgedichtet', false)}>Nein</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                                    <span className="umlaufend-label">Leibung Boden</span>
+                                                                    <div className="ja-nein-btns">
+                                                                        <button className={`ja-nein-btn ${t.leibungBodenAbgedichtet ? 'active ja' : ''}`}
+                                                                            onClick={() => updateTuer(t.id, 'leibungBodenAbgedichtet', true)}>Ja</button>
+                                                                        <button className={`ja-nein-btn ${!t.leibungBodenAbgedichtet ? 'active nein' : ''}`}
+                                                                            onClick={() => updateTuer(t.id, 'leibungBodenAbgedichtet', false)}>Nein</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                                    <span className="umlaufend-label">Türsturz</span>
+                                                                    <div className="ja-nein-btns">
+                                                                        <button className={`ja-nein-btn ${t.sturzAbgedichtet ? 'active ja' : ''}`}
+                                                                            onClick={() => updateTuer(t.id, 'sturzAbgedichtet', true)}>Ja</button>
+                                                                        <button className={`ja-nein-btn ${!t.sturzAbgedichtet ? 'active nein' : ''}`}
+                                                                            onClick={() => updateTuer(t.id, 'sturzAbgedichtet', false)}>Nein</button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </React.Fragment>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* ── Dauerelastisch versiegelt ── */}
+                                            <div style={{marginTop:'10px'}}>
+                                                <div className="umlaufend-group">
+                                                    <span className="umlaufend-label">Dauerelastisch versiegelt (Stahlzarge)</span>
+                                                    <div className="ja-nein-btns">
+                                                        <button className={`ja-nein-btn ${t.dauerelastisch ? 'active ja' : ''}`}
+                                                            onClick={() => updateTuer(t.id, 'dauerelastisch', true)}>Ja</button>
+                                                        <button className={`ja-nein-btn ${!t.dauerelastisch ? 'active nein' : ''}`}
+                                                            onClick={() => updateTuer(t.id, 'dauerelastisch', false)}>Nein</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* VOB-Tags */}
+                                            <div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginTop:'10px'}}>
+                                                {hVal > H && H > 0 ? (
+                                                    <span className="vob-tag abzug" style={{background:'rgba(230,126,34,0.12)', borderColor:'var(--accent-orange)', color:'var(--accent-orange)'}}>
+                                                        ⚠ Tür {fmtDe(hVal)}m &gt; Fliese {fmtDe(H)}m → −{fmtDe(bVal * H)} m²
+                                                    </span>
+                                                ) : (
+                                                    <span className={`vob-tag ${fl > 0.1 ? 'abzug' : 'ueber'}`}>
+                                                        Wand: {fl > 0.1 ? `−${fmtDe(fl)} m²` : '⊘ überm.'}
+                                                    </span>
+                                                )}
+                                                <span className="vob-tag ueber">Boden: ⊘ kein Abzug</span>
+                                                <span className={`vob-tag ${bVal > 1.0 ? 'abzug' : 'ueber'}`}>
+                                                    Sockel: {bVal > 1.0 ? `−${fmtDe(bVal)} m` : '⊘ überm.'}
+                                                </span>
+                                            </div>
+                                            <button className="contact-remove-btn" onClick={() => removeTuer(t.id)}
+                                                style={{marginTop:'10px', width:'100%', textAlign:'center', padding:'8px', color:'#e74c3c'}}>
+                                                🗑 Tür entfernen
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        <button className="add-abzug-btn" onClick={addTuer}>＋ Tür hinzufügen</button>
+                    </div>
+
+                    {/* ═══ FENSTER (eigene Sektion, aufklappbar) ═══ */}
+                    <div className="masse-section">
+                        <div className="masse-section-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span>🪟 Fenster ({fenster.length})</span>
+                            <div className="fenster-uebernehmen-toggle">
+                                <span className="fenster-uebernehmen-label">Fenster</span>
+                                <button className={`fenster-jn-btn ${fensterUebernehmen ? 'active' : ''}`}
+                                    onClick={() => setFensterUebernehmen(true)}>Ja</button>
+                                <button className={`fenster-jn-btn ${!fensterUebernehmen ? 'active nein' : ''}`}
+                                    onClick={() => setFensterUebernehmen(false)}>Nein</button>
+                            </div>
+                        </div>
+                        {fensterUebernehmen ? (<React.Fragment>
+                        {fenster.map(f => {
+                            const bVal = parseMass(f.breite); const hVal = parseMass(f.hoehe);
+                            const fl = bVal * hVal;
+                            return (
+                                <div key={f.id} className={`oeffnung-card ${f.expanded ? 'expanded' : ''}`}>
+                                    <div className="oeffnung-header" onClick={() => updateFenster(f.id, 'expanded', !f.expanded)}>
+                                        <span className="oeffnung-icon">🪟</span>
+                                        <div className="oeffnung-title">{f.name}</div>
+                                        {fl > 0 && <span className="oeffnung-result">{fmtDe(fl)} m²</span>}
+                                        <span className="pos-card-arrow">{f.expanded ? '▲' : '▼'}</span>
+                                    </div>
+                                    {f.expanded && (
+                                        <div className="oeffnung-body">
+                                            <div className="masse-field" style={{marginBottom:'8px'}}>
+                                                <span className="masse-label">Bezeichnung</span>
+                                                <input className="masse-input" type="text" value={f.name}
+                                                    onChange={e => updateFenster(f.id, 'name', e.target.value)} />
+                                            </div>
+                                            {/* Anzahl-Multiplikator */}
+                                            <div className="masse-field" style={{marginBottom:'8px'}}>
+                                                <span className="masse-label">Anzahl (gleiche Fenster)</span>
+                                                <div className="masse-input-wrap">
+                                                    <input className="masse-input" type="text" inputMode="numeric"
+                                                        value={f.anzahl || 1}
+                                                        onChange={e => updateFenster(f.id, 'anzahl', parseInt(e.target.value) || 1)}
+                                                        style={{textAlign:'center', fontWeight:'700', color:'var(--accent-blue)'}} />
+                                                    <span className="masse-unit">Stk</span>
+                                                </div>
+                                            </div>
+                                            <div className="masse-grid">
+                                                <div className="masse-field">
+                                                    <span className="masse-label">Breite (m)</span>
+                                                    <div className="masse-input-wrap">
+                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
+                                                            value={f.breite} onChange={e => updateFenster(f.id, 'breite', e.target.value)}
+                                                            onBlur={() => { if (f.breite) updateFenster(f.id, 'breite', formatMass(f.breite)); }}
+                                                            autoFocus={f.id === lastAddedFensterId}
+                                                            onFocus={() => { if (f.id === lastAddedFensterId) setLastAddedFensterId(null); }} />
+                                                        <span className="masse-unit">m</span>
+                                                    </div>
+                                                </div>
+                                                <div className="masse-field">
+                                                    <span className="masse-label">Höhe (m)</span>
+                                                    <div className="masse-input-wrap">
+                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
+                                                            value={f.hoehe} onChange={e => updateFenster(f.id, 'hoehe', e.target.value)}
+                                                            onBlur={() => { if (f.hoehe) updateFenster(f.id, 'hoehe', formatMass(f.hoehe)); }} />
+                                                        <span className="masse-unit">m</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Bruestungshoehe + Bodengleich */}
+                                            <div className="masse-grid" style={{marginTop:'8px'}}>
+                                                <div className="masse-field">
+                                                    <span className="masse-label">Brüstungshöhe (m)</span>
+                                                    <div className="masse-input-wrap">
+                                                        <input className="masse-input" type="text" inputMode="decimal"
+                                                            placeholder={f.bodengleich ? '0,00' : '0,00'}
+                                                            value={f.bruestung}
+                                                            disabled={f.bodengleich}
+                                                            style={f.bodengleich ? {opacity:0.5} : {}}
+                                                            onChange={e => updateFenster(f.id, 'bruestung', e.target.value)}
+                                                            onBlur={() => { if (f.bruestung) updateFenster(f.id, 'bruestung', formatMass(f.bruestung)); }} />
+                                                        <span className="masse-unit">m</span>
+                                                    </div>
+                                                </div>
+                                                <div className="masse-field" style={{display:'flex', alignItems:'flex-end'}}>
+                                                    <button className={`bodengleich-btn ${f.bodengleich ? 'active' : ''}`}
+                                                        onClick={() => updateFenster(f.id, 'bodengleich', !f.bodengleich)}>
+                                                        {f.bodengleich ? '✓ ' : ''}Bodengleich
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {/* Laibung */}
+                                            <div className="oeffnung-toggle" style={{marginTop:'10px'}}>
+                                                <label className="toggle-row">
+                                                    <span>Laibung</span>
+                                                    <div className={`toggle-switch ${f.hatLaibung ? 'active' : ''}`}
+                                                        onClick={() => updateFenster(f.id, 'hatLaibung', !f.hatLaibung)}>
+                                                        <div className="toggle-knob" />
+                                                    </div>
+                                                </label>
+                                                {f.hatLaibung && (
+                                                    <div className="masse-field" style={{marginTop:'8px'}}>
+                                                        <span className="masse-label">Laibungstiefe (m)</span>
+                                                        <div className="masse-input-wrap">
+                                                            <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
+                                                                value={f.tiefe} onChange={e => updateFenster(f.id, 'tiefe', e.target.value)}
+                                                                onBlur={() => { if (f.tiefe) updateFenster(f.id, 'tiefe', formatMass(f.tiefe)); }}
+                                                                autoFocus={!f.tiefe} />
+                                                            <span className="masse-unit">m</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* ── Neue Schalter: Gefliest ── */}
+                                            {f.hatLaibung && (
+                                                <div style={{marginTop:'10px', padding:'10px', background:'rgba(230,126,34,0.04)', borderRadius:'var(--radius-sm)', border:'1px solid rgba(230,126,34,0.12)'}}>
+                                                    <div style={{fontSize:'11px', color:'var(--accent-orange)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'8px'}}>🧱 Gefliest</div>
+                                                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                            <span className="umlaufend-label">Leibung Wand</span>
+                                                            <div className="ja-nein-btns">
+                                                                <button className={`ja-nein-btn ${f.leibungWandGefliest ? 'active ja' : ''}`}
+                                                                    onClick={() => updateFenster(f.id, 'leibungWandGefliest', true)}>Ja</button>
+                                                                <button className={`ja-nein-btn ${!f.leibungWandGefliest ? 'active nein' : ''}`}
+                                                                    onClick={() => updateFenster(f.id, 'leibungWandGefliest', false)}>Nein</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                            <span className="umlaufend-label">Fensterbank</span>
+                                                            <div className="ja-nein-btns">
+                                                                <button className={`ja-nein-btn ${f.fensterbankGefliest ? 'active ja' : ''}`}
+                                                                    onClick={() => updateFenster(f.id, 'fensterbankGefliest', true)}>Ja</button>
+                                                                <button className={`ja-nein-btn ${!f.fensterbankGefliest ? 'active nein' : ''}`}
+                                                                    onClick={() => updateFenster(f.id, 'fensterbankGefliest', false)}>Nein</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                            <span className="umlaufend-label">Fenstersturz</span>
+                                                            <div className="ja-nein-btns">
+                                                                <button className={`ja-nein-btn ${f.sturzGefliest ? 'active ja' : ''}`}
+                                                                    onClick={() => updateFenster(f.id, 'sturzGefliest', true)}>Ja</button>
+                                                                <button className={`ja-nein-btn ${!f.sturzGefliest ? 'active nein' : ''}`}
+                                                                    onClick={() => updateFenster(f.id, 'sturzGefliest', false)}>Nein</button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Abdichtung (nur wenn Abdichtungs-Position vorhanden) */}
+                                                    {hatWandabdichtung && (
+                                                        <React.Fragment>
+                                                            <div style={{fontSize:'11px', color:'var(--accent-blue)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'10px', marginBottom:'8px'}}>💧 Abgedichtet</div>
+                                                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
+                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                                    <span className="umlaufend-label">Leibung Wand</span>
+                                                                    <div className="ja-nein-btns">
+                                                                        <button className={`ja-nein-btn ${f.leibungWandAbgedichtet ? 'active ja' : ''}`}
+                                                                            onClick={() => updateFenster(f.id, 'leibungWandAbgedichtet', true)}>Ja</button>
+                                                                        <button className={`ja-nein-btn ${!f.leibungWandAbgedichtet ? 'active nein' : ''}`}
+                                                                            onClick={() => updateFenster(f.id, 'leibungWandAbgedichtet', false)}>Nein</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                                    <span className="umlaufend-label">Fensterbank</span>
+                                                                    <div className="ja-nein-btns">
+                                                                        <button className={`ja-nein-btn ${f.fensterbankAbgedichtet ? 'active ja' : ''}`}
+                                                                            onClick={() => updateFenster(f.id, 'fensterbankAbgedichtet', true)}>Ja</button>
+                                                                        <button className={`ja-nein-btn ${!f.fensterbankAbgedichtet ? 'active nein' : ''}`}
+                                                                            onClick={() => updateFenster(f.id, 'fensterbankAbgedichtet', false)}>Nein</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
+                                                                    <span className="umlaufend-label">Fenstersturz</span>
+                                                                    <div className="ja-nein-btns">
+                                                                        <button className={`ja-nein-btn ${f.sturzAbgedichtet ? 'active ja' : ''}`}
+                                                                            onClick={() => updateFenster(f.id, 'sturzAbgedichtet', true)}>Ja</button>
+                                                                        <button className={`ja-nein-btn ${!f.sturzAbgedichtet ? 'active nein' : ''}`}
+                                                                            onClick={() => updateFenster(f.id, 'sturzAbgedichtet', false)}>Nein</button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </React.Fragment>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {/* VOB-Tags */}
+                                            {(() => {
+                                                const brH = parseMass(f.bruestung);
+                                                const gesamt = brH + hVal;
+                                                const hoeherAlsFliese = gesamt > H && H > 0;
+                                                const effH = hoeherAlsFliese ? Math.max(0, hVal - (gesamt - H)) : hVal;
+                                                const effFl = effH * bVal;
+                                                return (
+                                                    <div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginTop:'10px'}}>
+                                                        {hoeherAlsFliese ? (
+                                                            <span className="vob-tag abzug" style={{background:'rgba(230,126,34,0.12)', borderColor:'var(--accent-orange)', color:'var(--accent-orange)'}}>
+                                                                ⚠ Gesamt {fmtDe(gesamt)}m &gt; Fliese {fmtDe(H)}m → −{fmtDe(effFl)} m²
+                                                            </span>
+                                                        ) : (
+                                                            <span className={`vob-tag ${fl > 0.1 ? 'abzug' : 'ueber'}`}>
+                                                                Wand: {fl > 0.1 ? `−${fmtDe(fl)} m²` : '⊘ überm.'}
+                                                            </span>
+                                                        )}
+                                                        <span className="vob-tag ueber">Boden: ⊘ kein Abzug</span>
+                                                    </div>
+                                                );
+                                            })()}
+                                            <button className="contact-remove-btn" onClick={() => removeFenster(f.id)}
+                                                style={{marginTop:'10px', width:'100%', textAlign:'center', padding:'8px', color:'#e74c3c'}}>
+                                                🗑 Fenster entfernen
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        <button className="add-abzug-btn" onClick={addFenster}>＋ Fenster hinzufügen</button>
+                        </React.Fragment>) : (
+                            <div style={{padding:'12px 16px', color:'var(--text-muted)', fontSize:'12px', fontStyle:'italic', textAlign:'center', background:'rgba(231,76,60,0.06)', borderRadius:'8px', margin:'8px 0'}}>
+                                🔒 Fenster deaktiviert – {fenster.length} Einträge gespeichert, nicht in Berechnung
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ═══ SONSTIGE ABZUeGE/ZURECHNUNGEN ═══ */}
+                    <div className="masse-section">
+                        <div className="masse-section-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span>➖➕ Sonstige Bauteile ({abzuege.length})</span>
+                            <div className="fenster-uebernehmen-toggle">
+                                <span className="fenster-uebernehmen-label">Sonstige Bauteile</span>
+                                <button className={`fenster-jn-btn ${sonstigeUebernehmen ? 'active' : ''}`}
+                                    onClick={() => setSonstigeUebernehmen(true)}>Ja</button>
+                                <button className={`fenster-jn-btn ${!sonstigeUebernehmen ? 'active nein' : ''}`}
+                                    onClick={() => setSonstigeUebernehmen(false)}>Nein</button>
+                            </div>
+                        </div>
+                        {sonstigeUebernehmen ? (<React.Fragment>
+                        {abzuege.map(a => {
+                            const bVal = parseMass(a.breite); const hVal = parseMass(a.hoehe); const tVal = parseMass(a.tiefe || '');
+                            const fl = a.manualRW ? Math.abs(a.manualRW.ergebnis) : (tVal > 0 ? bVal * hVal * tVal : bVal * hVal);
+                            const zuordnungen = a.posZuordnung || {};
+                            const zuordKeys = Object.keys(zuordnungen);
+                            const plusPosNr = zuordKeys.filter(k => zuordnungen[k].vorzeichen === 'plus');
+                            const minusPosNr = zuordKeys.filter(k => zuordnungen[k].vorzeichen === 'minus');
+                            return (
+                                <div className="abzug-item" key={a.id} style={{flexDirection:'column', alignItems:'stretch', gap:'6px'}}>
+                                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                                        <span style={{fontSize:'18px'}}>🔧</span>
+                                        <div className="abzug-info" style={{flex:1}}>
+                                            <div className="abzug-name">{a.name || 'Sonstige'}</div>
+                                            {fl > 0 && <div className="abzug-masse" style={{fontSize:'11px'}}>Standardmaß: {fmtDe(fl)} m²</div>}
+                                        </div>
+                                        <button style={{background:'none', border:'1px solid var(--accent-orange)', borderRadius:'5px', color:'var(--accent-orange)', fontSize:'13px', padding:'4px 10px', cursor:'pointer', fontWeight:600, marginRight:'4px'}}
+                                            onClick={() => openEditAbzug(a)}>✏️</button>
+                                        <button className="contact-remove-btn" onClick={() => removeAbzug(a.id)} style={{marginTop:0}}>✕</button>
+                                    </div>
+                                    {zuordKeys.length > 0 && (
+                                        <div style={{display:'flex', flexWrap:'wrap', gap:'4px', paddingLeft:'28px'}}>
+                                            {plusPosNr.map(nr => {
+                                                const rw = zuordnungen[nr].manualRW;
+                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '--');
+                                                return (
+                                                    <span key={nr} style={{fontSize:'11px', padding:'2px 6px', borderRadius:'3px',
+                                                        background:'rgba(39,174,96,0.12)', color:'#27ae60', fontWeight:600}}>
+                                                        +{wert} → Pos.{nr}
+                                                    </span>
+                                                );
+                                            })}
+                                            {minusPosNr.map(nr => {
+                                                const rw = zuordnungen[nr].manualRW;
+                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '--');
+                                                return (
+                                                    <span key={nr} style={{fontSize:'11px', padding:'2px 6px', borderRadius:'3px',
+                                                        background:'rgba(231,76,60,0.12)', color:'#e74c3c', fontWeight:600}}>
+                                                        −{wert} → Pos.{nr}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        <button className="add-abzug-btn" onClick={() => { setEditAbzugId(null); setAbzugForm({ name: '', breite: '', hoehe: '', tiefe: '', posZuordnung: {}, manualRW: null }); setShowAbzugModal(true); }}>
+                            ＋ Sonstiges Bauteil hinzufügen
+                        </button>
+                        </React.Fragment>) : (
+                            <div style={{padding:'12px 16px', color:'var(--text-muted)', fontSize:'12px', fontStyle:'italic', textAlign:'center', background:'rgba(231,76,60,0.06)', borderRadius:'8px', margin:'8px 0'}}>
+                                🔒 Sonstige Bauteile deaktiviert – {abzuege.length} Einträge gespeichert, nicht in Berechnung
+                            </div>
+                        )}
+                    </div>
                     </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
                     {rbTab === 1 && (
@@ -11979,495 +12585,6 @@
                             )}
                         </div>
                     )}
-
-                    {/* ═══ TAB 2: OEFFNUNGEN ═══ */}
-                    {rbTab === 2 && (<React.Fragment>
-
-                    {/* ═══ TUEREN (eigene Sektion, aufklappbar) ═══ */}
-                    <div className="masse-section">
-                        <div className="masse-section-title">🚪 Türen ({tueren.length})</div>
-                        {tueren.map(t => {
-                            const bVal = parseMass(t.breite); const hVal = parseMass(t.hoehe);
-                            const fl = bVal * hVal;
-                            return (
-                                <div key={t.id} className={`oeffnung-card ${t.expanded ? 'expanded' : ''}`}>
-                                    <div className="oeffnung-header" onClick={() => updateTuer(t.id, 'expanded', !t.expanded)}>
-                                        <span className="oeffnung-icon">🚪</span>
-                                        <div className="oeffnung-title">{t.name}</div>
-                                        {fl > 0 && <span className="oeffnung-result">{fmtDe(fl)} m²</span>}
-                                        <span className="pos-card-arrow">{t.expanded ? '▲' : '▼'}</span>
-                                    </div>
-                                    {t.expanded && (
-                                        <div className="oeffnung-body">
-                                            <div className="masse-field" style={{marginBottom:'8px'}}>
-                                                <span className="masse-label">Bezeichnung</span>
-                                                <input className="masse-input" type="text" value={t.name}
-                                                    onChange={e => updateTuer(t.id, 'name', e.target.value)} />
-                                            </div>
-                                            {/* Anzahl-Multiplikator */}
-                                            <div className="masse-field" style={{marginBottom:'8px'}}>
-                                                <span className="masse-label">Anzahl (gleiche Türen)</span>
-                                                <div className="masse-input-wrap">
-                                                    <input className="masse-input" type="text" inputMode="numeric"
-                                                        value={t.anzahl || 1}
-                                                        onChange={e => updateTuer(t.id, 'anzahl', parseInt(e.target.value) || 1)}
-                                                        style={{textAlign:'center', fontWeight:'700', color:'var(--accent-blue)'}} />
-                                                    <span className="masse-unit">Stk</span>
-                                                </div>
-                                            </div>
-                                            {/* DIN Tuer-Groessen Button */}
-                                            <div style={{marginBottom:'10px'}}>
-                                                <button className="din-tuer-btn" onClick={() => setDinTuerOpen(dinTuerOpen === t.id ? null : t.id)}>
-                                                    📐 DIN Tür-Größen
-                                                </button>
-                                            </div>
-                                            <div className="masse-grid">
-                                                <div className="masse-field">
-                                                    <span className="masse-label">Breite (m)</span>
-                                                    <div className="masse-input-wrap">
-                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                            value={t.breite} onChange={e => updateTuer(t.id, 'breite', e.target.value)}
-                                                            onBlur={() => { if (t.breite) updateTuer(t.id, 'breite', formatMass(t.breite)); }}
-                                                            autoFocus={t.id === lastAddedTuerId}
-                                                            onFocus={() => { if (t.id === lastAddedTuerId) setLastAddedTuerId(null); }}
-                                                            />
-                                                        <span className="masse-unit">m</span>
-                                                    </div>
-                                                </div>
-                                                <div className="masse-field">
-                                                    <span className="masse-label">Höhe (m)</span>
-                                                    <div className="masse-input-wrap">
-                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                            value={t.hoehe} onChange={e => updateTuer(t.id, 'hoehe', e.target.value)}
-                                                            onBlur={() => { if (t.hoehe) updateTuer(t.id, 'hoehe', formatMass(t.hoehe)); }} />
-                                                        <span className="masse-unit">m</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* Laibung */}
-                                            <div className="oeffnung-toggle" style={{marginTop:'10px'}}>
-                                                <label className="toggle-row">
-                                                    <span>Laibung</span>
-                                                    <div className={`toggle-switch ${t.hatLaibung ? 'active' : ''}`}
-                                                        onClick={() => updateTuer(t.id, 'hatLaibung', !t.hatLaibung)}>
-                                                        <div className="toggle-knob" />
-                                                    </div>
-                                                </label>
-                                                {t.hatLaibung && (
-                                                    <div className="masse-field" style={{marginTop:'8px'}}>
-                                                        <span className="masse-label">Laibungstiefe (m)</span>
-                                                        <div className="masse-input-wrap">
-                                                            <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                                value={t.tiefe} onChange={e => updateTuer(t.id, 'tiefe', e.target.value)}
-                                                                onBlur={() => { if (t.tiefe) updateTuer(t.id, 'tiefe', formatMass(t.tiefe)); }}
-                                                                autoFocus={!t.tiefe} />
-                                                            <span className="masse-unit">m</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* ── Neue Schalter: Gefliest ── */}
-                                            {t.hatLaibung && (
-                                                <div style={{marginTop:'10px', padding:'10px', background:'rgba(230,126,34,0.04)', borderRadius:'var(--radius-sm)', border:'1px solid rgba(230,126,34,0.12)'}}>
-                                                    <div style={{fontSize:'11px', color:'var(--accent-orange)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'8px'}}>🧱 Gefliest</div>
-                                                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
-                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                            <span className="umlaufend-label">Leibung Wand</span>
-                                                            <div className="ja-nein-btns">
-                                                                <button className={`ja-nein-btn ${t.leibungWandGefliest ? 'active ja' : ''}`}
-                                                                    onClick={() => updateTuer(t.id, 'leibungWandGefliest', true)}>Ja</button>
-                                                                <button className={`ja-nein-btn ${!t.leibungWandGefliest ? 'active nein' : ''}`}
-                                                                    onClick={() => updateTuer(t.id, 'leibungWandGefliest', false)}>Nein</button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                            <span className="umlaufend-label">Leibung Boden</span>
-                                                            <div className="ja-nein-btns">
-                                                                <button className={`ja-nein-btn ${t.leibungBodenGefliest ? 'active ja' : ''}`}
-                                                                    onClick={() => updateTuer(t.id, 'leibungBodenGefliest', true)}>Ja</button>
-                                                                <button className={`ja-nein-btn ${!t.leibungBodenGefliest ? 'active nein' : ''}`}
-                                                                    onClick={() => updateTuer(t.id, 'leibungBodenGefliest', false)}>Nein</button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                            <span className="umlaufend-label">Türsturz</span>
-                                                            <div className="ja-nein-btns">
-                                                                <button className={`ja-nein-btn ${t.sturzGefliest ? 'active ja' : ''}`}
-                                                                    onClick={() => updateTuer(t.id, 'sturzGefliest', true)}>Ja</button>
-                                                                <button className={`ja-nein-btn ${!t.sturzGefliest ? 'active nein' : ''}`}
-                                                                    onClick={() => updateTuer(t.id, 'sturzGefliest', false)}>Nein</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Abdichtung (nur wenn Abdichtungs-Position vorhanden) */}
-                                                    {hatWandabdichtung && (
-                                                        <React.Fragment>
-                                                            <div style={{fontSize:'11px', color:'var(--accent-blue)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'10px', marginBottom:'8px'}}>💧 Abgedichtet</div>
-                                                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
-                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                                    <span className="umlaufend-label">Leibung Wand</span>
-                                                                    <div className="ja-nein-btns">
-                                                                        <button className={`ja-nein-btn ${t.leibungWandAbgedichtet ? 'active ja' : ''}`}
-                                                                            onClick={() => updateTuer(t.id, 'leibungWandAbgedichtet', true)}>Ja</button>
-                                                                        <button className={`ja-nein-btn ${!t.leibungWandAbgedichtet ? 'active nein' : ''}`}
-                                                                            onClick={() => updateTuer(t.id, 'leibungWandAbgedichtet', false)}>Nein</button>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                                    <span className="umlaufend-label">Leibung Boden</span>
-                                                                    <div className="ja-nein-btns">
-                                                                        <button className={`ja-nein-btn ${t.leibungBodenAbgedichtet ? 'active ja' : ''}`}
-                                                                            onClick={() => updateTuer(t.id, 'leibungBodenAbgedichtet', true)}>Ja</button>
-                                                                        <button className={`ja-nein-btn ${!t.leibungBodenAbgedichtet ? 'active nein' : ''}`}
-                                                                            onClick={() => updateTuer(t.id, 'leibungBodenAbgedichtet', false)}>Nein</button>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                                    <span className="umlaufend-label">Türsturz</span>
-                                                                    <div className="ja-nein-btns">
-                                                                        <button className={`ja-nein-btn ${t.sturzAbgedichtet ? 'active ja' : ''}`}
-                                                                            onClick={() => updateTuer(t.id, 'sturzAbgedichtet', true)}>Ja</button>
-                                                                        <button className={`ja-nein-btn ${!t.sturzAbgedichtet ? 'active nein' : ''}`}
-                                                                            onClick={() => updateTuer(t.id, 'sturzAbgedichtet', false)}>Nein</button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </React.Fragment>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                            {/* ── Dauerelastisch versiegelt ── */}
-                                            <div style={{marginTop:'10px'}}>
-                                                <div className="umlaufend-group">
-                                                    <span className="umlaufend-label">Dauerelastisch versiegelt (Stahlzarge)</span>
-                                                    <div className="ja-nein-btns">
-                                                        <button className={`ja-nein-btn ${t.dauerelastisch ? 'active ja' : ''}`}
-                                                            onClick={() => updateTuer(t.id, 'dauerelastisch', true)}>Ja</button>
-                                                        <button className={`ja-nein-btn ${!t.dauerelastisch ? 'active nein' : ''}`}
-                                                            onClick={() => updateTuer(t.id, 'dauerelastisch', false)}>Nein</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* VOB-Tags */}
-                                            <div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginTop:'10px'}}>
-                                                {hVal > H && H > 0 ? (
-                                                    <span className="vob-tag abzug" style={{background:'rgba(230,126,34,0.12)', borderColor:'var(--accent-orange)', color:'var(--accent-orange)'}}>
-                                                        ⚠ Tür {fmtDe(hVal)}m &gt; Fliese {fmtDe(H)}m → −{fmtDe(bVal * H)} m²
-                                                    </span>
-                                                ) : (
-                                                    <span className={`vob-tag ${fl > 0.1 ? 'abzug' : 'ueber'}`}>
-                                                        Wand: {fl > 0.1 ? `−${fmtDe(fl)} m²` : '⊘ überm.'}
-                                                    </span>
-                                                )}
-                                                <span className="vob-tag ueber">Boden: ⊘ kein Abzug</span>
-                                                <span className={`vob-tag ${bVal > 1.0 ? 'abzug' : 'ueber'}`}>
-                                                    Sockel: {bVal > 1.0 ? `−${fmtDe(bVal)} m` : '⊘ überm.'}
-                                                </span>
-                                            </div>
-                                            <button className="contact-remove-btn" onClick={() => removeTuer(t.id)}
-                                                style={{marginTop:'10px', width:'100%', textAlign:'center', padding:'8px', color:'#e74c3c'}}>
-                                                🗑 Tür entfernen
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                        <button className="add-abzug-btn" onClick={addTuer}>＋ Tür hinzufügen</button>
-                    </div>
-
-                    {/* ═══ FENSTER (eigene Sektion, aufklappbar) ═══ */}
-                    <div className="masse-section">
-                        <div className="masse-section-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span>🪟 Fenster ({fenster.length})</span>
-                            <div className="fenster-uebernehmen-toggle">
-                                <span className="fenster-uebernehmen-label">Fenster</span>
-                                <button className={`fenster-jn-btn ${fensterUebernehmen ? 'active' : ''}`}
-                                    onClick={() => setFensterUebernehmen(true)}>Ja</button>
-                                <button className={`fenster-jn-btn ${!fensterUebernehmen ? 'active nein' : ''}`}
-                                    onClick={() => setFensterUebernehmen(false)}>Nein</button>
-                            </div>
-                        </div>
-                        {fensterUebernehmen ? (<React.Fragment>
-                        {fenster.map(f => {
-                            const bVal = parseMass(f.breite); const hVal = parseMass(f.hoehe);
-                            const fl = bVal * hVal;
-                            return (
-                                <div key={f.id} className={`oeffnung-card ${f.expanded ? 'expanded' : ''}`}>
-                                    <div className="oeffnung-header" onClick={() => updateFenster(f.id, 'expanded', !f.expanded)}>
-                                        <span className="oeffnung-icon">🪟</span>
-                                        <div className="oeffnung-title">{f.name}</div>
-                                        {fl > 0 && <span className="oeffnung-result">{fmtDe(fl)} m²</span>}
-                                        <span className="pos-card-arrow">{f.expanded ? '▲' : '▼'}</span>
-                                    </div>
-                                    {f.expanded && (
-                                        <div className="oeffnung-body">
-                                            <div className="masse-field" style={{marginBottom:'8px'}}>
-                                                <span className="masse-label">Bezeichnung</span>
-                                                <input className="masse-input" type="text" value={f.name}
-                                                    onChange={e => updateFenster(f.id, 'name', e.target.value)} />
-                                            </div>
-                                            {/* Anzahl-Multiplikator */}
-                                            <div className="masse-field" style={{marginBottom:'8px'}}>
-                                                <span className="masse-label">Anzahl (gleiche Fenster)</span>
-                                                <div className="masse-input-wrap">
-                                                    <input className="masse-input" type="text" inputMode="numeric"
-                                                        value={f.anzahl || 1}
-                                                        onChange={e => updateFenster(f.id, 'anzahl', parseInt(e.target.value) || 1)}
-                                                        style={{textAlign:'center', fontWeight:'700', color:'var(--accent-blue)'}} />
-                                                    <span className="masse-unit">Stk</span>
-                                                </div>
-                                            </div>
-                                            <div className="masse-grid">
-                                                <div className="masse-field">
-                                                    <span className="masse-label">Breite (m)</span>
-                                                    <div className="masse-input-wrap">
-                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                            value={f.breite} onChange={e => updateFenster(f.id, 'breite', e.target.value)}
-                                                            onBlur={() => { if (f.breite) updateFenster(f.id, 'breite', formatMass(f.breite)); }}
-                                                            autoFocus={f.id === lastAddedFensterId}
-                                                            onFocus={() => { if (f.id === lastAddedFensterId) setLastAddedFensterId(null); }} />
-                                                        <span className="masse-unit">m</span>
-                                                    </div>
-                                                </div>
-                                                <div className="masse-field">
-                                                    <span className="masse-label">Höhe (m)</span>
-                                                    <div className="masse-input-wrap">
-                                                        <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                            value={f.hoehe} onChange={e => updateFenster(f.id, 'hoehe', e.target.value)}
-                                                            onBlur={() => { if (f.hoehe) updateFenster(f.id, 'hoehe', formatMass(f.hoehe)); }} />
-                                                        <span className="masse-unit">m</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {/* Bruestungshoehe + Bodengleich */}
-                                            <div className="masse-grid" style={{marginTop:'8px'}}>
-                                                <div className="masse-field">
-                                                    <span className="masse-label">Brüstungshöhe (m)</span>
-                                                    <div className="masse-input-wrap">
-                                                        <input className="masse-input" type="text" inputMode="decimal"
-                                                            placeholder={f.bodengleich ? '0,00' : '0,00'}
-                                                            value={f.bruestung}
-                                                            disabled={f.bodengleich}
-                                                            style={f.bodengleich ? {opacity:0.5} : {}}
-                                                            onChange={e => updateFenster(f.id, 'bruestung', e.target.value)}
-                                                            onBlur={() => { if (f.bruestung) updateFenster(f.id, 'bruestung', formatMass(f.bruestung)); }} />
-                                                        <span className="masse-unit">m</span>
-                                                    </div>
-                                                </div>
-                                                <div className="masse-field" style={{display:'flex', alignItems:'flex-end'}}>
-                                                    <button className={`bodengleich-btn ${f.bodengleich ? 'active' : ''}`}
-                                                        onClick={() => updateFenster(f.id, 'bodengleich', !f.bodengleich)}>
-                                                        {f.bodengleich ? '✓ ' : ''}Bodengleich
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            {/* Laibung */}
-                                            <div className="oeffnung-toggle" style={{marginTop:'10px'}}>
-                                                <label className="toggle-row">
-                                                    <span>Laibung</span>
-                                                    <div className={`toggle-switch ${f.hatLaibung ? 'active' : ''}`}
-                                                        onClick={() => updateFenster(f.id, 'hatLaibung', !f.hatLaibung)}>
-                                                        <div className="toggle-knob" />
-                                                    </div>
-                                                </label>
-                                                {f.hatLaibung && (
-                                                    <div className="masse-field" style={{marginTop:'8px'}}>
-                                                        <span className="masse-label">Laibungstiefe (m)</span>
-                                                        <div className="masse-input-wrap">
-                                                            <input className="masse-input" type="text" inputMode="decimal" placeholder="0,000"
-                                                                value={f.tiefe} onChange={e => updateFenster(f.id, 'tiefe', e.target.value)}
-                                                                onBlur={() => { if (f.tiefe) updateFenster(f.id, 'tiefe', formatMass(f.tiefe)); }}
-                                                                autoFocus={!f.tiefe} />
-                                                            <span className="masse-unit">m</span>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* ── Neue Schalter: Gefliest ── */}
-                                            {f.hatLaibung && (
-                                                <div style={{marginTop:'10px', padding:'10px', background:'rgba(230,126,34,0.04)', borderRadius:'var(--radius-sm)', border:'1px solid rgba(230,126,34,0.12)'}}>
-                                                    <div style={{fontSize:'11px', color:'var(--accent-orange)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:'8px'}}>🧱 Gefliest</div>
-                                                    <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
-                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                            <span className="umlaufend-label">Leibung Wand</span>
-                                                            <div className="ja-nein-btns">
-                                                                <button className={`ja-nein-btn ${f.leibungWandGefliest ? 'active ja' : ''}`}
-                                                                    onClick={() => updateFenster(f.id, 'leibungWandGefliest', true)}>Ja</button>
-                                                                <button className={`ja-nein-btn ${!f.leibungWandGefliest ? 'active nein' : ''}`}
-                                                                    onClick={() => updateFenster(f.id, 'leibungWandGefliest', false)}>Nein</button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                            <span className="umlaufend-label">Fensterbank</span>
-                                                            <div className="ja-nein-btns">
-                                                                <button className={`ja-nein-btn ${f.fensterbankGefliest ? 'active ja' : ''}`}
-                                                                    onClick={() => updateFenster(f.id, 'fensterbankGefliest', true)}>Ja</button>
-                                                                <button className={`ja-nein-btn ${!f.fensterbankGefliest ? 'active nein' : ''}`}
-                                                                    onClick={() => updateFenster(f.id, 'fensterbankGefliest', false)}>Nein</button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                            <span className="umlaufend-label">Fenstersturz</span>
-                                                            <div className="ja-nein-btns">
-                                                                <button className={`ja-nein-btn ${f.sturzGefliest ? 'active ja' : ''}`}
-                                                                    onClick={() => updateFenster(f.id, 'sturzGefliest', true)}>Ja</button>
-                                                                <button className={`ja-nein-btn ${!f.sturzGefliest ? 'active nein' : ''}`}
-                                                                    onClick={() => updateFenster(f.id, 'sturzGefliest', false)}>Nein</button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Abdichtung (nur wenn Abdichtungs-Position vorhanden) */}
-                                                    {hatWandabdichtung && (
-                                                        <React.Fragment>
-                                                            <div style={{fontSize:'11px', color:'var(--accent-blue)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'10px', marginBottom:'8px'}}>💧 Abgedichtet</div>
-                                                            <div style={{display:'flex', gap:'6px', flexWrap:'wrap'}}>
-                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                                    <span className="umlaufend-label">Leibung Wand</span>
-                                                                    <div className="ja-nein-btns">
-                                                                        <button className={`ja-nein-btn ${f.leibungWandAbgedichtet ? 'active ja' : ''}`}
-                                                                            onClick={() => updateFenster(f.id, 'leibungWandAbgedichtet', true)}>Ja</button>
-                                                                        <button className={`ja-nein-btn ${!f.leibungWandAbgedichtet ? 'active nein' : ''}`}
-                                                                            onClick={() => updateFenster(f.id, 'leibungWandAbgedichtet', false)}>Nein</button>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                                    <span className="umlaufend-label">Fensterbank</span>
-                                                                    <div className="ja-nein-btns">
-                                                                        <button className={`ja-nein-btn ${f.fensterbankAbgedichtet ? 'active ja' : ''}`}
-                                                                            onClick={() => updateFenster(f.id, 'fensterbankAbgedichtet', true)}>Ja</button>
-                                                                        <button className={`ja-nein-btn ${!f.fensterbankAbgedichtet ? 'active nein' : ''}`}
-                                                                            onClick={() => updateFenster(f.id, 'fensterbankAbgedichtet', false)}>Nein</button>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="umlaufend-group" style={{flex:'1 1 auto', minWidth:'90px'}}>
-                                                                    <span className="umlaufend-label">Fenstersturz</span>
-                                                                    <div className="ja-nein-btns">
-                                                                        <button className={`ja-nein-btn ${f.sturzAbgedichtet ? 'active ja' : ''}`}
-                                                                            onClick={() => updateFenster(f.id, 'sturzAbgedichtet', true)}>Ja</button>
-                                                                        <button className={`ja-nein-btn ${!f.sturzAbgedichtet ? 'active nein' : ''}`}
-                                                                            onClick={() => updateFenster(f.id, 'sturzAbgedichtet', false)}>Nein</button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </React.Fragment>
-                                                    )}
-                                                </div>
-                                            )}
-                                            {/* VOB-Tags */}
-                                            {(() => {
-                                                const brH = parseMass(f.bruestung);
-                                                const gesamt = brH + hVal;
-                                                const hoeherAlsFliese = gesamt > H && H > 0;
-                                                const effH = hoeherAlsFliese ? Math.max(0, hVal - (gesamt - H)) : hVal;
-                                                const effFl = effH * bVal;
-                                                return (
-                                                    <div style={{display:'flex', gap:'4px', flexWrap:'wrap', marginTop:'10px'}}>
-                                                        {hoeherAlsFliese ? (
-                                                            <span className="vob-tag abzug" style={{background:'rgba(230,126,34,0.12)', borderColor:'var(--accent-orange)', color:'var(--accent-orange)'}}>
-                                                                ⚠ Gesamt {fmtDe(gesamt)}m &gt; Fliese {fmtDe(H)}m → −{fmtDe(effFl)} m²
-                                                            </span>
-                                                        ) : (
-                                                            <span className={`vob-tag ${fl > 0.1 ? 'abzug' : 'ueber'}`}>
-                                                                Wand: {fl > 0.1 ? `−${fmtDe(fl)} m²` : '⊘ überm.'}
-                                                            </span>
-                                                        )}
-                                                        <span className="vob-tag ueber">Boden: ⊘ kein Abzug</span>
-                                                    </div>
-                                                );
-                                            })()}
-                                            <button className="contact-remove-btn" onClick={() => removeFenster(f.id)}
-                                                style={{marginTop:'10px', width:'100%', textAlign:'center', padding:'8px', color:'#e74c3c'}}>
-                                                🗑 Fenster entfernen
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                        <button className="add-abzug-btn" onClick={addFenster}>＋ Fenster hinzufügen</button>
-                        </React.Fragment>) : (
-                            <div style={{padding:'12px 16px', color:'var(--text-muted)', fontSize:'12px', fontStyle:'italic', textAlign:'center', background:'rgba(231,76,60,0.06)', borderRadius:'8px', margin:'8px 0'}}>
-                                🔒 Fenster deaktiviert – {fenster.length} Einträge gespeichert, nicht in Berechnung
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ═══ SONSTIGE ABZUeGE/ZURECHNUNGEN ═══ */}
-                    <div className="masse-section">
-                        <div className="masse-section-title" style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                            <span>➖➕ Sonstige Bauteile ({abzuege.length})</span>
-                            <div className="fenster-uebernehmen-toggle">
-                                <span className="fenster-uebernehmen-label">Sonstige Bauteile</span>
-                                <button className={`fenster-jn-btn ${sonstigeUebernehmen ? 'active' : ''}`}
-                                    onClick={() => setSonstigeUebernehmen(true)}>Ja</button>
-                                <button className={`fenster-jn-btn ${!sonstigeUebernehmen ? 'active nein' : ''}`}
-                                    onClick={() => setSonstigeUebernehmen(false)}>Nein</button>
-                            </div>
-                        </div>
-                        {sonstigeUebernehmen ? (<React.Fragment>
-                        {abzuege.map(a => {
-                            const bVal = parseMass(a.breite); const hVal = parseMass(a.hoehe); const tVal = parseMass(a.tiefe || '');
-                            const fl = a.manualRW ? Math.abs(a.manualRW.ergebnis) : (tVal > 0 ? bVal * hVal * tVal : bVal * hVal);
-                            const zuordnungen = a.posZuordnung || {};
-                            const zuordKeys = Object.keys(zuordnungen);
-                            const plusPosNr = zuordKeys.filter(k => zuordnungen[k].vorzeichen === 'plus');
-                            const minusPosNr = zuordKeys.filter(k => zuordnungen[k].vorzeichen === 'minus');
-                            return (
-                                <div className="abzug-item" key={a.id} style={{flexDirection:'column', alignItems:'stretch', gap:'6px'}}>
-                                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                                        <span style={{fontSize:'18px'}}>🔧</span>
-                                        <div className="abzug-info" style={{flex:1}}>
-                                            <div className="abzug-name">{a.name || 'Sonstige'}</div>
-                                            {fl > 0 && <div className="abzug-masse" style={{fontSize:'11px'}}>Standardmaß: {fmtDe(fl)} m²</div>}
-                                        </div>
-                                        <button style={{background:'none', border:'1px solid var(--accent-orange)', borderRadius:'5px', color:'var(--accent-orange)', fontSize:'13px', padding:'4px 10px', cursor:'pointer', fontWeight:600, marginRight:'4px'}}
-                                            onClick={() => openEditAbzug(a)}>✏️</button>
-                                        <button className="contact-remove-btn" onClick={() => removeAbzug(a.id)} style={{marginTop:0}}>✕</button>
-                                    </div>
-                                    {zuordKeys.length > 0 && (
-                                        <div style={{display:'flex', flexWrap:'wrap', gap:'4px', paddingLeft:'28px'}}>
-                                            {plusPosNr.map(nr => {
-                                                const rw = zuordnungen[nr].manualRW;
-                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '--');
-                                                return (
-                                                    <span key={nr} style={{fontSize:'11px', padding:'2px 6px', borderRadius:'3px',
-                                                        background:'rgba(39,174,96,0.12)', color:'#27ae60', fontWeight:600}}>
-                                                        +{wert} → Pos.{nr}
-                                                    </span>
-                                                );
-                                            })}
-                                            {minusPosNr.map(nr => {
-                                                const rw = zuordnungen[nr].manualRW;
-                                                const wert = rw ? fmtDe(Math.abs(rw.ergebnis)) : (fl > 0 ? fmtDe(fl) : '--');
-                                                return (
-                                                    <span key={nr} style={{fontSize:'11px', padding:'2px 6px', borderRadius:'3px',
-                                                        background:'rgba(231,76,60,0.12)', color:'#e74c3c', fontWeight:600}}>
-                                                        −{wert} → Pos.{nr}
-                                                    </span>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                        <button className="add-abzug-btn" onClick={() => { setEditAbzugId(null); setAbzugForm({ name: '', breite: '', hoehe: '', tiefe: '', posZuordnung: {}, manualRW: null }); setShowAbzugModal(true); }}>
-                            ＋ Sonstiges Bauteil hinzufügen
-                        </button>
-                        </React.Fragment>) : (
-                            <div style={{padding:'12px 16px', color:'var(--text-muted)', fontSize:'12px', fontStyle:'italic', textAlign:'center', background:'rgba(231,76,60,0.06)', borderRadius:'8px', margin:'8px 0'}}>
-                                🔒 Sonstige Bauteile deaktiviert – {abzuege.length} Einträge gespeichert, nicht in Berechnung
-                            </div>
-                        )}
-                    </div>
-
-                    </React.Fragment>)}
 
                     {/* ═══ TAB 3: POSITIONEN ═══ */}
                     {rbTab === 3 && (<React.Fragment>
