@@ -6247,6 +6247,13 @@
             const [expandedPos, setExpandedPos] = useState(null);
             // ── Quick-Edit-Bearbeitungsleiste (Tab 3, vor Raum-Zusammenfassung) ──
             const [quickEditOpen, setQuickEditOpen] = useState(null); // pos-string oder null
+            // ── Positions-Editor (Tab 3, unterhalb Sonstige Bauteile) ──
+            // posEditorOpen: pos-Nr (string) oder null  → welche Position im Edit-Mode
+            // posEditorText: Map { posNr: string }       → Editor-Inhalt pro Position
+            // posEditorCollapsed: bool                   → Header-Toggle (Section eingeklappt?)
+            const [posEditorOpen, setPosEditorOpen] = useState(null);
+            const [posEditorText, setPosEditorText] = useState({});
+            const [posEditorCollapsed, setPosEditorCollapsed] = useState(false);
             // ── Aufmasz-Wiederaufnahme-Dialog (Etappe 6, koppelt an hasUnsavedChanges) ──
             const [wipResumeDialog, setWipResumeDialog] = useState(null); // {savedAt, meta, _wip} oder null
             // Dirty-Flag wird zentral durch hasUnsavedChanges gesteuert (siehe useEffect Zeile 6260+)
@@ -6452,6 +6459,163 @@
             };
 
             // ═══════════════════════════════════════════════
+            // POSITIONS-EDITOR (Tab 3) — Multi-Line-Rechenweg-Parser
+            // ───────────────────────────────────────────────
+            // Wandelt einen mehrzeiligen Editor-Text in Step-Array + Total um.
+            // Format pro Zeile: [+|-|leer] beschreibung = ergebnis einheit
+            // Beispiele:
+            //   2 x (4,50 + 3,20) x 2,40         = 36,96 m2
+            //   - Tuer 0,90 x 2,10               = 1,89 m2
+            //   + Laibung Tuer 2 x 2,10 x 0,15   = 0,63 m2
+            // Wenn keine "="-Trennung vorhanden, wird die Zeile als Formel
+            // ausgewertet (parseRWZeile-Fallback).
+            // Trennlinien (─, ===) und Total-Zeilen werden ignoriert.
+            // ═══════════════════════════════════════════════
+            const parseEditorText = (text) => {
+                if (!text || typeof text !== 'string') return { steps: [], total: 0 };
+                const zeilen = text.split('\n').map(z => z.trim()).filter(Boolean);
+                const steps = [];
+                let total = 0;
+                zeilen.forEach((z, idx) => {
+                    // Trennlinien / Total-Anzeigen ueberspringen (reine UI)
+                    if (/^[\u2500\u2501\u2014_=\-]+$/.test(z)) return;
+                    if (/^total\b/i.test(z)) return;
+                    if (/^summe\b/i.test(z)) return;
+                    if (/^ergebnis\b/i.test(z)) return;
+
+                    // Vorzeichen extrahieren
+                    let sign = 1;
+                    let rest = z;
+                    if (rest.startsWith('-')) { sign = -1; rest = rest.slice(1).trim(); }
+                    else if (rest.startsWith('+')) { rest = rest.slice(1).trim(); }
+
+                    // Trennung an "="
+                    const eqIdx = rest.lastIndexOf('=');
+                    let beschreibung, wertText, wert;
+                    if (eqIdx >= 0) {
+                        beschreibung = rest.slice(0, eqIdx).trim();
+                        wertText = rest.slice(eqIdx + 1).trim();
+                        // Einheit am Ende abtrennen
+                        wertText = wertText.replace(/\s*(m\u00b2|m2|qm|m|stk|st|stueck|lfm)\s*$/i, '').trim();
+                        // Erstmal als Mass parsen, sonst als Formel evaluieren
+                        wert = parseMass(wertText);
+                        if (!isFinite(wert) || isNaN(wert)) wert = parseRWZeile(wertText) || 0;
+                    } else {
+                        // Keine "="-Trennung: Komplette Zeile als Formel auswerten
+                        beschreibung = rest;
+                        wert = parseRWZeile(rest) || 0;
+                    }
+                    steps.push({
+                        id: 'edit_' + idx,
+                        label: beschreibung || rest,
+                        formel: rest,
+                        sign: sign,
+                        value: wert
+                    });
+                    total += sign * wert;
+                });
+                return { steps: steps, total: Math.max(0, total) };
+            };
+
+            // ═══════════════════════════════════════════════
+            // serializeRechenweg — Step-Array zurueck in Editor-Text
+            // ───────────────────────────────────────────────
+            // Inverse Operation zu parseEditorText. Verwendet von Etappe 2:
+            // Beim Oeffnen des Editors wird der aktuelle Rechenweg in Text
+            // gewandelt, damit der User ihn sieht und editieren kann.
+            // ═══════════════════════════════════════════════
+            const serializeRechenweg = (steps, einheit) => {
+                if (!steps || !Array.isArray(steps) || steps.length === 0) return '';
+                const u = einheit || '';
+                const lines = steps.map(s => {
+                    const sign = s.sign === -1 ? '- ' : (s.sign === 1 ? '+ ' : '');
+                    const label = s.label || s.formel || '';
+                    const val = (typeof s.value === 'number') ? s.value : 0;
+                    const valStr = val.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+                    // Erste Zeile bekommt kein Vorzeichen (positiv ist implizit)
+                    const prefix = (s === steps[0] && s.sign !== -1) ? '' : sign;
+                    return prefix + label + ' = ' + valStr + (u ? ' ' + u : '');
+                });
+                return lines.join('\n');
+            };
+
+            // ═══════════════════════════════════════════════
+            // Positions-Editor — Save / Reset / Open Helper
+            // ───────────────────────────────────────────────
+            // saveEditorText: User-Text parsen, Steps in pos.manualRechenweg
+            //                 schreiben, Total in pos.manualErgebnis. Nutzt
+            //                 die bestehende calcPositionResult-Logik
+            //                 (Prio 1 fuer hasManualRW + manualErgebnis>0).
+            // resetToAutoEditor: hasManualRW=false → Position berechnet sich
+            //                    wieder automatisch via Auto-Berechnung.
+            // openEditor: Default-Inhalt aus buildRechenweg+enrichRechenweg
+            //             generieren, in posEditorText schreiben, Edit-Mode an.
+            // ═══════════════════════════════════════════════
+            const saveEditorText = (posNr) => {
+                const text = posEditorText[posNr] || '';
+                const parsed = parseEditorText(text);
+                setPosCards(prev => prev.map(p => {
+                    if (p.pos !== posNr) return p;
+                    return Object.assign({}, p, {
+                        hasManualRW: true,
+                        manualRechenweg: parsed.steps,
+                        manualErgebnis: parsed.total,
+                        manualMenge: ''
+                    });
+                }));
+                setPosEditorOpen(null);
+            };
+
+            const resetToAutoEditor = (posNr) => {
+                setPosCards(prev => prev.map(p => {
+                    if (p.pos !== posNr) return p;
+                    return Object.assign({}, p, {
+                        hasManualRW: false,
+                        manualRechenweg: [],
+                        manualErgebnis: 0,
+                        manualMenge: ''
+                    });
+                }));
+                setPosEditorText(prev => {
+                    const next = Object.assign({}, prev);
+                    delete next[posNr];
+                    return next;
+                });
+                setPosEditorOpen(null);
+            };
+
+            const openEditor = (pos) => {
+                if (!posEditorText[pos.pos]) {
+                    let defaultText = '';
+                    if (pos.hasManualRW && pos.manualRechenweg && pos.manualRechenweg.length > 0) {
+                        defaultText = serializeRechenweg(pos.manualRechenweg, pos.einheit || 'm\u00b2');
+                    } else {
+                        try {
+                            const autoSteps = buildRechenweg(pos);
+                            const enriched = enrichRechenweg(autoSteps, pos);
+                            defaultText = serializeRechenweg(enriched, pos.einheit || 'm\u00b2');
+                        } catch(e) {
+                            defaultText = '';
+                        }
+                    }
+                    setPosEditorText(prev => Object.assign({}, prev, { [pos.pos]: defaultText }));
+                }
+                setPosEditorOpen(pos.pos);
+            };
+
+            const setPosManualMengeDirekt = (posNr, value) => {
+                setPosCards(prev => prev.map(p => {
+                    if (p.pos !== posNr) return p;
+                    return Object.assign({}, p, {
+                        manualMenge: value,
+                        hasManualRW: false,
+                        manualRechenweg: [],
+                        manualErgebnis: 0
+                    });
+                }));
+            };
+
+            // ═══════════════════════════════════════════════════
             // VOB/C DIN 18352 – Berechnungslogik (KOMPLETT)
             // ═══════════════════════════════════════════════
             // VOB-konforme Rundung: 2 Dezimalstellen bei Flaechen/Laengen
@@ -11749,6 +11913,190 @@
                             </div>
                         )}
                     </div>
+
+                    {/* ═══ POSITIONS-EDITOR (Tab 3, Skill v1.0 vom 27.04.2026) ═══ */}
+                    {/* Verschiebt die Positions-Bearbeitung von Tab 4 nach Tab 3.    */}
+                    {/* Multi-Line-Rechenweg-Editor fuer Wand/Boden/Abdichtung,        */}
+                    {/* kleines Zahlen-Input fuer Stueck/Meter-Positionen.            */}
+                    {posCards.length > 0 && (
+                        <div className="masse-section position-editor-section" style={{marginTop:'18px'}}>
+                            <div className="masse-section-title"
+                                style={{cursor:'pointer', display:'flex', alignItems:'center', gap:'8px'}}
+                                onClick={() => setPosEditorCollapsed(c => !c)}>
+                                <span style={{fontSize:'18px'}}>{'\u270F\uFE0F'}</span>
+                                <span>Positionen bearbeiten ({posCards.length})</span>
+                                <span style={{
+                                    fontSize:'10px', fontWeight:'400', color:'var(--text-muted)',
+                                    background:'rgba(30,136,229,0.10)', padding:'2px 6px', borderRadius:'4px'
+                                }}>Rechenweg-Editor</span>
+                                <span style={{marginLeft:'auto', fontSize:'14px', color:'var(--text-muted)'}}>
+                                    {posEditorCollapsed ? '\u25B8' : '\u25BE'}
+                                </span>
+                            </div>
+
+                            {!posEditorCollapsed && (
+                                <div style={{display:'flex', flexDirection:'column', gap:'10px', marginTop:'10px'}}>
+                                    {posCards.map(pos => {
+                                        const code = resolveAufmassCode(pos);
+                                        const ergebnis = calcPositionResult(pos);
+                                        const isStueck = (code === 'St');
+                                        const isMeter = (code === 'M');
+                                        const isLineEditor = !isStueck && !isMeter; // Wand/Boden/Abdichtung/Sockel
+                                        const isEditing = posEditorOpen === pos.pos;
+                                        const einheitLabel = isStueck ? 'Stk' : (isMeter ? 'm' : (pos.einheit || 'm\u00b2'));
+                                        const wertText = (typeof ergebnis === 'number')
+                                            ? ergebnis.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                            : '\u2014';
+
+                                        return (
+                                            <div key={'pe_' + pos.pos} className="position-editor-card" style={{
+                                                padding:'12px 14px', borderRadius:'10px',
+                                                background:'var(--bg-secondary)',
+                                                border: pos.hasManualRW ? '1px solid rgba(243,156,18,0.45)' : '1px solid var(--border-subtle)'
+                                            }}>
+                                                {/* Header-Zeile: Code + Pos-Nr + Bezeichnung + Total */}
+                                                <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px'}}>
+                                                    <span style={{
+                                                        fontFamily:'monospace', fontWeight:'700',
+                                                        fontSize:'11px', padding:'2px 6px', borderRadius:'4px',
+                                                        background: code ? 'rgba(30,136,229,0.15)' : 'rgba(120,120,120,0.10)',
+                                                        color: code ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                                        minWidth:'34px', textAlign:'center', letterSpacing:'0.5px'
+                                                    }}>{code || '\u2014'}</span>
+                                                    <span style={{fontWeight:'700', fontSize:'13px'}}>Pos. {pos.pos}</span>
+                                                    <span style={{fontSize:'12px', color:'var(--text-muted)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{pos.bez}</span>
+                                                    <span style={{
+                                                        fontWeight:'700', fontSize:'13px',
+                                                        color: ergebnis > 0 ? 'var(--success)' : 'var(--text-muted)',
+                                                        whiteSpace:'nowrap'
+                                                    }}>{wertText} {einheitLabel}</span>
+                                                </div>
+
+                                                {/* Modus 2: Stueck/Meter-Eingabe (klein, immer sichtbar) */}
+                                                {(isStueck || isMeter) && (
+                                                    <div style={{display:'flex', alignItems:'center', gap:'10px', marginTop:'6px'}}>
+                                                        <span style={{fontSize:'12px', color:'var(--text-secondary)'}}>
+                                                            {isStueck ? 'Anzahl:' : 'L\u00E4nge:'}
+                                                        </span>
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            value={pos.manualMenge || ''}
+                                                            onChange={e => setPosManualMengeDirekt(pos.pos, e.target.value)}
+                                                            style={{
+                                                                width:'120px', padding:'8px 10px',
+                                                                borderRadius:'6px',
+                                                                border:'1px solid var(--border-color)',
+                                                                background:'var(--bg-primary)',
+                                                                color:'var(--text-primary)',
+                                                                fontSize:'14px', fontFamily:'monospace', fontWeight:'600',
+                                                                textAlign:'right'
+                                                            }}
+                                                            placeholder="0"
+                                                        />
+                                                        <span style={{fontSize:'12px', color:'var(--text-muted)'}}>{einheitLabel}</span>
+                                                        {pos.manualMenge && (
+                                                            <button onClick={() => setPosManualMengeDirekt(pos.pos, '')}
+                                                                style={{padding:'6px 10px', borderRadius:'6px', border:'1px solid var(--border-subtle)', background:'var(--bg-tertiary)', color:'var(--text-muted)', fontSize:'11px', cursor:'pointer'}}>
+                                                                Auf Null
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Modus 1: Multi-Line-Rechenweg-Editor */}
+                                                {isLineEditor && !isEditing && (
+                                                    <div>
+                                                        {/* Read-Mode: Rechenweg-Vorschau */}
+                                                        <pre style={{
+                                                            margin:'4px 0 8px 0', padding:'10px 12px',
+                                                            background:'var(--bg-primary)', borderRadius:'8px',
+                                                            fontSize:'12px', lineHeight:'1.55',
+                                                            fontFamily:'Consolas, Monaco, "Courier New", monospace',
+                                                            color:'var(--text-secondary)',
+                                                            whiteSpace:'pre-wrap', wordBreak:'break-word',
+                                                            border:'1px solid var(--border-subtle)',
+                                                            maxHeight:'180px', overflowY:'auto'
+                                                        }}>
+                                                            {(() => {
+                                                                if (pos.hasManualRW && pos.manualRechenweg && pos.manualRechenweg.length > 0) {
+                                                                    return serializeRechenweg(pos.manualRechenweg, einheitLabel);
+                                                                }
+                                                                try {
+                                                                    const autoSteps = buildRechenweg(pos);
+                                                                    const enriched = enrichRechenweg(autoSteps, pos);
+                                                                    const txt = serializeRechenweg(enriched, einheitLabel);
+                                                                    return txt || '(Auto-Berechnung liefert noch keinen Rechenweg)';
+                                                                } catch(e) {
+                                                                    return '(Rechenweg nicht verf\u00FCgbar)';
+                                                                }
+                                                            })()}
+                                                        </pre>
+                                                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+                                                            <button onClick={() => openEditor(pos)}
+                                                                style={{padding:'8px 14px', borderRadius:'8px', border:'1px solid var(--accent-blue)', background:'rgba(30,136,229,0.10)', color:'var(--accent-blue)', fontWeight:'700', fontSize:'12px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                                {'\u270F\uFE0F'} Bearbeiten
+                                                            </button>
+                                                            {pos.hasManualRW && (
+                                                                <button onClick={() => resetToAutoEditor(pos.pos)}
+                                                                    style={{padding:'8px 14px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', color:'var(--text-muted)', fontWeight:'600', fontSize:'12px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                                    {'\u21BA'} Auf Auto-Wert zur\u00FCcksetzen
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {isLineEditor && isEditing && (
+                                                    <div>
+                                                        {/* Edit-Mode: Textarea */}
+                                                        <textarea
+                                                            value={posEditorText[pos.pos] || ''}
+                                                            onChange={e => setPosEditorText(prev => Object.assign({}, prev, { [pos.pos]: e.target.value }))}
+                                                            spellCheck={false}
+                                                            style={{
+                                                                width:'100%', minHeight:'180px',
+                                                                padding:'10px 12px',
+                                                                background:'var(--bg-primary)',
+                                                                color:'var(--text-primary)',
+                                                                border:'1px solid var(--accent-blue)',
+                                                                borderRadius:'8px',
+                                                                fontSize:'13px', lineHeight:'1.6',
+                                                                fontFamily:'Consolas, Monaco, "Courier New", monospace',
+                                                                resize:'vertical',
+                                                                outline:'none',
+                                                                boxSizing:'border-box'
+                                                            }}
+                                                            placeholder={'Format pro Zeile:  beschreibung = wert einheit\n\nBeispiel:\n2 \u00D7 (4,50 + 3,20) \u00D7 2,40 = 36,96 m\u00B2\n- T\u00FCr 0,90 \u00D7 2,10 = 1,89 m\u00B2\n+ Laibung 2 \u00D7 2,10 \u00D7 0,15 = 0,63 m\u00B2'}
+                                                        />
+                                                        <div style={{fontSize:'10px', color:'var(--text-muted)', margin:'4px 2px 8px', fontStyle:'italic'}}>
+                                                            Vorzeichen: <strong>{'-'}</strong> = Abzug, <strong>{'+'}</strong>/leer = Zurechnung. Wert hinter <strong>{'='}</strong>. Ohne <strong>{'='}</strong> wird die Formel ausgewertet.
+                                                        </div>
+                                                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+                                                            <button onClick={() => saveEditorText(pos.pos)}
+                                                                style={{padding:'10px 16px', borderRadius:'8px', border:'none', background:'#27ae60', color:'#fff', fontWeight:'700', fontSize:'13px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', boxShadow:'0 2px 6px rgba(39,174,96,0.30)'}}>
+                                                                {'\u2713'} Speichern
+                                                            </button>
+                                                            <button onClick={() => { setPosEditorOpen(null); }}
+                                                                style={{padding:'10px 16px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', color:'var(--text-secondary)', fontWeight:'600', fontSize:'13px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                                Abbrechen
+                                                            </button>
+                                                            {pos.hasManualRW && (
+                                                                <button onClick={() => resetToAutoEditor(pos.pos)}
+                                                                    style={{padding:'10px 16px', borderRadius:'8px', border:'1px solid var(--accent-orange)', background:'rgba(243,156,18,0.10)', color:'var(--accent-orange)', fontWeight:'600', fontSize:'12px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', marginLeft:'auto'}}>
+                                                                    {'\u21BA'} Auf Auto zur\u00FCck
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
                     </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
                     {rbTab === 1 && (
@@ -13200,75 +13548,26 @@
                         })}
                     </div>
 
-                    {/* ═══ QUICK-EDIT-BEARBEITUNGSLEISTE (Aufmasz-Code-System) ═══ */}
+                    {/* ═══ HINWEIS: Positionen werden auf Tab 3 bearbeitet ═══ */}
+                    {/* Frueher hier: QUICK-EDIT-BEARBEITUNGSLEISTE. Skill v1.0    */}
+                    {/* (27.04.2026) verschiebt sie auf Tab 3 (Oeffnungen).         */}
+                    {/* Tab 4 ist jetzt reine Freigabe-Uebersicht.                  */}
                     {posCards.length > 0 && (
-                        <div className="masse-section quick-edit-section" style={{marginTop:'16px'}}>
-                            <div className="masse-section-title" style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                                <span>\u270F\uFE0F Positions-Quick-Edit</span>
-                                <span style={{
-                                    fontSize:'10px', fontWeight:'400', color:'var(--text-muted)',
-                                    background:'rgba(30,136,229,0.10)', padding:'2px 6px', borderRadius:'4px'
-                                }}>Code-System</span>
-                            </div>
-                            {posCards.map(qPos => {
-                                const qErgebnis = calcPositionResult(qPos);
-                                const qCode = resolveAufmassCode(qPos);
-                                const qIstManuell = (qCode === 'M' || qCode === 'St');
-                                const qHatErgebnis = qErgebnis > 0;
-                                const qIsEditOpen = quickEditOpen === qPos.pos;
-                                return (
-                                    <div key={'qe_' + qPos.pos} className="quick-edit-card" style={{
-                                        padding:'10px 12px', borderRadius:'10px',
-                                        background:'var(--bg-secondary)', marginBottom:'8px',
-                                        border: qHatErgebnis ? '1px solid var(--border-color)' : '1px dashed var(--accent-orange)'
-                                    }}>
-                                        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
-                                            <span style={{
-                                                fontFamily:'monospace', fontWeight:'700',
-                                                fontSize:'11px', padding:'2px 6px', borderRadius:'4px',
-                                                background: qCode ? 'rgba(30,136,229,0.15)' : 'rgba(120,120,120,0.10)',
-                                                color: qCode ? 'var(--accent-blue)' : 'var(--text-muted)',
-                                                minWidth:'34px', textAlign:'center', letterSpacing:'0.5px'
-                                            }}>{qCode || '\u2014'}</span>
-                                            <span style={{fontWeight:'700', fontSize:'13px'}}>Pos. {qPos.pos}</span>
-                                            <span style={{fontSize:'12px', color:'var(--text-muted)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{qPos.bez}</span>
-                                        </div>
-                                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px'}}>
-                                            <span style={{
-                                                fontSize:'14px', fontWeight:'700',
-                                                color: qHatErgebnis ? '#27ae60' : 'var(--accent-orange)'
-                                            }}>
-                                                {qHatErgebnis
-                                                    ? fmtDe(qErgebnis) + ' ' + (qPos.einheit || '')
-                                                    : (qIstManuell ? 'manuell eingeben' : '0 ' + (qPos.einheit || ''))}
-                                            </span>
-                                            <button onClick={() => setQuickEditOpen(qIsEditOpen ? null : qPos.pos)}
-                                                style={{padding:'6px 12px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'transparent', cursor:'pointer', fontSize:'12px', color:'var(--text-primary)'}}>
-                                                {qIsEditOpen ? 'Schliessen' : 'Bearbeiten'}
-                                            </button>
-                                        </div>
-                                        {qIsEditOpen && (
-                                            <div style={{marginTop:'8px', paddingTop:'8px', borderTop:'1px solid var(--border-color)'}}>
-                                                <input
-                                                    type="text" inputMode="numeric"
-                                                    value={qPos.manualMenge || ''}
-                                                    onChange={e => updatePosManualMenge(qPos.pos, e.target.value)}
-                                                    placeholder={'z.B. ' + (qHatErgebnis ? fmtDe(qErgebnis) : '0')}
-                                                    style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid var(--accent-blue)', fontSize:'14px', boxSizing:'border-box', background:'var(--bg-primary)', color:'var(--text-primary)'}}
-                                                />
-                                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px'}}>
-                                                    {qIstManuell
-                                                        ? 'Eingabe in ' + (qPos.einheit || '')
-                                                        : 'Eingabe ueberschreibt automatischen Wert'}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                            <button onClick={onPositionenInRechnungUebernehmen}
-                                style={{width:'100%', marginTop:'10px', padding:'14px', borderRadius:'10px', border:'none', background:'#27ae60', color:'white', fontWeight:'700', fontSize:'14px', cursor:'pointer', boxShadow:'0 2px 8px rgba(39,174,96,0.3)'}}>
-                                \u2713 OK \u2014 in Rechnung uebernehmen
+                        <div style={{
+                            marginTop:'12px', padding:'10px 14px', borderRadius:'10px',
+                            background:'rgba(30,136,229,0.08)',
+                            border:'1px solid rgba(30,136,229,0.25)',
+                            display:'flex', alignItems:'center', gap:'10px',
+                            fontSize:'12px', color:'var(--accent-blue)'
+                        }}>
+                            <span style={{fontSize:'16px'}}>{'\u2139\uFE0F'}</span>
+                            <span style={{flex:1, lineHeight:'1.5', color:'var(--text-secondary)'}}>
+                                Positionen werden jetzt auf <strong style={{color:'var(--accent-blue)'}}>Tab \u00D6ffnungen</strong> bearbeitet (unter "Sonstige Bauteile").
+                                Hier ist nur noch die <strong>Freigabe-\u00DCbersicht</strong>.
+                            </span>
+                            <button onClick={() => setRbTab(4)}
+                                style={{padding:'6px 12px', borderRadius:'6px', border:'1px solid var(--accent-blue)', background:'transparent', color:'var(--accent-blue)', fontSize:'11px', fontWeight:'700', cursor:'pointer', whiteSpace:'nowrap', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                {'\u2190'} Zu \u00D6ffnungen
                             </button>
                         </div>
                     )}
@@ -13314,6 +13613,24 @@
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+
+                    {/* ═══ FREIGABE: Positionen in Rechnung uebernehmen ═══ */}
+                    {/* Vormals in der Quick-Edit-Section (jetzt entfernt). Skill */}
+                    {/* v1.0 vom 27.04.2026: Trennung Bearbeitung/Freigabe.        */}
+                    {posCards.length > 0 && (
+                        <div style={{marginTop:'14px'}}>
+                            <button onClick={onPositionenInRechnungUebernehmen}
+                                style={{
+                                    width:'100%', padding:'14px 18px', borderRadius:'10px',
+                                    border:'none', background:'#27ae60', color:'#fff',
+                                    fontWeight:'700', fontSize:'14px', cursor:'pointer',
+                                    fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px',
+                                    boxShadow:'0 2px 10px rgba(39,174,96,0.30)'
+                                }}>
+                                {'\u2713'} OK \u2014 in Rechnung \u00FCbernehmen
+                            </button>
                         </div>
                     )}
 
