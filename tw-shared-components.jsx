@@ -261,92 +261,89 @@
         }
 
         /* ═══════════════════════════════════════════
-           TOOLBAR-KOMPONENTEN — migriert in JSX-Quelle 27.04.2026
-           ═══════════════════════════════════════════
-           Diese drei Komponenten waren als Hotfix vom 26.04.2026 direkt in
-           index.html eingebettet, lebten aber in keiner JSX-Quelldatei. Beim
-           Frisch-Build aus index-template.html fehlten sie deshalb komplett
-           (ReferenceError: ToolbarButton is not defined in Raumerkennung).
-           Hier nun sauber in tw-shared-components.jsx migriert, damit sie
-           bei jedem Build (lokal und im Container) automatisch im Bundle landen.
+           TOOLBAR-PRIMITIVES (StatusPill, ToolbarButton, ToolbarRow)
+           Wiederhergestellt 27.04.2026 — Source-Drift-Fix.
+           Diese drei Komponenten waren in der Live-index.html als
+           pre-kompiliertes JS vorhanden, fehlten aber in der JSX-Source.
+           Ab jetzt: einzige Quelle der Wahrheit ist diese Datei.
+           Verwendet in: tw-aufmass.jsx (Raumerkennung, Raumblatt),
+           voraussichtlich auch in weiteren Modulen.
+           ═══════════════════════════════════════════ */
 
-           Verwendet von:
-           - tw-aufmass.jsx (Raumerkennungs-Toolbar, Pos-Modal-Toolbar)
-           - Phase-1-Platzoptimierung (Sticky-Toolbar oben)
-        */
-
+        // Anzeige-Pille fuer Zaehler/Status. Klickbar, wenn onClick gesetzt.
+        // Farb-Schema: success (gruen), info (blau), warning (orange), danger (rot), muted (grau)
         function StatusPill({ text, color, title, onClick }) {
-            // Anzeige-Pille (nicht klickbar, ausser onClick gesetzt) fuer Zaehler/Stati
             var colorMap = {
-                success: { bg: 'rgba(46,160,67,0.18)',  border: 'rgba(46,160,67,0.45)',  text: '#3fb950' },
-                info:    { bg: 'rgba(30,136,229,0.18)', border: 'rgba(30,136,229,0.45)', text: '#58a6ff' },
-                warning: { bg: 'rgba(243,156,18,0.18)', border: 'rgba(243,156,18,0.45)', text: '#f0a84a' },
-                danger:  { bg: 'rgba(196,30,30,0.18)',  border: 'rgba(196,30,30,0.45)',  text: '#ff6b6b' },
-                muted:   { bg: 'rgba(120,120,120,0.18)',border: 'rgba(160,160,160,0.35)',text: '#c8c8c8' }
+                success: { bg: 'rgba(46,160,67,0.18)',   border: 'rgba(46,160,67,0.45)',   text: '#3fb950' },
+                info:    { bg: 'rgba(30,136,229,0.18)',  border: 'rgba(30,136,229,0.45)',  text: '#58a6ff' },
+                warning: { bg: 'rgba(243,156,18,0.18)',  border: 'rgba(243,156,18,0.45)',  text: '#f0a84a' },
+                danger:  { bg: 'rgba(196,30,30,0.18)',   border: 'rgba(196,30,30,0.45)',   text: '#ff6b6b' },
+                muted:   { bg: 'rgba(120,120,120,0.18)', border: 'rgba(160,160,160,0.35)', text: '#c8c8c8' }
             };
             var c = colorMap[color] || colorMap.muted;
             return (
                 <span title={title || ''} onClick={onClick} style={{
-                    display:'inline-flex', alignItems:'center',
-                    padding:'4px 10px', borderRadius:'12px',
+                    display: 'inline-flex', alignItems: 'center',
+                    padding: '4px 10px', borderRadius: '12px',
                     background: c.bg, border: '1px solid ' + c.border, color: c.text,
-                    fontSize:'11px', fontWeight:700, fontFamily:'Oswald, sans-serif',
-                    textTransform:'uppercase', letterSpacing:'0.6px', whiteSpace:'nowrap',
-                    cursor: onClick ? 'pointer' : 'default', userSelect:'none'
+                    fontSize: '11px', fontWeight: 700, fontFamily: 'Oswald, sans-serif',
+                    textTransform: 'uppercase', letterSpacing: '0.6px',
+                    whiteSpace: 'nowrap',
+                    cursor: onClick ? 'pointer' : 'default',
+                    userSelect: 'none'
                 }}>{text}</span>
             );
         }
 
+        // Kompakter Action-Button (Icon + Label, ~32 px hoch).
+        // Farb-Schema: red (default), blue (positiv), orange (Auswahl), green (Bestaetigen), grey
         function ToolbarButton({ icon, label, color, onClick, disabled, title }) {
-            // Kompakter Action-Button (Icon + Label, ~32 px hoch).
-            // Farb-Schema: red (default), blue (positive), orange (Auswahl), green (Bestaetigen), grey
             var colorMap = {
-                red:    { bg:'linear-gradient(135deg, #e84040, #c42323)', shadow:'rgba(196,30,30,0.35)' },
-                blue:   { bg:'linear-gradient(135deg, #4a90e2, #1e6fc4)', shadow:'rgba(30,136,229,0.35)' },
-                orange: { bg:'linear-gradient(135deg, #f39c12, #d35400)', shadow:'rgba(211,84,0,0.35)' },
-                green:  { bg:'linear-gradient(135deg, #2ecc71, #1e8449)', shadow:'rgba(39,174,96,0.35)' },
-                grey:   { bg:'linear-gradient(135deg, #5d6d7e, #34495e)', shadow:'rgba(52,73,94,0.35)' }
+                red:    { bg: 'linear-gradient(135deg, #e84040, #c42323)', shadow: 'rgba(196,30,30,0.35)' },
+                blue:   { bg: 'linear-gradient(135deg, #4a90e2, #1e6fc4)', shadow: 'rgba(30,136,229,0.35)' },
+                orange: { bg: 'linear-gradient(135deg, #f39c12, #d35400)', shadow: 'rgba(211,84,0,0.35)' },
+                green:  { bg: 'linear-gradient(135deg, #2ecc71, #1e8449)', shadow: 'rgba(39,174,96,0.35)' },
+                grey:   { bg: 'linear-gradient(135deg, #5d6d7e, #34495e)', shadow: 'rgba(52,73,94,0.35)' }
             };
             var c = colorMap[color] || colorMap.red;
             return (
-                <button
-                    onClick={disabled ? undefined : onClick}
-                    title={title || label || ''}
-                    disabled={!!disabled}
-                    style={{
-                        display:'inline-flex', alignItems:'center', gap:'5px',
-                        padding:'6px 11px', height:'32px', borderRadius:'8px', border:'none',
-                        background: disabled ? 'rgba(120,120,120,0.22)' : c.bg,
-                        color: disabled ? 'rgba(255,255,255,0.4)' : '#ffffff',
-                        fontSize:'12px', fontWeight:700, fontFamily:'Oswald, sans-serif',
-                        textTransform:'uppercase', letterSpacing:'0.6px',
-                        boxShadow: disabled ? 'none' : '0 2px 8px ' + c.shadow,
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        whiteSpace:'nowrap', transition:'transform 0.15s ease, box-shadow 0.15s ease'
-                    }}>
-                    {icon && <span style={{fontSize:'14px', lineHeight:1}}>{icon}</span>}
+                <button onClick={disabled ? undefined : onClick} title={title || label || ''} disabled={!!disabled} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                    padding: '6px 11px', height: '32px', borderRadius: '8px',
+                    border: 'none',
+                    background: disabled ? 'rgba(120,120,120,0.22)' : c.bg,
+                    color: disabled ? 'rgba(255,255,255,0.4)' : '#ffffff',
+                    fontSize: '12px', fontWeight: 700, fontFamily: 'Oswald, sans-serif',
+                    textTransform: 'uppercase', letterSpacing: '0.6px',
+                    boxShadow: disabled ? 'none' : '0 2px 8px ' + c.shadow,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                }}>
+                    {icon && <span style={{ fontSize: '14px', lineHeight: 1 }}>{icon}</span>}
                     {label && <span>{label}</span>}
                 </button>
             );
         }
 
+        // Sticky horizontale Toolbar-Zeile mit linker und rechter Gruppe.
+        // Props: left (ReactNode), right (ReactNode), sticky (bool, default true), stickyTop (number, px)
         function ToolbarRow({ left, right, sticky, stickyTop }) {
-            // Sticky horizontale Toolbar-Zeile mit linker und rechter Gruppe.
             var stickyStyle = sticky === false ? {} : {
-                position:'sticky',
+                position: 'sticky',
                 top: (typeof stickyTop === 'number' ? stickyTop : 60) + 'px',
                 zIndex: 340
             };
             return (
                 <div className="tw-toolbar-row" style={Object.assign({
-                    display:'flex', justifyContent:'space-between', alignItems:'center',
-                    gap:'8px', padding:'6px 10px',
-                    background:'var(--bg-primary)',
-                    borderBottom:'1px solid var(--border-color)',
-                    flexWrap:'wrap'
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    gap: '8px', padding: '6px 10px',
+                    background: 'var(--bg-primary)',
+                    borderBottom: '1px solid var(--border-color)',
+                    flexWrap: 'wrap'
                 }, stickyStyle)}>
-                    <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap'}}>{left}</div>
-                    <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap'}}>{right}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>{left}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>{right}</div>
                 </div>
             );
         }
