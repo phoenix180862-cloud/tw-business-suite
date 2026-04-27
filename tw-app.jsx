@@ -443,13 +443,31 @@
             }, []);  // ← einmal beim Mount
 
             const navigateTo = useCallback((newPage) => {
+                // ── Aufmasz-Verlassen-Schutz (Skill 8.5) ──
+                // Wenn der User aus dem Aufmasz-Modul rausnavigiert und ungespeicherte
+                // Aenderungen vorhanden sind, Confirm einfordern. Das Aufmasz-Modul
+                // setzt window.__aufmassDirty = function() { return hasUnsavedChanges; }
+                // beim Mounten und raeumt es beim Unmount auf.
+                var fromAufmass = (page === 'raumerkennung' || page === 'raumblatt');
+                var leavingAufmass = fromAufmass && (newPage !== 'raumerkennung' && newPage !== 'raumblatt');
+                var aufmassDirtyCheck = (typeof window.__aufmassDirty === 'function')
+                    ? !!window.__aufmassDirty()
+                    : !!window.__aufmassDirty;
+                if (leavingAufmass && aufmassDirtyCheck) {
+                    var ok = window.confirm(
+                        'Im Aufmass gibt es ungespeicherte Aenderungen.\n\n' +
+                        'Wenn du jetzt navigierst, koennten Daten verloren gehen.\n\n' +
+                        'Trotzdem weiter? (Abbrechen = im Aufmass bleiben)'
+                    );
+                    if (!ok) return;
+                }
                 setPage(newPage);
                 setHistory(prev => {
                     const newHistory = [...prev.slice(0, historyIdx + 1), newPage];
                     setHistoryIdx(newHistory.length - 1);
                     return newHistory;
                 });
-            }, [historyIdx]);
+            }, [historyIdx, page]);
 
             // Globale Navigation fuer Module (z.B. Gesamtliste → Modulwahl)
             window._navigateToModulwahl = () => navigateTo('modulwahl');

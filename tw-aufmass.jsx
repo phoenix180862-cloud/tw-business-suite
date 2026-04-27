@@ -6247,9 +6247,9 @@
             const [expandedPos, setExpandedPos] = useState(null);
             // ── Quick-Edit-Bearbeitungsleiste (Tab 3, vor Raum-Zusammenfassung) ──
             const [quickEditOpen, setQuickEditOpen] = useState(null); // pos-string oder null
-            // ── Aufmasz-Wiederaufnahme-Dialog + Dirty-Flag (Etappe 6) ──
-            const [wipResumeDialog, setWipResumeDialog] = useState(null); // {savedAt, meta} oder null
-            const [aufmassDirty, setAufmassDirty] = useState(false);
+            // ── Aufmasz-Wiederaufnahme-Dialog (Etappe 6, koppelt an hasUnsavedChanges) ──
+            const [wipResumeDialog, setWipResumeDialog] = useState(null); // {savedAt, meta, _wip} oder null
+            // Dirty-Flag wird zentral durch hasUnsavedChanges gesteuert (siehe useEffect Zeile 6260+)
 
             // ── Manueller Rechenweg Modal ──
             const [rwModalPos, setRwModalPos] = useState(null); // pos.pos oder null
@@ -7729,7 +7729,7 @@
                 handleFinishRaumValidated(() => {
                     const payload = buildRaumFinishPayload();
                     onFinishRaum((raum && raum.nr), payload);
-                    setAufmassDirty(false); // Etappe 6: Dirty-Flag nach Save zuruecksetzen
+                    // hasUnsavedChanges wird durch setHasUnsavedChanges(false) im handleFinishRaumValidated zurueckgesetzt
                 });
             };
 
@@ -7738,7 +7738,6 @@
                 handleFinishRaumValidated(() => {
                     const payload = buildRaumFinishPayload();
                     onFinishRaum((raum && raum.nr), payload);
-                    setAufmassDirty(false); // Etappe 6: Dirty-Flag nach Save zuruecksetzen
                     // Aufmass beenden nach State-Update -- navigiert automatisch zum Rechnungsmodul
                     setTimeout(() => onAufmassBeenden && onAufmassBeenden(), 100);
                 });
@@ -8058,6 +8057,51 @@
                     if (typeof unsubRestore === 'function') unsubRestore();
                 };
             }, []);
+
+            // ── Auto-Trigger Wiederaufnahme-Dialog (Skill 8.3) ──
+            // Beim Mounten des Raumblatts pruefen, ob ein WIP existiert. Falls ja
+            // und kein globaler Akte-Restore aktiv ist, Dialog anbieten.
+            // Konfliktarm: 1.5s Verzoegerung laesst dem globalen System Vorrang;
+            // Suppression-Check verhindert Doppel-Modal.
+            React.useEffect(function() {
+                if (!kunde || !window.TWStorage || typeof window.TWStorage.loadWip !== 'function') return;
+                var kid = kunde._driveFolderId || kunde.id || kunde.name;
+                if (!kid) return;
+                // Wenn bereits Daten im State sind (durch reEdit oder globalen Restore), nichts tun
+                var hasInitialData = (Array.isArray(posCards) && posCards.length > 0) ||
+                                     (Array.isArray(wandMasse) && wandMasse.some(function(w) { return w && w.l && parseMass(w.l) > 0; })) ||
+                                     (masse && (parseMass(masse.laenge) > 0 || parseMass(masse.breite) > 0));
+                if (hasInitialData) return;
+                // Globale Suppression respektieren (= globaler Akte-Restore laeuft gerade)
+                var isSuppressed = function() {
+                    return !!(window.TW && window.TW.AutoSave && typeof window.TW.AutoSave.isSuppressed === 'function' && window.TW.AutoSave.isSuppressed());
+                };
+                if (isSuppressed()) return;
+                var timer = setTimeout(function() {
+                    if (isSuppressed()) return;
+                    window.TWStorage.loadWip(kid, 'aufmass').then(function(wip) {
+                        if (!wip || !wip.moduleState) return;
+                        setWipResumeDialog({
+                            savedAt: wip.savedAt || (wip.meta && wip.meta.savedAt) || null,
+                            meta: wip.meta || {},
+                            _wip: wip
+                        });
+                    }).catch(function(err) {
+                        console.warn('[Aufmasz] WIP-Resume-Check fehlgeschlagen:', err);
+                    });
+                }, 1500);
+                return function() { clearTimeout(timer); };
+            }, []);
+
+            // ── Verlassen-Schutz Hook (Skill 8.5) ──
+            // Setzt einen globalen Checker, den navigateTo in tw-app.jsx abfragt.
+            // Beim Unmount wird der Hook sauber aufgeraeumt.
+            React.useEffect(function() {
+                window.__aufmassDirty = function() { return !!hasUnsavedChanges; };
+                return function() {
+                    try { delete window.__aufmassDirty; } catch(e) { window.__aufmassDirty = null; }
+                };
+            }, [hasUnsavedChanges]);
 
             // ── Schnellzugriff Handler ──
             const handleOpenKundendaten = () => {
@@ -9060,11 +9104,11 @@
             };
 
             // ── Quick-Edit: manualMenge fuer Position aktualisieren ──
+            // hasUnsavedChanges wird automatisch durch setPosCards getriggert (zentraler useEffect)
             const updatePosManualMenge = (posNr, value) => {
                 setPosCards(prev => prev.map(p =>
                     p.pos === posNr ? { ...p, manualMenge: value } : p
                 ));
-                setAufmassDirty(true);
             };
             // ── Quick-Edit: Positionen in Rechnung uebernehmen (= Raumblatt fertigstellen) ──
             const onPositionenInRechnungUebernehmen = () => {
@@ -9099,7 +9143,7 @@
                     const cleared = {};
                     FOTO_PHASEN.forEach(function(phase) { cleared[phase.key] = {}; });
                     setPhasenFotos(cleared);
-                    setAufmassDirty(false);
+                    // hasUnsavedChanges wird durch setPhasenFotos automatisch getriggert
                     // 3) UI-Feedback
                     alert('Fotos gesichert. Aufnahme-Felder sind nun leer fuer neue Aufnahmen.');
                 } catch (err) {
@@ -10201,7 +10245,7 @@
                     )}
 
                     {/* ═══ AUFMASZ-WARNSCHILD (Etappe 6: Datenverlust-Schutz) ═══ */}
-                    {aufmassDirty && (
+                    {hasUnsavedChanges && (
                         <div style={{
                             position:'fixed', top:'88px', right:'12px', zIndex:9999,
                             padding:'8px 12px', borderRadius:'8px',

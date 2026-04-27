@@ -51,6 +51,138 @@
             var fmtZahl = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
             var fmtEuro = function(n) { var num = parseFloat(n) || 0; return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' \u20ac'; };
 
+            // ── AUFMASZ-CODE FUTURE-WORK (§14): Heuristik + KI + Bulk-Edit + Histogram ──
+            // Heuristik-Funktion: schlaegt einen Code basierend auf Bezeichnung + Einheit vor.
+            // Rueckgabe: Code-String oder '' (kein sicherer Treffer).
+            var VALID_CODES_DU = ['W','B','M','St','MU','AW','AB','S','AS'];
+            var heuristikCodeFuerPosition = function(p) {
+                var bez = String(p.bez || '').toLowerCase();
+                var einh = String(p.einheit || '').toLowerCase();
+                // Stueck-Position?
+                if (einh === 'stk' || einh === 'st' || einh === 'stck' || einh === 'st\u00fcck') return 'St';
+                // Sockel zuerst (wegen "Sockelfliese" vor "Fliese")
+                if (bez.indexOf('sockel') >= 0) {
+                    if (bez.indexOf('abdichtung') >= 0 || bez.indexOf('dichtschlaemm') >= 0) return 'AS';
+                    return 'S';
+                }
+                // Abdichtung
+                if (bez.indexOf('verbundabdicht') >= 0 || bez.indexOf('abdichtungsbahn') >= 0 || bez.indexOf('dichtschlaemm') >= 0 ||
+                    (bez.indexOf('abdicht') >= 0 && (einh === 'm\u00b2' || einh === 'm2' || einh === 'qm'))) {
+                    if (bez.indexOf('boden') >= 0) return 'AB';
+                    if (bez.indexOf('wand') >= 0) return 'AW';
+                    return 'AW'; // Default Wand bei Abdichtung
+                }
+                // Fliesen-Bereiche
+                if (bez.indexOf('wandflies') >= 0 || bez.indexOf('wandbel') >= 0 || (bez.indexOf('flies') >= 0 && bez.indexOf('wand') >= 0)) return 'W';
+                if (bez.indexOf('bodenflies') >= 0 || bez.indexOf('bodenbel') >= 0 || (bez.indexOf('flies') >= 0 && bez.indexOf('boden') >= 0)) return 'B';
+                // Meter-Positionen (Schienen, Profile, Kantenbaender etc.)
+                if (einh === 'm' || einh === 'lfm') {
+                    if (bez.indexOf('umfang') >= 0) return 'MU';
+                    if (bez.indexOf('schien') >= 0 || bez.indexOf('profil') >= 0 || bez.indexOf('kanten') >= 0 || bez.indexOf('eckschutz') >= 0 || bez.indexOf('silikon') >= 0) return 'M';
+                    return 'M';
+                }
+                // Generische Wand-Begriffe
+                if (bez.indexOf('wand') >= 0 && (einh === 'm\u00b2' || einh === 'm2' || einh === 'qm')) return 'W';
+                if (bez.indexOf('boden') >= 0 && (einh === 'm\u00b2' || einh === 'm2' || einh === 'qm')) return 'B';
+                return '';
+            };
+
+            // Bulk-Edit-Modal-State
+            var [codeBulkOpen, setCodeBulkOpen] = useState(false);
+            var [codeBulkVorschlaege, setCodeBulkVorschlaege] = useState({}); // {idx: code}
+            var [codeBulkLoading, setCodeBulkLoading] = useState(false);
+            var [codeBulkQuelle, setCodeBulkQuelle] = useState(''); // 'heuristik' oder 'ki'
+
+            // Heuristik fuer alle Positionen ohne Code anwenden
+            var startHeuristik = function() {
+                var vorschl = {};
+                positionen.forEach(function(p, idx) {
+                    if (p.aufmasscode) return; // Bestehende Codes nicht ueberschreiben
+                    var code = heuristikCodeFuerPosition(p);
+                    if (code) vorschl[idx] = code;
+                });
+                setCodeBulkVorschlaege(vorschl);
+                setCodeBulkQuelle('heuristik');
+                setCodeBulkOpen(true);
+            };
+
+            // KI-Vorbelegung via Gemini Pro
+            var startKiVorbelegung = async function() {
+                if (typeof window.callGeminiAPI !== 'function') {
+                    alert('Gemini-API ist nicht konfiguriert. Bitte API-Key setzen.');
+                    return;
+                }
+                var offene = positionen.map(function(p, idx) { return { idx: idx, pos: p.pos, bez: p.bez, einheit: p.einheit }; })
+                    .filter(function(x, i) { return !positionen[x.idx].aufmasscode; });
+                if (offene.length === 0) {
+                    alert('Alle Positionen haben bereits einen Code. Nichts zu tun.');
+                    return;
+                }
+                setCodeBulkLoading(true);
+                setCodeBulkQuelle('ki');
+                try {
+                    var prompt = 'Du bist VOB-Experte fuer Fliesenlegerarbeiten (DIN 18352). Ordne jeder LV-Position einen der folgenden Aufmasz-Codes zu:\n\n' +
+                        'W = Wandflaeche (m\u00b2)\n' +
+                        'B = Bodenflaeche (m\u00b2)\n' +
+                        'M = Meter manuell (lfm fuer Schienen/Profile)\n' +
+                        'St = Stueck\n' +
+                        'MU = Meter Umfang (lfm)\n' +
+                        'AW = Abdichtung Wand (m\u00b2)\n' +
+                        'AB = Abdichtung Boden (m\u00b2)\n' +
+                        'S = Sockel (lfm)\n' +
+                        'AS = Abdichtung Sockel (lfm oder m\u00b2)\n\n' +
+                        'Antworte NUR als JSON: {"vorschlaege": [{"idx": 0, "code": "W"}, ...]}\n' +
+                        'Wenn du dir unsicher bist, lasse die Position weg (leer).\n\n' +
+                        'Positionen:\n' + JSON.stringify(offene);
+                    var resp = await window.callGeminiAPI([{ role: 'user', content: prompt }], 2000, { model: 'pro' });
+                    var text = (resp && resp.text) || (resp && resp.choices && resp.choices[0] && resp.choices[0].message && resp.choices[0].message.content) || '';
+                    // JSON extrahieren (Gemini liefert manchmal Markdown-Backticks)
+                    var jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error('Keine JSON-Antwort gefunden');
+                    var parsed = JSON.parse(jsonMatch[0]);
+                    var vorschl = {};
+                    (parsed.vorschlaege || []).forEach(function(v) {
+                        if (v.code && VALID_CODES_DU.indexOf(v.code) >= 0) {
+                            vorschl[v.idx] = v.code;
+                        }
+                    });
+                    setCodeBulkVorschlaege(vorschl);
+                    setCodeBulkOpen(true);
+                } catch (err) {
+                    alert('KI-Vorbelegung fehlgeschlagen: ' + (err && err.message ? err.message : err));
+                } finally {
+                    setCodeBulkLoading(false);
+                }
+            };
+
+            // Vorschlaege uebernehmen
+            var applyCodeVorschlaege = function() {
+                setPositionen(function(prev) {
+                    return prev.map(function(p, idx) {
+                        if (codeBulkVorschlaege[idx]) {
+                            return Object.assign({}, p, { aufmasscode: codeBulkVorschlaege[idx] });
+                        }
+                        return p;
+                    });
+                });
+                setCodeBulkOpen(false);
+                setCodeBulkVorschlaege({});
+            };
+
+            // Code-Statistik (Mini-Histogram)
+            var codeStatistik = (function() {
+                var stat = { total: positionen.length, mitCode: 0, ohneCode: 0, perCode: {} };
+                positionen.forEach(function(p) {
+                    if (p.aufmasscode) {
+                        stat.mitCode++;
+                        stat.perCode[p.aufmasscode] = (stat.perCode[p.aufmasscode] || 0) + 1;
+                    } else {
+                        stat.ohneCode++;
+                    }
+                });
+                return stat;
+            })();
+
             // CRUD
             var updateStammFeld = function(key, val) { setStammFelder(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
             var updatePosition = function(idx, field, val) { setPositionen(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
@@ -199,6 +331,48 @@
 
                     {activeTab === 'positionen' && (
                         <div style={{overflowX:'auto'}}>
+                            {/* ── AUFMASZ-CODE-TOOLBAR (Future Work \u00a714) ── */}
+                            {positionen.length > 0 && (
+                                <div style={{display:'flex', flexWrap:'wrap', gap:'8px', alignItems:'center', padding:'8px 10px', marginBottom:'8px', borderRadius:'8px', background:'var(--bg-secondary)', border:'1px solid var(--border-color)'}}>
+                                    {/* Mini-Histogram links */}
+                                    <div style={{display:'flex', gap:'10px', alignItems:'center', fontSize:'11px'}}>
+                                        <span style={{color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', fontWeight:'700'}}>Codes:</span>
+                                        <span style={{color: codeStatistik.mitCode === codeStatistik.total ? '#27ae60' : 'var(--text-primary)', fontWeight:'700'}}>
+                                            {codeStatistik.mitCode}/{codeStatistik.total} gesetzt
+                                        </span>
+                                        {codeStatistik.ohneCode > 0 && (
+                                            <span style={{display:'inline-flex', alignItems:'center', gap:'4px', padding:'2px 8px', borderRadius:'10px', background:'rgba(231,76,60,0.12)', color:'#e74c3c', fontWeight:'700'}}>
+                                                <span style={{display:'inline-block', width:'6px', height:'6px', borderRadius:'50%', background:'#e74c3c'}}></span>
+                                                {codeStatistik.ohneCode} offen
+                                            </span>
+                                        )}
+                                        {Object.keys(codeStatistik.perCode).length > 0 && (
+                                            <span style={{display:'flex', gap:'4px', flexWrap:'wrap'}}>
+                                                {Object.keys(codeStatistik.perCode).sort().map(function(c) {
+                                                    return (
+                                                        <span key={c} style={{fontFamily:'monospace', padding:'1px 6px', borderRadius:'4px', background:'rgba(30,136,229,0.10)', color:'var(--accent-blue)', fontSize:'10px', fontWeight:'700'}}>
+                                                            {c}: {codeStatistik.perCode[c]}
+                                                        </span>
+                                                    );
+                                                })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {/* Buttons rechts */}
+                                    <div style={{display:'flex', gap:'6px', marginLeft:'auto'}}>
+                                        <button onClick={startHeuristik} disabled={codeBulkLoading || codeStatistik.ohneCode === 0}
+                                            title="Codes per Heuristik vorschlagen (lokal, schnell)"
+                                            style={{padding:'6px 10px', borderRadius:'6px', border:'1px solid var(--border-color)', background: codeStatistik.ohneCode === 0 ? 'rgba(120,120,120,0.10)' : 'transparent', color: codeStatistik.ohneCode === 0 ? 'var(--text-muted)' : 'var(--text-primary)', fontSize:'11px', fontWeight:'700', cursor: codeStatistik.ohneCode === 0 ? 'not-allowed' : 'pointer'}}>
+                                            \uD83C\uDFAF Heuristik
+                                        </button>
+                                        <button onClick={startKiVorbelegung} disabled={codeBulkLoading || codeStatistik.ohneCode === 0}
+                                            title="Codes per KI (Gemini Pro) vorschlagen"
+                                            style={{padding:'6px 10px', borderRadius:'6px', border:'none', background: codeStatistik.ohneCode === 0 ? 'rgba(120,120,120,0.30)' : 'linear-gradient(135deg, #4a90e2, #1e6fc4)', color:'white', fontSize:'11px', fontWeight:'700', cursor: codeStatistik.ohneCode === 0 ? 'not-allowed' : 'pointer'}}>
+                                            {codeBulkLoading ? '\u23F3 KI laeuft...' : '\uD83E\uDD16 KI-Codes'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             <div style={{minWidth: editMode ? '720px' : '610px'}}>
                                 <div style={{display:'grid', gridTemplateColumns: editMode ? '70px 90px 110px 55px 1fr 120px 105px 32px' : '60px 70px 80px 45px 1fr 95px 95px', gap:'4px', padding:'8px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
                                     <div>Pos-Nr.</div>
@@ -217,7 +391,12 @@
                                             {editMode ? cellEdit(p.pos, function(e){updatePosition(idx,'pos',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px', color: p._istNachtrag ? '#e67e22' : 'var(--text-primary)'}}>{p.pos}</div>}
                                             {editMode
                                                 ? cellEdit(p.aufmasscode || '', function(e){updatePosition(idx,'aufmasscode',e.target.value);}, {fontFamily:'monospace', fontWeight:'700', color:'var(--accent-blue)', textAlign:'center'})
-                                                : <div style={{fontFamily:'monospace', fontWeight:'700', fontSize:'12px', color: (p.aufmasscode ? 'var(--accent-blue)' : 'var(--text-muted)'), textAlign:'center', letterSpacing:'0.5px'}}>{p.aufmasscode || '\u2014'}</div>
+                                                : (p.aufmasscode
+                                                    ? <div style={{fontFamily:'monospace', fontWeight:'700', fontSize:'12px', color:'var(--accent-blue)', textAlign:'center', letterSpacing:'0.5px'}}>{p.aufmasscode}</div>
+                                                    : <div style={{textAlign:'center'}} title="Kein Aufmasz-Code gesetzt">
+                                                        <span style={{display:'inline-block', width:'8px', height:'8px', borderRadius:'50%', background:'#e74c3c', verticalAlign:'middle'}}></span>
+                                                    </div>
+                                                )
                                             }
                                             {editMode ? zahlInput(p.menge, function(v){updatePosition(idx,'menge',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(p.menge)}</div>}
                                             {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'12px', padding:'9px 4px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
@@ -277,6 +456,67 @@
                             </div>
                             {editMode && <button {...tap(addRaum)} style={Object.assign({width:'100%',padding:'10px',borderRadius:'10px',border:'2px dashed var(--accent-red)',background:'rgba(196,30,30,0.05)',color:'var(--accent-red-light)',fontSize:'13px',fontWeight:'700',cursor:'pointer',marginTop:'8px'},touchBase)}>+ Neuer Raum</button>}
                             {raeume.length === 0 && <div style={{textAlign:'center',padding:'40px 20px',color:'var(--text-muted)'}}><div style={{fontSize:'36px',marginBottom:'8px'}}>{'\uD83C\uDFE0'}</div><div>Keine Raeume</div></div>}
+                        </div>
+                    )}
+
+                    {/* ── BULK-CODE-VORSCHLAG-MODAL (Future Work \u00a714) ── */}
+                    {codeBulkOpen && (
+                        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, zIndex:9000, background:'rgba(0,0,0,0.75)', display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}
+                            onClick={function() { setCodeBulkOpen(false); }}>
+                            <div onClick={function(e) { e.stopPropagation(); }}
+                                style={{background:'var(--bg-primary)', borderRadius:'12px', padding:'20px', maxWidth:'640px', width:'100%', maxHeight:'85vh', overflow:'auto', border:'1px solid var(--border-color)'}}>
+                                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'12px'}}>
+                                    <div style={{fontSize:'17px', fontWeight:'700'}}>
+                                        {codeBulkQuelle === 'ki' ? '\uD83E\uDD16 KI-Code-Vorschlaege' : '\uD83C\uDFAF Heuristik-Code-Vorschlaege'}
+                                    </div>
+                                    <button onClick={function() { setCodeBulkOpen(false); }}
+                                        style={{background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'var(--text-muted)'}}>X</button>
+                                </div>
+                                {Object.keys(codeBulkVorschlaege).length === 0 ? (
+                                    <div style={{padding:'24px', textAlign:'center', color:'var(--text-muted)', fontSize:'13px'}}>
+                                        Keine Code-Vorschlaege erzeugt. Die {codeBulkQuelle === 'ki' ? 'KI' : 'Heuristik'} konnte fuer keine Position einen sicheren Code ableiten.
+                                    </div>
+                                ) : (
+                                    <React.Fragment>
+                                        <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'10px', lineHeight:'1.4'}}>
+                                            {Object.keys(codeBulkVorschlaege).length} Vorschlaege gefunden. Pruefen und einzeln deaktivieren wenn unpassend, dann uebernehmen.
+                                        </div>
+                                        <div style={{maxHeight:'50vh', overflowY:'auto', marginBottom:'12px'}}>
+                                            {positionen.map(function(p, idx) {
+                                                if (!codeBulkVorschlaege[idx]) return null;
+                                                var vorschCode = codeBulkVorschlaege[idx];
+                                                return (
+                                                    <div key={idx} style={{display:'grid', gridTemplateColumns:'60px 70px 1fr 70px 30px', gap:'8px', padding:'8px', fontSize:'12px', alignItems:'center', borderBottom:'1px solid var(--border-color)'}}>
+                                                        <div style={{fontWeight:'700'}}>{p.pos}</div>
+                                                        <div style={{fontFamily:'monospace', fontWeight:'700', textAlign:'center', color:'var(--accent-blue)', padding:'2px 6px', borderRadius:'4px', background:'rgba(30,136,229,0.10)'}}>{vorschCode}</div>
+                                                        <div style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.bez}>{p.bez}</div>
+                                                        <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>
+                                                        <button onClick={function() {
+                                                                setCodeBulkVorschlaege(function(prev) {
+                                                                    var n = Object.assign({}, prev);
+                                                                    delete n[idx];
+                                                                    return n;
+                                                                });
+                                                            }}
+                                                            title="Aus den Vorschlaegen entfernen"
+                                                            style={{background:'none', border:'none', color:'#e74c3c', fontSize:'14px', cursor:'pointer'}}>X</button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <div style={{display:'flex', gap:'8px'}}>
+                                            <button onClick={function() { setCodeBulkOpen(false); }}
+                                                style={{flex:1, padding:'12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'transparent', color:'var(--text-primary)', fontWeight:'700', cursor:'pointer'}}>
+                                                Abbrechen
+                                            </button>
+                                            <button onClick={applyCodeVorschlaege}
+                                                style={{flex:1, padding:'12px', borderRadius:'8px', border:'none', background:'#27ae60', color:'white', fontWeight:'700', cursor:'pointer'}}>
+                                                {Object.keys(codeBulkVorschlaege).length} Code(s) uebernehmen
+                                            </button>
+                                        </div>
+                                    </React.Fragment>
+                                )}
+                            </div>
                         </div>
                     )}
 
