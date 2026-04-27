@@ -97,6 +97,19 @@
                             );
                         })}
                     </div>
+
+                    {/* ═══ DRIVE-SYNC: Pro-Kunde Synchronisation ═══ */}
+                    {/* Sauberer Wrapper um TWStorage.DriveSync.syncKundenOrdner.
+                        Zeigt Phasen, Pending-Badge und letzten Sync-Zeitpunkt.
+                        Kein Confirm-Spam, alles inline. */}
+                    {kunde && (
+                        <div style={{marginTop:'18px', padding:'14px', background:'var(--bg-secondary)', borderRadius:'var(--radius-lg)', border:'1px solid var(--border-subtle)'}}>
+                            <div style={{fontSize:'10px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1.2px', marginBottom:'8px', fontFamily:'Oswald, sans-serif'}}>
+                                {'Datenstand mit Google Drive abgleichen'}
+                            </div>
+                            <KundenSyncButton kunde={kunde} compact={true} />
+                        </div>
+                    )}
                 </div>
             );
         }

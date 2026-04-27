@@ -3015,6 +3015,25 @@
                                     {'Nur lokal erstellte Dokumente \u2014 keine Google Drive Originale'}
                                 </div>
 
+                                {/* ═══ DRIVE-SYNC im Akte-Modal ═══ */}
+                                {/* Pro-Kunde Drive-Sync direkt aus der Akte heraus.
+                                    Bei Klick wird gegen die selben TWStorage-APIs synchronisiert,
+                                    danach laedt der Akte-Inhalt automatisch frisch nach. */}
+                                {selectedKunde && (
+                                    <div style={{marginBottom:'16px'}}>
+                                        <KundenSyncButton
+                                            kunde={selectedKunde}
+                                            compact={true}
+                                            onSyncComplete={function() {
+                                                // Akte-Inhalt nach Sync neu laden
+                                                if (window._akteOeffnenHandler) {
+                                                    setTimeout(function() { window._akteOeffnenHandler(); }, 300);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                )}
+
                                 {/* WIP-Eintraege (Bearbeitungsstaende) */}
                                 {akteData.wips && akteData.wips.length > 0 && (
                                     <div style={{marginBottom:'16px'}}>

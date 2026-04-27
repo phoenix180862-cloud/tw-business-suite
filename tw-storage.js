@@ -416,6 +416,29 @@
     }
 
     // ================================================================
+    // KUNDEN-ORDNER-STATUS — Gegen Single-Source-of-Truth window.DRIVE_ORDNER
+    // ================================================================
+    //
+    // Diagnose-Helfer: Welche Drive-Kundenordner sind lokal bereits gespiegelt
+    // und welche fehlen noch? Verwendet AUSSCHLIESSLICH window.DRIVE_ORDNER aus
+    // tw-infrastructure.js — keine eigene Ordner-Liste, damit es keine Drift
+    // gegenueber Drive geben kann (siehe Memory-Eintrag 18.04.2026).
+    //
+    // Liefert: { existing: [Ordnernamen], missing: [Ordnernamen], all: [Ordnernamen] }
+    function ensureKundenOrdner(kundeId) {
+        var driveOrdner = (typeof global !== 'undefined' && global.DRIVE_ORDNER) || (typeof window !== 'undefined' && window.DRIVE_ORDNER) || {};
+        var alleOrdnerNamen = Object.keys(driveOrdner).map(function(k) { return driveOrdner[k]; }).filter(function(n) { return !!n; });
+        return getByIndex('driveOrdner', 'kundeId', kundeId).then(function(localOrdner) {
+            var lokaleNamen = (localOrdner || []).map(function(o) { return o.name; });
+            var existing = alleOrdnerNamen.filter(function(n) { return lokaleNamen.indexOf(n) >= 0; });
+            var missing = alleOrdnerNamen.filter(function(n) { return lokaleNamen.indexOf(n) < 0; });
+            return { existing: existing, missing: missing, all: alleOrdnerNamen };
+        }).catch(function() {
+            return { existing: [], missing: alleOrdnerNamen, all: alleOrdnerNamen };
+        });
+    }
+
+    // ================================================================
     // FOTO-STORE — Bilder als Blobs in IndexedDB (persistent, effizient)
     // ================================================================
     //
@@ -2378,6 +2401,7 @@
         logSyncAction: logSyncAction, getUnsyncedChanges: getUnsyncedChanges, markAsSynced: markAsSynced,
         // Bearbeitungsstand (WIP)
         saveWip: saveWip, loadWip: loadWip, deleteWip: deleteWip, listWips: listWips, hasWip: hasWip,
+        ensureKundenOrdner: ensureKundenOrdner,
         // Foto-Store (Blobs, persistent, Multi-Geraete-faehig)
         saveFoto: saveFoto, updateFoto: updateFoto,
         loadFotoAsDataURL: loadFotoAsDataURL,
