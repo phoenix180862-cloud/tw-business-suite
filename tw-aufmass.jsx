@@ -6245,6 +6245,11 @@
                 });
             });
             const [expandedPos, setExpandedPos] = useState(null);
+            // ── Quick-Edit-Bearbeitungsleiste (Tab 3, vor Raum-Zusammenfassung) ──
+            const [quickEditOpen, setQuickEditOpen] = useState(null); // pos-string oder null
+            // ── Aufmasz-Wiederaufnahme-Dialog + Dirty-Flag (Etappe 6) ──
+            const [wipResumeDialog, setWipResumeDialog] = useState(null); // {savedAt, meta} oder null
+            const [aufmassDirty, setAufmassDirty] = useState(false);
 
             // ── Manueller Rechenweg Modal ──
             const [rwModalPos, setRwModalPos] = useState(null); // pos.pos oder null
@@ -6762,8 +6767,81 @@
                 return kat; // Default: eigene Kategorie
             };
 
+            // ── Aufmasz-Code-System (Prioritaet vor pos.kategorie) ──
+            // Codes: W, B, M, St, MU, AW, AB, S, AS — siehe SKILL-aufmasscode-system.md
+            // Eingabe in der Daten-Uebersicht (Spalte "Code"), Auswertung hier.
+            const VALID_AUFMASS_CODES = ['W','B','M','St','MU','AW','AB','S','AS'];
+            const resolveAufmassCode = (pos) => {
+                const raw = String((pos && pos.aufmasscode) || '').trim();
+                if (!raw) return '';
+                const upper = raw.toUpperCase();
+                if (upper === 'ST') return 'St';
+                if (upper === 'MU') return 'MU';
+                if (upper === 'AW') return 'AW';
+                if (upper === 'AB') return 'AB';
+                if (upper === 'AS') return 'AS';
+                if (VALID_AUFMASS_CODES.indexOf(upper) >= 0) return upper;
+                return '';
+            };
+            // Mappt Codes auf eine virtuelle pos-Struktur, damit die bestehende
+            // Rechenweg- und Berechnungs-Logik unveraendert greift.
+            // Rueckgabe: neue pos-Kopie mit ueberschriebenen kategorie/tags ODER null
+            const codeToVirtualPos = (pos, code) => {
+                if (!code) return null;
+                switch(code) {
+                    case 'W':  return { ...pos, kategorie: 'wand',       tags: [] };
+                    case 'B':  return { ...pos, kategorie: 'boden',      tags: [] };
+                    case 'AW': return { ...pos, kategorie: 'abdichtung', tags: ['wand'] };
+                    case 'AB': return { ...pos, kategorie: 'abdichtung', tags: ['boden'] };
+                    case 'S':  return { ...pos, kategorie: 'sockel',     tags: [] };
+                }
+                return null; // M, St, MU, AS werden separat behandelt (kein bestehender Kategorie-Match)
+            };
+
             // ── Rechenweg-Generator (VOB-konform) ──
             const buildRechenweg = (pos) => {
+                // ── Aufmasz-Code-Vorrang ──
+                const _aCode = resolveAufmassCode(pos);
+                if (_aCode) {
+                    // MU = Meter Umfang
+                    if (_aCode === 'MU') {
+                        const umf = isMultiWall ? perimeter : 2 * (L + B);
+                        const formel = isMultiWall
+                            ? wandMasse.map(w => fmtDe(parseMass(w.l))).join(' + ')
+                            : '2 \u00d7 (' + fmtDe(L) + ' + ' + fmtDe(B) + ')';
+                        return [{ label: 'Meter Umfang', formel: formel, ergebnis: fmtDe(umf) + ' m', type: 'umfang', sign: 1 }];
+                    }
+                    // M = Meter manuell, St = Stueck manuell
+                    if (_aCode === 'M' || _aCode === 'St') {
+                        const m = parseMass(pos.manualMenge);
+                        return [{
+                            label: _aCode === 'M' ? 'Meter manuell' : 'Stueck',
+                            formel: m > 0 ? 'manuelle Eingabe' : 'noch nicht eingegeben',
+                            ergebnis: fmtDe(m) + (_aCode === 'M' ? ' m' : ' Stk'),
+                            type: 'manuell', sign: 1
+                        }];
+                    }
+                    // AS = Abdichtung Sockel
+                    if (_aCode === 'AS') {
+                        const sockelStrecke = sockelErgebnis;
+                        const istLfm = (pos.einheit === 'm' || pos.einheit === 'lfm');
+                        if (istLfm) {
+                            return [{ label: 'Abdichtung Sockel (Strecke)', formel: 'Sockel-Strecke', ergebnis: fmtDe(sockelStrecke) + ' m', type: 'sockel', sign: 1 }];
+                        }
+                        const sH = (typeof sockelHoehe !== 'undefined' && parseMass(sockelHoehe) > 0)
+                            ? parseMass(sockelHoehe) : 0.10;
+                        return [
+                            { label: 'Sockel-Strecke', formel: 'aus Sockel-Berechnung', ergebnis: fmtDe(sockelStrecke) + ' m', type: 'sockel', sign: 1 },
+                            { label: 'Sockelhoehe', formel: fmtDe(sH) + ' m', ergebnis: fmtDe(sH) + ' m', type: 'sockel-hoehe', sign: 1 },
+                            { label: 'Abdichtungsflaeche', formel: fmtDe(sockelStrecke) + ' \u00d7 ' + fmtDe(sH), ergebnis: fmtDe(vobRound(sockelStrecke * sH)) + ' m\u00b2', type: 'sockel-flaeche', sign: 1 }
+                        ];
+                    }
+                    // W, B, AW, AB, S: virtueller pos mit ueberschriebener kategorie/tags
+                    const _virt = codeToVirtualPos(pos, _aCode);
+                    if (_virt) {
+                        pos = _virt; // bestehende Logik unten laeuft normal weiter
+                    }
+                }
                 const steps = [];
                 const kat = pos.kategorie;
                 const isAbdWand = kat === 'abdichtung' && (pos.tags && pos.tags.includes('wand'));
@@ -7286,6 +7364,71 @@
                 const posSonstAbzugSum = posSonst.filter(a => a.vobVorzeichen === 'abzug').reduce((s, a) => s + a.flaeche, 0);
                 const posSonstZurechSum = posSonst.filter(a => a.vobVorzeichen === 'zurechnung').reduce((s, a) => s + a.flaeche, 0);
 
+                // ── Aufmasz-Code-Switch (Prioritaet vor pos.kategorie) ──
+                const _aCode = resolveAufmassCode(pos);
+                if (_aCode) {
+                    switch(_aCode) {
+                        case 'W': {
+                            const wAbzug = wandAbzugItems.reduce((s, a) => s + a.flaeche, 0) + posSonstAbzugSum;
+                            const wZurech = wandLaibungen.reduce((s, a) => s + a.laibFlaeche, 0) + posSonstZurechSum;
+                            return vobRound(Math.max(0, wandflaeche - wAbzug + wZurech));
+                        }
+                        case 'B':
+                            return vobRound(Math.max(0, bodenBasis - posSonstAbzugSum + posSonstZurechSum));
+                        case 'M':
+                        case 'St':
+                            // manualMenge wird oben bereits ausgewertet (Prio 2). Wenn wir hier
+                            // ankommen, ist nichts manuelles eingegeben — Ergebnis 0.
+                            return 0;
+                        case 'MU': {
+                            const umf = isMultiWall ? perimeter : 2 * (L + B);
+                            return vobRound(umf);
+                        }
+                        case 'AW': {
+                            const useH = AH > 0 ? AH : H;
+                            const useFlaeche = AH > 0 ? abdichtungWandflaeche : wandflaeche;
+                            let aAbzug = 0;
+                            wandAbzugItems.forEach(a => {
+                                if (a.typ === 'tuer') {
+                                    aAbzug += (a.hVal > useH) ? a.bVal * useH : a.bVal * a.hVal;
+                                } else if (a.typ === 'fenster') {
+                                    const brH = a.brVal || 0;
+                                    const gesamtH = brH + a.hVal;
+                                    const effH = (gesamtH > useH && useH > 0) ? Math.max(0, a.hVal - (gesamtH - useH)) : a.hVal;
+                                    aAbzug += effH * a.bVal;
+                                } else {
+                                    aAbzug += a.flaeche;
+                                }
+                            });
+                            aAbzug += posSonstAbzugSum;
+                            let aZurech = 0;
+                            wandLaibungen.forEach(a => {
+                                if (a.typ === 'tuer' || a.typ === 'fenster') {
+                                    aZurech += a.laibAbdichtung || 0;
+                                } else {
+                                    aZurech += a.laibFlaeche;
+                                }
+                            });
+                            aZurech += posSonstZurechSum;
+                            return vobRound(Math.max(0, useFlaeche - aAbzug + aZurech));
+                        }
+                        case 'AB':
+                            return vobRound(Math.max(0, bodenBasis - posSonstAbzugSum + posSonstZurechSum));
+                        case 'S':
+                            return sockelErgebnis;
+                        case 'AS': {
+                            const sockelStrecke = sockelErgebnis;
+                            if (pos.einheit === 'm' || pos.einheit === 'lfm') {
+                                return vobRound(sockelStrecke);
+                            }
+                            const sH = (typeof sockelHoehe !== 'undefined' && parseMass(sockelHoehe) > 0)
+                                ? parseMass(sockelHoehe) : 0.10;
+                            return vobRound(sockelStrecke * sH);
+                        }
+                    }
+                }
+                // ── Falls kein Code gesetzt: weiter mit bestehender kategorie-Logik ──
+
                 switch(pos.kategorie) {
                     case 'wand': {
                         const wAbzug = wandAbzugItems.reduce((s, a) => s + a.flaeche, 0) + posSonstAbzugSum;
@@ -7586,6 +7729,7 @@
                 handleFinishRaumValidated(() => {
                     const payload = buildRaumFinishPayload();
                     onFinishRaum((raum && raum.nr), payload);
+                    setAufmassDirty(false); // Etappe 6: Dirty-Flag nach Save zuruecksetzen
                 });
             };
 
@@ -7594,6 +7738,7 @@
                 handleFinishRaumValidated(() => {
                     const payload = buildRaumFinishPayload();
                     onFinishRaum((raum && raum.nr), payload);
+                    setAufmassDirty(false); // Etappe 6: Dirty-Flag nach Save zuruecksetzen
                     // Aufmass beenden nach State-Update -- navigiert automatisch zum Rechnungsmodul
                     setTimeout(() => onAufmassBeenden && onAufmassBeenden(), 100);
                 });
@@ -8914,6 +9059,54 @@
                 setExpandedPos(prev => prev === posNr ? null : posNr);
             };
 
+            // ── Quick-Edit: manualMenge fuer Position aktualisieren ──
+            const updatePosManualMenge = (posNr, value) => {
+                setPosCards(prev => prev.map(p =>
+                    p.pos === posNr ? { ...p, manualMenge: value } : p
+                ));
+                setAufmassDirty(true);
+            };
+            // ── Quick-Edit: Positionen in Rechnung uebernehmen (= Raumblatt fertigstellen) ──
+            const onPositionenInRechnungUebernehmen = () => {
+                const offene = posCards.filter(p => calcPositionResult(p) === 0);
+                if (offene.length > 0) {
+                    const ok = window.confirm(
+                        offene.length + ' Position(en) ohne Wert. Trotzdem in Rechnung uebernehmen?'
+                    );
+                    if (!ok) return;
+                }
+                setQuickEditOpen(null);
+                // Bestehende Raumblatt-Speicher-Logik nutzen
+                if (raumblattActionsRef && raumblattActionsRef.current && raumblattActionsRef.current.doRaumblattFertigstellen) {
+                    raumblattActionsRef.current.doRaumblattFertigstellen();
+                }
+            };
+
+            // ── Foto-Persistenz: "Fotos endgueltig speichern und Felder leeren" ──
+            const onFotosEndgueltigSpeichern = async () => {
+                const ok = window.confirm(
+                    'Alle Fotos werden in Drive gesichert und aus den Aufnahme-Feldern entfernt.\n\n' +
+                    'Bereits gespeicherte Fotos bleiben unangetastet.\n\n' +
+                    'Fortfahren?'
+                );
+                if (!ok) return;
+                try {
+                    // 1) Drive-Sync forcieren falls FotoSync verfuegbar
+                    if (window.FotoSync && typeof window.FotoSync.syncKunde === 'function' && kunde && kunde.id) {
+                        await window.FotoSync.syncKunde(kunde.id);
+                    }
+                    // 2) Lokale Aufnahme-Slots leeren — phasenFotos-Struktur initial herstellen
+                    const cleared = {};
+                    FOTO_PHASEN.forEach(function(phase) { cleared[phase.key] = {}; });
+                    setPhasenFotos(cleared);
+                    setAufmassDirty(false);
+                    // 3) UI-Feedback
+                    alert('Fotos gesichert. Aufnahme-Felder sind nun leer fuer neue Aufnahmen.');
+                } catch (err) {
+                    alert('Fehler beim Speichern: ' + (err && err.message ? err.message : err));
+                }
+            };
+
             // Canvas drawing
             // ── Auto-Sync: Wenn Fenster/Tueren/Raummasse sich aendern, aktive Edits aktualisieren ──
             const getFingerprint = () => {
@@ -10003,6 +10196,66 @@
                                     onClick={function() { setEmpfindlichkeitPopupOpen(false); }}>
                                     Uebernehmen
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ AUFMASZ-WARNSCHILD (Etappe 6: Datenverlust-Schutz) ═══ */}
+                    {aufmassDirty && (
+                        <div style={{
+                            position:'fixed', top:'88px', right:'12px', zIndex:9999,
+                            padding:'8px 12px', borderRadius:'8px',
+                            background:'rgba(231,76,60,0.95)', color:'white',
+                            fontSize:'12px', fontWeight:'700',
+                            boxShadow:'0 4px 12px rgba(0,0,0,0.2)',
+                            cursor:'pointer', maxWidth:'220px', lineHeight:'1.3'
+                        }}
+                            onClick={function() {
+                                if (raumblattActionsRef && raumblattActionsRef.current && raumblattActionsRef.current.doRaumblattFertigstellen) {
+                                    raumblattActionsRef.current.doRaumblattFertigstellen();
+                                }
+                            }}
+                            title="Klicken zum Sichern">
+                            \u26A0 Ungespeicherte Aenderungen \u2014 jetzt sichern
+                        </div>
+                    )}
+
+                    {/* ═══ AUFMASZ-WIEDERAUFNAHME-DIALOG (Etappe 6) ═══ */}
+                    {wipResumeDialog && (
+                        <div className="modal-overlay" style={{zIndex:10001}}>
+                            <div className="modal" style={{maxWidth:'480px'}}>
+                                <div style={{padding:'20px'}}>
+                                    <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'12px'}}>
+                                        \uD83D\uDD04 Bearbeitung fortsetzen?
+                                    </div>
+                                    <div style={{fontSize:'14px', lineHeight:'1.5', marginBottom:'16px'}}>
+                                        Vom letzten Aufmasz wurde ein Bearbeitungsstand gefunden:
+                                        <div style={{marginTop:'10px', padding:'10px', borderRadius:'8px', background:'var(--bg-secondary)', fontSize:'13px'}}>
+                                            <div><strong>Letzter Stand:</strong> {wipResumeDialog.savedAt ? new Date(wipResumeDialog.savedAt).toLocaleString('de-DE') : '\u2014'}</div>
+                                            {wipResumeDialog.meta && wipResumeDialog.meta.raeume_count !== undefined && (
+                                                <div><strong>Raeume:</strong> {wipResumeDialog.meta.raeume_count}</div>
+                                            )}
+                                            {wipResumeDialog.meta && wipResumeDialog.meta.letzte_aenderung && (
+                                                <div><strong>Letzte Aenderung:</strong> {wipResumeDialog.meta.letzte_aenderung}</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div style={{display:'flex', gap:'8px'}}>
+                                        <button onClick={function() {
+                                                if (window.TW && window.TW.emit && wipResumeDialog._wip) {
+                                                    window.TW.emit('wip:restoreState', { modulName: 'aufmass', moduleState: wipResumeDialog._wip.moduleState });
+                                                }
+                                                setWipResumeDialog(null);
+                                            }}
+                                            style={{flex:1, padding:'12px', borderRadius:'8px', border:'none', background:'#27ae60', color:'white', fontWeight:'700', cursor:'pointer'}}>
+                                            Fortsetzen
+                                        </button>
+                                        <button onClick={function() { setWipResumeDialog(null); }}
+                                            style={{padding:'12px 16px', borderRadius:'8px', border:'1px solid #e74c3c', background:'transparent', color:'#e74c3c', fontWeight:'700', cursor:'pointer'}}>
+                                            Verwerfen
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -11839,6 +12092,21 @@
                                 </div>
                             </div>
 
+                            {/* ═══ FOTOS ENDGUELTIG SPEICHERN UND FELDER LEEREN ═══ */}
+                            <div style={{marginTop:'16px', padding:'12px', borderRadius:'10px',
+                                background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.3)'}}>
+                                <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px', lineHeight:'1.4'}}>
+                                    Wenn alle Fotos dieses Raumblatts zur Sicherung in Drive uebertragen
+                                    und die Aufnahme-Felder geleert werden sollen:
+                                </div>
+                                <button onClick={onFotosEndgueltigSpeichern}
+                                    style={{width:'100%', padding:'12px', borderRadius:'8px', border:'none',
+                                        background:'#e74c3c', color:'white', fontWeight:'700',
+                                        fontSize:'13px', cursor:'pointer', boxShadow:'0 2px 6px rgba(231,76,60,0.25)'}}>
+                                    \uD83D\uDCBE Fotos endgueltig speichern und Felder leeren
+                                </button>
+                            </div>
+
                             {/* ═══ CROP-MODAL ═══ */}
                             {cropState && (
                                 <div className="modal-overlay" style={{zIndex:5000}} onClick={() => setCropState(null)}>
@@ -12887,6 +13155,79 @@
                             );
                         })}
                     </div>
+
+                    {/* ═══ QUICK-EDIT-BEARBEITUNGSLEISTE (Aufmasz-Code-System) ═══ */}
+                    {posCards.length > 0 && (
+                        <div className="masse-section quick-edit-section" style={{marginTop:'16px'}}>
+                            <div className="masse-section-title" style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                                <span>\u270F\uFE0F Positions-Quick-Edit</span>
+                                <span style={{
+                                    fontSize:'10px', fontWeight:'400', color:'var(--text-muted)',
+                                    background:'rgba(30,136,229,0.10)', padding:'2px 6px', borderRadius:'4px'
+                                }}>Code-System</span>
+                            </div>
+                            {posCards.map(qPos => {
+                                const qErgebnis = calcPositionResult(qPos);
+                                const qCode = resolveAufmassCode(qPos);
+                                const qIstManuell = (qCode === 'M' || qCode === 'St');
+                                const qHatErgebnis = qErgebnis > 0;
+                                const qIsEditOpen = quickEditOpen === qPos.pos;
+                                return (
+                                    <div key={'qe_' + qPos.pos} className="quick-edit-card" style={{
+                                        padding:'10px 12px', borderRadius:'10px',
+                                        background:'var(--bg-secondary)', marginBottom:'8px',
+                                        border: qHatErgebnis ? '1px solid var(--border-color)' : '1px dashed var(--accent-orange)'
+                                    }}>
+                                        <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px'}}>
+                                            <span style={{
+                                                fontFamily:'monospace', fontWeight:'700',
+                                                fontSize:'11px', padding:'2px 6px', borderRadius:'4px',
+                                                background: qCode ? 'rgba(30,136,229,0.15)' : 'rgba(120,120,120,0.10)',
+                                                color: qCode ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                                minWidth:'34px', textAlign:'center', letterSpacing:'0.5px'
+                                            }}>{qCode || '\u2014'}</span>
+                                            <span style={{fontWeight:'700', fontSize:'13px'}}>Pos. {qPos.pos}</span>
+                                            <span style={{fontSize:'12px', color:'var(--text-muted)', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{qPos.bez}</span>
+                                        </div>
+                                        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px'}}>
+                                            <span style={{
+                                                fontSize:'14px', fontWeight:'700',
+                                                color: qHatErgebnis ? '#27ae60' : 'var(--accent-orange)'
+                                            }}>
+                                                {qHatErgebnis
+                                                    ? fmtDe(qErgebnis) + ' ' + (qPos.einheit || '')
+                                                    : (qIstManuell ? 'manuell eingeben' : '0 ' + (qPos.einheit || ''))}
+                                            </span>
+                                            <button onClick={() => setQuickEditOpen(qIsEditOpen ? null : qPos.pos)}
+                                                style={{padding:'6px 12px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'transparent', cursor:'pointer', fontSize:'12px', color:'var(--text-primary)'}}>
+                                                {qIsEditOpen ? 'Schliessen' : 'Bearbeiten'}
+                                            </button>
+                                        </div>
+                                        {qIsEditOpen && (
+                                            <div style={{marginTop:'8px', paddingTop:'8px', borderTop:'1px solid var(--border-color)'}}>
+                                                <input
+                                                    type="text" inputMode="numeric"
+                                                    value={qPos.manualMenge || ''}
+                                                    onChange={e => updatePosManualMenge(qPos.pos, e.target.value)}
+                                                    placeholder={'z.B. ' + (qHatErgebnis ? fmtDe(qErgebnis) : '0')}
+                                                    style={{width:'100%', padding:'10px', borderRadius:'8px', border:'1px solid var(--accent-blue)', fontSize:'14px', boxSizing:'border-box', background:'var(--bg-primary)', color:'var(--text-primary)'}}
+                                                />
+                                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'4px'}}>
+                                                    {qIstManuell
+                                                        ? 'Eingabe in ' + (qPos.einheit || '')
+                                                        : 'Eingabe ueberschreibt automatischen Wert'}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            <button onClick={onPositionenInRechnungUebernehmen}
+                                style={{width:'100%', marginTop:'10px', padding:'14px', borderRadius:'10px', border:'none', background:'#27ae60', color:'white', fontWeight:'700', fontSize:'14px', cursor:'pointer', boxShadow:'0 2px 8px rgba(39,174,96,0.3)'}}>
+                                \u2713 OK \u2014 in Rechnung uebernehmen
+                            </button>
+                        </div>
+                    )}
 
                     {/* Gesamtuebersicht */}
                     {posCards.length > 0 && (
