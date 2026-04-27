@@ -10009,13 +10009,14 @@
 
                     {/* ═══════════════════════════════════════════════════════════════════ */}
                     {/* QUICK-TOOLBAR (NEU 27.04.2026): blaue Schnellzugriffs-Leiste oben     */}
-                    {/* Sichtbar NUR auf Tab 0 (Grundriss) + Tab 3 (Positionen).             */}
+                    {/* Sichtbar auf ALLEN Raumblatt-Tabs (0,1,3,4) — sonst kommt der User   */}
+                    {/* von Tab 1/4 nicht mehr zurueck zu Grundriss (Korrektur 27.04.2026).  */}
                     {/* Ersetzt das frueher im Bearbeiten-Dropdown verschachtelte "Tabs"-    */}
                     {/* Submenue. Inhalt: Grundriss / Wand-Fotos / Objekte / Positionen +    */}
                     {/* Wandanzahl-Toggle + Masse-kopieren-Toggle.                            */}
                     {/* "Oeffnungen" wurde bewusst entfernt, da der Inhalt auf Tab 0 wandert.*/}
                     {/* ═══════════════════════════════════════════════════════════════════ */}
-                    {(rbTab === 0 || rbTab === 3) && (
+                    {(
                         <div className="raumblatt-quick-toolbar" style={{
                             position:'sticky', top:'120px', zIndex:98,
                             background:'var(--bg-primary)',
