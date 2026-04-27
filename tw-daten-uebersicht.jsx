@@ -35,9 +35,11 @@
             });
             // Positionen: bevorzugt aus _masterPositionen lesen (Trennung Daten <-> Aufmass)
             // Fallback: importResult.positionen, dann kunde._lvPositionen
+            // NEU 27.04.2026: aufmasscode-Feld wird mitgefuehrt (vom User selbst eingetragen,
+            // erlaubt spaetere Zuordnung von Aufmasz-Werten zur richtigen LV-Position).
             var allPos = (kunde && kunde._masterPositionen) || (ir.positionen) || (kunde && kunde._lvPositionen) || [];
             var [positionen, setPositionen] = useState(allPos.map(function(p, idx) {
-                return { _idx: idx, pos: p.pos || '', bez: p.bez || '', einheit: p.einheit || 'm\u00b2', menge: p.menge || 0, einzelpreis: p.einzelpreis || 0, kategorie: p.kategorie || '', _istNachtrag: p._istNachtrag || false };
+                return { _idx: idx, pos: p.pos || '', aufmasscode: p.aufmasscode || '', bez: p.bez || '', einheit: p.einheit || 'm\u00b2', menge: p.menge || 0, einzelpreis: p.einzelpreis || 0, kategorie: p.kategorie || '', _istNachtrag: p._istNachtrag || false };
             }));
             // Raeume: bevorzugt aus _masterRaeume lesen
             var allRaeume = (kunde && kunde._masterRaeume) || (ir.raeume) || (kunde && kunde._raeume) || [];
@@ -52,7 +54,7 @@
             // CRUD
             var updateStammFeld = function(key, val) { setStammFelder(function(prev) { var n = Object.assign({}, prev); n[key] = val; return n; }); };
             var updatePosition = function(idx, field, val) { setPositionen(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
-            var addPosition = function() { setPositionen(function(prev) { return prev.concat([{ _idx: prev.length, pos: '', bez: '', einheit: 'm\u00b2', menge: 0, einzelpreis: 0, kategorie: '', _istNachtrag: false }]); }); };
+            var addPosition = function() { setPositionen(function(prev) { return prev.concat([{ _idx: prev.length, pos: '', aufmasscode: '', bez: '', einheit: 'm\u00b2', menge: 0, einzelpreis: 0, kategorie: '', _istNachtrag: false }]); }); };
             var removePosition = function(idx) { if (!confirm('Position ' + (positionen[idx].pos || idx+1) + ' loeschen?')) return; setPositionen(function(prev) { return prev.filter(function(_, i) { return i !== idx; }); }); };
             var updateRaum = function(idx, field, val) { setRaeume(function(prev) { var n = prev.slice(); n[idx] = Object.assign({}, n[idx]); n[idx][field] = val; return n; }); };
             var addRaum = function() { setRaeume(function(prev) { return prev.concat([{ _idx: prev.length, nr: '', bez: '', geschoss: 'EG', flaeche: 0, umfang: 0, bemerkung: '' }]); }); };
@@ -102,6 +104,8 @@
             };
 
             // ── Zahl-Input: type=text, beim Focus leeren wenn 0, beim Blur formatieren ──
+            // VERGROESSERT 27.04.2026: padding/fontSize stark erhoeht damit auch 4-5-stellige
+            // Zahlen mit Nachkommastellen vollstaendig sichtbar bleiben (vorher abgeschnitten).
             var zahlInput = function(value, onChange, extra) {
                 return React.createElement('input', Object.assign({
                     type: 'text',
@@ -118,7 +122,7 @@
                         e.target.value = parsed === 0 ? '' : fmtZahl(parsed);
                         onChange(parsed);
                     },
-                    style: Object.assign({ width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', textAlign:'right', color:'var(--text-primary)', boxSizing:'border-box' }, extra || {})
+                    style: Object.assign({ width:'100%', padding:'9px 8px', borderRadius:'6px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'14px', fontWeight:'600', textAlign:'right', color:'var(--text-primary)', boxSizing:'border-box', fontFamily:'monospace', minHeight:'34px' }, extra || {})
                 }));
             };
 
@@ -152,7 +156,8 @@
                     </div>
                 );
             };
-            var cellEdit = function(val, onChange, extra) { return <input value={val} onChange={onChange} style={Object.assign({width:'100%', padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}, extra || {})} />; };
+            // VERGROESSERT 27.04.2026: padding/fontSize hoch fuer bessere Lesbarkeit
+            var cellEdit = function(val, onChange, extra) { return <input value={val} onChange={onChange} style={Object.assign({width:'100%', padding:'9px 8px', borderRadius:'6px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'14px', color:'var(--text-primary)', boxSizing:'border-box', minHeight:'34px'}, extra || {})} />; };
 
             return (
                 <div style={{padding:'12px 16px', minHeight:'100vh', background:'var(--bg-primary)', paddingBottom:'180px'}}>
@@ -194,33 +199,45 @@
 
                     {activeTab === 'positionen' && (
                         <div style={{overflowX:'auto'}}>
-                            <div style={{minWidth:'580px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'6px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
-                                    <div>Pos-Nr.</div><div style={{textAlign:'right'}}>Menge</div><div style={{textAlign:'center'}}>Einh.</div><div>Leistungsbeschreibung</div><div style={{textAlign:'right'}}>EP netto</div><div style={{textAlign:'right'}}>GP netto</div>
+                            <div style={{minWidth: editMode ? '720px' : '610px'}}>
+                                <div style={{display:'grid', gridTemplateColumns: editMode ? '70px 90px 110px 55px 1fr 120px 105px 32px' : '60px 70px 80px 45px 1fr 95px 95px', gap:'4px', padding:'8px 8px', fontSize:'10px', fontWeight:'700', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px', borderBottom:'2px solid var(--border-color)', marginBottom:'4px'}}>
+                                    <div>Pos-Nr.</div>
+                                    <div title="Code zur Zuordnung der Aufmasz-Werte zu dieser Position" style={{color:'var(--accent-blue)'}}>Code</div>
+                                    <div style={{textAlign:'right'}}>Menge</div>
+                                    <div style={{textAlign:'center'}}>Einh.</div>
+                                    <div>Leistungsbeschreibung</div>
+                                    <div style={{textAlign:'right'}}>EP netto</div>
+                                    <div style={{textAlign:'right'}}>GP netto</div>
+                                    {editMode && <div></div>}
                                 </div>
                                 {positionen.map(function(p, idx) {
                                     var gp = Math.round((p.menge || 0) * (p.einzelpreis || 0) * 100) / 100;
                                     return (
-                                        <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '58px 60px 42px 1fr 78px 88px 28px' : '58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'5px 8px', fontSize:'12px', alignItems:'center', background: p._istNachtrag ? 'rgba(230,126,34,0.06)' : (idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent'), borderBottom:'1px solid var(--border-color)', borderLeft: p._istNachtrag ? '3px solid #e67e22' : '3px solid transparent'}}>
+                                        <div key={idx} style={{display:'grid', gridTemplateColumns: editMode ? '70px 90px 110px 55px 1fr 120px 105px 32px' : '60px 70px 80px 45px 1fr 95px 95px', gap:'4px', padding: editMode ? '7px 8px' : '5px 8px', fontSize:'12px', alignItems:'center', background: p._istNachtrag ? 'rgba(230,126,34,0.06)' : (idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent'), borderBottom:'1px solid var(--border-color)', borderLeft: p._istNachtrag ? '3px solid #e67e22' : '3px solid transparent'}}>
                                             {editMode ? cellEdit(p.pos, function(e){updatePosition(idx,'pos',e.target.value);}, {fontWeight:'700'}) : <div style={{fontWeight:'700', fontSize:'11px', color: p._istNachtrag ? '#e67e22' : 'var(--text-primary)'}}>{p.pos}</div>}
+                                            {editMode
+                                                ? cellEdit(p.aufmasscode || '', function(e){updatePosition(idx,'aufmasscode',e.target.value);}, {fontFamily:'monospace', fontWeight:'700', color:'var(--accent-blue)', textAlign:'center'})
+                                                : <div style={{fontFamily:'monospace', fontWeight:'700', fontSize:'12px', color: (p.aufmasscode ? 'var(--accent-blue)' : 'var(--text-muted)'), textAlign:'center', letterSpacing:'0.5px'}}>{p.aufmasscode || '\u2014'}</div>
+                                            }
                                             {editMode ? zahlInput(p.menge, function(v){updatePosition(idx,'menge',v);}) : <div style={{textAlign:'right', fontSize:'11px'}}>{fmtZahl(p.menge)}</div>}
-                                            {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'10px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
+                                            {editMode ? cellEdit(p.einheit, function(e){updatePosition(idx,'einheit',e.target.value);}, {textAlign:'center', fontSize:'12px', padding:'9px 4px'}) : <div style={{textAlign:'center', fontSize:'10px', color:'var(--text-muted)'}}>{p.einheit}</div>}
                                             {editMode ? (
                                                 <div style={{display:'flex', gap:'2px'}}>
-                                                    <input value={p.bez} onChange={function(e){updatePosition(idx,'bez',e.target.value);}} style={{flex:1, padding:'4px', borderRadius:'4px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'11px', color:'var(--text-primary)', boxSizing:'border-box'}} />
+                                                    <input value={p.bez} onChange={function(e){updatePosition(idx,'bez',e.target.value);}} style={{flex:1, padding:'9px 8px', borderRadius:'6px', border:'1px solid var(--accent-blue)', background:'var(--bg-tertiary)', fontSize:'13px', color:'var(--text-primary)', boxSizing:'border-box', minHeight:'34px'}} />
                                                     <MicButton fieldKey={'pos_bez_' + idx} size="small" onResult={function(text){ updatePosition(idx, 'bez', (p.bez ? p.bez + ' ' : '') + text); }} />
                                                 </div>
                                             ) : <div style={{fontSize:'11px', lineHeight:'1.3', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}} title={p.bez}>{p.bez}</div>}
                                             {editMode ? zahlInput(p.einzelpreis, function(v){updatePosition(idx,'einzelpreis',v);}) : <div style={{textAlign:'right', fontSize:'11px', fontFamily:'monospace'}}>{fmtEuro(p.einzelpreis)}</div>}
-                                            <div style={{textAlign:'right', fontSize:'11px', fontWeight:'600', fontFamily:'monospace'}}>{fmtEuro(gp)}</div>
-                                            {editMode && <button {...tap(function(){removePosition(idx);})} style={Object.assign({width:'24px',height:'24px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'11px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
+                                            <div style={{textAlign:'right', fontSize: editMode ? '12px' : '11px', fontWeight:'600', fontFamily:'monospace'}}>{fmtEuro(gp)}</div>
+                                            {editMode && <button {...tap(function(){removePosition(idx);})} style={Object.assign({width:'28px',height:'28px',borderRadius:'50%',border:'none',background:'rgba(231,76,60,0.15)',color:'#e74c3c',fontSize:'12px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0},touchBase)}>X</button>}
                                         </div>
                                     );
                                 })}
                                 {positionen.length > 0 && (
-                                    <div style={{display:'grid', gridTemplateColumns:'58px 60px 42px 1fr 78px 88px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
-                                        <div></div><div></div><div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>SUMME NETTO:</div><div></div>
+                                    <div style={{display:'grid', gridTemplateColumns: editMode ? '70px 90px 110px 55px 1fr 120px 105px 32px' : '60px 70px 80px 45px 1fr 95px 95px', gap:'4px', padding:'8px', fontSize:'12px', fontWeight:'700', borderTop:'2px solid var(--border-color)', marginTop:'4px'}}>
+                                        <div></div><div></div><div></div><div></div><div style={{textAlign:'right', color:'var(--text-muted)'}}>SUMME NETTO:</div><div></div>
                                         <div style={{textAlign:'right', fontFamily:'monospace', fontSize:'13px'}}>{fmtEuro(positionen.reduce(function(s,p){return s+Math.round((p.menge||0)*(p.einzelpreis||0)*100)/100;},0))}</div>
+                                        {editMode && <div></div>}
                                     </div>
                                 )}
                             </div>

@@ -813,7 +813,7 @@
                 if (result.positionen) {
                     var lvPos = result.positionen.map(function(p) {
                         return {
-                            pos: p.pos, bez: p.bez, einheit: p.einheit, menge: p.menge,
+                            pos: p.pos, aufmasscode: p.aufmasscode || '', bez: p.bez, einheit: p.einheit, menge: p.menge,
                             einzelpreis: p.einzelpreis, bereich: p.bereich || '', kategorie: p.kategorie || '',
                             tags: p.tags || [], _epPreis: p.einzelpreis || null, _gpPreis: (p.menge * p.einzelpreis) || null,
                             _istNachtrag: p._istNachtrag || false
@@ -904,6 +904,7 @@
                 var lvPosFormatted = data.positionen.map(function(p) {
                     return {
                         pos: p.posNr,
+                        aufmasscode: p.aufmasscode || '',
                         bez: p.leistung,
                         einheit: p.einheit || 'm\u00b2',
                         menge: p.menge || 0,
