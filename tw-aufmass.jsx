@@ -12084,7 +12084,7 @@
                                                         <div style={{fontSize:'10px', color:'var(--text-muted)', margin:'4px 2px 8px', fontStyle:'italic'}}>
                                                             Vorzeichen: <strong>{'-'}</strong> = Abzug, <strong>{'+'}</strong>/leer = Zurechnung. Wert hinter <strong>{'='}</strong>. Ohne <strong>{'='}</strong> wird die Formel ausgewertet.
                                                         </div>
-                                                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap'}}>
+                                                        <div style={{display:'flex', gap:'8px', flexWrap:'wrap', alignItems:'center'}}>
                                                             <button onClick={() => saveEditorText(pos.pos)}
                                                                 style={{padding:'10px 16px', borderRadius:'8px', border:'none', background:'#27ae60', color:'#fff', fontWeight:'700', fontSize:'13px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', boxShadow:'0 2px 6px rgba(39,174,96,0.30)'}}>
                                                                 {'\u2713'} Speichern
@@ -12093,6 +12093,64 @@
                                                                 style={{padding:'10px 16px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-tertiary)', color:'var(--text-secondary)', fontWeight:'600', fontSize:'13px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
                                                                 Abbrechen
                                                             </button>
+
+                                                            {/* NEU 28.04.2026: Mikrofon-Button für Spracheingabe in die Textarea.
+                                                                Konvertiert "komma/plus/minus/mal/geteilt durch" zu Operatoren und
+                                                                hängt das Ergebnis ans Ende der Textarea an. */}
+                                                            <div style={{display:'inline-flex', alignItems:'center', transform:'scale(1.25)', transformOrigin:'center', marginLeft:'4px'}}>
+                                                                <MicButton
+                                                                    fieldKey={'rwedit_' + pos.pos}
+                                                                    size="normal"
+                                                                    onResult={text => {
+                                                                        if (!text) return;
+                                                                        var formel = text
+                                                                            .replace(/\bkomma\b/gi, ',')
+                                                                            .replace(/\bpunkt\b/gi, '.')
+                                                                            .replace(/\bplus\b/gi, '+')
+                                                                            .replace(/\bminus\b/gi, '-')
+                                                                            .replace(/\bgeteilt durch\b/gi, '/')
+                                                                            .replace(/\bmal\b/gi, '*')
+                                                                            .replace(/\bx\b/gi, '*')
+                                                                            .replace(/\s+/g, ' ').trim();
+                                                                        setPosEditorText(prev => {
+                                                                            var current = prev[pos.pos] || '';
+                                                                            var separator = (current && !current.endsWith('\n')) ? '\n' : '';
+                                                                            return Object.assign({}, prev, { [pos.pos]: current + separator + formel });
+                                                                        });
+                                                                    }}
+                                                                />
+                                                            </div>
+
+                                                            {/* NEU 28.04.2026: Werte-löschen-Button — leert die Position komplett.
+                                                                Nützlich wenn Vorraum-Werte übernommen wurden, die für diesen
+                                                                Raum nicht relevant sind. Position bleibt mit Pos-Nr/Bezeichnung,
+                                                                Ergebnis wird 0 (cleared-Flag). */}
+                                                            <button onClick={() => {
+                                                                if (!window.confirm('Werte für Position ' + pos.pos + ' wirklich löschen?\n\nDer Rechenweg wird komplett geleert.')) return;
+                                                                setPosEditorText(prev => Object.assign({}, prev, { [pos.pos]: '' }));
+                                                                setPosCards(prevCards => prevCards.map(pc => pc.pos === pos.pos ? Object.assign({}, pc, {
+                                                                    cleared: true,
+                                                                    manualRechenweg: [],
+                                                                    manualErgebnis: 0,
+                                                                    manualMenge: '',
+                                                                    hasManualRW: false
+                                                                }) : pc));
+                                                                setPosEditorOpen(null);
+                                                            }}
+                                                            title="Alle Werte und Berechnungen für diese Position löschen"
+                                                            style={{
+                                                                padding:'10px 16px', borderRadius:'8px',
+                                                                border:'2px solid var(--accent-red)',
+                                                                background:'rgba(196,30,30,0.10)',
+                                                                color:'var(--accent-red-light)',
+                                                                fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                                                fontWeight:'700', cursor:'pointer',
+                                                                textTransform:'uppercase', letterSpacing:'0.5px',
+                                                                display:'inline-flex', alignItems:'center', gap:'6px'
+                                                            }}>
+                                                                🗑️ Werte löschen
+                                                            </button>
+
                                                             {pos.hasManualRW && (
                                                                 <button onClick={() => resetToAutoEditor(pos.pos)}
                                                                     style={{padding:'10px 16px', borderRadius:'8px', border:'1px solid var(--accent-orange)', background:'rgba(243,156,18,0.10)', color:'var(--accent-orange)', fontWeight:'600', fontSize:'12px', cursor:'pointer', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px', marginLeft:'auto'}}>
@@ -12109,6 +12167,101 @@
                             )}
                         </div>
                     )}
+
+                    {/* ═══ NEU 28.04.2026: Aktionen-Button-Leiste UNTER den Positionen (Tab 0) ═══
+                         Diese Buttons waren vormals im "Bearbeiten" → "Aktionen" Submenu
+                         und sind nun direkt in Tab 0 sichtbar, wo der User arbeitet.
+                         Reihenfolge nach Workflow-Logik:
+                         1. Raumblatt rechnen (Vorschau)  2. Raumblatt fertigstellen (speichern)
+                         3. Aufmass fertigstellen (Endabschluss)  4. Gesamtliste (alle Räume) */}
+                    <div style={{
+                        marginTop:'18px',
+                        padding:'14px',
+                        background:'var(--bg-secondary)',
+                        border:'1px solid var(--border-color)',
+                        borderRadius:'12px'
+                    }}>
+                        <div style={{
+                            fontSize:'11px', fontWeight:'700',
+                            color:'var(--text-muted)', textTransform:'uppercase',
+                            letterSpacing:'1px', marginBottom:'10px',
+                            fontFamily:'Oswald, sans-serif'
+                        }}>
+                            ⚙ Raumblatt-Aktionen
+                        </div>
+                        <div style={{
+                            display:'grid',
+                            gridTemplateColumns:'repeat(2, 1fr)',
+                            gap:'8px'
+                        }}>
+                            <button onClick={() => setCalcModalOpen(true)}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                    color:'#fff', cursor:'pointer',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow:'0 2px 10px rgba(30,136,229,0.30)',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>📐</span>
+                                Raumblatt rechnen
+                            </button>
+
+                            <button onClick={() => { if (typeof doRaumblattFertigstellen === 'function') doRaumblattFertigstellen(); }}
+                                disabled={!onFinishRaum}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background: onFinishRaum ? 'linear-gradient(135deg, #27ae60, #1e8449)' : 'rgba(120,120,120,0.30)',
+                                    color: onFinishRaum ? '#fff' : 'rgba(255,255,255,0.5)',
+                                    cursor: onFinishRaum ? 'pointer' : 'not-allowed',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow: onFinishRaum ? '0 2px 10px rgba(39,174,96,0.30)' : 'none',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>✔</span>
+                                Raumblatt fertigstellen
+                            </button>
+
+                            <button onClick={() => { if (typeof doAufmassFertigstellen === 'function') doAufmassFertigstellen(); }}
+                                disabled={!onAufmassBeenden}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background: onAufmassBeenden ? 'linear-gradient(135deg, #e84040, #c41e1e)' : 'rgba(120,120,120,0.30)',
+                                    color: onAufmassBeenden ? '#fff' : 'rgba(255,255,255,0.5)',
+                                    cursor: onAufmassBeenden ? 'pointer' : 'not-allowed',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow: onAufmassBeenden ? '0 2px 10px rgba(196,30,30,0.30)' : 'none',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>🏁</span>
+                                Aufmass fertigstellen
+                            </button>
+
+                            <button onClick={() => { if (onShowGesamtliste) onShowGesamtliste(); }}
+                                disabled={!onShowGesamtliste}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background: onShowGesamtliste ? 'linear-gradient(135deg, #f39c12, #d35400)' : 'rgba(120,120,120,0.30)',
+                                    color: onShowGesamtliste ? '#fff' : 'rgba(255,255,255,0.5)',
+                                    cursor: onShowGesamtliste ? 'pointer' : 'not-allowed',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow: onShowGesamtliste ? '0 2px 10px rgba(211,84,0,0.30)' : 'none',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>📋</span>
+                                Gesamtliste
+                            </button>
+                        </div>
+                    </div>
+
                     </React.Fragment>)}
                     {/* ═══ TAB 1: FOTOS & KI-ERKENNUNG ═══ */}
                     {rbTab === 1 && (
