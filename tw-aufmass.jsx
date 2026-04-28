@@ -1522,7 +1522,7 @@
                     {/* HEADER */}
                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
                         <button {...tap(onBack)} style={Object.assign({}, touchBase, {background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'var(--text-secondary)', padding:'8px 12px', minHeight:'44px', minWidth:'44px'})}>
-                            {'\u2190'}
+                            \u2190
                         </button>
                         <div>
                             <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>Manuell Kunde anlegen</div>
@@ -1633,7 +1633,7 @@
 
                             {/* LV-Positionen */}
                             <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'8px'}}>
-                                <span style={{color:'var(--accent-blue)'}}>{'\u25B6'}</span> LV-Positionen ({positionen.length})
+                                <span style={{color:'var(--accent-blue)'}}>\u25B6</span> LV-Positionen ({positionen.length})
                             </div>
                             <button {...tap(function(){ resetPosForm(); setShowPosForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed var(--accent-blue)',
@@ -1688,7 +1688,7 @@
 
                             {/* NACHTRAEGE */}
                             <div style={{fontSize:'14px', fontWeight:'700', color:'#e67e22', marginBottom:'8px', marginTop:'16px', display:'flex', alignItems:'center', gap:'8px'}}>
-                                <span>{'\u25BC'}</span> Nachtraege ({nachtraege.length})
+                                <span>\u25BC</span> Nachtraege ({nachtraege.length})
                             </div>
                             <button {...tap(function(){ resetNachtragForm(); setShowNachtragForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed #e67e22',
@@ -2885,7 +2885,7 @@
 
                     <div className="breadcrumb">
                         <span>Google Drive</span>
-                        <span>{'\u203A'}</span>
+                        <span>\u203A</span>
                         <span className="breadcrumb-active">Baustellen neu</span>
                     </div>
                     <div className="page-title">Baustellen-Ordner</div>
@@ -10420,25 +10420,10 @@
                         </div>
                     )}
 
-                    {/* ═══ AUFMASZ-WARNSCHILD (Etappe 6: Datenverlust-Schutz) ═══ */}
-                    {hasUnsavedChanges && (
-                        <div style={{
-                            position:'fixed', top:'88px', right:'12px', zIndex:9999,
-                            padding:'8px 12px', borderRadius:'8px',
-                            background:'rgba(231,76,60,0.95)', color:'white',
-                            fontSize:'12px', fontWeight:'700',
-                            boxShadow:'0 4px 12px rgba(0,0,0,0.2)',
-                            cursor:'pointer', maxWidth:'220px', lineHeight:'1.3'
-                        }}
-                            onClick={function() {
-                                if (raumblattActionsRef && raumblattActionsRef.current && raumblattActionsRef.current.doRaumblattFertigstellen) {
-                                    raumblattActionsRef.current.doRaumblattFertigstellen();
-                                }
-                            }}
-                            title="Klicken zum Sichern">
-                            {'\u26A0 Ungespeicherte Aenderungen \u2014 jetzt sichern'}
-                        </div>
-                    )}
+                    {/* ═══ AUFMASZ-WARNSCHILD entfernt am 28.04.2026 ═══
+                        Der rote Banner "Ungespeicherte Aenderungen — jetzt sichern" wurde
+                        durch den neuen Speichern-Ja/Nein-Dialog beim Verlassen ersetzt.
+                        Der Auto-Save laeuft als Sicherheitsnetz im Hintergrund. */}
 
                     {/* ═══ AUFMASZ-WIEDERAUFNAHME-DIALOG (Etappe 6) ═══ */}
                     {wipResumeDialog && (
@@ -10446,7 +10431,7 @@
                             <div className="modal" style={{maxWidth:'480px'}}>
                                 <div style={{padding:'20px'}}>
                                     <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'12px'}}>
-                                        {'\uD83D\uDD04 Bearbeitung fortsetzen?'}
+                                        \uD83D\uDD04 Bearbeitung fortsetzen?
                                     </div>
                                     <div style={{fontSize:'14px', lineHeight:'1.5', marginBottom:'16px'}}>
                                         Vom letzten Aufmasz wurde ein Bearbeitungsstand gefunden:
@@ -12660,7 +12645,7 @@
                                     style={{width:'100%', padding:'12px', borderRadius:'8px', border:'none',
                                         background:'#e74c3c', color:'white', fontWeight:'700',
                                         fontSize:'13px', cursor:'pointer', boxShadow:'0 2px 6px rgba(231,76,60,0.25)'}}>
-                                    {'\uD83D\uDCBE Fotos endgueltig speichern und Felder leeren'}
+                                    \uD83D\uDCBE Fotos endgueltig speichern und Felder leeren
                                 </button>
                             </div>
 

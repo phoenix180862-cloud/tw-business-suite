@@ -34,15 +34,14 @@
         }
 
         // ═══════════════════════════════════════════════════════════
-        // AUTO-SAVE STATUS-INDIKATOR
+        // AUTO-SAVE STATUS-INDIKATOR (entfernt 28.04.2026)
         // ═══════════════════════════════════════════════════════════
-        // Kleine Komponente in der Navigationsleiste, die dem Benutzer
-        // ═══════════════════════════════════════════════════════════
-        // Etappe B1 (28.04.2026): AutoSaveStatusIndicator wurde
-        // ENTFERNT — die UI-Statusbox oben rechts hat den User irritiert.
-        // Die Auto-Save-Logik (window.TW.AutoSave + _collectAndSaveWip)
-        // laeuft weiter im Hintergrund als Sicherheitsnetz; nur die
-        // Anzeige ist weg.
+        // Die kleine Status-Box "OK 1m" oben rechts wurde auf User-Wunsch
+        // entfernt. Der Auto-Save-Mechanismus _collectAndSaveWip() laeuft
+        // weiterhin im Hintergrund als Sicherheitsnetz (Tablet zuklappen,
+        // Browser-Crash, Akku leer). Manuelle Speicherung erfolgt jetzt
+        // ueber den Speichern-Ja/Nein-Dialog beim Verlassen des
+        // Aufmasz-Bereichs.
         // ═══════════════════════════════════════════════════════════
 
         // ═══ BLOCK D / FIX D2 — Speicher-Anzeige ═══
@@ -185,23 +184,6 @@
             // ── Akte & Speichern (WIP) ──
             const [showAkteModal, setShowAkteModal] = useState(false);
             const [akteData, setAkteData] = useState({ wips: [], appDateien: [] });
-
-            // ═══════════════════════════════════════════════════════════
-            // Etappe B (28.04.2026) — AUFMASZ-WORKFLOW
-            // Modal-Kette beim Start des Aufmasz-Moduls:
-            //  1. WAHL-Modal: "Neues Aufmasz" / "Bestehendes Aufmasz"
-            //  2a. NEU-Modal: Bauvorhaben / Datum / Bemerkung -> startet Aufmasz
-            //  2b. LISTE-Modal: alle WIPs des Kunden vom Modul "aufmass"
-            //  3. SPEICHERN-Modal: Ja/Nein beim Verlassen aller 4 Tabs
-            // ═══════════════════════════════════════════════════════════
-            const [showAufmassWahlModal, setShowAufmassWahlModal] = useState(false);
-            const [showAufmassNeuModal, setShowAufmassNeuModal] = useState(false);
-            const [showAufmassListeModal, setShowAufmassListeModal] = useState(false);
-            const [showAufmassSpeichernModal, setShowAufmassSpeichernModal] = useState(false);
-            const [aufmassNeuMeta, setAufmassNeuMeta] = useState({ bauvorhaben:'', datum:'', bemerkung:'' });
-            const [aufmassListe, setAufmassListe] = useState([]);
-            const [aufmassListeLoading, setAufmassListeLoading] = useState(false);
-            const [pendingAufmassExitPage, setPendingAufmassExitPage] = useState(null);
             const [akteSaveToast, setAkteSaveToast] = useState(null);
 
             // ── Storage-Health-Dashboard (Punkt 6 aus Architektur-Plan, 25.04.2026) ──
@@ -216,6 +198,26 @@
             const [vorlageList, setVorlageList] = useState(null);
             // kundeOpenDialog: { kunde } wenn Dialog "Normal / Vorlage laden" sichtbar, sonst null
             const [kundeOpenDialog, setKundeOpenDialog] = useState(null);
+
+            // ══════════════════════════════════════════════════════════
+            // AUFMASZ-WORKFLOW-DIALOGE (28.04.2026)
+            // ══════════════════════════════════════════════════════════
+            // Beim Klick auf "Aufmass" in der Modulwahl wird ein mehrstufiger
+            // Dialog gezeigt:
+            //   1. 'auswahl' — Neues Aufmass / Bestehendes Aufmass bearbeiten
+            //   2. 'neu'     — Bauvorhaben + Datum + Bemerkung eingeben
+            //   3. 'liste'   — Liste aller bisher gespeicherten Aufmasse des Kunden
+            // Beim Verlassen des Aufmass-Bereichs:
+            //   4. 'verlassen' — Speichern Ja/Nein vor dem Wegnavigieren
+            // ══════════════════════════════════════════════════════════
+            const [aufmassDialogStep, setAufmassDialogStep] = useState(null);
+            const [aufmassNeuDaten, setAufmassNeuDaten] = useState({ bauvorhaben: '', datum: '', bemerkung: '' });
+            const [aufmassListeWips, setAufmassListeWips] = useState([]);
+            const [aufmassListeLoading, setAufmassListeLoading] = useState(false);
+            // Pending-Navigation: Ziel-Page wird gemerkt, bis User im Verlassen-Dialog Ja oder Nein gewaehlt hat
+            const [aufmassPendingNav, setAufmassPendingNav] = useState(null);
+            // Aktive Aufmass-Meta (Bauvorhaben + Datum + Bemerkung des laufenden Aufmasses)
+            const aktivesAufmassMetaRef = useRef(null);
 
             var PAGE_TO_MODUL = {
                 'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
@@ -418,22 +420,20 @@
                 return function() { window.removeEventListener('keydown', handleGlobalEnter); };
             }, []);  // ← einmal beim Mount
 
-            const navigateTo = useCallback((newPage) => {
-                // ── Aufmasz-Verlassen-Schutz (Skill 8.5 + Etappe B) ──
-                // Wenn der User aus dem Aufmasz-Modul rausnavigiert, fragen
-                // wir IMMER nach (Speichern Ja/Nein), nicht nur bei Dirty —
-                // so verlangt es der User-Workflow ab 28.04.2026.
-                // Ausnahme: interne Wechsel zwischen den vier Aufmasz-Tabs
-                // (raumerkennung <-> raumblatt) sowie Wechsel zur
-                // Gesamtliste, die zum Aufmasz-Modul gehoert.
+            const navigateTo = useCallback((newPage, opts) => {
+                // ── Aufmasz-Verlassen-Dialog (28.04.2026) ──
+                // Wenn der User aus dem Aufmasz-Bereich (raumerkennung/raumblatt) rausnavigiert,
+                // erscheint ein Modal mit der Frage "Aufmass speichern? Ja/Nein" — anstelle
+                // des frueheren window.confirm-Popups. Auto-Save laeuft als Sicherheitsnetz
+                // im Hintergrund weiter, sodass auch bei "Nein" keine Daten verloren gehen.
+                // Wenn opts.skipAufmassDialog === true, wird der Dialog uebersprungen
+                // (z.B. wenn der Dialog selbst die Navigation ausloest).
                 var fromAufmass = (page === 'raumerkennung' || page === 'raumblatt');
-                var aufmassInternalTargets = ['raumerkennung', 'raumblatt', 'gesamtliste'];
-                var leavingAufmass = fromAufmass && aufmassInternalTargets.indexOf(newPage) === -1;
-                if (leavingAufmass) {
-                    // Pendinge Ziel-Page merken und Modal aufrufen.
-                    // Die eigentliche Navigation passiert im Modal-Handler.
-                    setPendingAufmassExitPage(newPage);
-                    setShowAufmassSpeichernModal(true);
+                var leavingAufmass = fromAufmass && (newPage !== 'raumerkennung' && newPage !== 'raumblatt');
+                var skipDialog = opts && opts.skipAufmassDialog;
+                if (leavingAufmass && !skipDialog && selectedKunde) {
+                    setAufmassPendingNav(newPage);
+                    setAufmassDialogStep('verlassen');
                     return;
                 }
                 setPage(newPage);
@@ -442,7 +442,7 @@
                     setHistoryIdx(newHistory.length - 1);
                     return newHistory;
                 });
-            }, [historyIdx, page]);
+            }, [historyIdx, page, selectedKunde]);
 
             // Globale Navigation fuer Module (z.B. Gesamtliste → Modulwahl)
             window._navigateToModulwahl = () => navigateTo('modulwahl');
@@ -1131,9 +1131,8 @@
             const handleSelectModul = (modulId) => {
                 switch(modulId) {
                     case 'aufmass':
-                        // Etappe B (28.04.2026): Statt direkt zu starten, oeffnen
-                        // wir das Wahl-Modal (Neu / Bestehend bearbeiten).
-                        setShowAufmassWahlModal(true);
+                        // 28.04.2026: Aufmass-Auswahl-Dialog statt direktem Start
+                        setAufmassDialogStep('auswahl');
                         break;
                     case 'rechnung':
                         navigateTo('rechnung');
@@ -1842,136 +1841,21 @@
                 navigateTo('geladen');
             };
 
-            const handleStartAufmass = () => {
+            const handleStartAufmass = (meta) => {
                 setGesamtliste([]);
                 setFertigeRaeume([]);
                 setLastRaumData(null);
                 setAufmassGespeichert(false);
+                // 28.04.2026: Aktive Aufmass-Meta merken (fuer spaeteren Snapshot-Save)
+                if (meta) {
+                    aktivesAufmassMetaRef.current = {
+                        bauvorhaben: meta.bauvorhaben || '',
+                        datum: meta.datum || '',
+                        bemerkung: meta.bemerkung || '',
+                        startedAt: new Date().toISOString()
+                    };
+                }
                 navigateTo('raumerkennung');
-            };
-
-            // ═══════════════════════════════════════════════════════════
-            // Etappe B (28.04.2026) — AUFMASZ-WORKFLOW HANDLER
-            // ═══════════════════════════════════════════════════════════
-
-            // B2: Aus Wahl-Modal "Neues Aufmasz" gewaehlt → Neu-Modal mit
-            // vorausgefuellten Werten oeffnen (Bauvorhaben aus Kunde, heute,
-            // leere Bemerkung).
-            const handleAufmassWahlNeu = function() {
-                var bauvorhaben = '';
-                if (selectedKunde) {
-                    bauvorhaben = selectedKunde.bauvorhaben
-                        || selectedKunde.projektName
-                        || selectedKunde.name
-                        || '';
-                }
-                var heute = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-                setAufmassNeuMeta({
-                    bauvorhaben: bauvorhaben,
-                    datum: heute,
-                    bemerkung: ''
-                });
-                setShowAufmassWahlModal(false);
-                setShowAufmassNeuModal(true);
-            };
-
-            // B3: Aus Neu-Modal "Aufmasz beginnen" → Meta merken (window-Var
-            // damit _collectAndSaveWip beim naechsten Speichern darauf
-            // zugreifen kann), dann Aufmasz starten.
-            const handleAufmassNeuStart = function() {
-                var meta = aufmassNeuMeta || {};
-                var beschreibung = '';
-                if (meta.bauvorhaben) beschreibung += meta.bauvorhaben;
-                if (meta.datum) beschreibung += (beschreibung ? ' \u00b7 ' : '') + meta.datum;
-                if (meta.bemerkung) beschreibung += (beschreibung ? ' \u00b7 ' : '') + meta.bemerkung;
-                window._currentAufmassMeta = {
-                    bauvorhaben: meta.bauvorhaben || '',
-                    datum: meta.datum || '',
-                    bemerkung: meta.bemerkung || '',
-                    beschreibung: beschreibung,
-                    erstelltAm: new Date().toISOString()
-                };
-                setShowAufmassNeuModal(false);
-                handleStartAufmass();
-            };
-
-            // B5: Aus Wahl-Modal "Bestehendes Aufmasz" gewaehlt → WIPs des
-            // Kunden laden und Liste-Modal oeffnen. Filter auf modulName ===
-            // 'aufmass'.
-            const handleAufmassWahlBestehend = function() {
-                if (!selectedKunde) { alert('Bitte zuerst einen Kunden waehlen.'); return; }
-                var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
-                if (!window.TWStorage || !window.TWStorage.isReady()) {
-                    alert('Speicher noch nicht bereit. Bitte kurz warten und erneut versuchen.');
-                    return;
-                }
-                setShowAufmassWahlModal(false);
-                setAufmassListeLoading(true);
-                setShowAufmassListeModal(true);
-                TWStorage.listWips(kundeId).then(function(wips) {
-                    var nurAufmass = (wips || []).filter(function(w) {
-                        return w && w.modulName === 'aufmass';
-                    });
-                    // Neueste zuerst
-                    nurAufmass.sort(function(a, b) {
-                        var ta = a.savedAt ? new Date(a.savedAt).getTime() : 0;
-                        var tb = b.savedAt ? new Date(b.savedAt).getTime() : 0;
-                        return tb - ta;
-                    });
-                    setAufmassListe(nurAufmass);
-                    setAufmassListeLoading(false);
-                }).catch(function(err) {
-                    console.warn('[Aufmass-Liste] Laden fehlgeschlagen:', err);
-                    setAufmassListe([]);
-                    setAufmassListeLoading(false);
-                });
-            };
-
-            // B5: WIP aus Liste auswaehlen → wiederherstellen (nutzt die
-            // bestehende handleWipRestore-Logik via window-Bridge, weil sie
-            // weiter unten definiert ist; kleiner Indirektionsschritt).
-            const handleAufmassListeAuswahl = function(wipMeta) {
-                setShowAufmassListeModal(false);
-                // handleWipRestore wird weiter unten als var deklariert; es
-                // liegt im selben Scope, also rufen wir die Bridge ueber
-                // window auf, falls schon installiert — sonst direkt.
-                if (window._handleWipRestoreBridge) {
-                    window._handleWipRestoreBridge(wipMeta);
-                } else if (typeof handleWipRestore === 'function') {
-                    handleWipRestore(wipMeta);
-                }
-            };
-
-            // B4: Beim Verlassen des Aufmasz-Bereichs Speichern-Frage:
-            // Ja  → _collectAndSaveWip mit benanntem Snapshot, dann navigieren
-            // Nein → ohne expliziten Save navigieren (Auto-Save als Backup)
-            // Abbrechen → im Aufmasz bleiben, Modal zu, Navigation verworfen
-            const handleAufmassSpeichernEntscheidung = function(speichern) {
-                var ziel = pendingAufmassExitPage;
-                setShowAufmassSpeichernModal(false);
-                setPendingAufmassExitPage(null);
-                if (!ziel) return;
-                if (speichern) {
-                    var label = '';
-                    if (window._currentAufmassMeta && window._currentAufmassMeta.beschreibung) {
-                        label = window._currentAufmassMeta.beschreibung;
-                    }
-                    try {
-                        if (typeof _collectAndSaveWip === 'function') {
-                            _collectAndSaveWip({ customLabel: label });
-                        } else if (typeof window._manuellSpeichernHandler === 'function') {
-                            window._manuellSpeichernHandler(label);
-                        }
-                    } catch(err) { console.warn('[Aufmass-Speichern] Save fehlgeschlagen:', err); }
-                }
-                // Direkt setPage statt navigateTo, damit der Speichern-Check
-                // nicht erneut anschlaegt (sonst Endlosschleife).
-                setPage(ziel);
-                setHistory(prev => {
-                    const newHistory = [...prev.slice(0, historyIdx + 1), ziel];
-                    setHistoryIdx(newHistory.length - 1);
-                    return newHistory;
-                });
             };
 
             const handleSelectRaum = (raum, positions) => {
@@ -2145,6 +2029,28 @@
                     });
                 }
 
+                // 28.04.2026: AUFMASZ-SNAPSHOT (eigener Eintrag mit eindeutiger ID).
+                // Bei opts.aufmassSnapshot === true wird ein NEUER Eintrag unter
+                // 'aufmass-snap-<timestamp>' gespeichert (statt den laufenden WIP zu
+                // ueberschreiben). Damit bleibt das laufende 'aufmass'-WIP unangetastet
+                // und der User kann mehrere Aufmasse pro Kunde speichern.
+                if (opts && opts.aufmassSnapshot) {
+                    var snapModul = 'aufmass-snap-' + Date.now();
+                    var aktiv = aktivesAufmassMetaRef.current || {};
+                    stateData.meta = Object.assign({}, stateData.meta, {
+                        beschreibung: aktiv.bauvorhaben || ((MODUL_LABELS['aufmass'] || 'Aufmass') + ' gespeichert'),
+                        bauvorhaben: aktiv.bauvorhaben || '',
+                        datum: aktiv.datum || '',
+                        bemerkung: aktiv.bemerkung || '',
+                        icon: '\uD83D\uDCD0',
+                        autoSaved: false,
+                        manuellGespeichert: true,
+                        aufmassSnapshot: true,
+                        manuellTs: Date.now()
+                    });
+                    return TWStorage.saveWip(kundeId, snapModul, stateData.moduleState, page, stateData.meta);
+                }
+
                 return TWStorage.saveWip(kundeId, modulName, stateData.moduleState, page, stateData.meta);
             };
 
@@ -2218,14 +2124,19 @@
             // WICHTIG: listWips() liefert aus Performance-Gruenden NUR Metadaten
             // ohne moduleState. Daher muss hier erst der volle Record nachgeladen
             // werden, bevor der State wiederhergestellt werden kann.
+            // 28.04.2026: Erweitert um Aufmass-Snapshots (modulName beginnt mit 'aufmass-snap-').
             var handleWipRestore = function(wipMeta) {
                 if (!wipMeta || !wipMeta.modulName) return;
                 if (!selectedKunde) return;
                 if (!window.TWStorage || !window.TWStorage.isReady()) return;
                 var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
 
+                // Hilfs-Flag: ist das ein Aufmass (laufend ODER Snapshot)?
+                var isAufmassRecord = (wipMeta.modulName === 'aufmass' || (wipMeta.modulName.indexOf('aufmass-snap-') === 0));
+
                 // Modal sofort schliessen + Auto-Save fuer den Restore-Moment unterdruecken
                 setShowAkteModal(false);
+                setAufmassDialogStep(null);
                 if (window.TW && window.TW.AutoSave) {
                     window.TW.AutoSave.suppress(true);
                     setTimeout(function(){ if (window.TW && window.TW.AutoSave) window.TW.AutoSave.suppress(false); }, 1500);
@@ -2236,23 +2147,40 @@
                         alert('Der gespeicherte Stand konnte nicht geladen werden.');
                         return;
                     }
-                    var targetPage = wip.page || MODUL_PAGES[wip.modulName] || 'modulwahl';
+                    // Default-Page herleiten:
+                    // - Aufmass-Snapshots: aus wip.page (raumblatt/raumerkennung), Fallback raumerkennung
+                    // - Normale WIPs: ueber MODUL_PAGES
+                    var targetPage;
+                    if (isAufmassRecord) {
+                        targetPage = wip.page || 'raumerkennung';
+                    } else {
+                        targetPage = wip.page || MODUL_PAGES[wip.modulName] || 'modulwahl';
+                    }
 
                     // Aufmass-spezifisch: Basis-State wiederherstellen
-                    if (wip.modulName === 'aufmass' && wip.moduleState) {
+                    if (isAufmassRecord && wip.moduleState) {
                         if (wip.moduleState.gesamtliste) setGesamtliste(wip.moduleState.gesamtliste);
                         if (wip.moduleState.fertigeRaeume) setFertigeRaeume(wip.moduleState.fertigeRaeume);
                         if (wip.moduleState.selectedPositions) setSelectedPositions(wip.moduleState.selectedPositions);
                         if (wip.moduleState.aufmassGespeichert) setAufmassGespeichert(wip.moduleState.aufmassGespeichert);
+                        // Aktive Aufmass-Meta uebernehmen (fuer spaeteren Speichern-Dialog)
+                        aktivesAufmassMetaRef.current = {
+                            bauvorhaben: (wip.meta && wip.meta.bauvorhaben) || '',
+                            datum: (wip.meta && wip.meta.datum) || '',
+                            bemerkung: (wip.meta && wip.meta.bemerkung) || '',
+                            startedAt: wip.savedAt || new Date().toISOString(),
+                            restoredFromSnapshot: wip.modulName
+                        };
                     }
 
-                    navigateTo(targetPage);
+                    // Navigation OHNE Speichern-Dialog (skipAufmassDialog), da wir gerade RESTORE machen
+                    navigateTo(targetPage, { skipAufmassDialog: true });
 
                     // Nach Navigation: WIP-State ins Modul injizieren via Event-Bus
                     setTimeout(function() {
                         if (window.TW && window.TW.emit) {
                             TW.emit('wip:restoreState', {
-                                modulName: wip.modulName,
+                                modulName: isAufmassRecord ? 'aufmass' : wip.modulName,
                                 moduleState: wip.moduleState
                             });
                         }
@@ -2262,11 +2190,6 @@
                     alert('Der gespeicherte Stand konnte nicht geladen werden: ' + (err.message || 'Unbekannter Fehler'));
                 });
             };
-
-            // Etappe B (28.04.2026): Bridge fuer Aufmasz-Liste-Modal —
-            // damit handleAufmassListeAuswahl (weiter oben) handleWipRestore
-            // aufrufen kann, ohne auf TDZ-/Hoisting-Reihenfolge zu setzen.
-            window._handleWipRestoreBridge = handleWipRestore;
 
             // ══════════════════════════════════════════════════════════
             // AUTO-WIEDERHERSTELLUNG beim Kundenwechsel
@@ -2293,8 +2216,16 @@
 
                 TWStorage.listWips(kundeId).then(function(wips) {
                     if (!wips || wips.length === 0) return;
-                    // Neuesten WIP nehmen (listWips sortiert bereits absteigend)
-                    var latest = wips[0];
+                    // 28.04.2026: AUFMASZ-WIPs beim Kundenwechsel NICHT mehr automatisch
+                    // wiederherstellen — der User soll bewusst ueber das Aufmass-Auswahl-
+                    // Modal "Neues / Bestehendes" entscheiden. Andere Module behalten das
+                    // alte Verhalten (z.B. Rechnung, Schriftverkehr).
+                    var nonAufmass = wips.filter(function(w) {
+                        return w.modulName !== 'aufmass' && (w.modulName || '').indexOf('aufmass-snap-') !== 0;
+                    });
+                    if (nonAufmass.length === 0) return;
+                    // Neuesten Nicht-Aufmass-WIP nehmen
+                    var latest = nonAufmass[0];
                     if (!latest || !latest.id) return;
                     // Vollstaendigen WIP-Datensatz mit moduleState laden
                     return TWStorage.loadWip(kundeId, latest.modulName).then(function(wip) {
@@ -3072,7 +3003,7 @@
                                     {posModalToolbar}
                                 </div>
                             )}
-                            {/* Rechte Gruppe: AutoSave + FotoSync + Speicher + Memory-Badge - kompakt in der Ecke */}
+                            {/* Rechte Gruppe: FotoSync + Speicher + Memory-Badge - kompakt in der Ecke */}
                             {/* Memory-Badge (Etappe B, 25.04.2026): zeigt Queue-Status und oeffnet bei Klick das Storage-Health-Dashboard */}
                             <div style={{display:'flex', alignItems:'center', gap:'6px', marginLeft:'auto'}}>
                                 <FotoSyncIndicator status={fotoSyncStatus} />
@@ -3243,208 +3174,304 @@
                         </div>
                     )}
 
-                    {/* ═══════════════════════════════════════════════════
-                        ETAPPE B (28.04.2026) — AUFMASZ-WORKFLOW MODALE
-                        B2: Wahl-Modal (Neu / Bestehend)
-                        B3: Neu-Modal (Bauvorhaben/Datum/Bemerkung)
-                        B5: Liste-Modal (bestehende Aufmasze des Kunden)
-                        B4: Speichern-Frage beim Verlassen
-                        ═══════════════════════════════════════════════════ */}
-
-                    {/* B2: WAHL-MODAL */}
-                    {showAufmassWahlModal && (
-                        <div className="modal-overlay" style={{zIndex:3500}} onClick={function(e){ if(e.target === e.currentTarget) setShowAufmassWahlModal(false); }}>
-                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.5)'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
-                                        Aufmasz
+                    {/* ═══ AUFMASZ-AUSWAHL-DIALOG (28.04.2026) ═══ */}
+                    {/* Stufe 1: Neues Aufmass / Bestehendes Aufmass bearbeiten */}
+                    {aufmassDialogStep === 'auswahl' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setAufmassDialogStep(null); }}>
+                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'20px'}}>
+                                    <div style={{fontSize:'40px', marginBottom:'8px'}}>{'\uD83D\uDCD0'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'22px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Aufma\u00df'}
                                     </div>
-                                    <button onClick={function(){ setShowAufmassWahlModal(false); }}
-                                        style={{width:'36px', height:'36px', borderRadius:'50%', border:'none', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'18px', color:'var(--text-secondary)'}}>
-                                        {'\u2715'}
+                                    <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'6px'}}>
+                                        {'Was m\u00f6chtest du tun?'}
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                    <button onClick={function() {
+                                        // Vorschlagswerte fuer Bauvorhaben/Datum vorbelegen
+                                        var vorschlagBauvh = '';
+                                        if (selectedKunde) {
+                                            vorschlagBauvh = selectedKunde.bauvorhaben || selectedKunde.objekt || (selectedKunde.name || '').split(' \u2013 ')[0] || '';
+                                        }
+                                        var heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+                                        setAufmassNeuDaten({ bauvorhaben: vorschlagBauvh, datum: heute, bemerkung: '' });
+                                        setAufmassDialogStep('neu');
+                                    }}
+                                        style={{padding:'18px 16px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', boxShadow:'0 4px 14px rgba(30,136,229,0.3)'}}>
+                                        <span style={{fontSize:'22px'}}>{'\u2795'}</span>
+                                        {'Neues Aufma\u00df erstellen'}
                                     </button>
-                                </div>
-                                <div style={{fontSize:'13px', color:'var(--text-secondary)', marginBottom:'20px', lineHeight:'1.5'}}>
-                                    Was moechtest du tun?
-                                </div>
-                                <button onClick={handleAufmassWahlNeu}
-                                    style={{width:'100%', padding:'18px 16px', marginBottom:'12px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #1e88e5, #1565c0)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', boxShadow:'0 4px 14px rgba(30,136,229,0.35)', display:'flex', alignItems:'center', gap:'14px'}}>
-                                    <span style={{fontSize:'28px'}}>{'\u2795'}</span>
-                                    <div style={{textAlign:'left', flex:1}}>
-                                        <div>Neues Aufmasz erstellen</div>
-                                        <div style={{fontSize:'11px', fontWeight:500, opacity:0.85, textTransform:'none', letterSpacing:0, marginTop:'3px'}}>Bauvorhaben, Datum und Bemerkung erfassen</div>
-                                    </div>
-                                </button>
-                                <button onClick={handleAufmassWahlBestehend}
-                                    style={{width:'100%', padding:'18px 16px', borderRadius:'12px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', display:'flex', alignItems:'center', gap:'14px'}}>
-                                    <span style={{fontSize:'28px'}}>{'\uD83D\uDCC2'}</span>
-                                    <div style={{textAlign:'left', flex:1}}>
-                                        <div>Bestehendes Aufmasz bearbeiten</div>
-                                        <div style={{fontSize:'11px', fontWeight:500, opacity:0.7, textTransform:'none', letterSpacing:0, marginTop:'3px', color:'var(--text-secondary)'}}>Liste aller Aufmasze des Kunden</div>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* B3: NEU-MODAL — Bauvorhaben / Datum / Bemerkung */}
-                    {showAufmassNeuModal && (
-                        <div className="modal-overlay" style={{zIndex:3500}} onClick={function(e){ if(e.target === e.currentTarget) setShowAufmassNeuModal(false); }}>
-                            <div style={{width:'100%', maxWidth:'480px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.5)'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px'}}>
-                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
-                                        Neues Aufmasz
-                                    </div>
-                                    <button onClick={function(){ setShowAufmassNeuModal(false); }}
-                                        style={{width:'36px', height:'36px', borderRadius:'50%', border:'none', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'18px', color:'var(--text-secondary)'}}>
-                                        {'\u2715'}
+                                    <button onClick={function() {
+                                        // Liste laden
+                                        if (!selectedKunde || !window.TWStorage || !window.TWStorage.isReady()) {
+                                            alert('Speicher nicht bereit.');
+                                            return;
+                                        }
+                                        var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                                        setAufmassListeLoading(true);
+                                        setAufmassDialogStep('liste');
+                                        TWStorage.listWips(kundeId).then(function(wips) {
+                                            // Filter: nur Aufmass-Eintraege (laufender + Snapshots)
+                                            var aufmassWips = (wips || []).filter(function(w) {
+                                                return w.modulName === 'aufmass' || (w.modulName || '').indexOf('aufmass-snap-') === 0;
+                                            });
+                                            setAufmassListeWips(aufmassWips);
+                                            setAufmassListeLoading(false);
+                                        }).catch(function(err) {
+                                            console.warn('[Aufmass-Liste] Fehler:', err);
+                                            setAufmassListeWips([]);
+                                            setAufmassListeLoading(false);
+                                        });
+                                    }}
+                                        style={{padding:'18px 16px', borderRadius:'12px', border:'2px solid var(--accent-blue)', background:'transparent', color:'var(--accent-blue)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
+                                        <span style={{fontSize:'22px'}}>{'\uD83D\uDCC2'}</span>
+                                        {'Bestehendes Aufma\u00df bearbeiten'}
                                     </button>
-                                </div>
 
-                                <div style={{marginBottom:'14px'}}>
-                                    <div style={{fontSize:'11px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px'}}>Kunde</div>
-                                    <div style={{padding:'10px 12px', borderRadius:'8px', background:'var(--bg-secondary)', fontSize:'14px', color:'var(--text-primary)', fontWeight:600}}>
-                                        {selectedKunde ? (selectedKunde.name || '\u2014') : '\u2014'}
-                                    </div>
-                                </div>
-
-                                <div style={{marginBottom:'14px'}}>
-                                    <label style={{display:'block', fontSize:'11px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px'}}>Bauvorhaben</label>
-                                    <input type="text"
-                                        value={aufmassNeuMeta.bauvorhaben}
-                                        onChange={function(e){ setAufmassNeuMeta({...aufmassNeuMeta, bauvorhaben: e.target.value}); }}
-                                        placeholder="z.B. Schwimmbad Altenkirchen"
-                                        style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', boxSizing:'border-box'}} />
-                                </div>
-
-                                <div style={{marginBottom:'14px'}}>
-                                    <label style={{display:'block', fontSize:'11px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px'}}>Datum</label>
-                                    <input type="date"
-                                        value={aufmassNeuMeta.datum}
-                                        onChange={function(e){ setAufmassNeuMeta({...aufmassNeuMeta, datum: e.target.value}); }}
-                                        style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', boxSizing:'border-box'}} />
-                                </div>
-
-                                <div style={{marginBottom:'20px'}}>
-                                    <label style={{display:'block', fontSize:'11px', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px'}}>Bemerkung (optional)</label>
-                                    <input type="text"
-                                        value={aufmassNeuMeta.bemerkung}
-                                        onChange={function(e){ setAufmassNeuMeta({...aufmassNeuMeta, bemerkung: e.target.value}); }}
-                                        placeholder="z.B. Nachtragsaufmasz, 2. Etage"
-                                        style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', boxSizing:'border-box'}} />
-                                </div>
-
-                                <div style={{display:'flex', gap:'10px'}}>
-                                    <button onClick={function(){ setShowAufmassNeuModal(false); }}
-                                        style={{flex:1, padding:'14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                        Abbrechen
-                                    </button>
-                                    <button onClick={handleAufmassNeuStart}
-                                        style={{flex:2, padding:'14px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', boxShadow:'0 4px 14px rgba(39,174,96,0.35)'}}>
-                                        {'\u25B6 Aufmasz beginnen'}
+                                    <button onClick={function(){ setAufmassDialogStep(null); }}
+                                        style={{padding:'12px', marginTop:'8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'Abbrechen'}
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {/* B5: LISTE-MODAL — bestehende Aufmasze des Kunden */}
-                    {showAufmassListeModal && (
-                        <div className="modal-overlay" style={{zIndex:3500}} onClick={function(e){ if(e.target === e.currentTarget) setShowAufmassListeModal(false); }}>
-                            <div style={{width:'100%', maxWidth:'520px', maxHeight:'90vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.5)'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'18px'}}>
+                    {/* ═══ AUFMASZ-NEU-DIALOG (28.04.2026) ═══ */}
+                    {/* Stufe 2: Bauvorhaben + Datum + Bemerkung eingeben */}
+                    {aufmassDialogStep === 'neu' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setAufmassDialogStep('auswahl'); }}>
+                            <div style={{width:'100%', maxWidth:'480px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'6px'}}>{'\u2795'}</div>
                                     <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
-                                        Aufmasze waehlen
+                                        {'Neues Aufma\u00df'}
                                     </div>
-                                    <button onClick={function(){ setShowAufmassListeModal(false); }}
-                                        style={{width:'36px', height:'36px', borderRadius:'50%', border:'none', background:'var(--bg-secondary)', cursor:'pointer', fontSize:'18px', color:'var(--text-secondary)'}}>
-                                        {'\u2715'}
-                                    </button>
+                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px'}}>
+                                        {'Kurz die Eckdaten pr\u00fcfen, dann starten wir.'}
+                                    </div>
                                 </div>
 
-                                <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'16px'}}>
-                                    {selectedKunde ? ('Kunde: ' + (selectedKunde.name || '')) : ''}
+                                <div style={{display:'flex', flexDirection:'column', gap:'14px'}}>
+                                    {/* Kunde (read-only) */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Kunde'}</label>
+                                        <div style={{padding:'10px 12px', borderRadius:'8px', background:'var(--bg-secondary)', fontSize:'14px', fontWeight:600, color:'var(--text-primary)'}}>
+                                            {selectedKunde ? ((selectedKunde.name || selectedKunde.auftraggeber || 'Kunde').split(' \u2013 ')[0]) : 'Kein Kunde'}
+                                        </div>
+                                    </div>
+
+                                    {/* Bauvorhaben */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Bauvorhaben'}</label>
+                                        <input type="text" value={aufmassNeuDaten.bauvorhaben}
+                                            onChange={function(e){ setAufmassNeuDaten(Object.assign({}, aufmassNeuDaten, { bauvorhaben: e.target.value })); }}
+                                            placeholder="z.B. EFH Mustermann, OG Bad"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Datum */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Datum'}</label>
+                                        <input type="text" value={aufmassNeuDaten.datum}
+                                            onChange={function(e){ setAufmassNeuDaten(Object.assign({}, aufmassNeuDaten, { datum: e.target.value })); }}
+                                            placeholder="TT.MM.JJJJ"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Bemerkung */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Bemerkung (optional)'}</label>
+                                        <input type="text" value={aufmassNeuDaten.bemerkung}
+                                            onChange={function(e){ setAufmassNeuDaten(Object.assign({}, aufmassNeuDaten, { bemerkung: e.target.value })); }}
+                                            placeholder="z.B. Nachtragsaufma\u00df, 2. Etage"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', gap:'10px', marginTop:'22px'}}>
+                                    <button onClick={function(){ setAufmassDialogStep('auswahl'); }}
+                                        style={{flex:'0 0 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'\u2190 Zur\u00fcck'}
+                                    </button>
+                                    <button onClick={function() {
+                                        // Aufmass starten mit den eingegebenen Meta-Daten
+                                        var meta = {
+                                            bauvorhaben: aufmassNeuDaten.bauvorhaben || '',
+                                            datum: aufmassNeuDaten.datum || new Date().toLocaleDateString('de-DE'),
+                                            bemerkung: aufmassNeuDaten.bemerkung || ''
+                                        };
+                                        setAufmassDialogStep(null);
+                                        // handleStartAufmass setzt aktivesAufmassMetaRef.current
+                                        handleStartAufmass(meta);
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'12px 18px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', boxShadow:'0 4px 14px rgba(39,174,96,0.3)'}}>
+                                        {'\u2713 Aufma\u00df beginnen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ AUFMASZ-LISTE-DIALOG (28.04.2026) ═══ */}
+                    {/* Stufe 3: Liste aller bestehenden Aufmasse des Kunden */}
+                    {aufmassDialogStep === 'liste' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setAufmassDialogStep('auswahl'); }}>
+                            <div style={{width:'100%', maxWidth:'520px', maxHeight:'85vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'6px'}}>{'\uD83D\uDCC2'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Bestehende Aufma\u00dfe'}
+                                    </div>
+                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px'}}>
+                                        {'Klicke auf einen Eintrag, um ihn weiter zu bearbeiten.'}
+                                    </div>
                                 </div>
 
                                 {aufmassListeLoading && (
-                                    <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)', fontSize:'13px'}}>
-                                        Liste wird geladen...
+                                    <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)'}}>
+                                        {'L\u00e4dt\u2026'}
                                     </div>
                                 )}
 
-                                {!aufmassListeLoading && aufmassListe.length === 0 && (
-                                    <div style={{textAlign:'center', padding:'40px 20px', color:'var(--text-muted)'}}>
-                                        <div style={{fontSize:'42px', marginBottom:'12px'}}>{'\uD83D\uDCC4'}</div>
-                                        <div style={{fontSize:'14px', fontWeight:600, marginBottom:'6px'}}>Keine gespeicherten Aufmasze</div>
-                                        <div style={{fontSize:'12px'}}>Fuer diesen Kunden gibt es noch keinen gesicherten Aufmasz-Stand.</div>
+                                {!aufmassListeLoading && aufmassListeWips.length === 0 && (
+                                    <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'12px'}}>{'\uD83D\uDCED'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600}}>
+                                            {'Noch keine Aufma\u00dfe f\u00fcr diesen Kunden'}
+                                        </div>
+                                        <div style={{fontSize:'12px', marginTop:'6px'}}>
+                                            {'Erstelle zun\u00e4chst ein neues Aufma\u00df.'}
+                                        </div>
                                     </div>
                                 )}
 
-                                {!aufmassListeLoading && aufmassListe.length > 0 && aufmassListe.map(function(wip) {
-                                    var meta = wip.meta || {};
-                                    var titel = meta.bauvorhaben || (meta.beschreibung || '').split(' \u00b7 ')[0] || 'Aufmasz';
-                                    var datum = meta.datum || (wip.savedAt ? new Date(wip.savedAt).toISOString().slice(0,10) : '');
-                                    var bemerkung = meta.bemerkung || '';
-                                    var raeume = (typeof meta.raeume_count === 'number') ? meta.raeume_count : null;
-                                    var savedAtTxt = wip.savedAt ? new Date(wip.savedAt).toLocaleString('de-DE', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
-                                    return (
-                                        <button key={wip.id} onClick={function(){ handleAufmassListeAuswahl(wip); }}
-                                            style={{width:'100%', textAlign:'left', padding:'14px 16px', marginBottom:'8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px'}}>
-                                            <span style={{fontSize:'28px'}}>{'\uD83D\uDCD0'}</span>
-                                            <div style={{flex:1, minWidth:0}}>
-                                                <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-primary)', fontFamily:'Oswald, sans-serif', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                                                    {titel}
-                                                </div>
-                                                <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'3px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                                                    {datum}{bemerkung ? (' \u00b7 ' + bemerkung) : ''}{raeume !== null ? (' \u00b7 ' + raeume + ' Raeume') : ''}
-                                                </div>
-                                                <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
-                                                    Letzter Stand: {savedAtTxt}
-                                                </div>
-                                            </div>
-                                            <span style={{color:'var(--accent-blue)', fontSize:'14px', fontWeight:700, flexShrink:0}}>{'\u25B6'}</span>
-                                        </button>
-                                    );
-                                })}
+                                {!aufmassListeLoading && aufmassListeWips.length > 0 && (
+                                    <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                        {aufmassListeWips.map(function(wip) {
+                                            var isLaufend = (wip.modulName === 'aufmass');
+                                            var beschreibung = (wip.meta && wip.meta.bauvorhaben) || (wip.meta && wip.meta.beschreibung) || (isLaufend ? 'Laufendes Aufma\u00df' : 'Gespeichertes Aufma\u00df');
+                                            var datum = (wip.meta && wip.meta.datum) || (wip.savedAt ? new Date(wip.savedAt).toLocaleDateString('de-DE') : '');
+                                            var bemerkung = (wip.meta && wip.meta.bemerkung) || '';
+                                            var savedAt = wip.savedAt ? new Date(wip.savedAt) : null;
+                                            return (
+                                                <button key={wip.id} onClick={function(){ handleWipRestore(wip); }}
+                                                    style={{width:'100%', textAlign:'left', padding:'14px 16px', borderRadius:'10px', border:'1px solid ' + (isLaufend ? '#f39c12' : 'var(--border-color)'), background: isLaufend ? 'rgba(243,156,18,0.08)' : 'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px'}}>
+                                                    <span style={{fontSize:'28px'}}>{isLaufend ? '\u26A1' : '\uD83D\uDCD0'}</span>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-primary)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                            {beschreibung}
+                                                        </div>
+                                                        <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px'}}>
+                                                            {datum}
+                                                            {bemerkung ? (' \u00b7 ' + bemerkung) : ''}
+                                                            {isLaufend ? ' \u00b7 (laufend, nicht abgeschlossen)' : ''}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{textAlign:'right', flexShrink:0}}>
+                                                        <div style={{fontSize:'10px', color:'var(--text-muted)'}}>
+                                                            {savedAt ? savedAt.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : ''}
+                                                        </div>
+                                                    </div>
+                                                    <span style={{color:'var(--accent-blue)', fontSize:'14px', fontWeight:700, flexShrink:0}}>{'\u25B6'}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
 
-                                <button onClick={function(){ setShowAufmassListeModal(false); }}
-                                    style={{width:'100%', padding:'12px', marginTop:'12px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                    {'Schlie\u00dfen'}
-                                </button>
+                                <div style={{display:'flex', gap:'10px', marginTop:'18px'}}>
+                                    <button onClick={function(){ setAufmassDialogStep('auswahl'); }}
+                                        style={{flex:'1 1 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'\u2190 Zur\u00fcck'}
+                                    </button>
+                                    <button onClick={function(){ setAufmassDialogStep(null); }}
+                                        style={{flex:'0 0 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'Schlie\u00dfen'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* B4: SPEICHERN-FRAGE beim Verlassen des Aufmasz-Bereichs */}
-                    {showAufmassSpeichernModal && (
-                        <div className="modal-overlay" style={{zIndex:4000}}>
-                            <div style={{width:'100%', maxWidth:'420px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.5)'}}>
+                    {/* ═══ AUFMASZ-VERLASSEN-DIALOG (28.04.2026) ═══ */}
+                    {/* Stufe 4: Speichern Ja/Nein bei Verlassen des Aufmass-Bereichs */}
+                    {aufmassDialogStep === 'verlassen' && (
+                        <div className="modal-overlay" style={{zIndex:3700}}>
+                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
                                 <div style={{textAlign:'center', marginBottom:'18px'}}>
-                                    <div style={{fontSize:'48px', marginBottom:'10px'}}>{'\uD83D\uDCBE'}</div>
-                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'19px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
-                                        Aufmasz speichern?
+                                    <div style={{fontSize:'40px', marginBottom:'8px'}}>{'\uD83D\uDCBE'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Aufma\u00df speichern?'}
+                                    </div>
+                                    <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'8px', lineHeight:'1.5'}}>
+                                        {'Du verl\u00e4sst den Aufma\u00df-Bereich. M\u00f6chtest du den aktuellen Stand als gespeichertes Aufma\u00df ablegen?'}
                                     </div>
                                 </div>
-                                <div style={{fontSize:'13px', color:'var(--text-secondary)', marginBottom:'22px', lineHeight:'1.5', textAlign:'center'}}>
-                                    Du verlaesst den Aufmasz-Bereich. Soll der aktuelle Stand als benannter Snapshot gesichert werden?
-                                    <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'10px', fontStyle:'italic'}}>
-                                        Hinweis: Auto-Save laeuft als Sicherheitsnetz im Hintergrund unabhaengig weiter.
+
+                                {/* Info-Block: was Bauvorhaben/Datum sind, falls vorhanden */}
+                                {aktivesAufmassMetaRef.current && aktivesAufmassMetaRef.current.bauvorhaben && (
+                                    <div style={{padding:'12px 14px', borderRadius:'10px', background:'var(--bg-secondary)', fontSize:'13px', color:'var(--text-primary)', marginBottom:'18px'}}>
+                                        <div><strong>{'Bauvorhaben:'}</strong> {aktivesAufmassMetaRef.current.bauvorhaben}</div>
+                                        {aktivesAufmassMetaRef.current.datum && (
+                                            <div><strong>{'Datum:'}</strong> {aktivesAufmassMetaRef.current.datum}</div>
+                                        )}
+                                        {aktivesAufmassMetaRef.current.bemerkung && (
+                                            <div><strong>{'Bemerkung:'}</strong> {aktivesAufmassMetaRef.current.bemerkung}</div>
+                                        )}
                                     </div>
-                                </div>
-                                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
-                                    <button onClick={function(){ handleAufmassSpeichernEntscheidung(true); }}
-                                        style={{width:'100%', padding:'14px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'1px', boxShadow:'0 4px 14px rgba(39,174,96,0.35)'}}>
+                                )}
+
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <button onClick={function() {
+                                        // Nein: nicht zusaetzlich speichern, einfach navigieren.
+                                        // Auto-Save bleibt im Hintergrund aktiv (Sicherheitsnetz).
+                                        var target = aufmassPendingNav;
+                                        setAufmassDialogStep(null);
+                                        setAufmassPendingNav(null);
+                                        if (target) {
+                                            // Direkt setPage + History (skipAufmassDialog = true)
+                                            navigateTo(target, { skipAufmassDialog: true });
+                                        }
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'14px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.8px'}}>
+                                        {'Nein'}
+                                    </button>
+                                    <button onClick={function() {
+                                        // Ja: Snapshot speichern, dann navigieren.
+                                        var target = aufmassPendingNav;
+                                        var savePromise = _collectAndSaveWip({ aufmassSnapshot: true });
+                                        savePromise.then(function() {
+                                            setAufmassDialogStep(null);
+                                            setAufmassPendingNav(null);
+                                            // Aktive Aufmass-Meta zuruecksetzen (das Aufmass ist abgeschlossen)
+                                            aktivesAufmassMetaRef.current = null;
+                                            if (window._showToast) window._showToast('Aufma\u00df gespeichert', 'success');
+                                            if (target) {
+                                                navigateTo(target, { skipAufmassDialog: true });
+                                            }
+                                        }).catch(function(err) {
+                                            console.warn('[Aufmass-Speichern] Fehler:', err);
+                                            alert('Fehler beim Speichern: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+                                        });
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'14px 16px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', boxShadow:'0 4px 14px rgba(39,174,96,0.3)'}}>
                                         {'\u2713 Ja, speichern'}
                                     </button>
-                                    <button onClick={function(){ handleAufmassSpeichernEntscheidung(false); }}
-                                        style={{width:'100%', padding:'14px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'1px'}}>
-                                        Nein, ohne Speichern
-                                    </button>
-                                    <button onClick={function(){ setShowAufmassSpeichernModal(false); setPendingAufmassExitPage(null); }}
-                                        style={{width:'100%', padding:'10px', borderRadius:'10px', border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.5px'}}>
-                                        Abbrechen (im Aufmasz bleiben)
-                                    </button>
                                 </div>
+
+                                {/* Abbrechen-Button: Dialog schliessen, im Aufmass bleiben */}
+                                <button onClick={function() {
+                                    setAufmassDialogStep(null);
+                                    setAufmassPendingNav(null);
+                                }}
+                                    style={{width:'100%', padding:'10px', marginTop:'10px', borderRadius:'8px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:500, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                    {'Abbrechen \u00b7 im Aufma\u00df bleiben'}
+                                </button>
                             </div>
                         </div>
                     )}
@@ -3452,7 +3479,7 @@
                     {/* ═══ SPEICHERN TOAST ═══ */}
                     {akteSaveToast && (
                         <div style={{position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'#27ae60', color:'#fff', padding:'10px 24px', borderRadius:'12px', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'8px', animation:'fadeIn 0.2s ease'}}>
-                            <span style={{fontSize:'18px'}}>{'\u2713'}</span> {akteSaveToast}
+                            <span style={{fontSize:'18px'}}>\u2713</span> {akteSaveToast}
                         </div>
                     )}
 
@@ -3470,7 +3497,7 @@
                     {/* ═══ AUTO-WIEDERHERSTELLUNG TOAST ═══ */}
                     {autoRestoreToast && (
                         <div style={{position:'fixed', bottom:'130px', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', padding:'12px 28px', borderRadius:'12px', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'10px', maxWidth:'90vw', textAlign:'center'}}>
-                            <span style={{fontSize:'18px'}}>{'\u21BA'}</span> {autoRestoreToast}
+                            <span style={{fontSize:'18px'}}>\u21BA</span> {autoRestoreToast}
                         </div>
                     )}
 
