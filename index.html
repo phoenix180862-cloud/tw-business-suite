@@ -143,33 +143,33 @@
          ?v= Query-String erzwingt Browser-Reload nach jedem Build.
          Bei jedem Build wird hier ein neuer Zeitstempel eingesetzt,
          damit selbst aggressivste Caches nicht stoeren. -->
-    <script src="tw-core.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-storage.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-schema.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-storage-api.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-kundendaten-parser.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-infrastructure.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-staging.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-nav-dropdowns.js?v=20260428-recovery-all-changes"></script>
-    <script src="tw-storage-components.js?v=20260428-recovery-all-changes"></script>
+    <script src="tw-core.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-storage.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-schema.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-storage-api.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-kundendaten-parser.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-infrastructure.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-staging.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-nav-dropdowns.js?v=20260428-recovery-v2-diagnose"></script>
+    <script src="tw-storage-components.js?v=20260428-recovery-v2-diagnose"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
 
     <!-- ═══ TW BUSINESS SUITE — DESIGN SYSTEM ═══ -->
-    <link rel="stylesheet" href="tw-design.css?v=20260428-recovery-all-changes">
+    <link rel="stylesheet" href="tw-design.css?v=20260428-recovery-v2-diagnose">
 
 
-    <div id="root" data-build="20260428-recovery-all-changes"></div>
+    <div id="root" data-build="20260428-recovery-v2-diagnose"></div>
 
     <script>
     // Build-Version in die Console — damit man auf dem Tablet in den DevTools
     // sofort sieht, ob man die neueste Version hat oder eine gecachte.
-    console.log('%c[TW Build] Version: 20260428-recovery-all-changes', 'color:#1E88E5;font-weight:bold');
+    console.log('%c[TW Build] Version: 20260428-recovery-v2-diagnose', 'color:#1E88E5;font-weight:bold');
     </script>
 
 
     <script type="text/javascript">
-function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}window.__twSentinel={startedAt:Date.now(),built:"20260428-recovery-all-changes",completedModules:[]};// === MODUL-GRENZE: tw-shared-components.jsx ===
+function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}window.__twSentinel={startedAt:Date.now(),built:"20260428-recovery-v2-diagnose",completedModules:[]};// === MODUL-GRENZE: tw-shared-components.jsx ===
 window.__twSentinel.lastModule="tw-shared-components.jsx";const{useState,useEffect,useCallback,useRef}=React;/* ═══════════════════════════════════════════
            LEICA DISTO – Bluetooth Tastatur-Modus
            DISTO am Geraet auf "Text" oder "Tabelle" stellen,
@@ -6725,7 +6725,25 @@ function App() {
     handleLoadAkte: handleLoadAkte,
     navigateTo: navigateTo
   };
-  return /*#__PURE__*/React.createElement(React.Fragment, null, page !== 'start' && /*#__PURE__*/React.createElement(NavHeader, {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'fixed',
+      bottom: '0',
+      left: '0',
+      right: '0',
+      background: 'linear-gradient(90deg, #e84040, #f39c12, #e84040)',
+      color: '#fff',
+      padding: '4px 12px',
+      fontSize: '11px',
+      fontWeight: '700',
+      textAlign: 'center',
+      fontFamily: 'Oswald, sans-serif',
+      textTransform: 'uppercase',
+      letterSpacing: '1px',
+      zIndex: 99999,
+      boxShadow: '0 -2px 8px rgba(0,0,0,0.3)'
+    }
+  }, "\uD83D\uDD25 RECOVERY V28-04-2026 \u2014 Mikrofon \xB7 Werte l\xF6schen \xB7 Aktionen-Bar \xB7 Auto-Markierung \uD83D\uDD25"), page !== 'start' && /*#__PURE__*/React.createElement(NavHeader, {
     page: page,
     onBack: goBack,
     onForward: goForward,

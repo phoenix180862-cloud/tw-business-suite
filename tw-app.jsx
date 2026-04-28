@@ -2788,6 +2788,31 @@
 
             return (
                 <React.Fragment>
+                    {/* ═══ DIAGNOSE-MARKER (28.04.2026 - kann nach Test entfernt werden) ═══
+                         Dieser Banner zeigt unmissverstaendlich, dass die Recovery-Version
+                         (mit Mikrofon, Loesch-Button, Action-Bar, etc.) tatsaechlich
+                         im Browser geladen ist. Wenn dieser Banner SICHTBAR ist, lauft
+                         der neue Code. Wenn er NICHT sichtbar ist, hat der Browser noch
+                         die alte Version aus dem Cache. */}
+                    <div style={{
+                        position:'fixed',
+                        bottom:'0',
+                        left:'0',
+                        right:'0',
+                        background:'linear-gradient(90deg, #e84040, #f39c12, #e84040)',
+                        color:'#fff',
+                        padding:'4px 12px',
+                        fontSize:'11px',
+                        fontWeight:'700',
+                        textAlign:'center',
+                        fontFamily:'Oswald, sans-serif',
+                        textTransform:'uppercase',
+                        letterSpacing:'1px',
+                        zIndex:99999,
+                        boxShadow:'0 -2px 8px rgba(0,0,0,0.3)'
+                    }}>
+                        🔥 RECOVERY V28-04-2026 — Mikrofon · Werte löschen · Aktionen-Bar · Auto-Markierung 🔥
+                    </div>
                     {/* PHASE-3 (26.04.2026): Auf der Startseite KEIN NavHeader und KEINE
                         globale Toolbar mehr — der schwarze Querbalken hatte das Logo verdeckt
                         (siehe Foto vom 26.04.2026 18:02). Stattdessen schweben die 4 Status-
