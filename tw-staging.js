@@ -1074,6 +1074,207 @@
             return res.result;
         }
 
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE F: STAGING -> ORIGINAL SAMMEL-SYNC
+        // Ein-Tuer-Prinzip — manueller Tor-Schritt zwischen
+        // Mitarbeiter-Uploads (Staging) und Kundenakte (Original).
+        //
+        // Skill SKILL-baustellenapp-umbau Etappe F + Konzept-PDF Kapitel 7.1-7.3:
+        //   - Staging/Fotos   ->  Original/Bilder
+        //   - Staging/Stunden ->  Original/Stundennachweis
+        //   - Vorschau, Checkboxen pro Datei
+        //   - Kollisions-Erkennung mit 3-Wege-Strategie
+        //
+        // Andere Staging-Subfolder (Zeichnungen/Anweisungen/Baustellendaten)
+        // sind read-only fuer Mitarbeiter — fuer die gibt es keine Rueckrichtung.
+        // ═══════════════════════════════════════════════════════
+        var STAGING_ZU_ORIGINAL_MAP = {
+            'Fotos':   { zielName: 'Bilder',         finder: findeKundenBilderOrdner,  lister: listeStagingFotos   },
+            'Stunden': { zielName: 'Stundennachweis', finder: findeKundenStundenOrdner, lister: listeStagingStunden }
+        };
+
+        // Analysiert eine Baustelle: listet alle Mitarbeiter-Uploads (Fotos+Stunden),
+        // findet pro Kategorie den Original-Ziel-Ordner und prueft Namens-Kollisionen.
+        // Liefert eine flache Item-Liste, die direkt in den UI-Dialog gerendert wird.
+        async function analysiereStagingNachOriginal(baustelleName) {
+            assertDriveReady();
+            if (!baustelleName) throw new Error('baustelleName fehlt');
+            var ergebnis = {
+                baustelle: baustelleName,
+                items: [],         // ein Eintrag pro Staging-Datei
+                kategorienFehler: [] // wenn Ziel-Ordner nicht gefunden o.ae.
+            };
+
+            for (var subfolderName in STAGING_ZU_ORIGINAL_MAP) {
+                if (!STAGING_ZU_ORIGINAL_MAP.hasOwnProperty(subfolderName)) continue;
+                var mapping = STAGING_ZU_ORIGINAL_MAP[subfolderName];
+
+                // 1) Staging-Dateien dieser Kategorie listen
+                var stagingDateien = [];
+                try {
+                    stagingDateien = await mapping.lister(baustelleName);
+                } catch (e) {
+                    // Subfolder existiert nicht oder API-Fehler — ueberspringen, aber merken
+                    ergebnis.kategorienFehler.push({
+                        kategorie: subfolderName,
+                        fehler: 'Staging-Ordner nicht lesbar: ' + (e.message || String(e))
+                    });
+                    continue;
+                }
+                if (!stagingDateien || stagingDateien.length === 0) continue;
+
+                // 2) Ziel-Ordner im Original-Kundenordner finden
+                var zielOrdner;
+                try {
+                    zielOrdner = await mapping.finder(baustelleName);
+                } catch (e) {
+                    ergebnis.kategorienFehler.push({
+                        kategorie: subfolderName,
+                        fehler: 'Ziel-Ordner "' + mapping.zielName + '" nicht gefunden: ' + (e.message || String(e)),
+                        anzahlDateien: stagingDateien.length
+                    });
+                    continue;
+                }
+
+                // 3) Ziel-Inhalt einlesen fuer Kollisions-Pruefung
+                var zielDateien = [];
+                try {
+                    zielDateien = await listDateienInOrdner(zielOrdner.id);
+                } catch (e) {
+                    // Wenn Ziel-Liste nicht ladbar, nehmen wir an: keine Kollisionen (Default sicher)
+                    zielDateien = [];
+                }
+                var zielMap = {};
+                zielDateien.forEach(function(d){
+                    if (d && d.name) zielMap[d.name.toLowerCase()] = d;
+                });
+
+                // 4) Items zusammenbauen
+                for (var i = 0; i < stagingDateien.length; i++) {
+                    var s = stagingDateien[i];
+                    var kollision = zielMap[(s.name || '').toLowerCase()];
+                    // Smarte Erkennung: gleicher Name + gleiche Groesse = Doppel-Upload
+                    var istDoppelUpload = false;
+                    if (kollision && kollision.size && s.size && String(kollision.size) === String(s.size)) {
+                        istDoppelUpload = true;
+                    }
+                    ergebnis.items.push({
+                        kategorie: subfolderName,                  // 'Fotos' | 'Stunden'
+                        stagingFile: {
+                            id: s.id,
+                            name: s.name,
+                            size: s.size || 0,
+                            mimeType: s.mimeType || '',
+                            modifiedTime: s.modifiedTime || '',
+                            thumbnailLink: s.thumbnailLink || ''
+                        },
+                        zielOrdner: { id: zielOrdner.id, name: zielOrdner.name, kategorieZielName: mapping.zielName },
+                        kollision: !!kollision,
+                        kollisionFile: kollision ? {
+                            id: kollision.id,
+                            name: kollision.name,
+                            size: kollision.size || 0,
+                            modifiedTime: kollision.modifiedTime || ''
+                        } : null,
+                        istDoppelUpload: istDoppelUpload
+                    });
+                }
+            }
+
+            return ergebnis;
+        }
+
+        // Uebertraegt eine Auswahl von Items mit individueller Strategie pro Item.
+        // strategie pro Item: 'kopieren' | 'umbenennen' | 'ueberschreiben' | 'ignorieren'
+        //   - kopieren:      ohne Kollision direkt; mit Kollision faellt zurueck auf 'umbenennen'
+        //   - umbenennen:    bei Kollision wird die neue Datei mit Zeitstempel-Suffix kopiert
+        //   - ueberschreiben: bestehende Datei in Papierkorb, neue Datei mit Originalnamen
+        //   - ignorieren:    Datei wird nicht angefasst
+        // onProgress(index, total, currentName, lastResult)
+        async function uebertrageStagingNachOriginal(itemsMitStrategie, onProgress) {
+            assertDriveReady();
+            onProgress = onProgress || function(){};
+            var ergebnisse = {
+                erfolgreich: 0,
+                uebersprungen: 0,
+                fehler: 0,
+                details: []   // [{ name, status, neuerName?, fehler? }]
+            };
+
+            for (var i = 0; i < itemsMitStrategie.length; i++) {
+                var item = itemsMitStrategie[i];
+                var strategie = item.strategie || 'kopieren';
+                var dateiName = (item.stagingFile && item.stagingFile.name) || '?';
+                onProgress(i, itemsMitStrategie.length, dateiName, null);
+
+                // Ignorieren -> uebersprungen, kein API-Call
+                if (strategie === 'ignorieren' || strategie === 'ueberspringen') {
+                    ergebnisse.uebersprungen++;
+                    var detail = { name: dateiName, kategorie: item.kategorie, status: 'uebersprungen' };
+                    ergebnisse.details.push(detail);
+                    onProgress(i + 1, itemsMitStrategie.length, dateiName, detail);
+                    continue;
+                }
+
+                // Konflikt-Strategie an copyFile uebersetzen
+                var copyOpt = { onConflict: 'umbenennen' };
+                if (strategie === 'ueberschreiben') copyOpt.onConflict = 'ueberschreiben';
+                else if (strategie === 'umbenennen') copyOpt.onConflict = 'umbenennen';
+                else if (strategie === 'kopieren') {
+                    copyOpt.onConflict = item.kollision ? 'umbenennen' : 'umbenennen';
+                }
+
+                try {
+                    var r = await copyFile(item.stagingFile.id, item.zielOrdner.id, copyOpt);
+                    ergebnisse.erfolgreich++;
+                    var detailOk = {
+                        name: dateiName,
+                        kategorie: item.kategorie,
+                        status: 'kopiert',
+                        neuerName: r && r.name && r.name !== dateiName ? r.name : null,
+                        zielOrdner: item.zielOrdner.name
+                    };
+                    ergebnisse.details.push(detailOk);
+                    onProgress(i + 1, itemsMitStrategie.length, dateiName, detailOk);
+                } catch (e) {
+                    ergebnisse.fehler++;
+                    var detailErr = {
+                        name: dateiName,
+                        kategorie: item.kategorie,
+                        status: 'fehler',
+                        fehler: e.message || String(e)
+                    };
+                    ergebnisse.details.push(detailErr);
+                    onProgress(i + 1, itemsMitStrategie.length, dateiName, detailErr);
+                }
+            }
+
+            return ergebnisse;
+        }
+
+        // Sammel-Variante: alle bereitgestellten Baustellen analysieren.
+        // Liefert ein Map {baustelleName: analysiereResult}, plus globalen Aggregat.
+        async function analysiereAlleStagingsNachOriginal(onProgress) {
+            assertDriveReady();
+            onProgress = onProgress || function(){};
+            var alle = await listStagingBaustellen();
+            var map = {};
+            var aggregatItems = 0;
+            for (var i = 0; i < alle.length; i++) {
+                var b = alle[i];
+                onProgress(i, alle.length, b.name);
+                try {
+                    var erg = await analysiereStagingNachOriginal(b.name);
+                    map[b.name] = erg;
+                    aggregatItems += erg.items.length;
+                } catch (e) {
+                    map[b.name] = { baustelle: b.name, items: [], kategorienFehler: [{ kategorie: '*', fehler: e.message || String(e) }] };
+                }
+            }
+            onProgress(alle.length, alle.length, null);
+            return { proBaustelle: map, aggregatItems: aggregatItems };
+        }
+
         // ── Exporte ──
         window.TWStaging = {
             ensureRootFolder: ensureRootFolder,
@@ -1108,7 +1309,11 @@
             listeStagingStunden: listeStagingStunden,
             findeKundenStundenOrdner: findeKundenStundenOrdner,
             ensureLohnMonatsOrdner: ensureLohnMonatsOrdner,
-            kopierePdfInOrdner: kopierePdfInOrdner
+            kopierePdfInOrdner: kopierePdfInOrdner,
+            // Etappe F: Staging -> Original Sammel-Sync
+            analysiereStagingNachOriginal: analysiereStagingNachOriginal,
+            uebertrageStagingNachOriginal: uebertrageStagingNachOriginal,
+            analysiereAlleStagingsNachOriginal: analysiereAlleStagingsNachOriginal
         };
 
     })();

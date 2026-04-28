@@ -1058,6 +1058,8 @@
             const [laedt, setLaedt] = useState(false);
             const [fehler, setFehler] = useState(null);
             const [anlegeBusy, setAnlegeBusy] = useState(false);
+            // ETAPPE F: Sync-Vorschau-Dialog Staging -> Original
+            const [showStagingNachOriginal, setShowStagingNachOriginal] = useState(false);
 
             // ── Etappe 4.1 Baustein 1: 2-Ordner-Modell ──
             // subView: 'hauptordner' | 'baustellen-daten' | 'nachrichten'
@@ -1451,6 +1453,60 @@
                         </div>
                     )}
 
+                    {/* ETAPPE F: Action-Bar — Mitarbeiter-Uploads ins Original uebertragen */}
+                    {bereit && subView === 'hauptordner' && (
+                        <div style={{
+                            marginTop: '14px',
+                            padding: '10px 12px',
+                            borderRadius: 'var(--radius-sm)',
+                            background: 'rgba(39,174,96,0.06)',
+                            border: '1px solid rgba(39,174,96,0.25)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            flexWrap: 'wrap'
+                        }}>
+                            <span style={{ fontSize: '20px' }}>{'\uD83D\uDCE4'}</span>
+                            <div style={{ flex: 1, minWidth: '140px' }}>
+                                <div style={{
+                                    fontSize: '12px',
+                                    fontFamily: "'Oswald', sans-serif",
+                                    fontWeight: 600,
+                                    letterSpacing: '0.5px',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--success)'
+                                }}>
+                                    Uploads ins Original uebertragen
+                                </div>
+                                <div style={{
+                                    fontSize: '10px',
+                                    color: 'var(--text-muted)',
+                                    marginTop: '2px'
+                                }}>
+                                    Mitarbeiter-Fotos &amp; Stundenzettel mit Vorschau in die Kundenakte uebertragen
+                                </div>
+                            </div>
+                            <button
+                                onClick={function(){ setShowStagingNachOriginal(true); }}
+                                style={{
+                                    padding: '8px 14px',
+                                    background: 'linear-gradient(135deg, #43A047, #2E7D32)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: 'var(--radius-sm)',
+                                    fontFamily: "'Oswald', sans-serif",
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    letterSpacing: '0.8px',
+                                    textTransform: 'uppercase',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 3px 10px rgba(67,160,71,0.30)',
+                                    touchAction: 'manipulation'
+                                }}
+                            >Vorschau {'\u2192'}</button>
+                        </div>
+                    )}
+
                     {/* ═══════════════════════════════════════════════════════ */}
                     {/* ETAPPE 4.1 BAUSTEIN 4 — NACHRICHTEN-BEREICH             */}
                     {/* Eigener Router (Liste ↔ Detail). Kalender und Chat als  */}
@@ -1573,6 +1629,18 @@
                                 );
                             })}
                         </div>
+                    )}
+
+                    {/* ETAPPE F: Vorschau-Dialog fuer Staging -> Original */}
+                    {showStagingNachOriginal && (
+                        <StagingNachOriginalDialog
+                            baustelleName={baustelle.name}
+                            alleBaustellen={false}
+                            onSchliessen={function(){
+                                setShowStagingNachOriginal(false);
+                                ladeInfo(); // Info neu laden, falls Dateien gewandert sind
+                            }}
+                        />
                     )}
                 </div>
             );
@@ -4695,6 +4763,8 @@
             const [laedt, setLaedt] = useState(false);
             const [syncStatus, setSyncStatus] = useState({}); // { baustelleName: {running, ergebnis, fehler} }
             const [allesLaeuft, setAllesLaeuft] = useState(false);
+            // ETAPPE F: Sammel-Sync-Dialog (Staging -> Original ueber alle bereitgestellten Baustellen)
+            const [showSammelDialog, setShowSammelDialog] = useState(false);
 
             // ── Etappe 9: Map "Baustelle → letzter Sync-Audit-Event" ──
             // Damit koennen wir bei Baustellen, die in der letzten Zeit fehlerhaft waren,
@@ -4803,7 +4873,7 @@
                         onClick={syncAlle}
                         disabled={allesLaeuft || baustellen.length === 0}
                         style={{
-                            width:'100%', padding:'14px 16px', marginBottom:'14px',
+                            width:'100%', padding:'14px 16px', marginBottom:'10px',
                             borderRadius:'var(--radius-md)', border:'none',
                             background: allesLaeuft ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
                             color: allesLaeuft ? 'var(--text-muted)' : '#fff',
@@ -4816,6 +4886,27 @@
                         }}>
                         <span style={{ fontSize:'20px' }}>{allesLaeuft ? '⏳' : '🔄'}</span>
                         <span>{allesLaeuft ? 'Synchronisiert...' : 'Alle Baustellen synchronisieren'}</span>
+                    </button>
+
+                    {/* ETAPPE F: Sammel-Sync Staging -> Original ueber ALLE Baustellen */}
+                    <button
+                        onClick={function(){ setShowSammelDialog(true); }}
+                        disabled={baustellen.length === 0}
+                        style={{
+                            width:'100%', padding:'14px 16px', marginBottom:'14px',
+                            borderRadius:'var(--radius-md)', border:'none',
+                            background: 'linear-gradient(135deg, #43A047, #2E7D32)',
+                            color: '#fff',
+                            fontFamily:"'Oswald', sans-serif", fontSize:'14px', fontWeight:600,
+                            letterSpacing:'1.5px', textTransform:'uppercase',
+                            cursor: baustellen.length === 0 ? 'not-allowed' : 'pointer',
+                            opacity: baustellen.length === 0 ? 0.5 : 1,
+                            boxShadow: baustellen.length === 0 ? 'none' : '0 4px 15px rgba(67,160,71,0.30)',
+                            touchAction:'manipulation',
+                            display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'
+                        }}>
+                        <span style={{ fontSize:'20px' }}>{'\uD83D\uDCE4'}</span>
+                        <span>Mitarbeiter-Uploads ins Original (Sammel-Sync)</span>
                     </button>
 
                     {/* Fehler beim Laden */}
@@ -4981,8 +5072,717 @@
                             </div>
                         </div>
                     )}
+
+                    {/* ETAPPE F: Sammel-Sync-Dialog Staging -> Original */}
+                    {showSammelDialog && (
+                        <StagingNachOriginalDialog
+                            alleBaustellen={true}
+                            onSchliessen={function(){ setShowSammelDialog(false); }}
+                        />
+                    )}
                 </div>
             );
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // ETAPPE F — STAGING-NACH-ORIGINAL SYNC-DIALOG
+        // Manueller Tor-Schritt im Ein-Tuer-Prinzip:
+        // Mitarbeiter-Uploads (Fotos + Stundenzettel) aus dem Staging-Bereich
+        // werden in die Original-Kundenakte uebertragen.
+        //
+        // Modi:
+        //   einzeln    -  baustelleName gesetzt, eine Baustelle
+        //   sammel     -  alleBaustellen=true, alle bereitgestellten Baustellen
+        //
+        // Phasen:
+        //   analysiere -  scannt Staging, prueft Kollisionen
+        //   vorschau   -  Liste mit Checkboxen + Strategie-Toggle pro Datei
+        //   uebertrage -  fuehrt Drive-Copy aus, Fortschrittsbalken
+        //   fertig     -  Ergebnis-Zusammenfassung mit Audit-Log
+        // ═══════════════════════════════════════════════════════
+        function StagingNachOriginalDialog({ baustelleName, alleBaustellen, onSchliessen }) {
+            const [phase, setPhase] = useState('analysiere');
+            const [analyseFortschritt, setAnalyseFortschritt] = useState({ aktuell: 0, gesamt: 1, name: '' });
+            const [analyseFehler, setAnalyseFehler] = useState(null);
+            const [items, setItems] = useState([]); // [{kategorie, stagingFile, zielOrdner, kollision, kollisionFile, istDoppelUpload, strategie, ausgewaehlt, baustelle}]
+            const [kategorienFehler, setKategorienFehler] = useState([]); // [{baustelle, kategorie, fehler}]
+            const [uebertrageFortschritt, setUebertrageFortschritt] = useState({ aktuell: 0, gesamt: 0, name: '' });
+            const [ergebnis, setErgebnis] = useState(null);
+
+            // ── Initial-Analyse ──
+            useEffect(function() {
+                async function laden() {
+                    setPhase('analysiere');
+                    setAnalyseFehler(null);
+                    try {
+                        if (!window.TWStaging) throw new Error('Staging-API nicht geladen');
+                        var alleItems = [];
+                        var alleKatFehler = [];
+                        if (alleBaustellen) {
+                            // Sammel-Modus: ueber alle bereitgestellten Baustellen
+                            var resAlle = await window.TWStaging.analysiereAlleStagingsNachOriginal(function(akt, total, n) {
+                                setAnalyseFortschritt({ aktuell: akt, gesamt: total || 1, name: n || '' });
+                            });
+                            for (var bName in resAlle.proBaustelle) {
+                                if (!resAlle.proBaustelle.hasOwnProperty(bName)) continue;
+                                var bRes = resAlle.proBaustelle[bName];
+                                (bRes.items || []).forEach(function(it) {
+                                    it.baustelle = bName;
+                                    alleItems.push(it);
+                                });
+                                (bRes.kategorienFehler || []).forEach(function(kf) {
+                                    alleKatFehler.push(Object.assign({ baustelle: bName }, kf));
+                                });
+                            }
+                        } else {
+                            // Einzel-Modus
+                            setAnalyseFortschritt({ aktuell: 0, gesamt: 1, name: baustelleName });
+                            var einRes = await window.TWStaging.analysiereStagingNachOriginal(baustelleName);
+                            (einRes.items || []).forEach(function(it) {
+                                it.baustelle = baustelleName;
+                                alleItems.push(it);
+                            });
+                            (einRes.kategorienFehler || []).forEach(function(kf) {
+                                alleKatFehler.push(Object.assign({ baustelle: baustelleName }, kf));
+                            });
+                            setAnalyseFortschritt({ aktuell: 1, gesamt: 1, name: baustelleName });
+                        }
+
+                        // Default-Strategie pro Item:
+                        //   - keine Kollision  -> 'kopieren'  (ausgewaehlt)
+                        //   - Doppel-Upload     -> 'ignorieren' (NICHT ausgewaehlt — ist redundant)
+                        //   - normale Kollision -> 'umbenennen' (ausgewaehlt, sicher gegen Datenverlust)
+                        alleItems.forEach(function(it) {
+                            if (!it.kollision) {
+                                it.strategie = 'kopieren';
+                                it.ausgewaehlt = true;
+                            } else if (it.istDoppelUpload) {
+                                it.strategie = 'ignorieren';
+                                it.ausgewaehlt = false;
+                            } else {
+                                it.strategie = 'umbenennen';
+                                it.ausgewaehlt = true;
+                            }
+                        });
+                        setItems(alleItems);
+                        setKategorienFehler(alleKatFehler);
+                        setPhase('vorschau');
+                    } catch (e) {
+                        setAnalyseFehler(e.message || String(e));
+                        setPhase('vorschau');
+                    }
+                }
+                laden();
+            }, []);
+
+            // Helper: Items toggeln
+            function setItemAusgewaehlt(idx, val) {
+                setItems(function(prev) {
+                    var n = prev.slice();
+                    n[idx] = Object.assign({}, n[idx], { ausgewaehlt: !!val });
+                    return n;
+                });
+            }
+            function setItemStrategie(idx, strat) {
+                setItems(function(prev) {
+                    var n = prev.slice();
+                    n[idx] = Object.assign({}, n[idx], { strategie: strat });
+                    // Ausgewaehlt true setzen, wenn Strategie aus 'ignorieren' wechselt (sonst verwirrend)
+                    if (strat !== 'ignorieren') n[idx].ausgewaehlt = true;
+                    return n;
+                });
+            }
+            function alleAuswaehlen(val) {
+                setItems(function(prev) {
+                    return prev.map(function(it) { return Object.assign({}, it, { ausgewaehlt: !!val }); });
+                });
+            }
+
+            // ── Sync starten ──
+            async function handleSyncStarten() {
+                var ausgewaehlt = items.filter(function(it){ return it.ausgewaehlt && it.strategie !== 'ignorieren'; });
+                if (ausgewaehlt.length === 0) {
+                    alert('Keine Dateien ausgewaehlt.');
+                    return;
+                }
+                if (!confirm('Sollen ' + ausgewaehlt.length + ' Datei(en) in die Original-Kundenakten uebertragen werden?')) {
+                    return;
+                }
+                setPhase('uebertrage');
+                setUebertrageFortschritt({ aktuell: 0, gesamt: ausgewaehlt.length, name: '' });
+                try {
+                    var erg = await window.TWStaging.uebertrageStagingNachOriginal(ausgewaehlt, function(akt, total, name) {
+                        setUebertrageFortschritt({ aktuell: akt, gesamt: total, name: name || '' });
+                    });
+                    setErgebnis(erg);
+                    setPhase('fertig');
+                    // Audit-Log
+                    if (window.FirebaseService && window.FirebaseService.logAuditEvent) {
+                        window.FirebaseService.logAuditEvent('sync_staging_zu_original', {
+                            modus: alleBaustellen ? 'sammel' : 'einzeln',
+                            baustelle: baustelleName || null,
+                            anzahl: ausgewaehlt.length,
+                            erfolgreich: erg.erfolgreich,
+                            uebersprungen: erg.uebersprungen,
+                            fehler: erg.fehler
+                        });
+                    }
+                } catch (e) {
+                    setErgebnis({ erfolgreich: 0, uebersprungen: 0, fehler: ausgewaehlt.length, details: [], abbruch: e.message || String(e) });
+                    setPhase('fertig');
+                }
+            }
+
+            // ── Style-Helper ──
+            var overlayStyle = {
+                position: 'fixed', inset: 0,
+                background: 'rgba(0,0,0,0.65)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 99999,
+                padding: '12px',
+                touchAction: 'manipulation'
+            };
+            var dialogStyle = {
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-lg)',
+                width: '100%', maxWidth: '780px',
+                maxHeight: 'calc(100vh - 24px)',
+                display: 'flex', flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.5)'
+            };
+
+            // ── Header ──
+            var headerEl = (
+                <div style={{
+                    padding: '14px 18px',
+                    borderBottom: '1px solid var(--border-color)',
+                    background: 'linear-gradient(135deg, rgba(30,136,229,0.10), rgba(21,101,192,0.05))',
+                    display: 'flex', alignItems: 'center', gap: '10px'
+                }}>
+                    <span style={{ fontSize: '24px' }}>{'\uD83D\uDCE4'}</span>
+                    <div style={{ flex: 1 }}>
+                        <div style={{
+                            fontFamily: "'Oswald', sans-serif",
+                            fontSize: '15px', fontWeight: 600,
+                            letterSpacing: '1px', textTransform: 'uppercase',
+                            color: 'var(--text-primary)'
+                        }}>
+                            Mitarbeiter-Uploads ins Original
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {alleBaustellen ? 'Alle bereitgestellten Baustellen' : ('Baustelle: ' + (baustelleName || ''))}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onSchliessen}
+                        disabled={phase === 'uebertrage'}
+                        style={{
+                            background: 'none', border: 'none',
+                            color: 'var(--text-muted)',
+                            fontSize: '22px',
+                            cursor: phase === 'uebertrage' ? 'not-allowed' : 'pointer',
+                            opacity: phase === 'uebertrage' ? 0.4 : 1,
+                            padding: '4px 8px',
+                            touchAction: 'manipulation'
+                        }}
+                    >{'\u2715'}</button>
+                </div>
+            );
+
+            // ── Phase 1: Analyse ──
+            if (phase === 'analysiere') {
+                return (
+                    <div style={overlayStyle}>
+                        <div style={dialogStyle}>
+                            {headerEl}
+                            <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-light)' }}>
+                                <div style={{ fontSize: '40px', marginBottom: '12px' }}>{'\u23F3'}</div>
+                                <div style={{ fontSize: '14px', fontFamily: "'Oswald', sans-serif", letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                    Staging wird analysiert...
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {analyseFortschritt.name || ''}
+                                    {analyseFortschritt.gesamt > 1 ? ' (' + analyseFortschritt.aktuell + ' / ' + analyseFortschritt.gesamt + ')' : ''}
+                                </div>
+                                {analyseFortschritt.gesamt > 1 && (
+                                    <div style={{
+                                        marginTop: '14px',
+                                        height: '6px',
+                                        background: 'var(--bg-secondary)',
+                                        borderRadius: '3px',
+                                        overflow: 'hidden',
+                                        maxWidth: '320px',
+                                        margin: '14px auto 0'
+                                    }}>
+                                        <div style={{
+                                            width: Math.round((analyseFortschritt.aktuell / analyseFortschritt.gesamt) * 100) + '%',
+                                            height: '100%',
+                                            background: 'linear-gradient(90deg, #1E88E5, #1565C0)',
+                                            transition: 'width 0.2s'
+                                        }}></div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ── Phase 2: Vorschau ──
+            if (phase === 'vorschau') {
+                var ausgewaehltAnzahl = items.filter(function(it){ return it.ausgewaehlt && it.strategie !== 'ignorieren'; }).length;
+                var kollisionAnzahl = items.filter(function(it){ return it.kollision; }).length;
+                // Items nach Baustelle gruppieren (im Sammel-Modus relevant)
+                var nachBaustelle = {};
+                items.forEach(function(it, idx) {
+                    var key = it.baustelle || baustelleName || '?';
+                    if (!nachBaustelle[key]) nachBaustelle[key] = [];
+                    nachBaustelle[key].push({ it: it, idx: idx });
+                });
+                var baustellenNamen = Object.keys(nachBaustelle).sort();
+
+                return (
+                    <div style={overlayStyle}>
+                        <div style={dialogStyle}>
+                            {headerEl}
+
+                            {/* Statusleiste */}
+                            <div style={{
+                                padding: '10px 18px',
+                                background: 'var(--bg-secondary)',
+                                borderBottom: '1px solid var(--border-color)',
+                                fontSize: '12px',
+                                color: 'var(--text-light)',
+                                display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center'
+                            }}>
+                                <span><strong>{items.length}</strong> Datei(en) gefunden</span>
+                                <span style={{ color: 'var(--accent-blue)' }}>
+                                    <strong>{ausgewaehltAnzahl}</strong> ausgewaehlt
+                                </span>
+                                {kollisionAnzahl > 0 && (
+                                    <span style={{ color: 'var(--accent-orange)' }}>
+                                        {'\u26A0'} {kollisionAnzahl} Kollision(en)
+                                    </span>
+                                )}
+                                <span style={{ flex: 1 }}></span>
+                                {items.length > 0 && (
+                                    <React.Fragment>
+                                        <button
+                                            onClick={function(){ alleAuswaehlen(true); }}
+                                            style={{
+                                                background: 'none', border: '1px solid var(--border-color)',
+                                                color: 'var(--text-light)',
+                                                padding: '4px 10px', borderRadius: '4px',
+                                                fontSize: '10px', fontFamily: "'Oswald', sans-serif",
+                                                fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase',
+                                                cursor: 'pointer', touchAction: 'manipulation'
+                                            }}
+                                        >Alle</button>
+                                        <button
+                                            onClick={function(){ alleAuswaehlen(false); }}
+                                            style={{
+                                                background: 'none', border: '1px solid var(--border-color)',
+                                                color: 'var(--text-muted)',
+                                                padding: '4px 10px', borderRadius: '4px',
+                                                fontSize: '10px', fontFamily: "'Oswald', sans-serif",
+                                                fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase',
+                                                cursor: 'pointer', touchAction: 'manipulation'
+                                            }}
+                                        >Keine</button>
+                                    </React.Fragment>
+                                )}
+                            </div>
+
+                            {/* Hauptbereich: scrollbare Liste */}
+                            <div style={{
+                                flex: 1, overflow: 'auto',
+                                padding: '12px 18px'
+                            }}>
+                                {analyseFehler && (
+                                    <div style={{
+                                        padding: '10px 12px', marginBottom: '12px',
+                                        background: 'rgba(196,30,30,0.10)',
+                                        border: '1px solid rgba(196,30,30,0.30)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        color: 'var(--accent-red)', fontSize: '12px'
+                                    }}>
+                                        <strong>Analyse-Fehler:</strong> {analyseFehler}
+                                    </div>
+                                )}
+
+                                {kategorienFehler.length > 0 && (
+                                    <div style={{
+                                        padding: '10px 12px', marginBottom: '12px',
+                                        background: 'rgba(230,126,34,0.10)',
+                                        border: '1px solid rgba(230,126,34,0.30)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontSize: '11px', color: 'var(--accent-orange)',
+                                        lineHeight: 1.5
+                                    }}>
+                                        <strong>Hinweise zur Original-Struktur:</strong>
+                                        <ul style={{ margin: '6px 0 0', paddingLeft: '18px' }}>
+                                            {kategorienFehler.map(function(kf, i) {
+                                                return (
+                                                    <li key={i}>
+                                                        {kf.baustelle ? '[' + kf.baustelle + '] ' : ''}
+                                                        {kf.kategorie}: {kf.fehler}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {items.length === 0 && !analyseFehler && (
+                                    <div style={{
+                                        padding: '40px 20px',
+                                        textAlign: 'center',
+                                        color: 'var(--text-muted)',
+                                        fontSize: '13px'
+                                    }}>
+                                        <div style={{ fontSize: '36px', opacity: 0.3, marginBottom: '8px' }}>{'\u2705'}</div>
+                                        Keine neuen Mitarbeiter-Uploads gefunden.
+                                    </div>
+                                )}
+
+                                {baustellenNamen.map(function(bName) {
+                                    var liste = nachBaustelle[bName];
+                                    return (
+                                        <div key={bName} style={{ marginBottom: '14px' }}>
+                                            {alleBaustellen && (
+                                                <div style={{
+                                                    fontSize: '12px',
+                                                    fontFamily: "'Oswald', sans-serif",
+                                                    fontWeight: 600,
+                                                    letterSpacing: '0.5px',
+                                                    textTransform: 'uppercase',
+                                                    color: 'var(--text-light)',
+                                                    padding: '6px 8px',
+                                                    background: 'var(--bg-secondary)',
+                                                    borderRadius: 'var(--radius-sm)',
+                                                    marginBottom: '6px'
+                                                }}>
+                                                    {'\uD83C\uDFD7\uFE0F'} {bName} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({liste.length})</span>
+                                                </div>
+                                            )}
+                                            {liste.map(function(eintrag) {
+                                                var it = eintrag.it;
+                                                var idx = eintrag.idx;
+                                                var groesse = it.stagingFile.size ? Math.round(it.stagingFile.size / 1024) + ' KB' : '';
+                                                return (
+                                                    <div key={idx} style={{
+                                                        display: 'flex', alignItems: 'flex-start', gap: '10px',
+                                                        padding: '10px 12px',
+                                                        marginBottom: '6px',
+                                                        background: it.ausgewaehlt ? 'rgba(30,136,229,0.06)' : 'transparent',
+                                                        border: '1px solid ' + (it.ausgewaehlt ? 'rgba(30,136,229,0.30)' : 'var(--border-color)'),
+                                                        borderRadius: 'var(--radius-sm)',
+                                                        opacity: it.strategie === 'ignorieren' ? 0.55 : 1
+                                                    }}>
+                                                        {/* Checkbox */}
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!!it.ausgewaehlt}
+                                                            onChange={function(e){ setItemAusgewaehlt(idx, e.target.checked); }}
+                                                            style={{
+                                                                marginTop: '4px',
+                                                                width: '18px', height: '18px',
+                                                                accentColor: 'var(--accent-blue)',
+                                                                cursor: 'pointer',
+                                                                flexShrink: 0
+                                                            }}
+                                                        />
+
+                                                        {/* Text-Block */}
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{
+                                                                fontSize: '13px',
+                                                                fontWeight: 600,
+                                                                fontFamily: "'Oswald', sans-serif",
+                                                                letterSpacing: '0.3px',
+                                                                color: 'var(--text-primary)',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap'
+                                                            }}>
+                                                                {it.kategorie === 'Fotos' ? '\uD83D\uDCF8' : '\u23F1\uFE0F'} {it.stagingFile.name}
+                                                            </div>
+                                                            <div style={{
+                                                                fontSize: '10px',
+                                                                color: 'var(--text-muted)',
+                                                                marginTop: '2px'
+                                                            }}>
+                                                                Staging/{it.kategorie} {'\u2192'} Original/{it.zielOrdner.kategorieZielName}
+                                                                {groesse ? ' \u00B7 ' + groesse : ''}
+                                                            </div>
+                                                            {it.kollision && (
+                                                                <div style={{
+                                                                    marginTop: '6px',
+                                                                    padding: '6px 8px',
+                                                                    background: 'rgba(230,126,34,0.10)',
+                                                                    border: '1px solid rgba(230,126,34,0.30)',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '10px',
+                                                                    color: 'var(--accent-orange)'
+                                                                }}>
+                                                                    {'\u26A0'} Datei mit gleichem Namen existiert bereits im Original
+                                                                    {it.istDoppelUpload && <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>(Doppel-Upload erkannt)</span>}
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Strategie-Toggle */}
+                                                        <div style={{
+                                                            display: 'flex', flexDirection: 'column', gap: '3px',
+                                                            flexShrink: 0
+                                                        }}>
+                                                            {(it.kollision
+                                                                ? [
+                                                                    { id: 'umbenennen',     label: 'Umbenennen', farbe: 'var(--accent-blue)' },
+                                                                    { id: 'ueberschreiben', label: 'Ueberschreiben', farbe: 'var(--accent-red)' },
+                                                                    { id: 'ignorieren',     label: 'Ignorieren', farbe: 'var(--text-muted)' }
+                                                                  ]
+                                                                : [
+                                                                    { id: 'kopieren',   label: 'Kopieren',   farbe: 'var(--success)' },
+                                                                    { id: 'ignorieren', label: 'Ignorieren', farbe: 'var(--text-muted)' }
+                                                                  ]
+                                                            ).map(function(s) {
+                                                                var aktiv = it.strategie === s.id;
+                                                                return (
+                                                                    <button
+                                                                        key={s.id}
+                                                                        onClick={function(){ setItemStrategie(idx, s.id); }}
+                                                                        style={{
+                                                                            padding: '3px 8px',
+                                                                            background: aktiv ? s.farbe : 'transparent',
+                                                                            color: aktiv ? '#fff' : s.farbe,
+                                                                            border: '1px solid ' + s.farbe,
+                                                                            borderRadius: '3px',
+                                                                            fontSize: '9px',
+                                                                            fontFamily: "'Oswald', sans-serif",
+                                                                            fontWeight: 600,
+                                                                            letterSpacing: '0.3px',
+                                                                            textTransform: 'uppercase',
+                                                                            cursor: 'pointer',
+                                                                            touchAction: 'manipulation',
+                                                                            opacity: aktiv ? 1 : 0.7
+                                                                        }}
+                                                                    >{s.label}</button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Footer: Aktionen */}
+                            <div style={{
+                                padding: '12px 18px',
+                                borderTop: '1px solid var(--border-color)',
+                                background: 'var(--bg-secondary)',
+                                display: 'flex', gap: '10px',
+                                alignItems: 'center'
+                            }}>
+                                <button
+                                    onClick={onSchliessen}
+                                    style={{
+                                        padding: '10px 18px',
+                                        background: 'transparent',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-light)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontFamily: "'Oswald', sans-serif",
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        letterSpacing: '1px',
+                                        textTransform: 'uppercase',
+                                        cursor: 'pointer',
+                                        touchAction: 'manipulation'
+                                    }}
+                                >Abbrechen</button>
+                                <span style={{ flex: 1 }}></span>
+                                <button
+                                    onClick={handleSyncStarten}
+                                    disabled={ausgewaehltAnzahl === 0}
+                                    style={{
+                                        padding: '10px 22px',
+                                        background: ausgewaehltAnzahl === 0 ? 'var(--bg-card)' : 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                        color: ausgewaehltAnzahl === 0 ? 'var(--text-muted)' : '#fff',
+                                        border: 'none',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontFamily: "'Oswald', sans-serif",
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        letterSpacing: '1.5px',
+                                        textTransform: 'uppercase',
+                                        cursor: ausgewaehltAnzahl === 0 ? 'not-allowed' : 'pointer',
+                                        boxShadow: ausgewaehltAnzahl === 0 ? 'none' : '0 4px 12px rgba(30,136,229,0.30)',
+                                        touchAction: 'manipulation'
+                                    }}
+                                >{'\uD83D\uDCE4'} {ausgewaehltAnzahl} Datei(en) uebertragen</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ── Phase 3: Uebertragung ──
+            if (phase === 'uebertrage') {
+                var prozent = uebertrageFortschritt.gesamt > 0
+                    ? Math.round((uebertrageFortschritt.aktuell / uebertrageFortschritt.gesamt) * 100)
+                    : 0;
+                return (
+                    <div style={overlayStyle}>
+                        <div style={dialogStyle}>
+                            {headerEl}
+                            <div style={{ padding: '40px 30px', textAlign: 'center', color: 'var(--text-light)' }}>
+                                <div style={{ fontSize: '44px', marginBottom: '14px' }}>{'\uD83D\uDD04'}</div>
+                                <div style={{
+                                    fontSize: '14px',
+                                    fontFamily: "'Oswald', sans-serif",
+                                    letterSpacing: '0.5px',
+                                    marginBottom: '6px'
+                                }}>
+                                    Uebertrage Dateien...
+                                </div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', minHeight: '14px' }}>
+                                    {uebertrageFortschritt.name || ''}
+                                </div>
+                                <div style={{
+                                    marginTop: '20px',
+                                    height: '8px',
+                                    background: 'var(--bg-secondary)',
+                                    borderRadius: '4px',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{
+                                        width: prozent + '%',
+                                        height: '100%',
+                                        background: 'linear-gradient(90deg, #1E88E5, #1565C0)',
+                                        transition: 'width 0.25s'
+                                    }}></div>
+                                </div>
+                                <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {uebertrageFortschritt.aktuell} / {uebertrageFortschritt.gesamt} ({prozent}%)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ── Phase 4: Fertig ──
+            if (phase === 'fertig') {
+                var hatFehler = (ergebnis && ergebnis.fehler > 0) || (ergebnis && ergebnis.abbruch);
+                return (
+                    <div style={overlayStyle}>
+                        <div style={dialogStyle}>
+                            {headerEl}
+                            <div style={{ padding: '24px 24px 14px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '44px', marginBottom: '10px' }}>
+                                    {hatFehler ? '\u26A0\uFE0F' : '\u2705'}
+                                </div>
+                                <div style={{
+                                    fontSize: '14px',
+                                    fontFamily: "'Oswald', sans-serif",
+                                    letterSpacing: '1px',
+                                    textTransform: 'uppercase',
+                                    color: hatFehler ? 'var(--accent-orange)' : 'var(--success)',
+                                    fontWeight: 600
+                                }}>
+                                    {hatFehler ? 'Mit Hinweisen abgeschlossen' : 'Uebertragung erfolgreich'}
+                                </div>
+                            </div>
+                            <div style={{
+                                padding: '0 24px 14px',
+                                display: 'flex', justifyContent: 'center', gap: '20px',
+                                fontSize: '12px'
+                            }}>
+                                <span style={{ color: 'var(--success)' }}>{'\u2713'} <strong>{(ergebnis && ergebnis.erfolgreich) || 0}</strong> kopiert</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{'\u2014'} <strong>{(ergebnis && ergebnis.uebersprungen) || 0}</strong> uebersprungen</span>
+                                {(ergebnis && ergebnis.fehler > 0) && (
+                                    <span style={{ color: 'var(--accent-red)' }}>{'\u2715'} <strong>{ergebnis.fehler}</strong> Fehler</span>
+                                )}
+                            </div>
+                            <div style={{ flex: 1, overflow: 'auto', padding: '8px 24px 14px' }}>
+                                {ergebnis && ergebnis.abbruch && (
+                                    <div style={{
+                                        padding: '10px 12px',
+                                        marginBottom: '10px',
+                                        background: 'rgba(196,30,30,0.10)',
+                                        border: '1px solid rgba(196,30,30,0.30)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontSize: '11px',
+                                        color: 'var(--accent-red)'
+                                    }}>
+                                        <strong>Abbruch:</strong> {ergebnis.abbruch}
+                                    </div>
+                                )}
+                                {(ergebnis && ergebnis.details || []).map(function(d, i) {
+                                    var farbe = d.status === 'kopiert' ? 'var(--success)'
+                                              : d.status === 'fehler'  ? 'var(--accent-red)'
+                                              : 'var(--text-muted)';
+                                    return (
+                                        <div key={i} style={{
+                                            padding: '6px 10px',
+                                            borderBottom: '1px solid var(--border-color)',
+                                            fontSize: '11px',
+                                            display: 'flex', gap: '8px', alignItems: 'baseline'
+                                        }}>
+                                            <span style={{ color: farbe, minWidth: '14px', textAlign: 'center' }}>
+                                                {d.status === 'kopiert' ? '\u2713' : d.status === 'fehler' ? '\u2715' : '\u2014'}
+                                            </span>
+                                            <span style={{ flex: 1, color: 'var(--text-light)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {d.name}
+                                                {d.neuerName ? ' \u2192 ' + d.neuerName : ''}
+                                            </span>
+                                            {d.fehler && (
+                                                <span style={{ color: 'var(--accent-red)', fontSize: '10px' }}>
+                                                    {d.fehler.substring(0, 60)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div style={{
+                                padding: '12px 18px',
+                                borderTop: '1px solid var(--border-color)',
+                                background: 'var(--bg-secondary)',
+                                textAlign: 'right'
+                            }}>
+                                <button
+                                    onClick={onSchliessen}
+                                    style={{
+                                        padding: '10px 24px',
+                                        background: 'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontFamily: "'Oswald', sans-serif",
+                                        fontSize: '13px',
+                                        fontWeight: 600,
+                                        letterSpacing: '1.5px',
+                                        textTransform: 'uppercase',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 4px 12px rgba(30,136,229,0.30)',
+                                        touchAction: 'manipulation'
+                                    }}
+                                >Schliessen</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Fallback
+            return null;
         }
 
         // ═══════════════════════════════════════════════════════
