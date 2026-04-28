@@ -363,7 +363,7 @@
                                         <button onClick={startHeuristik} disabled={codeBulkLoading || codeStatistik.ohneCode === 0}
                                             title="Codes per Heuristik vorschlagen (lokal, schnell)"
                                             style={{padding:'6px 10px', borderRadius:'6px', border:'1px solid var(--border-color)', background: codeStatistik.ohneCode === 0 ? 'rgba(120,120,120,0.10)' : 'transparent', color: codeStatistik.ohneCode === 0 ? 'var(--text-muted)' : 'var(--text-primary)', fontSize:'11px', fontWeight:'700', cursor: codeStatistik.ohneCode === 0 ? 'not-allowed' : 'pointer'}}>
-                                            \uD83C\uDFAF Heuristik
+                                            {'\uD83C\uDFAF Heuristik'}
                                         </button>
                                         <button onClick={startKiVorbelegung} disabled={codeBulkLoading || codeStatistik.ohneCode === 0}
                                             title="Codes per KI (Gemini Pro) vorschlagen"

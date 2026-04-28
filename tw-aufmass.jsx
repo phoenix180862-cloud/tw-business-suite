@@ -1522,7 +1522,7 @@
                     {/* HEADER */}
                     <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px'}}>
                         <button {...tap(onBack)} style={Object.assign({}, touchBase, {background:'none', border:'none', fontSize:'22px', cursor:'pointer', color:'var(--text-secondary)', padding:'8px 12px', minHeight:'44px', minWidth:'44px'})}>
-                            \u2190
+                            {'\u2190'}
                         </button>
                         <div>
                             <div style={{fontSize:'18px', fontWeight:'800', color:'var(--text-primary)'}}>Manuell Kunde anlegen</div>
@@ -1633,7 +1633,7 @@
 
                             {/* LV-Positionen */}
                             <div style={{fontSize:'14px', fontWeight:'700', color:'var(--text-primary)', marginBottom:'8px', display:'flex', alignItems:'center', gap:'8px'}}>
-                                <span style={{color:'var(--accent-blue)'}}>\u25B6</span> LV-Positionen ({positionen.length})
+                                <span style={{color:'var(--accent-blue)'}}>{'\u25B6'}</span> LV-Positionen ({positionen.length})
                             </div>
                             <button {...tap(function(){ resetPosForm(); setShowPosForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed var(--accent-blue)',
@@ -1688,7 +1688,7 @@
 
                             {/* NACHTRAEGE */}
                             <div style={{fontSize:'14px', fontWeight:'700', color:'#e67e22', marginBottom:'8px', marginTop:'16px', display:'flex', alignItems:'center', gap:'8px'}}>
-                                <span>\u25BC</span> Nachtraege ({nachtraege.length})
+                                <span>{'\u25BC'}</span> Nachtraege ({nachtraege.length})
                             </div>
                             <button {...tap(function(){ resetNachtragForm(); setShowNachtragForm(true); })} style={Object.assign({}, touchBase, {
                                 width:'100%', padding:'12px', borderRadius:'10px', border:'2px dashed #e67e22',
@@ -2885,7 +2885,7 @@
 
                     <div className="breadcrumb">
                         <span>Google Drive</span>
-                        <span>\u203A</span>
+                        <span>{'\u203A'}</span>
                         <span className="breadcrumb-active">Baustellen neu</span>
                     </div>
                     <div className="page-title">Baustellen-Ordner</div>
@@ -10436,7 +10436,7 @@
                                 }
                             }}
                             title="Klicken zum Sichern">
-                            \u26A0 Ungespeicherte Aenderungen \u2014 jetzt sichern
+                            {'\u26A0 Ungespeicherte Aenderungen \u2014 jetzt sichern'}
                         </div>
                     )}
 
@@ -10446,7 +10446,7 @@
                             <div className="modal" style={{maxWidth:'480px'}}>
                                 <div style={{padding:'20px'}}>
                                     <div style={{fontSize:'18px', fontWeight:'700', marginBottom:'12px'}}>
-                                        \uD83D\uDD04 Bearbeitung fortsetzen?
+                                        {'\uD83D\uDD04 Bearbeitung fortsetzen?'}
                                     </div>
                                     <div style={{fontSize:'14px', lineHeight:'1.5', marginBottom:'16px'}}>
                                         Vom letzten Aufmasz wurde ein Bearbeitungsstand gefunden:
@@ -12660,7 +12660,7 @@
                                     style={{width:'100%', padding:'12px', borderRadius:'8px', border:'none',
                                         background:'#e74c3c', color:'white', fontWeight:'700',
                                         fontSize:'13px', cursor:'pointer', boxShadow:'0 2px 6px rgba(231,76,60,0.25)'}}>
-                                    \uD83D\uDCBE Fotos endgueltig speichern und Felder leeren
+                                    {'\uD83D\uDCBE Fotos endgueltig speichern und Felder leeren'}
                                 </button>
                             </div>
 
