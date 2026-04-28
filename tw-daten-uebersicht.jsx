@@ -520,11 +520,9 @@
                         </div>
                     )}
 
-                    <div style={{position:'fixed', bottom:0, left:0, right:0, padding:'12px 16px 20px', background:'linear-gradient(transparent, var(--bg-primary) 20%)', zIndex:100}}>
-                        <div style={{display:'flex', gap:'6px', maxWidth:'500px', margin:'0 auto'}}>
-                            <button {...tap(function(){ if(onBack) onBack(); })} style={Object.assign({flex:'0 0 auto', padding:'12px 16px', borderRadius:'var(--radius-md)', border:'none', cursor:'pointer', background:'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))', color:'#fff', fontSize:'13px', fontWeight:'600', boxShadow:'0 4px 15px rgba(196,30,30,0.3)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'1px', transition:'all 0.25s ease'},touchBase)}>{'\u2190'} Zurueck</button>
-                        </div>
-                    </div>
+                    {/* ETAPPE 7+: Unterer Zurueck-Button entfernt (28.04.2026) - redundant zum globalen
+                        Zurueck-Button in der oberen Toolbar. Navigation laeuft jetzt ueber
+                        NavDropdown ("Navigationsleiste") + globalen Zurueck/Vor-Buttons. */}
                 </div>
             );
         }

@@ -239,25 +239,31 @@
             }
         };
 
+        // PROMINENTER STYLE (28.04.2026): Der NavDropdown ist die zentrale Navigationsleiste.
+        // Daher merklich groesser als andere Toolbar-Buttons (AktionDropdown etc.) und mit
+        // Mini-Label "NAVIGATIONSLEISTE" als zweizeiliger Aufbau, damit Thomas die Funktion
+        // sofort erkennt.
         var mainBtnStyle = {
-            padding: '8px 16px',
-            minHeight: '36px',
+            padding: '6px 20px 8px',
+            minHeight: '48px',
             borderRadius: 'var(--radius-sm)',
-            border: 'none',
+            border: '2px solid rgba(255,255,255,0.18)',
             cursor: 'pointer',
             background: palette.mainGrad,
             color: '#fff',
-            fontSize: '12px',
+            fontSize: '14px',
             fontWeight: '700',
             fontFamily: 'Oswald, sans-serif',
             textTransform: 'uppercase',
             letterSpacing: '0.5px',
-            boxShadow: '0 2px 8px ' + palette.mainShadow,
+            boxShadow: '0 3px 12px ' + palette.mainShadow + ', 0 0 0 1px rgba(255,255,255,0.05) inset',
             transition: 'all 0.18s ease',
             whiteSpace: 'nowrap',
             display: 'inline-flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: '6px',
+            justifyContent: 'center',
+            gap: '0px',
             touchAction: 'manipulation',
             userSelect: 'none'
         };
@@ -312,16 +318,36 @@
                 onClick: function() { setOpen(function(v) { return !v; }); },
                 'aria-haspopup': 'true',
                 'aria-expanded': open,
-                title: 'Navigation -- aktuell: ' + currentMode
+                title: 'Navigationsleiste -- aktuell: ' + currentMode
             },
-                React.createElement('span', null, currentMode),
+                // Mini-Zeile oben (28.04.2026): "NAVIGATIONSLEISTE" -- macht klar, dass das
+                // der zentrale Wechsel-Button zwischen den Seiten ist.
                 React.createElement('span', {
                     style: {
-                        fontSize: '9px', opacity: 0.85,
-                        transform: open ? 'rotate(180deg)' : 'none',
-                        transition: 'transform 0.18s ease'
+                        fontSize: '8px',
+                        fontWeight: '600',
+                        opacity: 0.75,
+                        letterSpacing: '1.4px',
+                        lineHeight: '1',
+                        marginBottom: '3px'
                     }
-                }, '\u25BC')
+                }, 'NAVIGATIONSLEISTE'),
+                // Hauptzeile: aktueller Modus + Caret
+                React.createElement('span', {
+                    style: {
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        fontSize: '14px', fontWeight: '700', lineHeight: '1'
+                    }
+                },
+                    React.createElement('span', null, currentMode),
+                    React.createElement('span', {
+                        style: {
+                            fontSize: '9px', opacity: 0.85,
+                            transform: open ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 0.18s ease'
+                        }
+                    }, '\u25BC')
+                )
             ),
             // Panel (Mobile = BottomSheet, Desktop = klassisch)
             open && shownTargets.length > 0 && (
