@@ -5760,8 +5760,17 @@
             // "Masse kopieren"-Schalter: wird in localStorage persistiert, damit der
             // Zustand vom Vorraum automatisch auf den naechsten Raum uebernommen wird.
             // Thomas will: einmal "JA" gedrueckt -> bleibt "JA" bis explizit "NEIN".
+            // 28.04.2026: Default geaendert von false auf true, damit Werte (Wandlaengen,
+            // Tueren, Fenster, sonstige Bauteile) vom Vorraum direkt in den naechsten
+            // Raum uebernommen werden, ohne dass der User den Schalter erst aktivieren muss.
+            // Ueber den Schalter laesst sich die Uebernahme weiterhin abschalten.
             const [masseKopieren, setMasseKopieren] = useState(function() {
-                try { return localStorage.getItem('tw_masseKopieren') === 'true'; } catch(e) { return false; }
+                try {
+                    var v = localStorage.getItem('tw_masseKopieren');
+                    // Wenn noch nie gesetzt → default true; sonst gespeicherten Wert verwenden
+                    if (v === null || v === undefined) return true;
+                    return v === 'true';
+                } catch(e) { return true; }
             });
             useEffect(function() {
                 try { localStorage.setItem('tw_masseKopieren', String(masseKopieren)); } catch(e) {}
@@ -5842,12 +5851,20 @@
                         }));
                     }
                 }
-                // 2. Aus Raum-Objekt (Baugleich) oder Vorraum uebernehmen
+                // 2. Aus Raum-Objekt (Baugleich) oder Vorraum-Defaults uebernehmen
                 const sonstDef = (raum && raum.sonstigeDefaults) || (lastRaumData && lastRaumData.sonstigeDefaults);
                 if (sonstDef && sonstDef.length > 0) {
                     return sonstDef.map((a, i) => ({
                         ...a, id: Date.now() + 500 + i
                     }));
+                }
+                // 3. NEU 28.04.2026: Fallback auf lastRaumData.abzuege (sonstige Bauteile vom Vorraum)
+                //    Wird gesetzt von handleFinishRaum in tw-app.jsx → roomResult.raumState.abzuege.
+                //    Damit werden sonstige Bauteile (z.B. Pfeiler, Vorsprung, Nische) im naechsten
+                //    Raum vorgeschlagen und koennen mit einem Klick (oder Loesch-Button) entfernt werden.
+                const vorraumAbzuege = (lastRaumData && lastRaumData.abzuege) || [];
+                if (vorraumAbzuege.length > 0) {
+                    return vorraumAbzuege.map((a, i) => Object.assign({}, a, { id: Date.now() + 700 + i }));
                 }
                 return [];
             });

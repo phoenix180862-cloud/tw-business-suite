@@ -2267,6 +2267,29 @@
                 };
             }, []);
 
+            // ════════════════════════════════════════════════════════
+            // AUTO-MARKIERUNG fuer numerische Eingabefelder (28.04.2026)
+            // Wenn der Cursor in ein Feld mit Zahlen springt (inputMode
+            // decimal/numeric oder Klasse masse-input), wird der bisherige
+            // Wert automatisch markiert. So kann der User direkt die neue
+            // Zahl tippen und ueberschreibt damit das Vorgaengerwert vom
+            // letzten Raum, ohne erst manuell zu loeschen.
+            // ════════════════════════════════════════════════════════
+            useEffect(function() {
+                var handler = function(e) {
+                    var t = e.target;
+                    if (!t || t.tagName !== 'INPUT') return;
+                    var im = t.inputMode || (t.getAttribute && t.getAttribute('inputmode')) || '';
+                    var hasMasseClass = t.classList && t.classList.contains('masse-input');
+                    if (im === 'decimal' || im === 'numeric' || hasMasseClass) {
+                        // setTimeout damit etwaige State-Updates zuerst durch sind und die DOM-Selektion klappt
+                        setTimeout(function() { try { t.select(); } catch(err){} }, 10);
+                    }
+                };
+                document.addEventListener('focusin', handler);
+                return function() { document.removeEventListener('focusin', handler); };
+            }, []);
+
             // ══════════════════════════════════════════════════════════
             // GLOBALER DRINGLICHKEITS-ALARM (Baustellen-App Nachrichten)
             // Hoert auf ALLE Chats und triggert Sound + Notification wenn
