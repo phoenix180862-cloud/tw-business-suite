@@ -9327,6 +9327,45 @@
                 }
             };
 
+            // 28.04.2026: Foto-Sichern-Button in die globale Toolbar einblenden,
+            // wenn der User auf dem Wand-Fotos-Tab (rbTab === 1) ist. Sonst leeren.
+            // Cleanup beim Unmount der Raumblatt-Komponente.
+            useEffect(function() {
+                if (typeof window.__twSetTabActionToolbar !== 'function') return;
+                if (rbTab === 1) {
+                    var btn = React.createElement('button', {
+                        onClick: onFotosEndgueltigSpeichern,
+                        title: 'Alle Fotos in Drive sichern und Aufnahme-Felder leeren',
+                        style: {
+                            display:'flex', alignItems:'center', gap:'8px',
+                            padding:'8px 14px', borderRadius:'10px', border:'none',
+                            background:'linear-gradient(135deg, #e74c3c, #c0392b)',
+                            color:'#fff', cursor:'pointer',
+                            fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:700,
+                            textTransform:'uppercase', letterSpacing:'0.6px',
+                            boxShadow:'0 2px 8px rgba(231,76,60,0.35)',
+                            minHeight:'48px',
+                            border:'2px solid rgba(255,255,255,0.15)',
+                            touchAction:'manipulation'
+                        }
+                    },
+                        React.createElement('span', { style:{ fontSize:'18px' } }, '\uD83D\uDCBE'),
+                        React.createElement('div', { style:{ display:'flex', flexDirection:'column', alignItems:'flex-start', lineHeight:'1.1' } },
+                            React.createElement('span', { style:{ fontSize:'9px', fontWeight:500, opacity:0.85, letterSpacing:'1px' } }, 'FOTOS'),
+                            React.createElement('span', { style:{ fontSize:'13px', fontWeight:700 } }, 'SICHERN + LEEREN')
+                        )
+                    );
+                    window.__twSetTabActionToolbar(btn);
+                } else {
+                    window.__twSetTabActionToolbar(null);
+                }
+                return function() {
+                    if (typeof window.__twSetTabActionToolbar === 'function') {
+                        window.__twSetTabActionToolbar(null);
+                    }
+                };
+            }, [rbTab]);
+
             // Canvas drawing
             // ── Auto-Sync: Wenn Fenster/Tueren/Raummasse sich aendern, aktive Edits aktualisieren ──
             const getFingerprint = () => {
@@ -12634,20 +12673,10 @@
                                 </div>
                             </div>
 
-                            {/* ═══ FOTOS ENDGUELTIG SPEICHERN UND FELDER LEEREN ═══ */}
-                            <div style={{marginTop:'16px', padding:'12px', borderRadius:'10px',
-                                background:'rgba(231,76,60,0.05)', border:'1px solid rgba(231,76,60,0.3)'}}>
-                                <div style={{fontSize:'12px', color:'var(--text-muted)', marginBottom:'8px', lineHeight:'1.4'}}>
-                                    Wenn alle Fotos dieses Raumblatts zur Sicherung in Drive uebertragen
-                                    und die Aufnahme-Felder geleert werden sollen:
-                                </div>
-                                <button onClick={onFotosEndgueltigSpeichern}
-                                    style={{width:'100%', padding:'12px', borderRadius:'8px', border:'none',
-                                        background:'#e74c3c', color:'white', fontWeight:'700',
-                                        fontSize:'13px', cursor:'pointer', boxShadow:'0 2px 6px rgba(231,76,60,0.25)'}}>
-                                    \uD83D\uDCBE Fotos endgueltig speichern und Felder leeren
-                                </button>
-                            </div>
+                            {/* 28.04.2026: Der grosse rote Button "Fotos endgueltig speichern und
+                                Felder leeren" wurde von hier nach oben in die globale Toolbar
+                                (neben "Bearbeiten") verschoben. Siehe useEffect oben mit
+                                window.__twSetTabActionToolbar bei rbTab === 1. */}
 
                             {/* ═══ CROP-MODAL ═══ */}
                             {cropState && (

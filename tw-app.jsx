@@ -152,6 +152,13 @@
             // So ist alles in EINER Leiste, die Dropdowns AUFMASS/BEARBEITEN bleiben frei.
             const [posModalToolbar, setPosModalToolbar] = useState(null);
             useEffect(function(){ window.__twSetPosModalToolbar = setPosModalToolbar; }, []);
+
+            // 28.04.2026: Tab-spezifischer Action-Button in der globalen Toolbar.
+            // Module setzen via window.__twSetTabActionToolbar(<button>...) einen
+            // Action-Button neben "Bearbeiten" ein. Aktuell: Foto-endgueltig-Speichern
+            // auf Raumblatt-Tab "Wand-Fotos".
+            const [tabActionToolbar, setTabActionToolbar] = useState(null);
+            useEffect(function(){ window.__twSetTabActionToolbar = setTabActionToolbar; }, []);
             const [driveStatus, setDriveStatus] = useState('offline');
             const [showAuth, setShowAuth] = useState(false);
             const [loading, setLoading] = useState(false);
@@ -3001,6 +3008,12 @@
                             {posModalToolbar && (
                                 <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap'}}>
                                     {posModalToolbar}
+                                </div>
+                            )}
+                            {/* 28.04.2026: Tab-spezifischer Action-Button (z.B. "Fotos sichern" auf Wand-Fotos-Tab) */}
+                            {tabActionToolbar && (
+                                <div style={{display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap'}}>
+                                    {tabActionToolbar}
                                 </div>
                             )}
                             {/* Rechte Gruppe: FotoSync + Speicher + Memory-Badge - kompakt in der Ecke */}
