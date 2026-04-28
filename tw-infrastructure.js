@@ -622,6 +622,7 @@
                 id: f.id,
                 name: f.name,
                 letzteAenderung: new Date(f.modifiedTime).toLocaleDateString('de-DE'),
+                modifiedTimeMs: f.modifiedTime ? new Date(f.modifiedTime).getTime() : 0,
             }));
         },
 

@@ -553,6 +553,16 @@
                                     onMouseLeave={function(e) {
                                         e.currentTarget.style.transform = '';
                                     }}
+                                    onTouchStart={function(e) {
+                                        // ETAPPE E (A): Press-Feedback fuer Tablet-Mitarbeiter
+                                        e.currentTarget.style.transform = 'translateY(0) scale(0.98)';
+                                    }}
+                                    onTouchEnd={function(e) {
+                                        e.currentTarget.style.transform = '';
+                                    }}
+                                    onTouchCancel={function(e) {
+                                        e.currentTarget.style.transform = '';
+                                    }}
                                 >
                                     <span style={{ fontSize: '36px', marginTop: '2px', lineHeight: 1 }}>{c.icon}</span>
                                     <div style={{ flex: 1 }}>
@@ -631,6 +641,26 @@
             const [listeFehler, setListeFehler] = useState(null);
             const [suche, setSuche] = useState('');
             const [filter, setFilter] = useState('alle'); // 'alle' | 'bereitgestellt' | 'offen'
+            // ETAPPE E (B): Sortier-Modus — Default Name A-Z (wie bisher implizit ueber Drive-API).
+            // 'name' = alphabetisch, 'geaendert' = neueste zuerst, 'status' = bereitgestellt zuerst
+            const [sortierung, setSortierung] = useState('name');
+
+            // ETAPPE E (C): Helper fuer Relativzeit-Anzeige.
+            // Wandelt Timestamp in 'Heute' / 'Gestern' / 'Vor X Tg.' / dd.mm.yyyy.
+            // Mitternacht-basiert, damit ein Eintrag von 23:55 morgens nicht
+            // ploetzlich 'Vor 1 Tag' anzeigt.
+            function formatRelativDatum(ms) {
+                if (!ms || typeof ms !== 'number') return '';
+                var d = new Date(ms);
+                var heute0 = new Date(); heute0.setHours(0, 0, 0, 0);
+                var ziel0 = new Date(d); ziel0.setHours(0, 0, 0, 0);
+                var diffTage = Math.round((heute0.getTime() - ziel0.getTime()) / 86400000);
+                if (diffTage === 0) return 'Heute';
+                if (diffTage === 1) return 'Gestern';
+                if (diffTage > 1 && diffTage < 7) return 'Vor ' + diffTage + ' Tg.';
+                if (diffTage < 0) return 'In Zukunft';
+                return d.toLocaleDateString('de-DE');
+            }
 
             // ── Baustellen-Liste laden ──
             async function ladeBaustellen() {
@@ -688,6 +718,33 @@
                 if (filter === 'offen' && bereit) return false;
                 return true;
             });
+
+            // ETAPPE E (B): Sortierung anwenden — kopiert die gefilterte Liste,
+            // damit das ursprueliche Filter-Array unveraendert bleibt.
+            var gefiltertSortiert = gefiltert.slice();
+            if (sortierung === 'name') {
+                gefiltertSortiert.sort(function(a, b) {
+                    return (a.name || '').localeCompare(b.name || '', 'de');
+                });
+            } else if (sortierung === 'geaendert') {
+                // Neueste zuerst — ungeaenderte (ts=0) fallen ans Ende
+                gefiltertSortiert.sort(function(a, b) {
+                    return (b.modifiedTimeMs || 0) - (a.modifiedTimeMs || 0);
+                });
+            } else if (sortierung === 'status') {
+                // Bereitgestellt-vollstaendig zuerst (3), dann unvollstaendig (2),
+                // dann offen (1). Bei Gleichstand alphabetisch.
+                gefiltertSortiert.sort(function(a, b) {
+                    function rank(x) {
+                        var s = stagingStatus[x.name];
+                        if (!s || !s.vorhanden) return 1;
+                        if (s.vollstaendig) return 3;
+                        return 2;
+                    }
+                    var d = rank(b) - rank(a);
+                    return d !== 0 ? d : (a.name || '').localeCompare(b.name || '', 'de');
+                });
+            }
 
             // ── EBENE 2: Detail-Ansicht einer Baustelle ──
             if (view === 'detail' && activeBaustelle) {
@@ -775,7 +832,7 @@
                     <div style={{
                         display: 'flex',
                         gap: '6px',
-                        marginBottom: '14px'
+                        marginBottom: '8px'
                     }}>
                         {[
                             { id: 'alle', label: 'Alle', count: baustellen.length },
@@ -804,6 +861,56 @@
                                     }}
                                 >
                                     {f.label} <span style={{ opacity: 0.7 }}>({f.count})</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* ETAPPE E (B): Sortier-Pills — kompakte zweite Reihe unter den Filter-Pills */}
+                    <div style={{
+                        display: 'flex',
+                        gap: '6px',
+                        marginBottom: '14px',
+                        alignItems: 'center'
+                    }}>
+                        <span style={{
+                            fontSize: '10px',
+                            fontFamily: "'Oswald', sans-serif",
+                            fontWeight: 600,
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase',
+                            color: 'var(--text-muted)',
+                            paddingLeft: '2px'
+                        }}>
+                            {'\u21F5'} Sortierung
+                        </span>
+                        {[
+                            { id: 'name',      label: 'Name'      },
+                            { id: 'geaendert', label: 'Geaendert' },
+                            { id: 'status',    label: 'Status'    }
+                        ].map(function(s) {
+                            var aktiv = sortierung === s.id;
+                            return (
+                                <button
+                                    key={s.id}
+                                    onClick={function(){ setSortierung(s.id); }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '6px 4px',
+                                        borderRadius: 'var(--radius-sm)',
+                                        border: '1px solid ' + (aktiv ? 'var(--accent-blue)' : 'var(--border-color)'),
+                                        background: aktiv ? 'rgba(77,166,255,0.10)' : 'transparent',
+                                        color: aktiv ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                        fontSize: '10px',
+                                        fontWeight: 600,
+                                        fontFamily: "'Oswald', sans-serif",
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.5px',
+                                        cursor: 'pointer',
+                                        touchAction: 'manipulation'
+                                    }}
+                                >
+                                    {s.label}
                                 </button>
                             );
                         })}
@@ -861,7 +968,7 @@
                             <div style={{ fontSize: '36px', opacity: 0.4, marginBottom: '10px' }}>⏳</div>
                             <div style={{ fontSize: '13px' }}>Baustellen werden geladen...</div>
                         </div>
-                    ) : gefiltert.length === 0 ? (
+                    ) : gefiltertSortiert.length === 0 ? (
                         <div style={{
                             textAlign: 'center',
                             padding: '40px 20px',
@@ -872,10 +979,12 @@
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {gefiltert.map(function(b) {
+                            {gefiltertSortiert.map(function(b) {
                                 var status = stagingStatus[b.name];
                                 var bereit = !!(status && status.vorhanden);
                                 var vollstaendig = !!(status && status.vollstaendig);
+                                // ETAPPE E (C): Relativzeit bevorzugen, sonst Fallback auf vorformatiertes Datum
+                                var datumAnzeige = formatRelativDatum(b.modifiedTimeMs) || b.letzteAenderung || '';
                                 return (
                                     <button
                                         key={b.id}
@@ -923,15 +1032,14 @@
                                                 marginTop: '3px'
                                             }}>
                                                 {bereit ? (vollstaendig ? 'Staging bereitgestellt' : 'Staging unvollstaendig') : 'Nicht bereitgestellt'}
-                                                {' · '}
-                                                {b.letzteAenderung || ''}
+                                                {datumAnzeige ? ' \u00B7 ' + datumAnzeige : ''}
                                             </div>
                                         </div>
                                         <span style={{
                                             fontSize: '18px',
                                             color: 'var(--text-muted)',
                                             flexShrink: 0
-                                        }}>›</span>
+                                        }}>{'\u203A'}</span>
                                     </button>
                                 );
                             })}
@@ -1301,14 +1409,14 @@
                                 </div>
                             </button>
 
-                            {/* Kachel 2: NACHRICHTEN */}
+                            {/* Kachel 2: NACHRICHTEN — Tuerkis gemaess Design-System (Skill baustellenapp-umbau) */}
                             <button
                                 onClick={function(){ setSubView('nachrichten'); }}
                                 style={{
                                     padding: '28px 14px',
                                     borderRadius: 'var(--radius-md)',
-                                    border: '1px solid rgba(39,174,96,0.35)',
-                                    background: 'linear-gradient(135deg, rgba(39,174,96,0.15), rgba(31,139,76,0.08))',
+                                    border: '1px solid rgba(0,172,193,0.40)',
+                                    background: 'linear-gradient(135deg, rgba(0,172,193,0.18), rgba(0,131,143,0.10))',
                                     color: 'var(--text-primary)',
                                     cursor: 'pointer',
                                     textAlign: 'center',
@@ -1319,10 +1427,10 @@
                                     alignItems: 'center',
                                     gap: '10px',
                                     minHeight: '160px',
-                                    boxShadow: '0 4px 12px rgba(39,174,96,0.15)'
+                                    boxShadow: '0 4px 12px rgba(0,172,193,0.18)'
                                 }}
                             >
-                                <span style={{ fontSize: '52px', color: '#27ae60' }}>💬</span>
+                                <span style={{ fontSize: '52px', color: '#00ACC1' }}>{'\uD83D\uDCAC'}</span>
                                 <div style={{
                                     fontSize: '15px',
                                     fontWeight: 600,
@@ -1337,7 +1445,7 @@
                                     lineHeight: 1.45,
                                     padding: '0 4px'
                                 }}>
-                                    Kalender & Chat pro Mitarbeiter
+                                    Kalender &amp; Chat pro Mitarbeiter
                                 </div>
                             </button>
                         </div>
@@ -5599,6 +5707,8 @@
                 return window.MITARBEITER_LISTE || [];
             });
             const [chatsData, setChatsData] = useState({});
+            // ETAPPE D: Baustellen-Planungen fuer Filter (nur wenn baustelleName gesetzt)
+            const [planungen, setPlanungen] = useState({});
 
             // Mitarbeiter live: Grundstock + Firebase mergen
             useEffect(function() {
@@ -5629,6 +5739,54 @@
                 });
                 return unsub;
             }, []);
+
+            // ETAPPE D: Baustellen-Planungen abonnieren — nur wenn aus Baustellen-Kontext aufgerufen
+            // (baustelleName ist gesetzt). Im globalen Nachrichten-Hub (baustelleName=null) sparen
+            // wir uns die Subscription, weil wir dort eh alle MA zeigen.
+            useEffect(function() {
+                if (!baustelleName) return;
+                if (!window.FirebaseService || !window.FirebaseService.subscribeBaustellenPlanungen) return;
+                var unsub = window.FirebaseService.subscribeBaustellenPlanungen(function(data) {
+                    setPlanungen(data || {});
+                });
+                return unsub;
+            }, [baustelleName]);
+
+            // ETAPPE D: Set der eingeplanten Mitarbeiter-IDs fuer diese Baustelle.
+            // Filter-Regel:
+            //   - baustelleId in planungen muss exakt mit baustelleName matchen
+            //   - Zeitraum bis >= heute (also aktuell laufend ODER zukuenftig)
+            //   - Vergangene Zeitraeume zaehlen NICHT
+            // Ergebnis ist null wenn baustelleName nicht gesetzt — dann findet kein Filter statt.
+            var eingeplanteIds = (function() {
+                if (!baustelleName) return null;
+                var jetzt = Date.now();
+                var ids = {};
+                var bucket = planungen[baustelleName];
+                if (!bucket) return ids;
+                for (var zId in bucket) {
+                    if (!bucket.hasOwnProperty(zId)) continue;
+                    var z = bucket[zId];
+                    if (!z || typeof z.bis !== 'number') continue;
+                    if (z.bis < jetzt) continue; // vergangener Zeitraum — uebergehen
+                    if (z.mitarbeiter && typeof z.mitarbeiter === 'object') {
+                        for (var maId in z.mitarbeiter) {
+                            if (z.mitarbeiter.hasOwnProperty(maId) && z.mitarbeiter[maId]) {
+                                ids[maId] = true;
+                            }
+                        }
+                    }
+                }
+                return ids;
+            })();
+
+            // ETAPPE D: gefilterte Liste — im Baustellen-Kontext nur eingeplante MA, sonst alle.
+            var gefilterteListe = mitarbeiter;
+            if (eingeplanteIds) {
+                gefilterteListe = mitarbeiter.filter(function(m) {
+                    return m && m.id && eingeplanteIds[m.id];
+                });
+            }
 
             // Helper: ungelesene MA-Nachrichten zaehlen
             function ungeleseneAnzahl(maId) {
@@ -5676,16 +5834,19 @@
                 return map[code] || ('🏳 ' + (code || 'de').toUpperCase());
             }
 
-            var ohneMa = mitarbeiter.length === 0;
+            // ETAPPE D: Leer-Zustand und Intro-Texte sind jetzt kontextabhaengig.
+            // Im Baustellen-Kontext (baustelleName gesetzt) heissen sie anders als im globalen Hub.
+            var ohneMa = gefilterteListe.length === 0;
+            var imBaustellenKontext = !!baustelleName;
 
             return (
                 <div style={{ marginTop: '12px' }}>
-                    {/* Intro-Zeile */}
+                    {/* Intro-Zeile — Text wechselt je nach Kontext */}
                     <div style={{
                         padding: '10px 12px',
                         marginBottom: '14px',
-                        background: 'rgba(39,174,96,0.08)',
-                        border: '1px solid rgba(39,174,96,0.25)',
+                        background: imBaustellenKontext ? 'rgba(0,172,193,0.10)' : 'rgba(39,174,96,0.08)',
+                        border: '1px solid ' + (imBaustellenKontext ? 'rgba(0,172,193,0.30)' : 'rgba(39,174,96,0.25)'),
                         borderRadius: 'var(--radius-sm)',
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -5693,16 +5854,19 @@
                         gap: '8px'
                     }}>
                         <div style={{ fontSize: '12px', color: 'var(--text-light)' }}>
-                            💬 Chats & Kalender sind <strong>pro Mitarbeiter</strong>, nicht pro Baustelle
+                            {imBaustellenKontext
+                                ? <span>{'\uD83D\uDC65'} Eingeplante Mitarbeiter fuer <strong>{baustelleName}</strong></span>
+                                : <span>{'\uD83D\uDCAC'} Chats &amp; Kalender sind <strong>pro Mitarbeiter</strong>, nicht pro Baustelle</span>
+                            }
                         </div>
                         <div style={{
                             fontSize: '11px',
                             fontFamily: "'Oswald', sans-serif",
                             fontWeight: 600,
-                            color: 'var(--success)',
+                            color: imBaustellenKontext ? 'var(--accent-cyan, #00ACC1)' : 'var(--success)',
                             whiteSpace: 'nowrap'
                         }}>
-                            {mitarbeiter.length} MA
+                            {gefilterteListe.length} MA
                         </div>
                     </div>
 
@@ -5711,13 +5875,26 @@
                             padding: '40px 20px',
                             textAlign: 'center',
                             color: 'var(--text-muted)',
-                            fontSize: '13px'
+                            fontSize: '13px',
+                            lineHeight: 1.6
                         }}>
-                            Keine Mitarbeiter in der Stammliste. Ueber TEAM → "Neue Einladung" anlegen.
+                            {imBaustellenKontext ? (
+                                <React.Fragment>
+                                    <div style={{ fontSize: '36px', marginBottom: '10px', opacity: 0.4 }}>{'\uD83D\uDCC5'}</div>
+                                    <div style={{ marginBottom: '6px' }}>
+                                        Keine Mitarbeiter fuer <strong>{baustelleName}</strong> eingeplant.
+                                    </div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                        Mitarbeiter ueber den <strong>Hauptkalender</strong> einplanen, dann erscheinen sie hier.
+                                    </div>
+                                </React.Fragment>
+                            ) : (
+                                <span>Keine Mitarbeiter in der Stammliste. Ueber TEAM &rarr; "Neue Einladung" anlegen.</span>
+                            )}
                         </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {mitarbeiter.map(function(ma) {
+                            {gefilterteListe.map(function(ma) {
                                 var anzUngel = ungeleseneAnzahl(ma.id);
                                 var letzte = letzteNachricht(ma.id);
                                 var geraete = ma.geraete_uuids ? Object.keys(ma.geraete_uuids).length : 0;
