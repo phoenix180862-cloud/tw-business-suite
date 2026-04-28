@@ -226,6 +226,39 @@
             // Aktive Aufmass-Meta (Bauvorhaben + Datum + Bemerkung des laufenden Aufmasses)
             const aktivesAufmassMetaRef = useRef(null);
 
+            // ══════════════════════════════════════════════════════════
+            // RECHNUNGS-WORKFLOW-DIALOGE (28.04.2026 -- Skill: tw-speicher-workflow-pattern)
+            // ══════════════════════════════════════════════════════════
+            // Analog zum Aufmass-Workflow: Auswahl / Neu / Liste / Verlassen.
+            // Sub-Typ wandert in meta.rechnungstyp (5 Werte: abschlag/schluss/einzel/nachtrag/angebot).
+            // ══════════════════════════════════════════════════════════
+            const [rechnungDialogStep, setRechnungDialogStep] = useState(null);
+            const [rechnungNeuDaten, setRechnungNeuDaten] = useState({
+                rechnungstyp: '', bauvorhaben: '', datum: '', rechnungsnummer: '', bemerkung: ''
+            });
+            const [rechnungListeWips, setRechnungListeWips] = useState([]);
+            const [rechnungListeLoading, setRechnungListeLoading] = useState(false);
+            const [rechnungPendingNav, setRechnungPendingNav] = useState(null);
+            const aktiveRechnungMetaRef = useRef(null);
+            // Eckdaten-Vorwahl an das Rechnungsmodul (Bauvorhaben/Rechnungsnummer/Datum)
+            const [rechnungEckdaten, setRechnungEckdaten] = useState(null);
+
+            // ══════════════════════════════════════════════════════════
+            // SCHRIFTVERKEHR-WORKFLOW-DIALOGE (28.04.2026 -- Skill: tw-speicher-workflow-pattern)
+            // ══════════════════════════════════════════════════════════
+            // Sub-Typ: 'mail' oder 'post' (passt zum bestehenden versandKanal im Modul).
+            // ══════════════════════════════════════════════════════════
+            const [schriftverkehrDialogStep, setSchriftverkehrDialogStep] = useState(null);
+            const [schriftverkehrNeuDaten, setSchriftverkehrNeuDaten] = useState({
+                kanal: '', empfaenger: '', betreff: '', datum: '', bemerkung: ''
+            });
+            const [schriftverkehrListeWips, setSchriftverkehrListeWips] = useState([]);
+            const [schriftverkehrListeLoading, setSchriftverkehrListeLoading] = useState(false);
+            const [schriftverkehrPendingNav, setSchriftverkehrPendingNav] = useState(null);
+            const aktivesSchriftverkehrMetaRef = useRef(null);
+            // Eckdaten-Vorwahl an das Schriftverkehrsmodul (Kanal/Empfaenger/Betreff/Datum)
+            const [schriftverkehrEckdaten, setSchriftverkehrEckdaten] = useState(null);
+
             var PAGE_TO_MODUL = {
                 'raumerkennung': 'aufmass', 'raumblatt': 'aufmass',
                 'rechnung': 'rechnung', 'ausgangsbuch': 'ausgangsbuch',
@@ -443,6 +476,28 @@
                     setAufmassDialogStep('verlassen');
                     return;
                 }
+
+                // ── Rechnung-Verlassen-Dialog (28.04.2026) ──
+                var fromRechnung = (page === 'rechnung');
+                var leavingRechnung = fromRechnung && (newPage !== 'rechnung');
+                var skipRechnungDialog = opts && opts.skipRechnungDialog;
+                // Nur wenn aktiv eine Rechnung gestartet wurde (MetaRef gesetzt)
+                if (leavingRechnung && !skipRechnungDialog && selectedKunde && aktiveRechnungMetaRef.current) {
+                    setRechnungPendingNav(newPage);
+                    setRechnungDialogStep('verlassen');
+                    return;
+                }
+
+                // ── Schriftverkehr-Verlassen-Dialog (28.04.2026) ──
+                var fromSchriftverkehr = (page === 'schriftverkehr');
+                var leavingSchriftverkehr = fromSchriftverkehr && (newPage !== 'schriftverkehr');
+                var skipSchriftverkehrDialog = opts && opts.skipSchriftverkehrDialog;
+                if (leavingSchriftverkehr && !skipSchriftverkehrDialog && selectedKunde && aktivesSchriftverkehrMetaRef.current) {
+                    setSchriftverkehrPendingNav(newPage);
+                    setSchriftverkehrDialogStep('verlassen');
+                    return;
+                }
+
                 setPage(newPage);
                 setHistory(prev => {
                     const newHistory = [...prev.slice(0, historyIdx + 1), newPage];
@@ -1142,13 +1197,15 @@
                         setAufmassDialogStep('auswahl');
                         break;
                     case 'rechnung':
-                        navigateTo('rechnung');
+                        // 28.04.2026: Rechnungs-Auswahl-Dialog statt direktem Start
+                        setRechnungDialogStep('auswahl');
                         break;
                     case 'ausgangsbuch':
                         navigateTo('ausgangsbuch');
                         break;
                     case 'schriftverkehr':
-                        navigateTo('schriftverkehr');
+                        // 28.04.2026: Schriftverkehr-Auswahl-Dialog statt direktem Start
+                        setSchriftverkehrDialogStep('auswahl');
                         break;
                     case 'baustelle':
                         navigateTo('baustelle');
@@ -1865,6 +1922,52 @@
                 navigateTo('raumerkennung');
             };
 
+            // ── Rechnung starten (28.04.2026, Workflow-Pattern) ──
+            // Setzt MetaRef + uebergibt Eckdaten ans Modul, dann Navigation.
+            const handleStartRechnung = (meta) => {
+                if (meta) {
+                    aktiveRechnungMetaRef.current = {
+                        rechnungstyp: meta.rechnungstyp || '',
+                        bauvorhaben: meta.bauvorhaben || '',
+                        datum: meta.datum || '',
+                        rechnungsnummer: meta.rechnungsnummer || '',
+                        bemerkung: meta.bemerkung || '',
+                        startedAt: new Date().toISOString()
+                    };
+                    // Sub-Typ ueber bestehendes vorwahlTyp-Prop des RechnungsModuls
+                    setRechnungsVorwahl(meta.rechnungstyp || null);
+                    // Eckdaten ueber neues eckdaten-Prop
+                    setRechnungEckdaten({
+                        bauvorhaben: meta.bauvorhaben || '',
+                        datum: meta.datum || '',
+                        rechnungsnummer: meta.rechnungsnummer || '',
+                        rechnungstyp: meta.rechnungstyp || ''
+                    });
+                }
+                navigateTo('rechnung');
+            };
+
+            // ── Schriftverkehr starten (28.04.2026, Workflow-Pattern) ──
+            const handleStartSchriftverkehr = (meta) => {
+                if (meta) {
+                    aktivesSchriftverkehrMetaRef.current = {
+                        kanal: meta.kanal || '',
+                        empfaenger: meta.empfaenger || '',
+                        betreff: meta.betreff || '',
+                        datum: meta.datum || '',
+                        bemerkung: meta.bemerkung || '',
+                        startedAt: new Date().toISOString()
+                    };
+                    setSchriftverkehrEckdaten({
+                        kanal: meta.kanal || '',
+                        empfaenger: meta.empfaenger || '',
+                        betreff: meta.betreff || '',
+                        datum: meta.datum || ''
+                    });
+                }
+                navigateTo('schriftverkehr');
+            };
+
             const handleSelectRaum = (raum, positions) => {
                 setSelectedRaum(raum);
                 setSelectedPositions(positions || []);
@@ -2058,6 +2161,48 @@
                     return TWStorage.saveWip(kundeId, snapModul, stateData.moduleState, page, stateData.meta);
                 }
 
+                // 28.04.2026: RECHNUNG-SNAPSHOT (analog zu Aufmass).
+                // Sub-Typ wandert in meta.rechnungstyp (abschlag/schluss/einzel/nachtrag/angebot).
+                if (opts && opts.rechnungSnapshot) {
+                    var snapModulR = 'rechnung-snap-' + Date.now();
+                    var aktivR = aktiveRechnungMetaRef.current || {};
+                    stateData.meta = Object.assign({}, stateData.meta, {
+                        beschreibung: aktivR.bauvorhaben || ((MODUL_LABELS['rechnung'] || 'Rechnung') + ' gespeichert'),
+                        bauvorhaben: aktivR.bauvorhaben || '',
+                        datum: aktivR.datum || '',
+                        bemerkung: aktivR.bemerkung || '',
+                        rechnungstyp: aktivR.rechnungstyp || '',
+                        rechnungsnummer: aktivR.rechnungsnummer || '',
+                        icon: '\uD83D\uDCB6',
+                        autoSaved: false,
+                        manuellGespeichert: true,
+                        rechnungSnapshot: true,
+                        manuellTs: Date.now()
+                    });
+                    return TWStorage.saveWip(kundeId, snapModulR, stateData.moduleState, page, stateData.meta);
+                }
+
+                // 28.04.2026: SCHRIFTVERKEHR-SNAPSHOT (analog zu Aufmass).
+                // Sub-Typ wandert in meta.schriftverkehrstyp ('mail' oder 'post').
+                if (opts && opts.schriftverkehrSnapshot) {
+                    var snapModulS = 'schriftverkehr-snap-' + Date.now();
+                    var aktivS = aktivesSchriftverkehrMetaRef.current || {};
+                    stateData.meta = Object.assign({}, stateData.meta, {
+                        beschreibung: aktivS.betreff || aktivS.empfaenger || ((MODUL_LABELS['schriftverkehr'] || 'Schriftverkehr') + ' gespeichert'),
+                        empfaenger: aktivS.empfaenger || '',
+                        betreff: aktivS.betreff || '',
+                        datum: aktivS.datum || '',
+                        bemerkung: aktivS.bemerkung || '',
+                        schriftverkehrstyp: aktivS.kanal || '',
+                        icon: '\u2709\uFE0F',
+                        autoSaved: false,
+                        manuellGespeichert: true,
+                        schriftverkehrSnapshot: true,
+                        manuellTs: Date.now()
+                    });
+                    return TWStorage.saveWip(kundeId, snapModulS, stateData.moduleState, page, stateData.meta);
+                }
+
                 return TWStorage.saveWip(kundeId, modulName, stateData.moduleState, page, stateData.meta);
             };
 
@@ -2140,10 +2285,14 @@
 
                 // Hilfs-Flag: ist das ein Aufmass (laufend ODER Snapshot)?
                 var isAufmassRecord = (wipMeta.modulName === 'aufmass' || (wipMeta.modulName.indexOf('aufmass-snap-') === 0));
+                var isRechnungRecord = (wipMeta.modulName === 'rechnung' || (wipMeta.modulName.indexOf('rechnung-snap-') === 0));
+                var isSchriftverkehrRecord = (wipMeta.modulName === 'schriftverkehr' || (wipMeta.modulName.indexOf('schriftverkehr-snap-') === 0));
 
                 // Modal sofort schliessen + Auto-Save fuer den Restore-Moment unterdruecken
                 setShowAkteModal(false);
                 setAufmassDialogStep(null);
+                setRechnungDialogStep(null);
+                setSchriftverkehrDialogStep(null);
                 if (window.TW && window.TW.AutoSave) {
                     window.TW.AutoSave.suppress(true);
                     setTimeout(function(){ if (window.TW && window.TW.AutoSave) window.TW.AutoSave.suppress(false); }, 1500);
@@ -2156,10 +2305,16 @@
                     }
                     // Default-Page herleiten:
                     // - Aufmass-Snapshots: aus wip.page (raumblatt/raumerkennung), Fallback raumerkennung
+                    // - Rechnung-Snapshots: page 'rechnung'
+                    // - Schriftverkehr-Snapshots: page 'schriftverkehr'
                     // - Normale WIPs: ueber MODUL_PAGES
                     var targetPage;
                     if (isAufmassRecord) {
                         targetPage = wip.page || 'raumerkennung';
+                    } else if (isRechnungRecord) {
+                        targetPage = 'rechnung';
+                    } else if (isSchriftverkehrRecord) {
+                        targetPage = 'schriftverkehr';
                     } else {
                         targetPage = wip.page || MODUL_PAGES[wip.modulName] || 'modulwahl';
                     }
@@ -2180,14 +2335,61 @@
                         };
                     }
 
-                    // Navigation OHNE Speichern-Dialog (skipAufmassDialog), da wir gerade RESTORE machen
-                    navigateTo(targetPage, { skipAufmassDialog: true });
+                    // Rechnung-spezifisch: MetaRef + Sub-Typ-Vorwahl + Eckdaten wiederherstellen
+                    if (isRechnungRecord) {
+                        aktiveRechnungMetaRef.current = {
+                            rechnungstyp: (wip.meta && wip.meta.rechnungstyp) || '',
+                            bauvorhaben: (wip.meta && wip.meta.bauvorhaben) || '',
+                            datum: (wip.meta && wip.meta.datum) || '',
+                            rechnungsnummer: (wip.meta && wip.meta.rechnungsnummer) || '',
+                            bemerkung: (wip.meta && wip.meta.bemerkung) || '',
+                            startedAt: wip.savedAt || new Date().toISOString(),
+                            restoredFromSnapshot: wip.modulName
+                        };
+                        if (wip.meta && wip.meta.rechnungstyp) setRechnungsVorwahl(wip.meta.rechnungstyp);
+                        setRechnungEckdaten({
+                            bauvorhaben: (wip.meta && wip.meta.bauvorhaben) || '',
+                            datum: (wip.meta && wip.meta.datum) || '',
+                            rechnungsnummer: (wip.meta && wip.meta.rechnungsnummer) || '',
+                            rechnungstyp: (wip.meta && wip.meta.rechnungstyp) || ''
+                        });
+                    }
+
+                    // Schriftverkehr-spezifisch: MetaRef + Kanal-Vorwahl + Eckdaten wiederherstellen
+                    if (isSchriftverkehrRecord) {
+                        aktivesSchriftverkehrMetaRef.current = {
+                            kanal: (wip.meta && wip.meta.schriftverkehrstyp) || '',
+                            empfaenger: (wip.meta && wip.meta.empfaenger) || '',
+                            betreff: (wip.meta && wip.meta.betreff) || '',
+                            datum: (wip.meta && wip.meta.datum) || '',
+                            bemerkung: (wip.meta && wip.meta.bemerkung) || '',
+                            startedAt: wip.savedAt || new Date().toISOString(),
+                            restoredFromSnapshot: wip.modulName
+                        };
+                        setSchriftverkehrEckdaten({
+                            kanal: (wip.meta && wip.meta.schriftverkehrstyp) || '',
+                            empfaenger: (wip.meta && wip.meta.empfaenger) || '',
+                            betreff: (wip.meta && wip.meta.betreff) || '',
+                            datum: (wip.meta && wip.meta.datum) || ''
+                        });
+                    }
+
+                    // Navigation OHNE Speichern-Dialog (skip*Dialog), da wir gerade RESTORE machen
+                    navigateTo(targetPage, {
+                        skipAufmassDialog: true,
+                        skipRechnungDialog: true,
+                        skipSchriftverkehrDialog: true
+                    });
 
                     // Nach Navigation: WIP-State ins Modul injizieren via Event-Bus
                     setTimeout(function() {
                         if (window.TW && window.TW.emit) {
+                            var emitModul = isAufmassRecord ? 'aufmass'
+                                          : isRechnungRecord ? 'rechnung'
+                                          : isSchriftverkehrRecord ? 'schriftverkehr'
+                                          : wip.modulName;
                             TW.emit('wip:restoreState', {
-                                modulName: isAufmassRecord ? 'aufmass' : wip.modulName,
+                                modulName: emitModul,
                                 moduleState: wip.moduleState
                             });
                         }
@@ -2223,16 +2425,19 @@
 
                 TWStorage.listWips(kundeId).then(function(wips) {
                     if (!wips || wips.length === 0) return;
-                    // 28.04.2026: AUFMASZ-WIPs beim Kundenwechsel NICHT mehr automatisch
-                    // wiederherstellen — der User soll bewusst ueber das Aufmass-Auswahl-
-                    // Modal "Neues / Bestehendes" entscheiden. Andere Module behalten das
-                    // alte Verhalten (z.B. Rechnung, Schriftverkehr).
-                    var nonAufmass = wips.filter(function(w) {
-                        return w.modulName !== 'aufmass' && (w.modulName || '').indexOf('aufmass-snap-') !== 0;
+                    // 28.04.2026: WIPs mit neuem Workflow-Pattern beim Kundenwechsel NICHT
+                    // mehr automatisch wiederherstellen — der User soll bewusst ueber die
+                    // Modul-Auswahl-Modale "Neues / Bestehendes" entscheiden.
+                    // Betrifft: Aufmass, Rechnung, Schriftverkehr (jeweils laufend + Snapshots).
+                    var nonWorkflow = wips.filter(function(w) {
+                        var n = w.modulName || '';
+                        return n !== 'aufmass'         && n.indexOf('aufmass-snap-') !== 0
+                            && n !== 'rechnung'        && n.indexOf('rechnung-snap-') !== 0
+                            && n !== 'schriftverkehr'  && n.indexOf('schriftverkehr-snap-') !== 0;
                     });
-                    if (nonAufmass.length === 0) return;
-                    // Neuesten Nicht-Aufmass-WIP nehmen
-                    var latest = nonAufmass[0];
+                    if (nonWorkflow.length === 0) return;
+                    // Neuesten Nicht-Workflow-WIP nehmen
+                    var latest = nonWorkflow[0];
                     if (!latest || !latest.id) return;
                     // Vollstaendigen WIP-Datensatz mit moduleState laden
                     return TWStorage.loadWip(kundeId, latest.modulName).then(function(wip) {
@@ -2806,11 +3011,11 @@
                     case 'raumblatt':
                         return <Raumblatt kunde={selectedKunde} raum={selectedRaum} onFinishRaum={handleFinishRaum} onBack={handleBackToRaumerkennung} selectedPositions={selectedPositions} lastRaumData={lastRaumData} gesamtliste={gesamtliste} onShowGesamtliste={() => setShowGesamtliste(true)} onAufmassBeenden={handleAufmassBeenden} />;
                     case 'rechnung':
-                        return <RechnungsModul kunde={selectedKunde} importResult={importResult} gesamtliste={gesamtliste} aufmassGespeichert={aufmassGespeichert} vorwahlTyp={rechnungsVorwahl} onVorwahlUsed={function(){setRechnungsVorwahl(null);}} onBack={() => navigateTo('modulwahl')} />;
+                        return <RechnungsModul kunde={selectedKunde} importResult={importResult} gesamtliste={gesamtliste} aufmassGespeichert={aufmassGespeichert} vorwahlTyp={rechnungsVorwahl} onVorwahlUsed={function(){setRechnungsVorwahl(null);}} eckdaten={rechnungEckdaten} onEckdatenUsed={function(){setRechnungEckdaten(null);}} onBack={() => navigateTo('modulwahl')} />;
                     case 'ausgangsbuch':
                         return <RechnungsAusgangsbuch kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
                     case 'schriftverkehr':
-                        return <SchriftverkehrModul kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
+                        return <SchriftverkehrModul kunde={selectedKunde} vorwahlKanal={schriftverkehrEckdaten ? schriftverkehrEckdaten.kanal : null} eckdaten={schriftverkehrEckdaten} onEckdatenUsed={function(){setSchriftverkehrEckdaten(null);}} onBack={() => navigateTo('modulwahl')} />;
                     case 'baustelle':
                         return <BaustellenAppAdmin kunde={selectedKunde} onBack={() => navigateTo('modulwahl')} />;
                     default:
@@ -3493,6 +3698,711 @@
                     {akteSaveToast && (
                         <div style={{position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', zIndex:9999, background:'#27ae60', color:'#fff', padding:'10px 24px', borderRadius:'12px', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, boxShadow:'0 4px 16px rgba(0,0,0,0.3)', display:'flex', alignItems:'center', gap:'8px', animation:'fadeIn 0.2s ease'}}>
                             <span style={{fontSize:'18px'}}>\u2713</span> {akteSaveToast}
+                        </div>
+                    )}
+
+                    {/* ═════════════════════════════════════════════════════ */}
+                    {/* RECHNUNGS-WORKFLOW-MODALE (28.04.2026)                 */}
+                    {/* ═════════════════════════════════════════════════════ */}
+
+                    {/* ═══ RECHNUNGS-AUSWAHL-DIALOG ═══ */}
+                    {rechnungDialogStep === 'auswahl' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setRechnungDialogStep(null); }}>
+                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'20px'}}>
+                                    <div style={{fontSize:'40px', marginBottom:'8px'}}>{'\uD83D\uDCB6'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'22px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Rechnung'}
+                                    </div>
+                                    <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'6px'}}>
+                                        {'Was m\u00f6chtest du tun?'}
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                    <button onClick={function() {
+                                        var vorschlagBauvh = '';
+                                        if (selectedKunde) {
+                                            vorschlagBauvh = selectedKunde.bauvorhaben || selectedKunde.objekt || (selectedKunde.name || '').split(' \u2013 ')[0] || '';
+                                        }
+                                        var heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+                                        setRechnungNeuDaten({ rechnungstyp: '', bauvorhaben: vorschlagBauvh, datum: heute, rechnungsnummer: '', bemerkung: '' });
+                                        setRechnungDialogStep('neu');
+                                    }}
+                                        style={{padding:'18px 16px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', boxShadow:'0 4px 14px rgba(30,136,229,0.3)'}}>
+                                        <span style={{fontSize:'22px'}}>{'\u2795'}</span>
+                                        {'Neue Rechnung erstellen'}
+                                    </button>
+
+                                    <button onClick={function() {
+                                        if (!selectedKunde || !window.TWStorage || !window.TWStorage.isReady()) {
+                                            alert('Speicher nicht bereit.');
+                                            return;
+                                        }
+                                        var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                                        setRechnungListeLoading(true);
+                                        setRechnungDialogStep('liste');
+                                        TWStorage.listWips(kundeId).then(function(wips) {
+                                            var rWips = (wips || []).filter(function(w) {
+                                                return w.modulName === 'rechnung' || (w.modulName || '').indexOf('rechnung-snap-') === 0;
+                                            });
+                                            setRechnungListeWips(rWips);
+                                            setRechnungListeLoading(false);
+                                        }).catch(function(err) {
+                                            console.warn('[Rechnung-Liste] Fehler:', err);
+                                            setRechnungListeWips([]);
+                                            setRechnungListeLoading(false);
+                                        });
+                                    }}
+                                        style={{padding:'18px 16px', borderRadius:'12px', border:'2px solid var(--accent-blue)', background:'transparent', color:'var(--accent-blue)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
+                                        <span style={{fontSize:'22px'}}>{'\uD83D\uDCC2'}</span>
+                                        {'Bestehende Rechnung bearbeiten'}
+                                    </button>
+
+                                    <button onClick={function(){ setRechnungDialogStep(null); }}
+                                        style={{padding:'12px', marginTop:'8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'Abbrechen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ RECHNUNGS-NEU-DIALOG (Eckdaten + Sub-Typ) ═══ */}
+                    {rechnungDialogStep === 'neu' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setRechnungDialogStep('auswahl'); }}>
+                            <div style={{width:'100%', maxWidth:'520px', maxHeight:'90vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'6px'}}>{'\u2795'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Neue Rechnung'}
+                                    </div>
+                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px'}}>
+                                        {'Sub-Typ w\u00e4hlen, dann Eckdaten pr\u00fcfen.'}
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', flexDirection:'column', gap:'14px'}}>
+                                    {/* Sub-Typ-Wahl */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Rechnungstyp'}</label>
+                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
+                                            {[
+                                                { id:'abschlag',  label:'Abschlag',     icon:'\u23F1' },
+                                                { id:'schluss',   label:'Schluss',      icon:'\uD83D\uDD12' },
+                                                { id:'einzel',    label:'Einzel',       icon:'\uD83D\uDCB6' },
+                                                { id:'nachtrag',  label:'Nachtrag',     icon:'\u2795' },
+                                                { id:'angebot',   label:'Angebot',      icon:'\uD83D\uDCDC' }
+                                            ].map(function(t) {
+                                                var aktiv = (rechnungNeuDaten.rechnungstyp === t.id);
+                                                return (
+                                                    <button key={t.id}
+                                                        onClick={function(){ setRechnungNeuDaten(Object.assign({}, rechnungNeuDaten, { rechnungstyp: t.id })); }}
+                                                        style={{
+                                                            padding:'10px 12px', borderRadius:'8px',
+                                                            border: aktiv ? '2px solid #1E88E5' : '1px solid var(--border-color)',
+                                                            background: aktiv ? 'rgba(30,136,229,0.10)' : 'var(--bg-secondary)',
+                                                            color: aktiv ? '#1E88E5' : 'var(--text-primary)',
+                                                            cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:700,
+                                                            textTransform:'uppercase', letterSpacing:'0.5px',
+                                                            display:'flex', alignItems:'center', gap:'8px'
+                                                        }}>
+                                                        <span style={{fontSize:'18px'}}>{t.icon}</span>{t.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Kunde (read-only) */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Kunde'}</label>
+                                        <div style={{padding:'10px 12px', borderRadius:'8px', background:'var(--bg-secondary)', fontSize:'14px', fontWeight:600, color:'var(--text-primary)'}}>
+                                            {selectedKunde ? ((selectedKunde.name || selectedKunde.auftraggeber || 'Kunde').split(' \u2013 ')[0]) : 'Kein Kunde'}
+                                        </div>
+                                    </div>
+
+                                    {/* Bauvorhaben */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Bauvorhaben'}</label>
+                                        <input type="text" value={rechnungNeuDaten.bauvorhaben}
+                                            onChange={function(e){ setRechnungNeuDaten(Object.assign({}, rechnungNeuDaten, { bauvorhaben: e.target.value })); }}
+                                            placeholder="z.B. EFH Mustermann, OG Bad"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Rechnungsnummer */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>
+                                            {rechnungNeuDaten.rechnungstyp === 'angebot' ? 'Angebotsnummer' :
+                                             rechnungNeuDaten.rechnungstyp === 'nachtrag' ? 'Nachtragsnummer' :
+                                             'Rechnungsnummer'}
+                                        </label>
+                                        <input type="text" value={rechnungNeuDaten.rechnungsnummer}
+                                            onChange={function(e){ setRechnungNeuDaten(Object.assign({}, rechnungNeuDaten, { rechnungsnummer: e.target.value })); }}
+                                            placeholder={rechnungNeuDaten.rechnungstyp === 'angebot' ? 'AG-2026-001' :
+                                                         rechnungNeuDaten.rechnungstyp === 'nachtrag' ? 'NT-2026-001' :
+                                                         'RE-2026-001'}
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Datum */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Datum'}</label>
+                                        <input type="text" value={rechnungNeuDaten.datum}
+                                            onChange={function(e){ setRechnungNeuDaten(Object.assign({}, rechnungNeuDaten, { datum: e.target.value })); }}
+                                            placeholder="TT.MM.JJJJ"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Bemerkung */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Bemerkung (optional)'}</label>
+                                        <input type="text" value={rechnungNeuDaten.bemerkung}
+                                            onChange={function(e){ setRechnungNeuDaten(Object.assign({}, rechnungNeuDaten, { bemerkung: e.target.value })); }}
+                                            placeholder="z.B. 1. Abschlag, Bauabschnitt 2"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', gap:'10px', marginTop:'22px'}}>
+                                    <button onClick={function(){ setRechnungDialogStep('auswahl'); }}
+                                        style={{flex:'0 0 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'\u2190 Zur\u00fcck'}
+                                    </button>
+                                    <button onClick={function() {
+                                        if (!rechnungNeuDaten.rechnungstyp) {
+                                            alert('Bitte einen Rechnungstyp w\u00e4hlen.');
+                                            return;
+                                        }
+                                        var meta = {
+                                            rechnungstyp: rechnungNeuDaten.rechnungstyp,
+                                            bauvorhaben: rechnungNeuDaten.bauvorhaben || '',
+                                            datum: rechnungNeuDaten.datum || new Date().toLocaleDateString('de-DE'),
+                                            rechnungsnummer: rechnungNeuDaten.rechnungsnummer || '',
+                                            bemerkung: rechnungNeuDaten.bemerkung || ''
+                                        };
+                                        setRechnungDialogStep(null);
+                                        handleStartRechnung(meta);
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'12px 18px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', boxShadow:'0 4px 14px rgba(39,174,96,0.3)'}}>
+                                        {'\u2713 Rechnung beginnen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ RECHNUNGS-LISTE-DIALOG ═══ */}
+                    {rechnungDialogStep === 'liste' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setRechnungDialogStep('auswahl'); }}>
+                            <div style={{width:'100%', maxWidth:'520px', maxHeight:'85vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'6px'}}>{'\uD83D\uDCC2'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Bestehende Rechnungen'}
+                                    </div>
+                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px'}}>
+                                        {'Klicke auf einen Eintrag, um ihn weiter zu bearbeiten.'}
+                                    </div>
+                                </div>
+
+                                {rechnungListeLoading && (
+                                    <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)'}}>{'L\u00e4dt\u2026'}</div>
+                                )}
+
+                                {!rechnungListeLoading && rechnungListeWips.length === 0 && (
+                                    <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'12px'}}>{'\uD83D\uDCED'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600}}>{'Noch keine Rechnungen f\u00fcr diesen Kunden'}</div>
+                                        <div style={{fontSize:'12px', marginTop:'6px'}}>{'Erstelle zun\u00e4chst eine neue Rechnung.'}</div>
+                                    </div>
+                                )}
+
+                                {!rechnungListeLoading && rechnungListeWips.length > 0 && (
+                                    <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                        {rechnungListeWips.map(function(wip) {
+                                            var isLaufend = (wip.modulName === 'rechnung');
+                                            var typ = (wip.meta && wip.meta.rechnungstyp) || '';
+                                            var typLabel = typ === 'abschlag' ? 'Abschlag'
+                                                         : typ === 'schluss'  ? 'Schluss'
+                                                         : typ === 'einzel'   ? 'Einzel'
+                                                         : typ === 'nachtrag' ? 'Nachtrag'
+                                                         : typ === 'angebot'  ? 'Angebot'
+                                                         : '';
+                                            var typIcon = typ === 'abschlag' ? '\u23F1'
+                                                        : typ === 'schluss'  ? '\uD83D\uDD12'
+                                                        : typ === 'einzel'   ? '\uD83D\uDCB6'
+                                                        : typ === 'nachtrag' ? '\u2795'
+                                                        : typ === 'angebot'  ? '\uD83D\uDCDC'
+                                                        : '\uD83D\uDCB6';
+                                            var beschreibung = (wip.meta && wip.meta.bauvorhaben) || (wip.meta && wip.meta.beschreibung) || (isLaufend ? 'Laufende Rechnung' : 'Gespeicherte Rechnung');
+                                            var datum = (wip.meta && wip.meta.datum) || (wip.savedAt ? new Date(wip.savedAt).toLocaleDateString('de-DE') : '');
+                                            var nr = (wip.meta && wip.meta.rechnungsnummer) || '';
+                                            var savedAt = wip.savedAt ? new Date(wip.savedAt) : null;
+                                            return (
+                                                <button key={wip.id} onClick={function(){ handleWipRestore(wip); }}
+                                                    style={{width:'100%', textAlign:'left', padding:'14px 16px', borderRadius:'10px', border:'1px solid ' + (isLaufend ? '#f39c12' : 'var(--border-color)'), background: isLaufend ? 'rgba(243,156,18,0.08)' : 'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px'}}>
+                                                    <span style={{fontSize:'28px'}}>{isLaufend ? '\u26A1' : typIcon}</span>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-primary)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                            {beschreibung}
+                                                        </div>
+                                                        <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px'}}>
+                                                            {typLabel ? (typLabel + ' \u00b7 ') : ''}
+                                                            {nr ? (nr + ' \u00b7 ') : ''}
+                                                            {datum}
+                                                            {isLaufend ? ' \u00b7 (laufend)' : ''}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{textAlign:'right', flexShrink:0}}>
+                                                        <div style={{fontSize:'10px', color:'var(--text-muted)'}}>
+                                                            {savedAt ? savedAt.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : ''}
+                                                        </div>
+                                                    </div>
+                                                    <span style={{color:'var(--accent-blue)', fontSize:'14px', fontWeight:700, flexShrink:0}}>{'\u25B6'}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                <div style={{display:'flex', gap:'10px', marginTop:'18px'}}>
+                                    <button onClick={function(){ setRechnungDialogStep('auswahl'); }}
+                                        style={{flex:'1 1 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'\u2190 Zur\u00fcck'}
+                                    </button>
+                                    <button onClick={function(){ setRechnungDialogStep(null); }}
+                                        style={{flex:'0 0 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'Schlie\u00dfen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ RECHNUNGS-VERLASSEN-DIALOG ═══ */}
+                    {rechnungDialogStep === 'verlassen' && (
+                        <div className="modal-overlay" style={{zIndex:3700}}>
+                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'40px', marginBottom:'8px'}}>{'\uD83D\uDCBE'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Rechnung speichern?'}
+                                    </div>
+                                    <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'8px', lineHeight:'1.5'}}>
+                                        {'Du verl\u00e4sst den Rechnungs-Bereich. M\u00f6chtest du den aktuellen Stand als gespeicherte Rechnung ablegen?'}
+                                    </div>
+                                </div>
+
+                                {aktiveRechnungMetaRef.current && (aktiveRechnungMetaRef.current.bauvorhaben || aktiveRechnungMetaRef.current.rechnungsnummer) && (
+                                    <div style={{padding:'12px 14px', borderRadius:'10px', background:'var(--bg-secondary)', fontSize:'13px', color:'var(--text-primary)', marginBottom:'18px'}}>
+                                        {aktiveRechnungMetaRef.current.rechnungstyp && (
+                                            <div><strong>{'Typ:'}</strong> {aktiveRechnungMetaRef.current.rechnungstyp}</div>
+                                        )}
+                                        {aktiveRechnungMetaRef.current.bauvorhaben && (
+                                            <div><strong>{'Bauvorhaben:'}</strong> {aktiveRechnungMetaRef.current.bauvorhaben}</div>
+                                        )}
+                                        {aktiveRechnungMetaRef.current.rechnungsnummer && (
+                                            <div><strong>{'Nummer:'}</strong> {aktiveRechnungMetaRef.current.rechnungsnummer}</div>
+                                        )}
+                                        {aktiveRechnungMetaRef.current.datum && (
+                                            <div><strong>{'Datum:'}</strong> {aktiveRechnungMetaRef.current.datum}</div>
+                                        )}
+                                        {aktiveRechnungMetaRef.current.bemerkung && (
+                                            <div><strong>{'Bemerkung:'}</strong> {aktiveRechnungMetaRef.current.bemerkung}</div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <button onClick={function() {
+                                        var target = rechnungPendingNav;
+                                        setRechnungDialogStep(null);
+                                        setRechnungPendingNav(null);
+                                        // MetaRef NICHT loeschen — der laufende WIP bleibt unter 'rechnung'
+                                        if (target) navigateTo(target, { skipRechnungDialog: true });
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'14px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.8px'}}>
+                                        {'Nein'}
+                                    </button>
+                                    <button onClick={function() {
+                                        var target = rechnungPendingNav;
+                                        var savePromise = _collectAndSaveWip({ rechnungSnapshot: true });
+                                        savePromise.then(function() {
+                                            setRechnungDialogStep(null);
+                                            setRechnungPendingNav(null);
+                                            aktiveRechnungMetaRef.current = null;
+                                            if (window._showToast) window._showToast('Rechnung gespeichert', 'success');
+                                            if (target) navigateTo(target, { skipRechnungDialog: true });
+                                        }).catch(function(err) {
+                                            console.warn('[Rechnung-Speichern] Fehler:', err);
+                                            alert('Fehler beim Speichern: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+                                        });
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'14px 16px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', boxShadow:'0 4px 14px rgba(39,174,96,0.3)'}}>
+                                        {'\u2713 Ja, speichern'}
+                                    </button>
+                                </div>
+
+                                <button onClick={function() {
+                                    setRechnungDialogStep(null);
+                                    setRechnungPendingNav(null);
+                                }}
+                                    style={{width:'100%', padding:'10px', marginTop:'10px', borderRadius:'8px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:500, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                    {'Abbrechen \u00b7 in Rechnung bleiben'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═════════════════════════════════════════════════════ */}
+                    {/* SCHRIFTVERKEHR-WORKFLOW-MODALE (28.04.2026)            */}
+                    {/* ═════════════════════════════════════════════════════ */}
+
+                    {/* ═══ SCHRIFTVERKEHR-AUSWAHL-DIALOG ═══ */}
+                    {schriftverkehrDialogStep === 'auswahl' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setSchriftverkehrDialogStep(null); }}>
+                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'20px'}}>
+                                    <div style={{fontSize:'40px', marginBottom:'8px'}}>{'\u2709\uFE0F'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'22px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Schriftverkehr'}
+                                    </div>
+                                    <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'6px'}}>
+                                        {'Was m\u00f6chtest du tun?'}
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                                    <button onClick={function() {
+                                        var vorschlagEmpf = '';
+                                        if (selectedKunde) {
+                                            vorschlagEmpf = selectedKunde.auftraggeber || (selectedKunde.name || '').split(' \u2013 ')[0] || '';
+                                        }
+                                        var heute = new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+                                        setSchriftverkehrNeuDaten({ kanal: '', empfaenger: vorschlagEmpf, betreff: '', datum: heute, bemerkung: '' });
+                                        setSchriftverkehrDialogStep('neu');
+                                    }}
+                                        style={{padding:'18px 16px', borderRadius:'12px', border:'none', background:'linear-gradient(135deg, #1E88E5, #1565C0)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', boxShadow:'0 4px 14px rgba(30,136,229,0.3)'}}>
+                                        <span style={{fontSize:'22px'}}>{'\u2795'}</span>
+                                        {'Neuen Schriftverkehr erstellen'}
+                                    </button>
+
+                                    <button onClick={function() {
+                                        if (!selectedKunde || !window.TWStorage || !window.TWStorage.isReady()) {
+                                            alert('Speicher nicht bereit.');
+                                            return;
+                                        }
+                                        var kundeId = selectedKunde._driveFolderId || selectedKunde.id || selectedKunde.name;
+                                        setSchriftverkehrListeLoading(true);
+                                        setSchriftverkehrDialogStep('liste');
+                                        TWStorage.listWips(kundeId).then(function(wips) {
+                                            var sWips = (wips || []).filter(function(w) {
+                                                return w.modulName === 'schriftverkehr' || (w.modulName || '').indexOf('schriftverkehr-snap-') === 0;
+                                            });
+                                            setSchriftverkehrListeWips(sWips);
+                                            setSchriftverkehrListeLoading(false);
+                                        }).catch(function(err) {
+                                            console.warn('[Schriftverkehr-Liste] Fehler:', err);
+                                            setSchriftverkehrListeWips([]);
+                                            setSchriftverkehrListeLoading(false);
+                                        });
+                                    }}
+                                        style={{padding:'18px 16px', borderRadius:'12px', border:'2px solid var(--accent-blue)', background:'transparent', color:'var(--accent-blue)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'15px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
+                                        <span style={{fontSize:'22px'}}>{'\uD83D\uDCC2'}</span>
+                                        {'Bestehenden Schriftverkehr bearbeiten'}
+                                    </button>
+
+                                    <button onClick={function(){ setSchriftverkehrDialogStep(null); }}
+                                        style={{padding:'12px', marginTop:'8px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'Abbrechen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ SCHRIFTVERKEHR-NEU-DIALOG (Eckdaten + Sub-Typ) ═══ */}
+                    {schriftverkehrDialogStep === 'neu' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setSchriftverkehrDialogStep('auswahl'); }}>
+                            <div style={{width:'100%', maxWidth:'520px', maxHeight:'90vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'6px'}}>{'\u2795'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Neuer Schriftverkehr'}
+                                    </div>
+                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px'}}>
+                                        {'Kanal w\u00e4hlen, dann Eckdaten pr\u00fcfen.'}
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', flexDirection:'column', gap:'14px'}}>
+                                    {/* Sub-Typ-Wahl */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Kanal'}</label>
+                                        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
+                                            {[
+                                                { id:'mail', label:'E-Mail', icon:'\u2709\uFE0F' },
+                                                { id:'post', label:'Brief',  icon:'\uD83D\uDCEE' }
+                                            ].map(function(t) {
+                                                var aktiv = (schriftverkehrNeuDaten.kanal === t.id);
+                                                return (
+                                                    <button key={t.id}
+                                                        onClick={function(){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { kanal: t.id })); }}
+                                                        style={{
+                                                            padding:'12px', borderRadius:'8px',
+                                                            border: aktiv ? '2px solid #1E88E5' : '1px solid var(--border-color)',
+                                                            background: aktiv ? 'rgba(30,136,229,0.10)' : 'var(--bg-secondary)',
+                                                            color: aktiv ? '#1E88E5' : 'var(--text-primary)',
+                                                            cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700,
+                                                            textTransform:'uppercase', letterSpacing:'0.5px',
+                                                            display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                                        }}>
+                                                        <span style={{fontSize:'20px'}}>{t.icon}</span>{t.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Empfaenger */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Empf\u00e4nger'}</label>
+                                        {/* Quick-Buttons */}
+                                        {selectedKunde && (
+                                            <div style={{display:'flex', gap:'6px', marginBottom:'6px', flexWrap:'wrap'}}>
+                                                {selectedKunde.auftraggeber && (
+                                                    <button onClick={function(){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { empfaenger: selectedKunde.auftraggeber })); }}
+                                                        style={{padding:'5px 10px', fontSize:'11px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'inherit'}}>
+                                                        {'Bauherr'}
+                                                    </button>
+                                                )}
+                                                {selectedKunde.bauleiter && (
+                                                    <button onClick={function(){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { empfaenger: selectedKunde.bauleiter })); }}
+                                                        style={{padding:'5px 10px', fontSize:'11px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'inherit'}}>
+                                                        {'Bauleiter'}
+                                                    </button>
+                                                )}
+                                                {selectedKunde.architekt && (
+                                                    <button onClick={function(){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { empfaenger: selectedKunde.architekt })); }}
+                                                        style={{padding:'5px 10px', fontSize:'11px', borderRadius:'6px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'inherit'}}>
+                                                        {'Architekt'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                        <input type="text" value={schriftverkehrNeuDaten.empfaenger}
+                                            onChange={function(e){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { empfaenger: e.target.value })); }}
+                                            placeholder="Name des Empf\u00e4ngers"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Betreff */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Betreff'}</label>
+                                        <input type="text" value={schriftverkehrNeuDaten.betreff}
+                                            onChange={function(e){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { betreff: e.target.value })); }}
+                                            placeholder="z.B. Aufma\u00dftermin Bauvorhaben Mustermann"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Datum */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Datum'}</label>
+                                        <input type="text" value={schriftverkehrNeuDaten.datum}
+                                            onChange={function(e){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { datum: e.target.value })); }}
+                                            placeholder="TT.MM.JJJJ"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+
+                                    {/* Bemerkung */}
+                                    <div>
+                                        <label style={{fontSize:'11px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'6px', display:'block'}}>{'Bemerkung (optional)'}</label>
+                                        <input type="text" value={schriftverkehrNeuDaten.bemerkung}
+                                            onChange={function(e){ setSchriftverkehrNeuDaten(Object.assign({}, schriftverkehrNeuDaten, { bemerkung: e.target.value })); }}
+                                            placeholder="z.B. Behinderungsanzeige"
+                                            style={{width:'100%', padding:'10px 12px', borderRadius:'8px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', color:'var(--text-primary)', fontSize:'14px', fontFamily:'inherit', boxSizing:'border-box'}} />
+                                    </div>
+                                </div>
+
+                                <div style={{display:'flex', gap:'10px', marginTop:'22px'}}>
+                                    <button onClick={function(){ setSchriftverkehrDialogStep('auswahl'); }}
+                                        style={{flex:'0 0 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'\u2190 Zur\u00fcck'}
+                                    </button>
+                                    <button onClick={function() {
+                                        if (!schriftverkehrNeuDaten.kanal) {
+                                            alert('Bitte einen Kanal w\u00e4hlen (E-Mail oder Brief).');
+                                            return;
+                                        }
+                                        var meta = {
+                                            kanal: schriftverkehrNeuDaten.kanal,
+                                            empfaenger: schriftverkehrNeuDaten.empfaenger || '',
+                                            betreff: schriftverkehrNeuDaten.betreff || '',
+                                            datum: schriftverkehrNeuDaten.datum || new Date().toLocaleDateString('de-DE'),
+                                            bemerkung: schriftverkehrNeuDaten.bemerkung || ''
+                                        };
+                                        setSchriftverkehrDialogStep(null);
+                                        handleStartSchriftverkehr(meta);
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'12px 18px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', boxShadow:'0 4px 14px rgba(39,174,96,0.3)'}}>
+                                        {'\u2713 Beginnen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ SCHRIFTVERKEHR-LISTE-DIALOG ═══ */}
+                    {schriftverkehrDialogStep === 'liste' && (
+                        <div className="modal-overlay" style={{zIndex:3600}} onClick={function(e){ if(e.target === e.currentTarget) setSchriftverkehrDialogStep('auswahl'); }}>
+                            <div style={{width:'100%', maxWidth:'520px', maxHeight:'85vh', overflow:'auto', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'36px', marginBottom:'6px'}}>{'\uD83D\uDCC2'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Bestehender Schriftverkehr'}
+                                    </div>
+                                    <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'4px'}}>
+                                        {'Klicke auf einen Eintrag, um ihn weiter zu bearbeiten.'}
+                                    </div>
+                                </div>
+
+                                {schriftverkehrListeLoading && (
+                                    <div style={{textAlign:'center', padding:'30px', color:'var(--text-muted)'}}>{'L\u00e4dt\u2026'}</div>
+                                )}
+
+                                {!schriftverkehrListeLoading && schriftverkehrListeWips.length === 0 && (
+                                    <div style={{textAlign:'center', padding:'30px 20px', color:'var(--text-muted)'}}>
+                                        <div style={{fontSize:'36px', marginBottom:'12px'}}>{'\uD83D\uDCED'}</div>
+                                        <div style={{fontSize:'14px', fontWeight:600}}>{'Noch kein Schriftverkehr f\u00fcr diesen Kunden'}</div>
+                                        <div style={{fontSize:'12px', marginTop:'6px'}}>{'Erstelle zun\u00e4chst einen neuen Eintrag.'}</div>
+                                    </div>
+                                )}
+
+                                {!schriftverkehrListeLoading && schriftverkehrListeWips.length > 0 && (
+                                    <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+                                        {schriftverkehrListeWips.map(function(wip) {
+                                            var isLaufend = (wip.modulName === 'schriftverkehr');
+                                            var kanal = (wip.meta && wip.meta.schriftverkehrstyp) || '';
+                                            var kanalIcon = kanal === 'mail' ? '\u2709\uFE0F' : kanal === 'post' ? '\uD83D\uDCEE' : '\u2709\uFE0F';
+                                            var kanalLabel = kanal === 'mail' ? 'E-Mail' : kanal === 'post' ? 'Brief' : '';
+                                            var beschreibung = (wip.meta && wip.meta.betreff) || (wip.meta && wip.meta.empfaenger) || (wip.meta && wip.meta.beschreibung) || (isLaufend ? 'Laufender Schriftverkehr' : 'Gespeicherter Schriftverkehr');
+                                            var datum = (wip.meta && wip.meta.datum) || (wip.savedAt ? new Date(wip.savedAt).toLocaleDateString('de-DE') : '');
+                                            var empf = (wip.meta && wip.meta.empfaenger) || '';
+                                            var savedAt = wip.savedAt ? new Date(wip.savedAt) : null;
+                                            return (
+                                                <button key={wip.id} onClick={function(){ handleWipRestore(wip); }}
+                                                    style={{width:'100%', textAlign:'left', padding:'14px 16px', borderRadius:'10px', border:'1px solid ' + (isLaufend ? '#f39c12' : 'var(--border-color)'), background: isLaufend ? 'rgba(243,156,18,0.08)' : 'var(--bg-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'12px'}}>
+                                                    <span style={{fontSize:'28px'}}>{isLaufend ? '\u26A1' : kanalIcon}</span>
+                                                    <div style={{flex:1, minWidth:0}}>
+                                                        <div style={{fontSize:'14px', fontWeight:700, color:'var(--text-primary)', fontFamily:'Oswald, sans-serif', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                                            {beschreibung}
+                                                        </div>
+                                                        <div style={{fontSize:'12px', color:'var(--text-secondary)', marginTop:'2px'}}>
+                                                            {kanalLabel ? (kanalLabel + ' \u00b7 ') : ''}
+                                                            {empf ? (empf + ' \u00b7 ') : ''}
+                                                            {datum}
+                                                            {isLaufend ? ' \u00b7 (laufend)' : ''}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{textAlign:'right', flexShrink:0}}>
+                                                        <div style={{fontSize:'10px', color:'var(--text-muted)'}}>
+                                                            {savedAt ? savedAt.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'}) : ''}
+                                                        </div>
+                                                    </div>
+                                                    <span style={{color:'var(--accent-blue)', fontSize:'14px', fontWeight:700, flexShrink:0}}>{'\u25B6'}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                <div style={{display:'flex', gap:'10px', marginTop:'18px'}}>
+                                    <button onClick={function(){ setSchriftverkehrDialogStep('auswahl'); }}
+                                        style={{flex:'1 1 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'\u2190 Zur\u00fcck'}
+                                    </button>
+                                    <button onClick={function(){ setSchriftverkehrDialogStep(null); }}
+                                        style={{flex:'0 0 auto', padding:'12px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'13px', fontWeight:600, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                        {'Schlie\u00dfen'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ SCHRIFTVERKEHR-VERLASSEN-DIALOG ═══ */}
+                    {schriftverkehrDialogStep === 'verlassen' && (
+                        <div className="modal-overlay" style={{zIndex:3700}}>
+                            <div style={{width:'100%', maxWidth:'440px', background:'var(--bg-primary)', borderRadius:'16px', margin:'16px', padding:'24px', boxShadow:'0 12px 40px rgba(0,0,0,0.4)'}}>
+                                <div style={{textAlign:'center', marginBottom:'18px'}}>
+                                    <div style={{fontSize:'40px', marginBottom:'8px'}}>{'\uD83D\uDCBE'}</div>
+                                    <div style={{fontFamily:'Oswald, sans-serif', fontSize:'20px', fontWeight:700, color:'var(--text-primary)', textTransform:'uppercase', letterSpacing:'1px'}}>
+                                        {'Schriftverkehr speichern?'}
+                                    </div>
+                                    <div style={{fontSize:'13px', color:'var(--text-secondary)', marginTop:'8px', lineHeight:'1.5'}}>
+                                        {'Du verl\u00e4sst den Schriftverkehr-Bereich. M\u00f6chtest du den aktuellen Stand als gespeicherten Schriftverkehr ablegen?'}
+                                    </div>
+                                </div>
+
+                                {aktivesSchriftverkehrMetaRef.current && (aktivesSchriftverkehrMetaRef.current.betreff || aktivesSchriftverkehrMetaRef.current.empfaenger) && (
+                                    <div style={{padding:'12px 14px', borderRadius:'10px', background:'var(--bg-secondary)', fontSize:'13px', color:'var(--text-primary)', marginBottom:'18px'}}>
+                                        {aktivesSchriftverkehrMetaRef.current.kanal && (
+                                            <div><strong>{'Kanal:'}</strong> {aktivesSchriftverkehrMetaRef.current.kanal === 'mail' ? 'E-Mail' : 'Brief'}</div>
+                                        )}
+                                        {aktivesSchriftverkehrMetaRef.current.empfaenger && (
+                                            <div><strong>{'Empf\u00e4nger:'}</strong> {aktivesSchriftverkehrMetaRef.current.empfaenger}</div>
+                                        )}
+                                        {aktivesSchriftverkehrMetaRef.current.betreff && (
+                                            <div><strong>{'Betreff:'}</strong> {aktivesSchriftverkehrMetaRef.current.betreff}</div>
+                                        )}
+                                        {aktivesSchriftverkehrMetaRef.current.datum && (
+                                            <div><strong>{'Datum:'}</strong> {aktivesSchriftverkehrMetaRef.current.datum}</div>
+                                        )}
+                                        {aktivesSchriftverkehrMetaRef.current.bemerkung && (
+                                            <div><strong>{'Bemerkung:'}</strong> {aktivesSchriftverkehrMetaRef.current.bemerkung}</div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div style={{display:'flex', gap:'10px'}}>
+                                    <button onClick={function() {
+                                        var target = schriftverkehrPendingNav;
+                                        setSchriftverkehrDialogStep(null);
+                                        setSchriftverkehrPendingNav(null);
+                                        if (target) navigateTo(target, { skipSchriftverkehrDialog: true });
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'14px 16px', borderRadius:'10px', border:'1px solid var(--border-color)', background:'var(--bg-secondary)', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:'0.8px'}}>
+                                        {'Nein'}
+                                    </button>
+                                    <button onClick={function() {
+                                        var target = schriftverkehrPendingNav;
+                                        var savePromise = _collectAndSaveWip({ schriftverkehrSnapshot: true });
+                                        savePromise.then(function() {
+                                            setSchriftverkehrDialogStep(null);
+                                            setSchriftverkehrPendingNav(null);
+                                            aktivesSchriftverkehrMetaRef.current = null;
+                                            if (window._showToast) window._showToast('Schriftverkehr gespeichert', 'success');
+                                            if (target) navigateTo(target, { skipSchriftverkehrDialog: true });
+                                        }).catch(function(err) {
+                                            console.warn('[Schriftverkehr-Speichern] Fehler:', err);
+                                            alert('Fehler beim Speichern: ' + (err && err.message ? err.message : 'Unbekannter Fehler'));
+                                        });
+                                    }}
+                                        style={{flex:'1 1 auto', padding:'14px 16px', borderRadius:'10px', border:'none', background:'linear-gradient(135deg, #27ae60, #1e8449)', color:'#fff', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'14px', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.8px', boxShadow:'0 4px 14px rgba(39,174,96,0.3)'}}>
+                                        {'\u2713 Ja, speichern'}
+                                    </button>
+                                </div>
+
+                                <button onClick={function() {
+                                    setSchriftverkehrDialogStep(null);
+                                    setSchriftverkehrPendingNav(null);
+                                }}
+                                    style={{width:'100%', padding:'10px', marginTop:'10px', borderRadius:'8px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'Oswald, sans-serif', fontSize:'12px', fontWeight:500, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                    {'Abbrechen \u00b7 in Schriftverkehr bleiben'}
+                                </button>
+                            </div>
                         </div>
                     )}
 

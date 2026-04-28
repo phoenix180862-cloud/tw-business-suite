@@ -4,14 +4,15 @@
            Phase: kanalwahl -> startseite (PDF-Vorschau) -> bearbeiten-popup
            PDF: Identisch zum Rechnungsmodul (jsPDF Briefkopf)
            ===================================================================== */
-        function SchriftverkehrModul({ kunde, onBack }) {
+        function SchriftverkehrModul({ kunde, vorwahlKanal, eckdaten, onEckdatenUsed, onBack }) {
             var BLAU = 'linear-gradient(135deg, #1E88E5, #1565C0)';
             var BLAU_SHADOW = '0 6px 20px rgba(30,136,229,0.30)';
             var ROT = 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))';
             var ROT_SHADOW = '0 4px 15px rgba(196,30,30,0.3)';
 
-            const [phase, setPhase] = useState('kanalwahl');
-            const [versandKanal, setVersandKanal] = useState(null);
+            // 28.04.2026: Wenn vorwahlKanal gesetzt ist, direkt auf 'startseite' starten
+            const [phase, setPhase] = useState(vorwahlKanal ? 'startseite' : 'kanalwahl');
+            const [versandKanal, setVersandKanal] = useState(vorwahlKanal || null);
             const [showBearbeitenPopup, setShowBearbeitenPopup] = useState(false);
             const [editMode, setEditMode] = useState(false);
             const [showMailDialog, setShowMailDialog] = useState(false);
@@ -36,6 +37,24 @@
             const [bilder, setBilder] = useState([]);
             const [vorlage, setVorlage] = useState('');
             const [sendStatus, setSendStatus] = useState(null);
+
+            // 28.04.2026: Eckdaten aus Workflow-Dialog uebernehmen (Empfaenger/Betreff/Datum/Kanal).
+            // Datum kommt im Format TT.MM.JJJJ -> in ISO-Format konvertieren fuer briefDatum.
+            useEffect(function() {
+                if (!eckdaten) return;
+                if (eckdaten.kanal && eckdaten.kanal !== versandKanal) setVersandKanal(eckdaten.kanal);
+                if (eckdaten.empfaenger) setEmpfaenger(eckdaten.empfaenger);
+                if (eckdaten.betreff)    setBetreff(eckdaten.betreff);
+                if (eckdaten.datum) {
+                    var m = (eckdaten.datum || '').match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+                    if (m) {
+                        setBriefDatum(m[3] + '-' + m[2] + '-' + m[1]);
+                    } else if (/^\d{4}-\d{2}-\d{2}$/.test(eckdaten.datum)) {
+                        setBriefDatum(eckdaten.datum);
+                    }
+                }
+                if (onEckdatenUsed) onEckdatenUsed();
+            }, [eckdaten]);
 
             var vorlagen = [
                 { id: 'aufmass', name: 'Aufma\u00DFank\u00FCndigung', betreff: 'Aufma\u00DF-Termin -- ' + bauvorhaben, text: 'bezugnehmend auf den oben genannten Bauvertrag m\u00F6chte ich Ihnen mitteilen, dass ich beabsichtige, ein Aufma\u00DF der bisher erbrachten Leistungen durchzuf\u00FChren.\n\nIch bitte Sie, einen Vertreter zu diesem Termin zu entsenden, um das Aufma\u00DF gemeinsam vorzunehmen.\n\nSollte der vorgeschlagene Termin nicht passen, bitte ich um kurzfristige R\u00FCckmeldung, damit wir einen Alternativtermin vereinbaren k\u00F6nnen.' },

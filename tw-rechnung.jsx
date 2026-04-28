@@ -5,7 +5,7 @@
            Buttons: Alle 6 in einheitlichem Blau
            6. Button: Aufmass (laedt Gesamtliste, druckt/versendet als PDF)
            ===================================================================== */
-        function RechnungsModul({ kunde, importResult, gesamtliste, aufmassGespeichert, vorwahlTyp, onVorwahlUsed, onBack }) {
+        function RechnungsModul({ kunde, importResult, gesamtliste, aufmassGespeichert, vorwahlTyp, onVorwahlUsed, eckdaten, onEckdatenUsed, onBack }) {
             const [phase, setPhase] = useState(vorwahlTyp ? 'startseite' : 'typwahl');
             const [rechnungsTyp, setRechnungsTyp] = useState(vorwahlTyp || null);
             const [positionen, setPositionen] = useState([]);
@@ -93,6 +93,33 @@
                     if (onVorwahlUsed) onVorwahlUsed();
                 }
             }, [vorwahlTyp]);
+
+            // --- 28.04.2026: Eckdaten aus Workflow-Dialog uebernehmen ---
+            // Wenn der User im Rechnung-Neu-Dialog Bauvorhaben/Rechnungsnummer/Datum
+            // eingegeben hat, werden diese Werte hier in die internen States gespiegelt.
+            // Datum kommt im Format TT.MM.JJJJ -> in ISO-Format konvertieren fuer den
+            // type=date-konformen rechnungsDatum-State.
+            useEffect(function() {
+                if (!eckdaten) return;
+                if (eckdaten.bauvorhaben) setBauvorhabenText(eckdaten.bauvorhaben);
+                if (eckdaten.rechnungsnummer) {
+                    var typ = eckdaten.rechnungstyp || vorwahlTyp || '';
+                    if (typ === 'nachtrag')      setNachtragsNr(eckdaten.rechnungsnummer);
+                    else if (typ === 'angebot')  setAngebotsNr(eckdaten.rechnungsnummer);
+                    else if (typ === 'aufmass')  setAufmassNr(eckdaten.rechnungsnummer);
+                    else                          setRechnungsNr(eckdaten.rechnungsnummer);
+                }
+                if (eckdaten.datum) {
+                    // TT.MM.JJJJ -> JJJJ-MM-TT
+                    var m = (eckdaten.datum || '').match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+                    if (m) {
+                        setRechnungsDatum(m[3] + '-' + m[2] + '-' + m[1]);
+                    } else if (/^\d{4}-\d{2}-\d{2}$/.test(eckdaten.datum)) {
+                        setRechnungsDatum(eckdaten.datum);
+                    }
+                }
+                if (onEckdatenUsed) onEckdatenUsed();
+            }, [eckdaten]);
             var lvPositionen = [];
             if (importResult && importResult.positionen && importResult.positionen.length > 0) { lvPositionen = importResult.positionen; }
             else if (kunde && kunde._lvPositionen && kunde._lvPositionen.length > 0) { lvPositionen = kunde._lvPositionen; }
