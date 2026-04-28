@@ -7505,6 +7505,9 @@
 
             // Automatische Berechnung pro Position (VOB-konform, positionsspezifisch)
             const calcPositionResult = (pos) => {
+                // NEU 28.04.2026: Wenn Lösch-Button gedrueckt → Ergebnis = 0
+                // Das Flag wird durch erneute Bearbeitung (Stift, Mic) automatisch zurueckgesetzt.
+                if (pos.cleared) return 0;
                 // 1. Prio: Fertiggestellter manueller Rechenweg
                 if (pos.hasManualRW && pos.manualErgebnis > 0) {
                     return pos.manualErgebnis;
@@ -7947,21 +7950,13 @@
             useEffect(function() {
                 var R = raumblattActionsRef;
 
-                // Sub-Menue "Aktionen" - die frueher roten Buttons
+                // Sub-Menue "Aktionen" - nur noch "Zurueck" (28.04.2026)
+                // Die anderen Aktionen (Gesamtliste, Raumblatt berechnen/fertigstellen,
+                // Aufmass fertigstellen) sind jetzt als feste Button-Leiste UNTER den
+                // Positionen verfuegbar (Tab 3, RaumblattActionBar).
                 var subAktionen = [
                     { label: 'Zurueck', icon: '\u21A9',
-                      onClick: function(){ R.current.doZurueckZurRaumerkennung && R.current.doZurueckZurRaumerkennung(); } },
-                    { label: 'Gesamtliste', icon: '\uD83D\uDCCB',
-                      disabled: !rbHasGesamtliste,
-                      onClick: function(){ if (R.current.onShowGesamtliste) R.current.onShowGesamtliste(); } },
-                    { label: 'Raumblatt berechnen', icon: '\uD83D\uDCD0',
-                      onClick: function(){ R.current.setCalcModalOpen(true); } },
-                    { label: 'Raumblatt fertigstellen', icon: '\u2714',
-                      disabled: !rbHasOnFinish,
-                      onClick: function(){ if (R.current.onFinishRaum) R.current.doRaumblattFertigstellen(); } },
-                    { label: 'Aufmass fertigstellen', icon: '\uD83C\uDFC1',
-                      disabled: !rbHasOnBeenden,
-                      onClick: function(){ if (R.current.onAufmassBeenden) R.current.doAufmassFertigstellen(); } }
+                      onClick: function(){ R.current.doZurueckZurRaumerkennung && R.current.doZurueckZurRaumerkennung(); } }
                 ];
 
                 // ── ENTFERNT 27.04.2026: subTabs-Submenue und Toggles fuer Wandanzahl/Masse-kopieren ──
@@ -13341,6 +13336,80 @@
                                                         <span className="stift-icon">✏️</span>
                                                         {isEditMode ? 'Bearbeitung aktiv' : 'Rechenweg bearbeiten'}
                                                     </button>
+
+                                                    {/* NEU 28.04.2026: Mikrofon-Button - Spracheingabe fuer Rechenweg.
+                                                        Gesprochene Worte werden zu einer neuen Rechenweg-Zeile.
+                                                        Konvertiert "komma/plus/minus/mal" zu Operatoren. */}
+                                                    <div onClick={e => e.stopPropagation()} style={{display:'inline-flex', alignItems:'center', transform:'scale(1.25)', transformOrigin:'center', margin:'0 4px'}}>
+                                                        <MicButton
+                                                            fieldKey={'rw_' + pos.pos}
+                                                            size="normal"
+                                                            onResult={text => {
+                                                                if (!text) return;
+                                                                // Text in evaluierbare Formel umwandeln
+                                                                var formel = text
+                                                                    .replace(/\bkomma\b/gi, ',')
+                                                                    .replace(/\bpunkt\b/gi, '.')
+                                                                    .replace(/\bplus\b/gi, '+')
+                                                                    .replace(/\bminus\b/gi, '-')
+                                                                    .replace(/\bgeteilt durch\b/gi, '/')
+                                                                    .replace(/\bmal\b/gi, '*')
+                                                                    .replace(/\bin\b/gi, '*')
+                                                                    .replace(/\bx\b/gi, '*')
+                                                                    .replace(/\s+/g, '');
+                                                                // Edit-Mode aktivieren (falls noetig) und neue Zeile anhaengen
+                                                                if (!isEditMode) activateEdit();
+                                                                var newId = 'step_mic_' + Date.now();
+                                                                setTimeout(function() {
+                                                                    setPosRechenwegEdits(p => {
+                                                                        var current = p[pos.pos] || [];
+                                                                        return Object.assign({}, p, { [pos.pos]: current.concat([{ id: newId, label: 'Sprache', formel: formel, sign: 1 }]) });
+                                                                    });
+                                                                    // cleared-Flag zuruecksetzen wenn Daten reinkommen
+                                                                    setPosCards(prev => prev.map(pc => pc.pos === pos.pos && pc.cleared ? Object.assign({}, pc, { cleared: false }) : pc));
+                                                                }, 50);
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {/* NEU 28.04.2026: Werte-loeschen-Button - leert komplett den
+                                                        Rechenweg fuer diese Position (cleared-Flag = true → Ergebnis 0).
+                                                        Nuetzlich wenn Daten vom Vorraum uebernommen wurden, aber diese
+                                                        Position fuer den aktuellen Raum nicht relevant ist. */}
+                                                    <button onClick={e => {
+                                                        e.stopPropagation();
+                                                        if (!window.confirm('Werte für Position ' + pos.pos + ' wirklich löschen?\n\nDer Rechenweg wird komplett geleert.')) return;
+                                                        setPosRechenwegEdits(p => { var n=Object.assign({}, p); delete n[pos.pos]; return n; });
+                                                        setPosCards(prev => prev.map(pc => pc.pos === pos.pos ? Object.assign({}, pc, {
+                                                            cleared: true,
+                                                            manualRechenweg: [],
+                                                            manualErgebnis: 0,
+                                                            manualMenge: '',
+                                                            hasManualRW: false
+                                                        }) : pc));
+                                                    }}
+                                                    title="Alle Werte und Berechnungen für diese Position löschen"
+                                                    style={{
+                                                        padding: '8px 14px',
+                                                        borderRadius: '8px',
+                                                        border: '2px solid var(--accent-red)',
+                                                        background: 'rgba(196,30,30,0.10)',
+                                                        color: 'var(--accent-red-light)',
+                                                        fontFamily: 'Oswald, sans-serif',
+                                                        fontSize: '13px',
+                                                        fontWeight: '700',
+                                                        cursor: 'pointer',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.5px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        minHeight: '38px',
+                                                        marginLeft: '4px'
+                                                    }}>
+                                                        🗑️ Werte löschen
+                                                    </button>
+
                                                     {isEditMode && (
                                                         <button className="rw-edit-reset-btn"
                                                             onClick={() => setPosRechenwegEdits(p => { const n={...p}; delete n[pos.pos]; return n; })}>
@@ -13633,6 +13702,103 @@
                             </button>
                         </div>
                     )}
+
+                    {/* ═══ NEU 28.04.2026: Aktionen-Button-Leiste UNTER den Positionen ═══
+                         Diese Buttons waren vormals im "Bearbeiten" → "Aktionen" Submenu
+                         und sind nun direkt erreichbar. Reihenfolge nach Workflow-Logik:
+                         1. Raumblatt rechnen (Vorschau)  2. Raumblatt fertigstellen (speichern)
+                         3. Aufmass fertigstellen (Endabschluss)  4. Gesamtliste (alle Räume) */}
+                    <div style={{
+                        marginTop:'18px',
+                        padding:'14px',
+                        background:'var(--bg-secondary)',
+                        border:'1px solid var(--border-color)',
+                        borderRadius:'12px'
+                    }}>
+                        <div style={{
+                            fontSize:'11px', fontWeight:'700',
+                            color:'var(--text-muted)', textTransform:'uppercase',
+                            letterSpacing:'1px', marginBottom:'10px',
+                            fontFamily:'Oswald, sans-serif'
+                        }}>
+                            ⚙ Raumblatt-Aktionen
+                        </div>
+                        <div style={{
+                            display:'grid',
+                            gridTemplateColumns:'repeat(2, 1fr)',
+                            gap:'8px'
+                        }}>
+                            {/* Raumblatt rechnen */}
+                            <button onClick={() => setCalcModalOpen(true)}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                    color:'#fff', cursor:'pointer',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow:'0 2px 10px rgba(30,136,229,0.30)',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>📐</span>
+                                Raumblatt rechnen
+                            </button>
+
+                            {/* Raumblatt fertigstellen */}
+                            <button onClick={() => { if (typeof doRaumblattFertigstellen === 'function') doRaumblattFertigstellen(); }}
+                                disabled={!onFinishRaum}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background: onFinishRaum ? 'linear-gradient(135deg, #27ae60, #1e8449)' : 'rgba(120,120,120,0.30)',
+                                    color: onFinishRaum ? '#fff' : 'rgba(255,255,255,0.5)',
+                                    cursor: onFinishRaum ? 'pointer' : 'not-allowed',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow: onFinishRaum ? '0 2px 10px rgba(39,174,96,0.30)' : 'none',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>✔</span>
+                                Raumblatt fertigstellen
+                            </button>
+
+                            {/* Aufmass fertigstellen */}
+                            <button onClick={() => { if (typeof doAufmassFertigstellen === 'function') doAufmassFertigstellen(); }}
+                                disabled={!onAufmassBeenden}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background: onAufmassBeenden ? 'linear-gradient(135deg, #e84040, #c41e1e)' : 'rgba(120,120,120,0.30)',
+                                    color: onAufmassBeenden ? '#fff' : 'rgba(255,255,255,0.5)',
+                                    cursor: onAufmassBeenden ? 'pointer' : 'not-allowed',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow: onAufmassBeenden ? '0 2px 10px rgba(196,30,30,0.30)' : 'none',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>🏁</span>
+                                Aufmass fertigstellen
+                            </button>
+
+                            {/* Gesamtliste */}
+                            <button onClick={() => { if (onShowGesamtliste) onShowGesamtliste(); }}
+                                disabled={!onShowGesamtliste}
+                                style={{
+                                    padding:'14px 12px', borderRadius:'10px', border:'none',
+                                    background: onShowGesamtliste ? 'linear-gradient(135deg, #f39c12, #d35400)' : 'rgba(120,120,120,0.30)',
+                                    color: onShowGesamtliste ? '#fff' : 'rgba(255,255,255,0.5)',
+                                    cursor: onShowGesamtliste ? 'pointer' : 'not-allowed',
+                                    fontFamily:'Oswald, sans-serif', fontSize:'13px',
+                                    fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.5px',
+                                    boxShadow: onShowGesamtliste ? '0 2px 10px rgba(211,84,0,0.30)' : 'none',
+                                    minHeight:'52px',
+                                    display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                                }}>
+                                <span style={{fontSize:'18px'}}>📋</span>
+                                Gesamtliste
+                            </button>
+                        </div>
+                    </div>
 
 
                     </React.Fragment>)}
