@@ -1061,11 +1061,45 @@
             // ETAPPE F: Sync-Vorschau-Dialog Staging -> Original
             const [showStagingNachOriginal, setShowStagingNachOriginal] = useState(false);
 
+            // ── Mitarbeiter-Freigabe (Baustellen-Planung) — direkter Zugriff aus dem Kunden-Kontext ──
+            const [planungsDialogOffen, setPlanungsDialogOffen] = useState(false);
+            const [mitarbeiterListe, setMitarbeiterListe] = useState(function(){
+                return window.MITARBEITER_LISTE || [];
+            });
+            const [bestehendePlanungen, setBestehendePlanungen] = useState({});
+
+            // MA-Liste live (Grundstock + Firebase mergen)
+            useEffect(function() {
+                if (!window.FirebaseService || !window.FirebaseService.subscribeMitarbeiter) return;
+                var grundstock = window.MITARBEITER_LISTE || [];
+                var unsub = window.FirebaseService.subscribeMitarbeiter(function(fbArr) {
+                    var merged = {};
+                    grundstock.forEach(function(m){ if (m && m.id) merged[m.id] = m; });
+                    (fbArr || []).forEach(function(m){
+                        if (m && m.id) merged[m.id] = Object.assign({}, merged[m.id] || {}, m);
+                    });
+                    var arr = [];
+                    for (var k in merged) { if (merged.hasOwnProperty(k)) arr.push(merged[k]); }
+                    arr.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+                    setMitarbeiterListe(arr);
+                });
+                return unsub;
+            }, []);
+
+            // Bestehende Planungen live (fuer bekannteIds-Prop des Dialogs)
+            useEffect(function() {
+                if (!window.FirebaseService || !window.FirebaseService.subscribeBaustellenPlanungen) return;
+                var unsub = window.FirebaseService.subscribeBaustellenPlanungen(function(data) {
+                    setBestehendePlanungen(data || {});
+                });
+                return unsub;
+            }, []);
+
             // ── Etappe 4.1 Baustein 1: 2-Ordner-Modell ──
             // subView: 'hauptordner' | 'baustellen-daten' | 'nachrichten'
-            //   hauptordner    = 2 grosse Kacheln (BAUSTELLEN-DATEN + NACHRICHTEN)
+            //   hauptordner    = 2 grosse Kacheln (BAUSTELLEN-DATEN + MITARBEITER-FREIGABE)
             //   baustellen-daten = die bisherigen 4 Sub-Ordner (Migration auf 5 in B2)
-            //   nachrichten    = Kalender + Chat pro MA (Platzhalter bis B4-B6)
+            //   nachrichten    = Kalender + Chat pro MA (Legacy-Subview, nicht mehr direkt erreichbar)
             const [subView, setSubView] = useState('hauptordner');
 
             function handleBack() {
@@ -1411,9 +1445,9 @@
                                 </div>
                             </button>
 
-                            {/* Kachel 2: NACHRICHTEN — Tuerkis gemaess Design-System (Skill baustellenapp-umbau) */}
+                            {/* Kachel 2: MITARBEITER-FREIGABE — oeffnet BaustellenPlanungDialog direkt */}
                             <button
-                                onClick={function(){ setSubView('nachrichten'); }}
+                                onClick={function(){ setPlanungsDialogOffen(true); }}
                                 style={{
                                     padding: '28px 14px',
                                     borderRadius: 'var(--radius-md)',
@@ -1432,7 +1466,7 @@
                                     boxShadow: '0 4px 12px rgba(0,172,193,0.18)'
                                 }}
                             >
-                                <span style={{ fontSize: '52px', color: '#00ACC1' }}>{'\uD83D\uDCAC'}</span>
+                                <span style={{ fontSize: '52px', color: '#00ACC1' }}>{'\uD83D\uDC65'}</span>
                                 <div style={{
                                     fontSize: '15px',
                                     fontWeight: 600,
@@ -1440,14 +1474,14 @@
                                     letterSpacing: '1px',
                                     textTransform: 'uppercase',
                                     color: 'var(--text-primary)'
-                                }}>Nachrichten</div>
+                                }}>Mitarbeiter-Freigabe</div>
                                 <div style={{
                                     fontSize: '11px',
                                     color: 'var(--text-muted)',
                                     lineHeight: 1.45,
                                     padding: '0 4px'
                                 }}>
-                                    Kalender &amp; Chat pro Mitarbeiter
+                                    Zeitraum &amp; Mitarbeiter zuordnen
                                 </div>
                             </button>
                         </div>
@@ -1640,6 +1674,33 @@
                                 setShowStagingNachOriginal(false);
                                 ladeInfo(); // Info neu laden, falls Dateien gewandert sind
                             }}
+                        />
+                    )}
+
+                    {/* Mitarbeiter-Freigabe (Baustellen-Planung) — Dialog mit fixierter Baustelle */}
+                    {planungsDialogOffen && (
+                        <BaustellenPlanungDialog
+                            mitarbeiterListe={mitarbeiterListe}
+                            bestehend={null}
+                            bekannteIds={Object.keys(bestehendePlanungen)}
+                            baustelleVorausgewaehlt={baustelle.name}
+                            verfuegbareBaustellen={[{ id: baustelle.name, name: baustelle.name }]}
+                            onSpeichern={function(data) {
+                                if (!window.FirebaseService || !window.FirebaseService.schreibeBaustellenPlanung) {
+                                    alert('Firebase-Service nicht verfuegbar.');
+                                    return;
+                                }
+                                var bId = data.baustelleId;
+                                var zId = 'zt-' + Date.now();
+                                window.FirebaseService.schreibeBaustellenPlanung(bId, zId, data)
+                                    .then(function(){ setPlanungsDialogOffen(false); })
+                                    .catch(function(e){ alert('Fehler beim Speichern:\n' + (e && e.message || e)); });
+                            }}
+                            onLoeschen={function() {
+                                // Im Neu-Anlage-Modus nicht relevant — einfach schliessen
+                                setPlanungsDialogOffen(false);
+                            }}
+                            onSchliessen={function(){ setPlanungsDialogOffen(false); }}
                         />
                     )}
                 </div>
@@ -8208,6 +8269,21 @@
             const [planungen, setPlanungen] = useState({});
             const [dialogOffen, setDialogOffen] = useState(false);
             const [dialogPlanung, setDialogPlanung] = useState(null);
+            // Liste aller Drive-Baustellen-Ordner fuer das Dropdown im Dialog
+            const [verfuegbareBaustellen, setVerfuegbareBaustellen] = useState([]);
+
+            // Drive-Kundenordner fuer Dropdown laden (einmalig)
+            useEffect(function() {
+                if (!window.GoogleDriveService || !window.GoogleDriveService.listKundenOrdner) return;
+                window.GoogleDriveService.listKundenOrdner().then(function(kunden) {
+                    var arr = (kunden || []).map(function(k){
+                        return { id: k.id, name: k.name };
+                    }).sort(function(a, b){ return (a.name || '').localeCompare(b.name || ''); });
+                    setVerfuegbareBaustellen(arr);
+                }).catch(function(e) {
+                    console.warn('[HauptkalenderView] Baustellen-Liste konnte nicht geladen werden:', e);
+                });
+            }, []);
 
             // MA-Liste: Grundstock + Firebase mergen
             useEffect(function() {
@@ -8681,6 +8757,7 @@
                             mitarbeiterListe={mitarbeiter}
                             bestehend={dialogPlanung}
                             bekannteIds={Object.keys(planungen)}
+                            verfuegbareBaustellen={verfuegbareBaustellen}
                             onSpeichern={function(data) {
                                 var bId = data.baustelleId;
                                 var zId = (dialogPlanung && dialogPlanung.zeitraumId) || ('zt-' + Date.now());
@@ -8708,7 +8785,7 @@
         // Felder: Baustelle-ID (Autosuggest), Von, Bis, Farbe-Presets,
         // Beschreibung, Mitarbeiter-Auswahl als Checkboxen.
         // ═══════════════════════════════════════════════════════
-        function BaustellenPlanungDialog({ mitarbeiterListe, bestehend, bekannteIds, onSpeichern, onLoeschen, onSchliessen }) {
+        function BaustellenPlanungDialog({ mitarbeiterListe, bestehend, bekannteIds, verfuegbareBaustellen, baustelleVorausgewaehlt, onSpeichern, onLoeschen, onSchliessen }) {
             function tsToDateStr(ts) {
                 var d = new Date(ts);
                 var mm = String(d.getMonth() + 1);
@@ -8720,7 +8797,9 @@
 
             const heute = new Date();
             const [baustelleId, setBaustelleId] = useState(function(){
-                return (bestehend && bestehend.baustelleId) || '';
+                if (bestehend && bestehend.baustelleId) return bestehend.baustelleId;
+                if (baustelleVorausgewaehlt) return baustelleVorausgewaehlt;
+                return '';
             });
             const [vonStr, setVonStr] = useState(function(){
                 if (bestehend && bestehend.von) return tsToDateStr(bestehend.von);
@@ -8851,7 +8930,7 @@
                             >×</button>
                         </div>
 
-                        {/* Baustelle-ID */}
+                        {/* Baustelle-ID — Dropdown wenn Liste vorhanden, sonst Fallback Input */}
                         <div style={{ marginBottom: '12px' }}>
                             <label style={{
                                 display: 'block',
@@ -8862,29 +8941,66 @@
                                 textTransform: 'uppercase',
                                 color: 'var(--text-muted)',
                                 marginBottom: '5px'
-                            }}>Baustelle-ID *</label>
-                            <input
-                                type="text"
-                                list="b7-baustellen-ids"
-                                value={baustelleId}
-                                onChange={function(e){ setBaustelleId(e.target.value); }}
-                                disabled={!!bestehend}
-                                placeholder="z.B. meyer-bad"
-                                style={{
-                                    width: '100%',
-                                    padding: '10px 12px',
-                                    background: bestehend ? 'var(--bg-secondary)' : 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: 'var(--radius-sm)',
-                                    fontSize: '14px',
-                                    boxSizing: 'border-box',
-                                    opacity: bestehend ? 0.75 : 1
-                                }}
-                            />
-                            <datalist id="b7-baustellen-ids">
-                                {(bekannteIds || []).map(function(b){ return <option key={b} value={b} />; })}
-                            </datalist>
+                            }}>Baustelle *</label>
+                            {(verfuegbareBaustellen && verfuegbareBaustellen.length > 0) ? (
+                                <select
+                                    value={baustelleId}
+                                    onChange={function(e){ setBaustelleId(e.target.value); }}
+                                    disabled={!!bestehend || !!baustelleVorausgewaehlt}
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 12px',
+                                        background: 'var(--bg-secondary)',
+                                        color: 'var(--text-primary)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: 'var(--radius-sm)',
+                                        fontSize: '14px',
+                                        boxSizing: 'border-box',
+                                        opacity: (bestehend || baustelleVorausgewaehlt) ? 0.75 : 1,
+                                        appearance: 'auto'
+                                    }}
+                                >
+                                    <option value="">— Baustelle auswaehlen —</option>
+                                    {verfuegbareBaustellen.map(function(b){
+                                        var v = (typeof b === 'string') ? b : (b && (b.name || b.id)) || '';
+                                        var label = (typeof b === 'string') ? b : (b && (b.name || b.id)) || '';
+                                        if (!v) return null;
+                                        return <option key={v} value={v}>{label}</option>;
+                                    })}
+                                    {/* Falls aktueller Wert nicht in Liste vorkommt, trotzdem zeigen */}
+                                    {baustelleId && !(verfuegbareBaustellen.some(function(b){
+                                        var v = (typeof b === 'string') ? b : (b && (b.name || b.id));
+                                        return v === baustelleId;
+                                    })) && (
+                                        <option key={baustelleId} value={baustelleId}>{baustelleId}</option>
+                                    )}
+                                </select>
+                            ) : (
+                                <React.Fragment>
+                                    <input
+                                        type="text"
+                                        list="b7-baustellen-ids"
+                                        value={baustelleId}
+                                        onChange={function(e){ setBaustelleId(e.target.value); }}
+                                        disabled={!!bestehend}
+                                        placeholder="z.B. meyer-bad"
+                                        style={{
+                                            width: '100%',
+                                            padding: '10px 12px',
+                                            background: 'var(--bg-secondary)',
+                                            color: 'var(--text-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: 'var(--radius-sm)',
+                                            fontSize: '14px',
+                                            boxSizing: 'border-box',
+                                            opacity: bestehend ? 0.75 : 1
+                                        }}
+                                    />
+                                    <datalist id="b7-baustellen-ids">
+                                        {(bekannteIds || []).map(function(b){ return <option key={b} value={b} />; })}
+                                    </datalist>
+                                </React.Fragment>
+                            )}
                             {bestehend && (
                                 <div style={{ marginTop: '3px', fontSize: '10px', color: 'var(--text-muted)' }}>
                                     ID kann nicht geaendert werden. Fuer andere Baustelle neue Planung anlegen.
