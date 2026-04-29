@@ -1099,7 +1099,7 @@
             // subView: 'hauptordner' | 'baustellen-daten' | 'nachrichten'
             //   hauptordner    = 2 grosse Kacheln (BAUSTELLEN-DATEN + MITARBEITER-FREIGABE)
             //   baustellen-daten = die bisherigen 4 Sub-Ordner (Migration auf 5 in B2)
-            //   nachrichten    = Kalender + Chat pro MA (Legacy-Subview, nicht mehr direkt erreichbar)
+            //   nachrichten    = Legacy-Subview, nicht mehr direkt erreichbar
             const [subView, setSubView] = useState('hauptordner');
 
             function handleBack() {
@@ -1697,7 +1697,6 @@
                                     .catch(function(e){ alert('Fehler beim Speichern:\n' + (e && e.message || e)); });
                             }}
                             onLoeschen={function() {
-                                // Im Neu-Anlage-Modus nicht relevant — einfach schliessen
                                 setPlanungsDialogOffen(false);
                             }}
                             onSchliessen={function(){ setPlanungsDialogOffen(false); }}
@@ -8967,7 +8966,6 @@
                                         if (!v) return null;
                                         return <option key={v} value={v}>{label}</option>;
                                     })}
-                                    {/* Falls aktueller Wert nicht in Liste vorkommt, trotzdem zeigen */}
                                     {baustelleId && !(verfuegbareBaustellen.some(function(b){
                                         var v = (typeof b === 'string') ? b : (b && (b.name || b.id));
                                         return v === baustelleId;

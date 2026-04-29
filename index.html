@@ -143,34 +143,34 @@
          ?v= Query-String erzwingt Browser-Reload nach jedem Build.
          Bei jedem Build wird hier ein neuer Zeitstempel eingesetzt,
          damit selbst aggressivste Caches nicht stoeren. -->
-    <script src="tw-core.js?v=20260429-095716"></script>
-    <script src="tw-storage.js?v=20260429-095716"></script>
-    <script src="tw-schema.js?v=20260429-095716"></script>
-    <script src="tw-storage-api.js?v=20260429-095716"></script>
-    <script src="tw-kundendaten-parser.js?v=20260429-095716"></script>
-    <script src="tw-infrastructure.js?v=20260429-095716"></script>
-    <script src="tw-staging.js?v=20260429-095716"></script>
-    <script src="tw-nav-dropdowns.js?v=20260429-095716"></script>
-    <script src="tw-storage-components.js?v=20260429-095716"></script>
+    <script src="tw-core.js?v=20260429-101912"></script>
+    <script src="tw-storage.js?v=20260429-101912"></script>
+    <script src="tw-schema.js?v=20260429-101912"></script>
+    <script src="tw-storage-api.js?v=20260429-101912"></script>
+    <script src="tw-kundendaten-parser.js?v=20260429-101912"></script>
+    <script src="tw-infrastructure.js?v=20260429-101912"></script>
+    <script src="tw-staging.js?v=20260429-101912"></script>
+    <script src="tw-nav-dropdowns.js?v=20260429-101912"></script>
+    <script src="tw-storage-components.js?v=20260429-101912"></script>
 
     <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
 
     <!-- ═══ TW BUSINESS SUITE — DESIGN SYSTEM ═══ -->
-    <link rel="stylesheet" href="tw-design.css?v=20260429-095716">
+    <link rel="stylesheet" href="tw-design.css?v=20260429-101912">
 
 
-    <div id="root" data-build="20260429-095716"></div>
+    <div id="root" data-build="20260429-101912"></div>
 
     <script>
     // Build-Version in die Console — damit man auf dem Tablet in den DevTools
     // sofort sieht, ob man die neueste Version hat oder eine gecachte.
-    console.log('%c[TW Build] Version: 20260429-095716', 'color:#1E88E5;font-weight:bold');
+    console.log('%c[TW Build] Version: 20260429-101912', 'color:#1E88E5;font-weight:bold');
     </script>
 
 
     <script type="text/javascript">
 function _extends(){return _extends=Object.assign?Object.assign.bind():function(n){for(var e=1;e<arguments.length;e++){var t=arguments[e];for(var r in t)({}).hasOwnProperty.call(t,r)&&(n[r]=t[r]);}return n;},_extends.apply(null,arguments);}
-window.__twSentinel={startedAt:Date.now(),built:"20260429-095716",completedModules:[]};
+window.__twSentinel={startedAt:Date.now(),built:"20260429-101912",completedModules:[]};
 window.__twSentinel.lastModule="tw-shared-components.jsx";
 const {
   useState,
@@ -837,6 +837,186 @@ function findDuplicatePositions(positionen) {
     }
   });
   return duplicates;
+}
+
+/* ═══════════════════════════════════════════
+   TOOLBAR-KOMPONENTEN — HOTFIX 26.04.2026
+   ═══════════════════════════════════════════
+   Diese drei Komponenten waren laut LIESMICH-Platzoptimierung-Phase1.md
+   Teil von "Phase 1+2A" und werden seit langem von tw-aufmass.jsx
+   verwendet (Pos-Modal-Toolbar, Raumerkennungs-Toolbar). Sie haben
+   jedoch nie ihren Weg in die Code-Basis gefunden, was zu einem
+   ReferenceError fuehrte, sobald die Raumerkennungs-Seite die globale
+   Toolbar einspeiste. Nachgereicht hier am 26.04.2026 19:00.
+    - StatusPill: Anzeige-Pille (nicht klickbar) fuer Zaehler/Stati
+   - ToolbarButton: Kompakter Action-Button (Icon + Label, ~32 px hoch)
+   - ToolbarRow: Sticky horizontale Toolbar-Zeile mit linker/rechter Gruppe
+*/
+
+/* ---- StatusPill ---- */
+function StatusPill({
+  text,
+  color,
+  title,
+  onClick
+}) {
+  // Farb-Schema: success (gruen), info (blau), warning (orange), danger (rot), muted (grau)
+  const colorMap = {
+    success: {
+      bg: 'rgba(46,160,67,0.18)',
+      border: 'rgba(46,160,67,0.45)',
+      text: '#3fb950'
+    },
+    info: {
+      bg: 'rgba(30,136,229,0.18)',
+      border: 'rgba(30,136,229,0.45)',
+      text: '#58a6ff'
+    },
+    warning: {
+      bg: 'rgba(243,156,18,0.18)',
+      border: 'rgba(243,156,18,0.45)',
+      text: '#f0a84a'
+    },
+    danger: {
+      bg: 'rgba(196,30,30,0.18)',
+      border: 'rgba(196,30,30,0.45)',
+      text: '#ff6b6b'
+    },
+    muted: {
+      bg: 'rgba(120,120,120,0.18)',
+      border: 'rgba(160,160,160,0.35)',
+      text: '#c8c8c8'
+    }
+  };
+  const c = colorMap[color] || colorMap.muted;
+  return /*#__PURE__*/React.createElement("span", {
+    title: title || '',
+    onClick: onClick,
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '4px 10px',
+      borderRadius: '12px',
+      background: c.bg,
+      border: '1px solid ' + c.border,
+      color: c.text,
+      fontSize: '11px',
+      fontWeight: 700,
+      fontFamily: 'Oswald, sans-serif',
+      textTransform: 'uppercase',
+      letterSpacing: '0.6px',
+      whiteSpace: 'nowrap',
+      cursor: onClick ? 'pointer' : 'default',
+      userSelect: 'none'
+    }
+  }, text);
+}
+
+/* ---- ToolbarButton ---- */
+function ToolbarButton({
+  icon,
+  label,
+  color,
+  onClick,
+  disabled,
+  title
+}) {
+  // Farb-Schema fuer Buttons: red (default Aktion), blue (positive Aktion), orange (Auswahl), green (Bestaetigen)
+  const colorMap = {
+    red: {
+      bg: 'linear-gradient(135deg, #e84040, #c42323)',
+      shadow: 'rgba(196,30,30,0.35)'
+    },
+    blue: {
+      bg: 'linear-gradient(135deg, #4a90e2, #1e6fc4)',
+      shadow: 'rgba(30,136,229,0.35)'
+    },
+    orange: {
+      bg: 'linear-gradient(135deg, #f39c12, #d35400)',
+      shadow: 'rgba(211,84,0,0.35)'
+    },
+    green: {
+      bg: 'linear-gradient(135deg, #2ecc71, #1e8449)',
+      shadow: 'rgba(39,174,96,0.35)'
+    },
+    grey: {
+      bg: 'linear-gradient(135deg, #5d6d7e, #34495e)',
+      shadow: 'rgba(52,73,94,0.35)'
+    }
+  };
+  const c = colorMap[color] || colorMap.red;
+  return /*#__PURE__*/React.createElement("button", {
+    onClick: disabled ? undefined : onClick,
+    title: title || label || '',
+    disabled: !!disabled,
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '5px',
+      padding: '6px 11px',
+      height: '32px',
+      borderRadius: '8px',
+      border: 'none',
+      background: disabled ? 'rgba(120,120,120,0.22)' : c.bg,
+      color: disabled ? 'rgba(255,255,255,0.4)' : '#ffffff',
+      fontSize: '12px',
+      fontWeight: 700,
+      fontFamily: 'Oswald, sans-serif',
+      textTransform: 'uppercase',
+      letterSpacing: '0.6px',
+      boxShadow: disabled ? 'none' : '0 2px 8px ' + c.shadow,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      whiteSpace: 'nowrap',
+      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+    }
+  }, icon && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: '14px',
+      lineHeight: 1
+    }
+  }, icon), label && /*#__PURE__*/React.createElement("span", null, label));
+}
+
+/* ---- ToolbarRow ---- */
+function ToolbarRow({
+  left,
+  right,
+  sticky,
+  stickyTop
+}) {
+  const stickyStyle = sticky === false ? {} : {
+    position: 'sticky',
+    top: (typeof stickyTop === 'number' ? stickyTop : 60) + 'px',
+    zIndex: 340
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "tw-toolbar-row",
+    style: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '6px 10px',
+      background: 'var(--bg-primary)',
+      borderBottom: '1px solid var(--border-color)',
+      flexWrap: 'wrap',
+      ...stickyStyle
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      flexWrap: 'wrap'
+    }
+  }, left), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      flexWrap: 'wrap'
+    }
+  }, right));
 }
 
 /* ═══════════════════════════════════════════
@@ -2618,54 +2798,54 @@ function FigurSilke() {
   }))), /*#__PURE__*/React.createElement("g", {
     className: "tw-leg-l"
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M 39,98 Q 38,130 37,155 L 43,155 Q 44,130 44,98 Z",
+    d: "M 36,98 Q 35,130 34,155 L 42,155 Q 43,130 44,98 Z",
     fill: "url(#hoseSilke)"
   }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "40",
+    cx: "38",
     cy: "157",
-    rx: "6",
+    rx: "7",
     ry: "3.5",
     fill: "#1a1a1a"
   })), /*#__PURE__*/React.createElement("g", {
     className: "tw-leg-r"
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M 47,98 Q 48,130 49,155 L 55,155 Q 54,130 51,98 Z",
+    d: "M 46,98 Q 47,130 48,155 L 56,155 Q 55,130 54,98 Z",
     fill: "url(#hoseSilke)"
   }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "51",
+    cx: "52",
     cy: "157",
-    rx: "6",
+    rx: "7",
     ry: "3.5",
     fill: "#1a1a1a"
   })), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
-    d: "M 32,55 Q 30,65 31,78 Q 29,85 31,98 L 59,98 Q 61,85 59,78 Q 60,65 58,55 Z",
+    d: "M 29,55 Q 26,68 27,82 Q 25,92 28,99 L 62,99 Q 65,92 63,82 Q 64,68 61,55 Z",
     fill: "url(#jackeSilke)"
   }), /*#__PURE__*/React.createElement("line", {
     x1: "45",
     y1: "58",
     x2: "45",
-    y2: "95",
+    y2: "97",
     stroke: "#5d4037",
     strokeWidth: "0.6"
   }), /*#__PURE__*/React.createElement("rect", {
-    x: "31",
-    y: "92",
-    width: "28",
-    height: "4",
+    x: "28",
+    y: "93",
+    width: "34",
+    height: "4.5",
     fill: "#5d4037"
   }), /*#__PURE__*/React.createElement("rect", {
     x: "43",
-    y: "91",
+    y: "92",
     width: "4",
-    height: "6",
+    height: "6.5",
     fill: "#f1c40f"
   }), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
-    d: "M 27,56 L 34,55 L 64,95 L 60,100 Z",
+    d: "M 25,56 L 33,55 L 65,96 L 60,101 Z",
     fill: "url(#schaerpeSilke)",
     stroke: "#7d6608",
     strokeWidth: "0.5"
   }), /*#__PURE__*/React.createElement("path", {
-    d: "M 27,56 L 34,55",
+    d: "M 25,56 L 33,55",
     stroke: "#ffd700",
     strokeWidth: "1"
   }), /*#__PURE__*/React.createElement("text", {
@@ -2679,36 +2859,36 @@ function FigurSilke() {
     transform: "rotate(52 45 74)"
   }, "BIG BOSS"), /*#__PURE__*/React.createElement("circle", {
     cx: "60",
-    cy: "100",
+    cy: "101",
     r: "2.5",
     fill: "#f1c40f",
     stroke: "#7d6608",
     strokeWidth: "0.3"
   }), /*#__PURE__*/React.createElement("line", {
     x1: "60",
-    y1: "102",
+    y1: "103",
     x2: "59",
-    y2: "106",
+    y2: "107",
     stroke: "#b7950b",
     strokeWidth: "0.5"
   }), /*#__PURE__*/React.createElement("line", {
     x1: "61",
-    y1: "102",
+    y1: "103",
     x2: "61",
-    y2: "106",
+    y2: "107",
     stroke: "#b7950b",
     strokeWidth: "0.5"
   }), /*#__PURE__*/React.createElement("line", {
     x1: "62",
-    y1: "102",
+    y1: "103",
     x2: "63",
-    y2: "106",
+    y2: "107",
     stroke: "#b7950b",
     strokeWidth: "0.5"
   })), /*#__PURE__*/React.createElement("rect", {
-    x: "30",
+    x: "28",
     y: "84",
-    width: "30",
+    width: "34",
     height: "8",
     fill: "#ffffff",
     opacity: "0.95",
@@ -2725,25 +2905,25 @@ function FigurSilke() {
   }, "SILKE")), /*#__PURE__*/React.createElement("g", {
     className: "tw-arm-l"
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M 30,58 Q 26,73 24,92 L 29,93 Q 32,73 34,58 Z",
+    d: "M 28,58 Q 23,73 21,92 L 27,93 Q 30,73 32,58 Z",
     fill: "url(#jackeSilke)"
   }), /*#__PURE__*/React.createElement("circle", {
-    cx: "27",
+    cx: "24",
     cy: "93",
     r: "4.5",
     fill: "url(#hautSilke)"
   })), /*#__PURE__*/React.createElement("g", {
     className: "tw-arm-r"
   }, /*#__PURE__*/React.createElement("path", {
-    d: "M 60,58 Q 64,73 66,92 L 61,93 Q 58,73 56,58 Z",
+    d: "M 62,58 Q 67,73 69,92 L 63,93 Q 60,73 58,58 Z",
     fill: "url(#jackeSilke)"
   }), /*#__PURE__*/React.createElement("circle", {
-    cx: "63",
+    cx: "66",
     cy: "93",
     r: "4.5",
     fill: "url(#hautSilke)"
   }), /*#__PURE__*/React.createElement("g", {
-    transform: "translate(63,97)"
+    transform: "translate(66,97)"
   }, /*#__PURE__*/React.createElement("rect", {
     x: "-6",
     y: "-3",
@@ -2801,30 +2981,7 @@ function FigurSilke() {
     fontSize: "3.5",
     fontWeight: "900",
     fontFamily: "Arial Black, sans-serif"
-  }, "BOSS"))), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
-    d: "M 35,33 Q 22,45 20,62 Q 19,78 22,90 Q 24,95 27,92 Q 25,78 26,62 Q 28,48 38,38 Z",
-    fill: "url(#haareSilke)",
-    stroke: "#7d6608",
-    strokeWidth: "0.3"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M 28,45 Q 26,60 27,75",
-    stroke: "#f4d03f",
-    strokeWidth: "0.8",
-    fill: "none",
-    opacity: "0.7"
-  }), /*#__PURE__*/React.createElement("path", {
-    d: "M 32,42 Q 30,55 31,70",
-    stroke: "#f4d03f",
-    strokeWidth: "0.6",
-    fill: "none",
-    opacity: "0.5"
-  }), /*#__PURE__*/React.createElement("ellipse", {
-    cx: "30",
-    cy: "35",
-    rx: "3",
-    ry: "2",
-    fill: "#c2185b"
-  })), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
+  }, "BOSS"))), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("rect", {
     x: "41",
     y: "48",
     width: "8",
@@ -2837,11 +2994,15 @@ function FigurSilke() {
     ry: "12",
     fill: "url(#hautSilke)"
   }), /*#__PURE__*/React.createElement("path", {
-    d: "M 36,35 Q 34,42 36,50 L 38,50 Q 37,42 38,35 Z",
-    fill: "url(#haareSilke)"
+    d: "M 33,33 Q 30,42 32,52 Q 33,55 36,55 L 38,55 Q 36,46 38,36 Z",
+    fill: "url(#haareSilke)",
+    stroke: "#7d6608",
+    strokeWidth: "0.3"
   }), /*#__PURE__*/React.createElement("path", {
-    d: "M 54,35 Q 56,42 54,50 L 52,50 Q 53,42 52,35 Z",
-    fill: "url(#haareSilke)"
+    d: "M 57,33 Q 60,42 58,52 Q 57,55 54,55 L 52,55 Q 54,46 52,36 Z",
+    fill: "url(#haareSilke)",
+    stroke: "#7d6608",
+    strokeWidth: "0.3"
   }), /*#__PURE__*/React.createElement("path", {
     d: "M 37,34 Q 45,30 53,34 L 53,37 L 37,37 Z",
     fill: "url(#haareSilke)"
@@ -2974,6 +3135,567 @@ function FigurSilke() {
   }))));
 }
 
+/* ---- Figur 8: THOMAS — Chef im roten PKW (26.04.2026) ----
+   Die Boss-Figur faehrt zwischen den Bauteam-Gruppen mit. Statt zu laufen
+   rollt Thomas in einem roten PKW (oben rausguckend) ueber den Bildschirm.
+   Eine Sprechblase ueber dem Auto blendet rhythmisch ein/aus. */
+function FigurThomas() {
+  // Wichtig: KEIN tw-figure / tw-leg / tw-arm — Thomas faehrt, er laeuft nicht.
+  // Eigene Klasse tw-pkw bekommt im Animation-CSS ein anderes Bewegungsprofil.
+  return /*#__PURE__*/React.createElement("div", {
+    className: "tw-pkw-wrap",
+    style: {
+      position: 'relative',
+      width: '150px',
+      height: '170px'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "tw-speech-bubble",
+    style: {
+      position: 'absolute',
+      top: '2px',
+      left: '45px',
+      background: '#ffffff',
+      border: '2px solid #1a1a1a',
+      borderRadius: '14px',
+      padding: '5px 10px',
+      fontSize: '11px',
+      fontWeight: '900',
+      color: '#c0392b',
+      fontFamily: 'Oswald, Arial Black, sans-serif',
+      whiteSpace: 'nowrap',
+      boxShadow: '2px 2px 6px rgba(0,0,0,0.35)',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    }
+  }, "Yallah, Yallah!", /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      bottom: '-8px',
+      left: '18px',
+      width: 0,
+      height: 0,
+      borderLeft: '7px solid transparent',
+      borderRight: '7px solid transparent',
+      borderTop: '8px solid #1a1a1a'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: 'absolute',
+      bottom: '-5px',
+      left: '19px',
+      width: 0,
+      height: 0,
+      borderLeft: '6px solid transparent',
+      borderRight: '6px solid transparent',
+      borderTop: '7px solid #ffffff'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "tw-pkw",
+    style: {
+      position: 'absolute',
+      bottom: '0',
+      left: '0'
+    }
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 150 130",
+    width: "150",
+    height: "130"
+  }, /*#__PURE__*/React.createElement("defs", null, /*#__PURE__*/React.createElement("linearGradient", {
+    id: "pkwBody",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#e74c3c"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "0.5",
+    stopColor: "#c0392b"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#7b241c"
+  })), /*#__PURE__*/React.createElement("linearGradient", {
+    id: "pkwDach",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#a93226"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#641e16"
+  })), /*#__PURE__*/React.createElement("radialGradient", {
+    id: "pkwScheibe",
+    cx: "0.3",
+    cy: "0.3"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#aed6f1"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#5dade2"
+  })), /*#__PURE__*/React.createElement("radialGradient", {
+    id: "hautThomas",
+    cx: "0.4",
+    cy: "0.4"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#fdebd0"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#dc7633"
+  })), /*#__PURE__*/React.createElement("radialGradient", {
+    id: "helmThomas",
+    cx: "0.3",
+    cy: "0.3"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#ffffff"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#bdc3c7"
+  })), /*#__PURE__*/React.createElement("radialGradient", {
+    id: "reifenGrad",
+    cx: "0.5",
+    cy: "0.5"
+  }, /*#__PURE__*/React.createElement("stop", {
+    offset: "0",
+    stopColor: "#34495e"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "0.7",
+    stopColor: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("stop", {
+    offset: "1",
+    stopColor: "#000000"
+  }))), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "75",
+    cy: "120",
+    rx: "60",
+    ry: "5",
+    fill: "rgba(0,0,0,0.45)",
+    opacity: "0.6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 12,95 Q 14,80 22,75 L 50,72 Q 60,55 75,53 L 105,55 Q 118,72 128,80 L 138,82 Q 142,85 142,95 L 142,108 Q 142,112 138,112 L 14,112 Q 10,112 10,108 Z",
+    fill: "url(#pkwBody)",
+    stroke: "#641e16",
+    strokeWidth: "1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 50,72 Q 60,55 75,53 L 105,55 Q 118,72 118,72",
+    fill: "url(#pkwDach)",
+    stroke: "#641e16",
+    strokeWidth: "0.8"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 53,72 Q 62,60 75,58 L 90,58 L 100,72 Z",
+    fill: "url(#pkwScheibe)",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.6",
+    opacity: "0.85"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 100,72 L 90,58 L 105,60 Q 113,68 116,72 Z",
+    fill: "url(#pkwScheibe)",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.6",
+    opacity: "0.7"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 60,68 L 68,62",
+    stroke: "#ffffff",
+    strokeWidth: "1.3",
+    opacity: "0.85"
+  }), /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("path", {
+    d: "M 62,68 Q 68,62 75,61 L 90,62 Q 95,66 96,72 L 62,72 Z",
+    fill: "#2c3e50",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 77,66 L 80,72 L 79,68 L 81,72 L 80,66 Z",
+    fill: "#c0392b"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "76",
+    y: "55",
+    width: "6",
+    height: "6",
+    fill: "url(#hautThomas)"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "79",
+    cy: "48",
+    rx: "9",
+    ry: "11",
+    fill: "url(#hautThomas)"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "76",
+    cy: "46",
+    r: "0.9",
+    fill: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "82",
+    cy: "46",
+    r: "0.9",
+    fill: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 74,43 Q 76,42 78,43",
+    stroke: "#3e2723",
+    strokeWidth: "0.9",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 80,43 Q 82,42 84,43",
+    stroke: "#3e2723",
+    strokeWidth: "0.9",
+    fill: "none"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 79,47 L 78,50 L 80,50",
+    fill: "none",
+    stroke: "#a04000",
+    strokeWidth: "0.6"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 76,53 Q 79,55 82,53",
+    fill: "none",
+    stroke: "#7b241c",
+    strokeWidth: "0.9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 70,40 Q 79,30 88,40 L 88,42 L 70,42 Z",
+    fill: "url(#helmThomas)",
+    stroke: "#7f8c8d",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "79",
+    cy: "39",
+    rx: "9",
+    ry: "2.5",
+    fill: "#ecf0f1"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 73,36 Q 76,32 79,31",
+    stroke: "#ffffff",
+    strokeWidth: "1.3",
+    fill: "none",
+    opacity: "0.85"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "74",
+    y: "36",
+    width: "10",
+    height: "3",
+    fill: "#c0392b",
+    stroke: "#7b241c",
+    strokeWidth: "0.3"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "79",
+    y: "38.5",
+    textAnchor: "middle",
+    fill: "#ffffff",
+    fontSize: "2.3",
+    fontWeight: "900",
+    fontFamily: "Arial Black, sans-serif"
+  }, "CHEF")), /*#__PURE__*/React.createElement("line", {
+    x1: "20",
+    y1: "92",
+    x2: "135",
+    y2: "92",
+    stroke: "#641e16",
+    strokeWidth: "0.6"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "42",
+    y: "86",
+    width: "6",
+    height: "2",
+    rx: "1",
+    fill: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "108",
+    y: "86",
+    width: "6",
+    height: "2",
+    rx: "1",
+    fill: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "135",
+    cy: "98",
+    rx: "4",
+    ry: "3",
+    fill: "#f9e79f",
+    stroke: "#b7950b",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "135",
+    cy: "98",
+    rx: "2",
+    ry: "1.5",
+    fill: "#fffacd"
+  }), /*#__PURE__*/React.createElement("ellipse", {
+    cx: "15",
+    cy: "98",
+    rx: "3",
+    ry: "2.5",
+    fill: "#922b21",
+    stroke: "#641e16",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "10",
+    y: "105",
+    width: "132",
+    height: "4",
+    rx: "2",
+    fill: "#7f8c8d",
+    stroke: "#34495e",
+    strokeWidth: "0.4"
+  }), /*#__PURE__*/React.createElement("g", {
+    transform: "translate(75, 60)"
+  }, /*#__PURE__*/React.createElement("rect", {
+    x: "-3",
+    y: "14",
+    width: "62",
+    height: "3",
+    rx: "1.2",
+    fill: "#3e2723",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.4"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "6",
+    y1: "13",
+    x2: "6",
+    y2: "20",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.9"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "50",
+    y1: "13",
+    x2: "50",
+    y2: "20",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.9"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M -2,7 Q -4,14 2,16 L 14,16 L 14,7 Z",
+    fill: "#6e2c00",
+    stroke: "#3e2723",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "2",
+    y1: "9",
+    x2: "12",
+    y2: "14",
+    stroke: "#3e2723",
+    strokeWidth: "0.4",
+    opacity: "0.6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "3",
+    y1: "11",
+    x2: "11",
+    y2: "15",
+    stroke: "#3e2723",
+    strokeWidth: "0.3",
+    opacity: "0.5"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "14",
+    y: "6",
+    width: "32",
+    height: "10",
+    fill: "#2c3e50",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "15",
+    y: "7",
+    width: "30",
+    height: "2",
+    fill: "#34495e"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "30",
+    y: "13.5",
+    textAnchor: "middle",
+    fill: "#f1c40f",
+    fontSize: "4",
+    fontWeight: "900",
+    fontFamily: "Arial Black, sans-serif",
+    letterSpacing: "0.2"
+  }, "KALASCHNIKOW"), /*#__PURE__*/React.createElement("path", {
+    d: "M 20,16 Q 19,24 24,28 L 32,28 Q 34,22 32,16 Z",
+    fill: "#34495e",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "22",
+    y1: "18",
+    x2: "32",
+    y2: "18",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.3",
+    opacity: "0.7"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "22",
+    y1: "21",
+    x2: "32",
+    y2: "21",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.3",
+    opacity: "0.7"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "23",
+    y1: "24",
+    x2: "31",
+    y2: "24",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.3",
+    opacity: "0.7"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "24",
+    y1: "27",
+    x2: "30",
+    y2: "27",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.3",
+    opacity: "0.7"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "46",
+    y: "9",
+    width: "20",
+    height: "3",
+    fill: "#1a1a1a",
+    stroke: "#000000",
+    strokeWidth: "0.4"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "64",
+    y: "8",
+    width: "3",
+    height: "5",
+    fill: "#000000",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.3"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "46",
+    y: "6.5",
+    width: "14",
+    height: "2",
+    fill: "#1a1a1a",
+    stroke: "#000000",
+    strokeWidth: "0.3"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "22",
+    y: "3",
+    width: "3",
+    height: "3",
+    fill: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("rect", {
+    x: "58",
+    y: "4.5",
+    width: "2",
+    height: "2.5",
+    fill: "#1a1a1a"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 14,16 L 17,22 L 20,22 L 20,16 Z",
+    fill: "#3e2723",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.4"
+  }), /*#__PURE__*/React.createElement("path", {
+    d: "M 19,16 Q 19,20 23,20 L 23,18 Q 21,18 21,16 Z",
+    fill: "none",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.5"
+  })), /*#__PURE__*/React.createElement("g", {
+    className: "tw-pkw-wheel",
+    style: {
+      transformOrigin: '35px 112px'
+    }
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "35",
+    cy: "112",
+    r: "11",
+    fill: "url(#reifenGrad)",
+    stroke: "#000000",
+    strokeWidth: "0.8"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "35",
+    cy: "112",
+    r: "5",
+    fill: "#7f8c8d",
+    stroke: "#34495e",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "35",
+    y1: "106",
+    x2: "35",
+    y2: "118",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "29",
+    y1: "112",
+    x2: "41",
+    y2: "112",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.6"
+  })), /*#__PURE__*/React.createElement("g", {
+    className: "tw-pkw-wheel",
+    style: {
+      transformOrigin: '115px 112px'
+    }
+  }, /*#__PURE__*/React.createElement("circle", {
+    cx: "115",
+    cy: "112",
+    r: "11",
+    fill: "url(#reifenGrad)",
+    stroke: "#000000",
+    strokeWidth: "0.8"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: "115",
+    cy: "112",
+    r: "5",
+    fill: "#7f8c8d",
+    stroke: "#34495e",
+    strokeWidth: "0.5"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "115",
+    y1: "106",
+    x2: "115",
+    y2: "118",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.6"
+  }), /*#__PURE__*/React.createElement("line", {
+    x1: "109",
+    y1: "112",
+    x2: "121",
+    y2: "112",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.6"
+  })), /*#__PURE__*/React.createElement("rect", {
+    x: "15",
+    y: "89",
+    width: "88",
+    height: "15",
+    fill: "#ffffff",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.7",
+    rx: "2"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "59",
+    y: "100.5",
+    textAnchor: "middle",
+    fill: "#c0392b",
+    fontSize: "14",
+    fontWeight: "900",
+    fontFamily: "Arial Black, sans-serif",
+    letterSpacing: "0.5"
+  }, "THOMAS"), /*#__PURE__*/React.createElement("rect", {
+    x: "118",
+    y: "94",
+    width: "20",
+    height: "9",
+    fill: "#ffffff",
+    stroke: "#1a1a1a",
+    strokeWidth: "0.4",
+    rx: "1"
+  }), /*#__PURE__*/React.createElement("text", {
+    x: "128",
+    y: "101",
+    textAnchor: "middle",
+    fill: "#c0392b",
+    fontSize: "6",
+    fontWeight: "900",
+    fontFamily: "Arial Black, sans-serif"
+  }, "TW"))));
+}
+
 /* ---- HAUPT-KOMPONENTE: BauteamAnimation mit 3 Gruppen ---- */
 function BauteamAnimation() {
   // Gesamtzyklus 45s, je 15s pro Gruppe
@@ -3015,6 +3737,8 @@ function BauteamAnimation() {
   }, /*#__PURE__*/React.createElement(FigurIvan, null)), /*#__PURE__*/React.createElement("div", {
     className: "tw-fig-wrap tw-fig-2"
   }, /*#__PURE__*/React.createElement(FigurMichal, null)), /*#__PURE__*/React.createElement("div", {
+    className: "tw-fig-wrap tw-fig-thomas tw-fig-thomas-1"
+  }, /*#__PURE__*/React.createElement(FigurThomas, null)), /*#__PURE__*/React.createElement("div", {
     className: "tw-fig-wrap tw-fig-3"
   }, /*#__PURE__*/React.createElement(FigurIurii, null))), /*#__PURE__*/React.createElement("div", {
     className: "tw-group tw-group-2",
@@ -3028,6 +3752,8 @@ function BauteamAnimation() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "tw-fig-wrap tw-fig-4"
   }, /*#__PURE__*/React.createElement(FigurPeter, null)), /*#__PURE__*/React.createElement("div", {
+    className: "tw-fig-wrap tw-fig-thomas tw-fig-thomas-2"
+  }, /*#__PURE__*/React.createElement(FigurThomas, null)), /*#__PURE__*/React.createElement("div", {
     className: "tw-fig-wrap tw-fig-5"
   }, /*#__PURE__*/React.createElement(FigurLucaAM, null))), /*#__PURE__*/React.createElement("div", {
     className: "tw-group tw-group-3",
@@ -3041,6 +3767,8 @@ function BauteamAnimation() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "tw-fig-wrap tw-fig-6"
   }, /*#__PURE__*/React.createElement(FigurLuca2, null)), /*#__PURE__*/React.createElement("div", {
+    className: "tw-fig-wrap tw-fig-thomas tw-fig-thomas-3"
+  }, /*#__PURE__*/React.createElement(FigurThomas, null)), /*#__PURE__*/React.createElement("div", {
     className: "tw-fig-wrap tw-fig-7"
   }, /*#__PURE__*/React.createElement(FigurSilke, null))), /*#__PURE__*/React.createElement("style", {
     dangerouslySetInnerHTML: {
@@ -3132,6 +3860,49 @@ function BauteamAnimation() {
 .tw-fig-7 .tw-leg-l, .tw-fig-7 .tw-leg-r,
 .tw-fig-7 .tw-arm-l, .tw-fig-7 .tw-arm-r { animation-duration: 1.1s; animation-delay: -0.5s; }
 .tw-fig-7 .tw-figure { animation-duration: 0.55s; animation-delay: -0.25s; }
+
+/* ─────────────────────────────────────────────────────────────
+   THOMAS-PKW (26.04.2026): Eigene Bewegungs-Charakteristik —
+   kein twBodyBob (Laufzyklus), sondern sanftes "Federn" wie ein
+   rollendes Auto. Reifen drehen sich. Sprechblase pulsiert.
+   ───────────────────────────────────────────────────────────── */
+.tw-pkw {
+    animation: twPkwBounce 1.4s ease-in-out infinite;
+    transform-origin: center bottom;
+}
+@keyframes twPkwBounce {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25%      { transform: translateY(-1.5px) rotate(-0.4deg); }
+    50%      { transform: translateY(0) rotate(0deg); }
+    75%      { transform: translateY(-1px) rotate(0.4deg); }
+}
+.tw-pkw-wheel {
+    animation: twWheelSpin 0.6s linear infinite;
+}
+@keyframes twWheelSpin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* Sprechblase blendet rhythmisch ein/aus —
+   3.6s Zyklus: 0.0-0.4 Erscheinen, 0.4-2.4 sichtbar, 2.4-2.8 Ausblenden, 2.8-3.6 unsichtbar */
+.tw-speech-bubble {
+    animation: twSpeechBubble 3.6s ease-in-out infinite;
+    transform-origin: bottom left;
+}
+@keyframes twSpeechBubble {
+    0%   { opacity: 0; transform: scale(0.6) translateY(6px); }
+    11%  { opacity: 1; transform: scale(1) translateY(0); }
+    66%  { opacity: 1; transform: scale(1) translateY(0); }
+    78%  { opacity: 0; transform: scale(0.6) translateY(6px); }
+    100% { opacity: 0; transform: scale(0.6) translateY(6px); }
+}
+/* Pro-Gruppe-Phasenversatz, damit Thomas in jeder Gruppe leicht anders schwingt */
+.tw-fig-thomas-1 .tw-pkw { animation-duration: 1.4s; animation-delay: -0.2s; }
+.tw-fig-thomas-2 .tw-pkw { animation-duration: 1.55s; animation-delay: -0.6s; }
+.tw-fig-thomas-3 .tw-pkw { animation-duration: 1.3s; animation-delay: -0.4s; }
+.tw-fig-thomas-1 .tw-speech-bubble { animation-delay: 0s; }
+.tw-fig-thomas-2 .tw-speech-bubble { animation-delay: -1.2s; }
+.tw-fig-thomas-3 .tw-speech-bubble { animation-delay: -2.4s; }
 
 .tw-group {
     left: -400px;
@@ -4786,184 +5557,17 @@ function LokalerOrdnerBrowser({
 }
 
 /* ═══════════════════════════════════════════
-   MODULWAHL -- Dashboard nach Kundenauswahl
+   KUNDEN-SYNC-BUTTON -- Pro-Kunde Drive-Synchronisation
+   ───────────────────────────────────────────
+   Sauberer Wrapper um TWStorage.DriveSync.syncKundenOrdner und
+   TWStorage.DriveUploadSync.uploadAppDateien. Zeigt:
+     - Phasen-State (scanning -> uploading -> downloading -> done)
+     - Pending-Badge mit Anzahl ausstehender Uploads
+     - Letzter Sync-Zeitpunkt
+     - Inline-Fehler-Anzeige (KEIN alert/confirm-Spam)
+   Verwendet ausschliesslich BESTEHENDE TWStorage-APIs. Kein neuer
+   Speicher-Mechanismus, keine doppelten Pfade.
    ═══════════════════════════════════════════ */
-
-// ═══════════════════════════════════════════
-// Wiederhergestellte Komponenten aus index.html
-// (StatusPill, ToolbarButton, ToolbarRow, KundenSyncButton)
-// ═══════════════════════════════════════════
-// Auto-extracted Components from index.html
-// StatusPill, ToolbarButton, ToolbarRow, KundenSyncButton
-// Babel pre-compiled (React.createElement form)
-
-/* ---- StatusPill ---- */
-function StatusPill({
-  text,
-  color,
-  title,
-  onClick
-}) {
-  // Farb-Schema: success (gruen), info (blau), warning (orange), danger (rot), muted (grau)
-  const colorMap = {
-    success: {
-      bg: 'rgba(46,160,67,0.18)',
-      border: 'rgba(46,160,67,0.45)',
-      text: '#3fb950'
-    },
-    info: {
-      bg: 'rgba(30,136,229,0.18)',
-      border: 'rgba(30,136,229,0.45)',
-      text: '#58a6ff'
-    },
-    warning: {
-      bg: 'rgba(243,156,18,0.18)',
-      border: 'rgba(243,156,18,0.45)',
-      text: '#f0a84a'
-    },
-    danger: {
-      bg: 'rgba(196,30,30,0.18)',
-      border: 'rgba(196,30,30,0.45)',
-      text: '#ff6b6b'
-    },
-    muted: {
-      bg: 'rgba(120,120,120,0.18)',
-      border: 'rgba(160,160,160,0.35)',
-      text: '#c8c8c8'
-    }
-  };
-  const c = colorMap[color] || colorMap.muted;
-  return /*#__PURE__*/React.createElement("span", {
-    title: title || '',
-    onClick: onClick,
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      padding: '4px 10px',
-      borderRadius: '12px',
-      background: c.bg,
-      border: '1px solid ' + c.border,
-      color: c.text,
-      fontSize: '11px',
-      fontWeight: 700,
-      fontFamily: 'Oswald, sans-serif',
-      textTransform: 'uppercase',
-      letterSpacing: '0.6px',
-      whiteSpace: 'nowrap',
-      cursor: onClick ? 'pointer' : 'default',
-      userSelect: 'none'
-    }
-  }, text);
-}
-
-/* ---- ToolbarButton ---- */
-function ToolbarButton({
-  icon,
-  label,
-  color,
-  onClick,
-  disabled,
-  title
-}) {
-  // Farb-Schema fuer Buttons: red (default Aktion), blue (positive Aktion), orange (Auswahl), green (Bestaetigen)
-  const colorMap = {
-    red: {
-      bg: 'linear-gradient(135deg, #e84040, #c42323)',
-      shadow: 'rgba(196,30,30,0.35)'
-    },
-    blue: {
-      bg: 'linear-gradient(135deg, #4a90e2, #1e6fc4)',
-      shadow: 'rgba(30,136,229,0.35)'
-    },
-    orange: {
-      bg: 'linear-gradient(135deg, #f39c12, #d35400)',
-      shadow: 'rgba(211,84,0,0.35)'
-    },
-    green: {
-      bg: 'linear-gradient(135deg, #2ecc71, #1e8449)',
-      shadow: 'rgba(39,174,96,0.35)'
-    },
-    grey: {
-      bg: 'linear-gradient(135deg, #5d6d7e, #34495e)',
-      shadow: 'rgba(52,73,94,0.35)'
-    }
-  };
-  const c = colorMap[color] || colorMap.red;
-  return /*#__PURE__*/React.createElement("button", {
-    onClick: disabled ? undefined : onClick,
-    title: title || label || '',
-    disabled: !!disabled,
-    style: {
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '5px',
-      padding: '6px 11px',
-      height: '32px',
-      borderRadius: '8px',
-      border: 'none',
-      background: disabled ? 'rgba(120,120,120,0.22)' : c.bg,
-      color: disabled ? 'rgba(255,255,255,0.4)' : '#ffffff',
-      fontSize: '12px',
-      fontWeight: 700,
-      fontFamily: 'Oswald, sans-serif',
-      textTransform: 'uppercase',
-      letterSpacing: '0.6px',
-      boxShadow: disabled ? 'none' : '0 2px 8px ' + c.shadow,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      whiteSpace: 'nowrap',
-      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
-    }
-  }, icon && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: '14px',
-      lineHeight: 1
-    }
-  }, icon), label && /*#__PURE__*/React.createElement("span", null, label));
-}
-
-/* ---- ToolbarRow ---- */
-function ToolbarRow({
-  left,
-  right,
-  sticky,
-  stickyTop
-}) {
-  const stickyStyle = sticky === false ? {} : {
-    position: 'sticky',
-    top: (typeof stickyTop === 'number' ? stickyTop : 60) + 'px',
-    zIndex: 340
-  };
-  return /*#__PURE__*/React.createElement("div", {
-    className: "tw-toolbar-row",
-    style: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: '8px',
-      padding: '6px 10px',
-      background: 'var(--bg-primary)',
-      borderBottom: '1px solid var(--border-color)',
-      flexWrap: 'wrap',
-      ...stickyStyle
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      flexWrap: 'wrap'
-    }
-  }, left), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: '6px',
-      flexWrap: 'wrap'
-    }
-  }, right));
-}
-
-/* ---- KundenSyncButton ---- */
 function KundenSyncButton({
   kunde,
   onSyncComplete,
@@ -4982,7 +5586,9 @@ function KundenSyncButton({
   const [lastSyncAt, setLastSyncAt] = React.useState(null);
   const [, forceTick] = React.useState(0);
   var kundeId = kunde && (kunde._driveFolderId || kunde.id || kunde.name);
-  var driveFolderId = kunde && (kunde._driveFolderId || kunde.driveFolderId || kunde.folderId); // Pending-Count und letzten Sync-Zeitpunkt initial laden + alle 30s aktualisieren
+  var driveFolderId = kunde && (kunde._driveFolderId || kunde.driveFolderId || kunde.folderId);
+
+  // Pending-Count und letzten Sync-Zeitpunkt initial laden + alle 30s aktualisieren
   React.useEffect(function () {
     if (!kundeId || !window.TWStorage || !window.TWStorage.isReady()) return;
     var aktiv = true;
@@ -5246,6 +5852,10 @@ function KundenSyncButton({
     }
   }, !driveFolderId ? 'Kein Drive-Ordner fuer diesen Kunden hinterlegt.' : 'Bitte zuerst Google Drive verbinden.'));
 }
+
+/* ═══════════════════════════════════════════
+   MODULWAHL -- Dashboard nach Kundenauswahl
+   ═══════════════════════════════════════════ */
 
 window.__twSentinel.completedModules.push("tw-shared-components.jsx");
 window.__twSentinel.lastModule="tw-aufmass.jsx";
@@ -15321,7 +15931,7 @@ useEffect(function(){if(!window.FirebaseService||!window.FirebaseService.subscri
 // subView: 'hauptordner' | 'baustellen-daten' | 'nachrichten'
 //   hauptordner    = 2 grosse Kacheln (BAUSTELLEN-DATEN + MITARBEITER-FREIGABE)
 //   baustellen-daten = die bisherigen 4 Sub-Ordner (Migration auf 5 in B2)
-//   nachrichten    = Kalender + Chat pro MA (Legacy-Subview, nicht mehr direkt erreichbar)
+//   nachrichten    = Legacy-Subview, nicht mehr direkt erreichbar
 const[subView,setSubView]=useState('hauptordner');function handleBack(){// Rueckwaerts-Navigation: in Sub-Views erst auf hauptordner, dann raus
 if(subView!=='hauptordner'){setSubView('hauptordner');}else{onBack();}}var bereit=!!(stagingStatus&&stagingStatus.vorhanden);async function ladeInfo(){if(!bereit||!window.TWStaging)return;setLaedt(true);setFehler(null);try{var i=await window.TWStaging.getStagingInfo(baustelle.name);setInfo(i);}catch(e){setFehler(e.message||String(e));}setLaedt(false);}useEffect(function(){ladeInfo();},[baustelle.name,bereit]);async function handleStagingAnlegen(){if(!window.TWStaging){alert('TWStaging-Service nicht verfuegbar');return;}setAnlegeBusy(true);try{await window.TWStaging.createStagingBaustelle(baustelle.name);// Info neu laden
 await ladeInfo();alert('Staging-Bereich fuer "'+baustelle.name+'" erfolgreich angelegt.');}catch(e){alert('Fehler beim Anlegen:\n\n'+(e.message||String(e)));}setAnlegeBusy(false);}// ── Die 5 Standard-Unterordner (aus STAGING_CONFIG, Etappe 4.1 B2) ──
@@ -15329,8 +15939,7 @@ await ladeInfo();alert('Staging-Bereich fuer "'+baustelle.name+'" erfolgreich an
 // Baustellendaten ist neu. Alias-Logik in tw-staging.js — Legacy-Ordner
 // werden automatisch unter dem neuen Namen angezeigt.
 var cfg=window.STAGING_CONFIG||{};var unterordnerListe=(cfg.SUBFOLDERS||['Zeichnungen','Anweisungen','Baustellendaten','Fotos','Stunden']).map(function(name){var icon='📁';var farbe='#1E88E5';if(name==='Zeichnungen'){icon='📐';farbe='#2ecc71';}if(name==='Anweisungen'){icon='📋';farbe='#3498db';}if(name==='Baustellendaten'){icon='📊';farbe='#1E88E5';}if(name==='Fotos'){icon='📸';farbe='#e91e63';}if(name==='Stunden'){icon='⏱️';farbe='#e67e22';}var daten=info&&info.unterordner?info.unterordner[name]:null;return{name:name,icon:icon,farbe:farbe,daten:daten,permission:(cfg.SUBFOLDER_PERMISSIONS||{})[name]||'readonly',legacyName:daten&&daten.legacyName?daten.legacyName:null};});return/*#__PURE__*/React.createElement("div",{className:"page-container",style:{padding:'16px',minHeight:'100vh'}},/*#__PURE__*/React.createElement(UnterseitenHeader,{icon:subView==='nachrichten'?'💬':subView==='baustellen-daten'?'📂':'📁',titel:baustelle.name,untertitel:!bereit?'Noch nicht bereitgestellt':subView==='baustellen-daten'?'Baustellen-Daten':subView==='nachrichten'?'Nachrichten (Kalender & Chat)':'Staging-Bereich',onBack:handleBack}),!bereit&&/*#__PURE__*/React.createElement("div",{style:{padding:'28px 20px',textAlign:'center',background:'rgba(230,126,34,0.08)',border:'1px solid rgba(230,126,34,0.25)',borderRadius:'var(--radius-md)',marginBottom:'16px'}},/*#__PURE__*/React.createElement("div",{style:{fontSize:'44px',marginBottom:'14px'}},"\uD83D\uDEA7"),/*#__PURE__*/React.createElement("div",{style:{fontFamily:"'Oswald', sans-serif",fontSize:'15px',fontWeight:600,letterSpacing:'1px',textTransform:'uppercase',color:'var(--text-light)',marginBottom:'8px'}},"Staging noch nicht angelegt"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'13px',color:'var(--text-muted)',lineHeight:1.6,marginBottom:'18px'}},"Legt einen neuen Ordner ",/*#__PURE__*/React.createElement("strong",null,"Baustellen-App-Staging/",baustelle.name)," an mit den fuenf Unterordnern. Der Original-Kundenordner bleibt dabei unveraendert."),/*#__PURE__*/React.createElement("button",{onClick:handleStagingAnlegen,disabled:anlegeBusy,style:{padding:'14px 28px',borderRadius:'var(--radius-md)',border:'none',background:anlegeBusy?'var(--bg-secondary)':'linear-gradient(135deg, var(--accent-orange), var(--accent-orange-light))',color:'#fff',fontFamily:"'Oswald', sans-serif",fontSize:'14px',fontWeight:600,letterSpacing:'1.2px',textTransform:'uppercase',cursor:anlegeBusy?'not-allowed':'pointer',boxShadow:anlegeBusy?'none':'var(--shadow-md)',touchAction:'manipulation'}},anlegeBusy?'⏳ Lege an...':'✚ Staging anlegen')),bereit&&stagingStatus&&!stagingStatus.vollstaendig&&/*#__PURE__*/React.createElement("div",{style:{padding:'10px 14px',marginBottom:'14px',background:'rgba(230,126,34,0.1)',border:'1px solid rgba(230,126,34,0.3)',borderRadius:'var(--radius-sm)',fontSize:'12px',color:'var(--accent-orange)',lineHeight:1.5}},"\u26A0\uFE0F Einige Unterordner fehlen: ",(stagingStatus.fehlendeUnterordner||[]).join(', '),". Neu anlegen vervollstaendigt sie.",/*#__PURE__*/React.createElement("button",{onClick:handleStagingAnlegen,disabled:anlegeBusy,style:{marginTop:'8px',padding:'6px 14px',background:'var(--accent-orange)',color:'#fff',border:'none',borderRadius:'var(--radius-sm)',fontSize:'11px',fontFamily:"'Oswald', sans-serif",fontWeight:600,letterSpacing:'0.5px',textTransform:'uppercase',cursor:'pointer',touchAction:'manipulation'}},anlegeBusy?'⏳...':'Vervollstaendigen')),laedt&&/*#__PURE__*/React.createElement("div",{style:{textAlign:'center',padding:'24px',color:'var(--text-muted)',fontSize:'13px'}},"\u23F3 Ordner-Info wird geladen..."),fehler&&/*#__PURE__*/React.createElement("div",{style:{padding:'12px 14px',marginBottom:'14px',background:'rgba(196,30,30,0.1)',border:'1px solid rgba(196,30,30,0.3)',borderRadius:'var(--radius-md)',color:'var(--accent-red)',fontSize:'13px'}},/*#__PURE__*/React.createElement("strong",null,"Fehler:")," ",fehler),bereit&&subView==='hauptordner'&&function(){var legacyListe=unterordnerListe.filter(function(x){return!!x.legacyName;});if(legacyListe.length===0)return null;return/*#__PURE__*/React.createElement("div",{style:{marginBottom:'12px',padding:'12px 14px',background:'rgba(230,126,34,0.10)',border:'1px solid rgba(230,126,34,0.40)',borderRadius:'var(--radius-sm)',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}},/*#__PURE__*/React.createElement("div",{style:{fontSize:'22px'}},"\u26A0"),/*#__PURE__*/React.createElement("div",{style:{flex:1,minWidth:'180px'}},/*#__PURE__*/React.createElement("div",{style:{fontSize:'12px',fontFamily:"'Oswald', sans-serif",fontWeight:600,letterSpacing:'0.5px',color:'var(--accent-orange)',textTransform:'uppercase'}},legacyListe.length," Ordner mit Legacy-Namen"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'11px',color:'var(--text-muted)',marginTop:'2px'}},legacyListe.map(function(x){return'"'+x.legacyName+'" → "'+x.name+'"';}).join(', '))),/*#__PURE__*/React.createElement("button",{onClick:function(){var liste=legacyListe.map(function(x){return'  "'+x.legacyName+'" → "'+x.name+'"';}).join('\n');if(!confirm('Alle Legacy-Ordner auf Drive umbenennen?\n\n'+liste+'\n\nInhalt und Rechte bleiben unveraendert. Danach laedt die Seite automatisch neu.'))return;if(!window.TWStaging||!window.TWStaging.migriereLegacyOrdner){alert('Migrations-API nicht verfuegbar. Seite neu laden.');return;}window.TWStaging.migriereLegacyOrdner(baustelle.name,function(phase,detail){console.log('[B8-Migrate]',phase,detail);}).then(function(erg){var msg='✓ Migration abgeschlossen\n\n';msg+='Umbenannt: '+erg.migriert.length+'\n';msg+='Uebersprungen: '+erg.uebersprungen.length+'\n';msg+='Fehler: '+erg.fehler.length;if(erg.fehler.length>0){msg+='\n\nFehler-Details:\n'+erg.fehler.map(function(f){return'- '+f.name+': '+f.fehler;}).join('\n');}alert(msg);window.location.reload();}).catch(function(err){alert('Fehler waehrend Migration:\n'+(err&&err.message||err));});},style:{padding:'8px 14px',background:'linear-gradient(135deg, #e67e22, #d35400)',color:'#fff',border:'none',borderRadius:'var(--radius-sm)',fontFamily:"'Oswald', sans-serif",fontSize:'12px',fontWeight:600,letterSpacing:'0.5px',cursor:'pointer',touchAction:'manipulation',boxShadow:'0 2px 8px rgba(230,126,34,0.30)'}},"\u2713 Alle umbenennen"));}(),bereit&&subView==='hauptordner'&&/*#__PURE__*/React.createElement("div",{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginTop:'4px'}},/*#__PURE__*/React.createElement("button",{onClick:function(){setSubView('baustellen-daten');},style:{padding:'28px 14px',borderRadius:'var(--radius-md)',border:'1px solid rgba(30,136,229,0.35)',background:'linear-gradient(135deg, rgba(30,136,229,0.15), rgba(21,101,192,0.08))',color:'var(--text-primary)',cursor:'pointer',textAlign:'center',transition:'all 0.2s',touchAction:'manipulation',display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',minHeight:'160px',boxShadow:'0 4px 12px rgba(30,136,229,0.15)'}},/*#__PURE__*/React.createElement("span",{style:{fontSize:'52px',color:'#1E88E5'}},"\uD83D\uDCC2"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'15px',fontWeight:600,fontFamily:"'Oswald', sans-serif",letterSpacing:'1px',textTransform:'uppercase',color:'var(--text-primary)'}},"Baustellen-Daten"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'11px',color:'var(--text-muted)',lineHeight:1.45,padding:'0 4px'}},"Zeichnungen \xB7 Anweisungen \xB7 Baustellendaten \xB7 Fotos \xB7 Stunden")),/*#__PURE__*/React.createElement("button",{onClick:function(){setPlanungsDialogOffen(true);},style:{padding:'28px 14px',borderRadius:'var(--radius-md)',border:'1px solid rgba(0,172,193,0.40)',background:'linear-gradient(135deg, rgba(0,172,193,0.18), rgba(0,131,143,0.10))',color:'var(--text-primary)',cursor:'pointer',textAlign:'center',transition:'all 0.2s',touchAction:'manipulation',display:'flex',flexDirection:'column',alignItems:'center',gap:'10px',minHeight:'160px',boxShadow:'0 4px 12px rgba(0,172,193,0.18)'}},/*#__PURE__*/React.createElement("span",{style:{fontSize:'52px',color:'#00ACC1'}},'\uD83D\uDC65'),/*#__PURE__*/React.createElement("div",{style:{fontSize:'15px',fontWeight:600,fontFamily:"'Oswald', sans-serif",letterSpacing:'1px',textTransform:'uppercase',color:'var(--text-primary)'}},"Mitarbeiter-Freigabe"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'11px',color:'var(--text-muted)',lineHeight:1.45,padding:'0 4px'}},"Zeitraum & Mitarbeiter zuordnen"))),bereit&&subView==='hauptordner'&&/*#__PURE__*/React.createElement("div",{style:{marginTop:'14px',padding:'10px 12px',borderRadius:'var(--radius-sm)',background:'rgba(39,174,96,0.06)',border:'1px solid rgba(39,174,96,0.25)',display:'flex',alignItems:'center',gap:'10px',flexWrap:'wrap'}},/*#__PURE__*/React.createElement("span",{style:{fontSize:'20px'}},'\uD83D\uDCE4'),/*#__PURE__*/React.createElement("div",{style:{flex:1,minWidth:'140px'}},/*#__PURE__*/React.createElement("div",{style:{fontSize:'12px',fontFamily:"'Oswald', sans-serif",fontWeight:600,letterSpacing:'0.5px',textTransform:'uppercase',color:'var(--success)'}},"Uploads ins Original uebertragen"),/*#__PURE__*/React.createElement("div",{style:{fontSize:'10px',color:'var(--text-muted)',marginTop:'2px'}},"Mitarbeiter-Fotos & Stundenzettel mit Vorschau in die Kundenakte uebertragen")),/*#__PURE__*/React.createElement("button",{onClick:function(){setShowStagingNachOriginal(true);},style:{padding:'8px 14px',background:'linear-gradient(135deg, #43A047, #2E7D32)',color:'#fff',border:'none',borderRadius:'var(--radius-sm)',fontFamily:"'Oswald', sans-serif",fontSize:'11px',fontWeight:600,letterSpacing:'0.8px',textTransform:'uppercase',cursor:'pointer',boxShadow:'0 3px 10px rgba(67,160,71,0.30)',touchAction:'manipulation'}},"Vorschau ",'\u2192')),subView==='nachrichten'&&/*#__PURE__*/React.createElement(NachrichtenBereich,{baustelleName:baustelle.name}),bereit&&subView==='baustellen-daten'&&/*#__PURE__*/React.createElement("div",{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},unterordnerListe.map(function(u){var daten=u.daten;var vorhanden=!!daten;var anzahl=daten?daten.anzahlDateien:0;var groesse=daten?formatiereGroesse(daten.groesseBytes):'–';var letzte=daten&&daten.letzteAenderung?new Date(daten.letzteAenderung).toLocaleDateString('de-DE'):'–';return/*#__PURE__*/React.createElement("button",{key:u.name,onClick:function(){if(vorhanden){onOpenUnterordner(u);}},disabled:!vorhanden,style:{padding:'16px 12px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-color)',background:vorhanden?'var(--bg-card)':'var(--bg-secondary)',color:'var(--text-primary)',cursor:vorhanden?'pointer':'not-allowed',opacity:vorhanden?1:0.5,textAlign:'center',transition:'all 0.2s',touchAction:'manipulation',display:'flex',flexDirection:'column',alignItems:'center',gap:'6px'}},/*#__PURE__*/React.createElement("span",{style:{fontSize:'32px',color:u.farbe}},u.icon),/*#__PURE__*/React.createElement("div",{style:{fontSize:'13px',fontWeight:600,fontFamily:"'Oswald', sans-serif",letterSpacing:'0.5px',textTransform:'uppercase'}},u.name),/*#__PURE__*/React.createElement("div",{style:{fontSize:'11px',color:'var(--text-muted)',lineHeight:1.4}},/*#__PURE__*/React.createElement("div",null,/*#__PURE__*/React.createElement("strong",{style:{color:'var(--text-light)'}},anzahl)," Datei",anzahl!==1?'en':''),/*#__PURE__*/React.createElement("div",null,groesse),/*#__PURE__*/React.createElement("div",{style:{fontSize:'10px',marginTop:'2px'}},letzte)),/*#__PURE__*/React.createElement("div",{style:{marginTop:'4px',fontSize:'9px',padding:'2px 8px',background:u.permission==='upload'?'rgba(39,174,96,0.15)':'rgba(77,166,255,0.15)',color:u.permission==='upload'?'var(--success)':'var(--accent-blue)',borderRadius:'4px',fontFamily:"'Oswald', sans-serif",fontWeight:600,letterSpacing:'0.5px',textTransform:'uppercase'}},u.permission==='upload'?'MA: Upload':'MA: nur lesen'),u.legacyName&&/*#__PURE__*/React.createElement("div",{onClick:function(e){e.stopPropagation();if(!confirm('Drive-Ordner "'+u.legacyName+'" in "'+u.name+'" umbenennen?\n\nDies wirkt sich nur auf den Drive-Ordnernamen aus. Inhalt und Zugriffsrechte bleiben unveraendert.'))return;if(!window.TWStaging||!window.TWStaging.umbenennenOrdner){alert('Migrations-API nicht verfuegbar. Seite neu laden.');return;}window.TWStaging.umbenennenOrdner(u.daten.id,u.name).then(function(){alert('✓ Umbenennen erfolgreich:\n"'+u.legacyName+'" → "'+u.name+'"');window.location.reload();}).catch(function(err){alert('Fehler beim Umbenennen:\n'+(err&&err.message||err));});},title:'Drive-Ordner "'+u.legacyName+'" → "'+u.name+'" umbenennen (Klick)',style:{marginTop:'3px',fontSize:'8px',padding:'2px 6px',background:'rgba(230,126,34,0.15)',color:'var(--accent-orange)',border:'1px solid rgba(230,126,34,0.35)',borderRadius:'3px',fontFamily:"'Oswald', sans-serif",fontWeight:600,letterSpacing:'0.3px',cursor:'pointer',touchAction:'manipulation'}},"\u26A0 \"",u.legacyName,"\" \u2192 umbenennen"));})),showStagingNachOriginal&&/*#__PURE__*/React.createElement(StagingNachOriginalDialog,{baustelleName:baustelle.name,alleBaustellen:false,onSchliessen:function(){setShowStagingNachOriginal(false);ladeInfo();// Info neu laden, falls Dateien gewandert sind
-}}),planungsDialogOffen&&/*#__PURE__*/React.createElement(BaustellenPlanungDialog,{mitarbeiterListe:mitarbeiterListe,bestehend:null,bekannteIds:Object.keys(bestehendePlanungen),baustelleVorausgewaehlt:baustelle.name,verfuegbareBaustellen:[{id:baustelle.name,name:baustelle.name}],onSpeichern:function(data){if(!window.FirebaseService||!window.FirebaseService.schreibeBaustellenPlanung){alert('Firebase-Service nicht verfuegbar.');return;}var bId=data.baustelleId;var zId='zt-'+Date.now();window.FirebaseService.schreibeBaustellenPlanung(bId,zId,data).then(function(){setPlanungsDialogOffen(false);}).catch(function(e){alert('Fehler beim Speichern:\n'+(e&&e.message||e));});},onLoeschen:function(){// Im Neu-Anlage-Modus nicht relevant — einfach schliessen
-setPlanungsDialogOffen(false);},onSchliessen:function(){setPlanungsDialogOffen(false);}}));}// ═══════════════════════════════════════════════════════
+}}),planungsDialogOffen&&/*#__PURE__*/React.createElement(BaustellenPlanungDialog,{mitarbeiterListe:mitarbeiterListe,bestehend:null,bekannteIds:Object.keys(bestehendePlanungen),baustelleVorausgewaehlt:baustelle.name,verfuegbareBaustellen:[{id:baustelle.name,name:baustelle.name}],onSpeichern:function(data){if(!window.FirebaseService||!window.FirebaseService.schreibeBaustellenPlanung){alert('Firebase-Service nicht verfuegbar.');return;}var bId=data.baustelleId;var zId='zt-'+Date.now();window.FirebaseService.schreibeBaustellenPlanung(bId,zId,data).then(function(){setPlanungsDialogOffen(false);}).catch(function(e){alert('Fehler beim Speichern:\n'+(e&&e.message||e));});},onLoeschen:function(){setPlanungsDialogOffen(false);},onSchliessen:function(){setPlanungsDialogOffen(false);}}));}// ═══════════════════════════════════════════════════════
 // ORDNER-BROWSER (read-only in Etappe 3)
 // Breadcrumbs-Navigation, Dateiliste mit Typ/Groesse,
 // Klick auf Datei = Vorschau im Drive-Tab
