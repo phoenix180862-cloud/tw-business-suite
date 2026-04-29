@@ -2762,6 +2762,94 @@
             s.forEach(function(c){p.push({id:c.key,...c.val()});}); return p;
         },
         async unpublishProject(id) { await this.db.ref('projects/'+id).remove(); },
+
+        // ─────────────────────────────────────────────────────────
+        // AKTIVE BAUSTELLEN (Verbindung Master-App ↔ Baustellen-App)
+        // ─────────────────────────────────────────────────────────
+        // Pfad: /aktive_baustellen/{baustellenId}/
+        //   ├ name              (string)
+        //   ├ status            ('aktiv' | 'beendet')
+        //   ├ letzter_push      (Timestamp, ServerValue)
+        //   ├ staging_folder_id (string, Drive-Ordner-ID, optional)
+        //   └ freigegebene_geraete: { uid: true, ... }
+        // Die Baustellen-App liest GENAU diesen Pfad.
+        // ID = Slug aus dem Baustellen-Namen (Kleinbuchstaben, Bindestriche).
+        _slugifyBaustelle(name) {
+            if(!name) return '';
+            return String(name).toLowerCase()
+                .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+                .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+        },
+
+        // Schreibt eine aktive Baustelle. payload: { name, status, staging_folder_id? }
+        // letzter_push wird automatisch auf Server-Timestamp gesetzt.
+        // Bestehende freigegebene_geraete bleiben erhalten (Merge via update).
+        async pushAktiveBaustelle(baustelleId, payload) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId) throw new Error('baustelleId fehlt');
+            var ref = this.db.ref('aktive_baustellen/'+baustelleId);
+            var data = {
+                name: (payload && payload.name) || baustelleId,
+                status: (payload && payload.status) || 'aktiv',
+                letzter_push: firebase.database.ServerValue.TIMESTAMP
+            };
+            if (payload && payload.staging_folder_id) {
+                data.staging_folder_id = payload.staging_folder_id;
+            }
+            // update statt set: erhaelt freigegebene_geraete falls schon vorhanden
+            await ref.update(data);
+            return baustelleId;
+        },
+
+        // Loescht eine aktive Baustelle vollstaendig (inkl. Freigaben).
+        async removeAktiveBaustelle(baustelleId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            await this.db.ref('aktive_baustellen/'+baustelleId).remove();
+        },
+
+        // Live-Subscription auf alle aktiven Baustellen.
+        // Callback erhaelt: { id1: {name,status,...}, id2: {...} }
+        subscribeAktiveBaustellen(callback) {
+            if(!this.db) return function(){};
+            var ref = this.db.ref('aktive_baustellen');
+            var h = ref.on('value', function(snap){
+                callback(snap.val() || {});
+            });
+            return function(){ ref.off('value', h); };
+        },
+
+        // Setzt/entfernt Geraete-Freigabe fuer eine Baustelle.
+        // freigegeben=true → schreibt true; freigegeben=false → loescht den Eintrag.
+        async setBaustelleFreigabe(baustelleId, uid, freigegeben) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !uid) throw new Error('baustelleId/uid fehlen');
+            var ref = this.db.ref('aktive_baustellen/'+baustelleId+'/freigegebene_geraete/'+uid);
+            if (freigegeben) {
+                await ref.set(true);
+            } else {
+                await ref.remove();
+            }
+        },
+
+        // Komfort: alle aktuell approved Geraete fuer eine Baustelle freigeben.
+        // (Genutzt direkt nach pushAktiveBaustelle, damit neue Baustellen sofort
+        // bei allen Mitarbeitern auftauchen — ohne extra Klick.)
+        async freigebenAlleApproved(baustelleId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            var s = await this.db.ref('users').once('value');
+            var freigaben = {};
+            s.forEach(function(c){
+                var d = c.val();
+                if (d && d.approved && !d.locked) {
+                    freigaben[c.key] = true;
+                }
+            });
+            if (Object.keys(freigaben).length > 0) {
+                await this.db.ref('aktive_baustellen/'+baustelleId+'/freigegebene_geraete').update(freigaben);
+            }
+            return Object.keys(freigaben).length;
+        },
+
         async getSyncStatus() {
             if(!this.db) return {projects:0,users:0};
             var p=await this.db.ref('projects').once('value');

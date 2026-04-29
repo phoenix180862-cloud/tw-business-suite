@@ -303,10 +303,17 @@
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
+            if (subpage === 'aktivBaustellen') {
+                return <AktiveBaustellenFreigabe
+                    fbOk={fbOk}
+                    users={users}
+                    onBack={function(){ setSubpage('start'); }}
+                />;
+            }
 
             // ════════════════════════════════════════════════════
-            // STARTSEITE: 6 grosse blaue Buttons
-            // (Etappe 4.1 B9 + Nachrichten)
+            // STARTSEITE: 7 grosse blaue Buttons
+            // (Etappe 4.1 B9 + Nachrichten + Baustellen-App-Aktivierung)
             // ════════════════════════════════════════════════════
             return <BaustellenAppStartseite
                 kunde={kunde}
@@ -318,6 +325,7 @@
                 onHauptkalender={function(){ setSubpage('hauptkalender'); }}
                 onFreigaben={function(){ setSubpage('freigaben'); }}
                 onNachrichten={function(){ setSubpage('nachrichten'); }}
+                onAktivBaustellen={function(){ setSubpage('aktivBaustellen'); }}
                 onBack={onBack}
             />;
         }
@@ -328,7 +336,7 @@
         //   BAUSTELLEN - TEAM - SYNC - HAUPTKALENDER - FREIGABEN
         // HAUPTKALENDER kam in B7 dazu, FREIGABEN in B9.
         // ═══════════════════════════════════════════════════════
-        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onBack }) {
+        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onAktivBaustellen, onBack }) {
             // Wartende Foto-Freigaben zaehlen (Live-Listener, fuer Badge)
             const [fotoPending, setFotoPending] = useState(0);
             useEffect(function(){
@@ -419,6 +427,14 @@
                     onClick: onNachrichten,
                     badge: nachrichtenUngelesen > 0 ? String(nachrichtenUngelesen) : null,
                     badgeDringend: nachrichtenDringend > 0
+                },
+                {
+                    id: 'aktiv-baustellen',
+                    icon: '📡',
+                    title: 'Baustellen aktivieren',
+                    desc: 'Welche Baustellen sind in der Mitarbeiter-App sichtbar? Aktivieren, deaktivieren, Geraete-Freigaben.',
+                    onClick: onAktivBaustellen,
+                    badge: null
                 }
             ];
 
@@ -10703,3 +10719,270 @@
             );
         }
 
+
+        // ═══════════════════════════════════════════════════════
+        // AKTIVE BAUSTELLEN — FREIGABE-VERWALTUNG (📡)
+        // ═══════════════════════════════════════════════════════
+        // Zeigt alle Drive-Kundenordner als Liste. Pro Eintrag:
+        //   • Toggle "Aktiv" → schreibt nach /aktive_baustellen/{slug}/
+        //   • Beim Aktivieren werden ALLE approved Geraete sofort freigegeben
+        //   • Pro Baustelle: Liste der freigegebenen Geraete mit Haekchen
+        //   • Live-Subscription auf /aktive_baustellen/ → UI immer aktuell
+        function AktiveBaustellenFreigabe({ fbOk, users, onBack }) {
+            const [drveBaustellen, setDriveBaustellen] = useState([]);
+            const [aktiveMap, setAktiveMap] = useState({}); // { slug: {name,status,freigegebene_geraete:{...}} }
+            const [lade, setLade] = useState(true);
+            const [busy, setBusy] = useState({}); // { slug: true } waehrend Schreiboperation
+            const [fehler, setFehler] = useState(null);
+            const [info, setInfo] = useState(null);
+            const [expandiert, setExpandiert] = useState({}); // { slug: true } = Mitarbeiter-Liste sichtbar
+
+            // ── 1. Drive-Kundenordner laden (potenzielle Baustellen) ──
+            useEffect(function(){
+                if (!window.GoogleDriveService) {
+                    setFehler('Google Drive nicht verbunden — bitte zuerst in der Master-App-Startseite synchronisieren.');
+                    setLade(false);
+                    return;
+                }
+                window.GoogleDriveService.listKundenOrdner().then(function(arr){
+                    setDriveBaustellen(arr || []);
+                    setLade(false);
+                }).catch(function(e){
+                    setFehler('Konnte Baustellen-Liste nicht laden: ' + (e && e.message || e));
+                    setLade(false);
+                });
+            }, []);
+
+            // ── 2. Live-Subscription auf /aktive_baustellen/ ──
+            useEffect(function(){
+                if (!fbOk || !window.FirebaseService || !window.FirebaseService.subscribeAktiveBaustellen) return;
+                var unsub = window.FirebaseService.subscribeAktiveBaustellen(function(data){
+                    setAktiveMap(data || {});
+                });
+                return unsub;
+            }, [fbOk]);
+
+            function setBusyFor(slug, val) {
+                setBusy(function(p){ var n = Object.assign({}, p); if(val) n[slug]=true; else delete n[slug]; return n; });
+            }
+
+            // ── Aktivieren: pushAktiveBaustelle + alle approved freigeben ──
+            async function aktiviere(baustelle) {
+                if (!fbOk || !window.FirebaseService) return;
+                var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
+                setBusyFor(slug, true); setFehler(null); setInfo(null);
+                try {
+                    await window.FirebaseService.pushAktiveBaustelle(slug, {
+                        name: baustelle.name,
+                        status: 'aktiv',
+                        staging_folder_id: baustelle.id || null
+                    });
+                    var n = await window.FirebaseService.freigebenAlleApproved(slug);
+                    await window.FirebaseService.logAuditEvent('baustelle_aktiviert', {
+                        baustelle: baustelle.name, slug: slug, freigegeben_count: n
+                    });
+                    setInfo('"' + baustelle.name + '" ist jetzt fuer ' + n + ' Geraet(e) sichtbar.');
+                } catch (e) {
+                    setFehler('Aktivierung fehlgeschlagen: ' + (e && e.message || e));
+                }
+                setBusyFor(slug, false);
+            }
+
+            // ── Deaktivieren: removeAktiveBaustelle ──
+            async function deaktiviere(baustelle) {
+                if (!fbOk || !window.FirebaseService) return;
+                var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
+                if (!confirm('Baustelle "' + baustelle.name + '" aus der Mitarbeiter-App entfernen?')) return;
+                setBusyFor(slug, true); setFehler(null); setInfo(null);
+                try {
+                    await window.FirebaseService.removeAktiveBaustelle(slug);
+                    await window.FirebaseService.logAuditEvent('baustelle_deaktiviert', {
+                        baustelle: baustelle.name, slug: slug
+                    });
+                    setInfo('"' + baustelle.name + '" wurde deaktiviert.');
+                } catch (e) {
+                    setFehler('Deaktivierung fehlgeschlagen: ' + (e && e.message || e));
+                }
+                setBusyFor(slug, false);
+            }
+
+            // ── Pro UID Freigabe togglen ──
+            async function toggleGeraet(slug, uid, neu) {
+                if (!fbOk || !window.FirebaseService) return;
+                setFehler(null);
+                try {
+                    await window.FirebaseService.setBaustelleFreigabe(slug, uid, neu);
+                } catch (e) {
+                    setFehler('Geraete-Freigabe fehlgeschlagen: ' + (e && e.message || e));
+                }
+            }
+
+            // ── Helper: ist diese Drive-Baustelle aktiv? ──
+            function findeAktivEintrag(baustelle) {
+                if (!fbOk || !window.FirebaseService) return null;
+                var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
+                return aktiveMap[slug] ? { slug: slug, data: aktiveMap[slug] } : null;
+            }
+
+            // ── Ohne Firebase: Hinweis-Screen ──
+            if (!fbOk) {
+                return (
+                    <div className="page-container" style={{padding:'16px'}}>
+                        <UnterseitenHeader
+                            icon="📡"
+                            titel="Baustellen aktivieren"
+                            untertitel="Firebase nicht verbunden"
+                            onBack={onBack}
+                        />
+                        <div style={{
+                            background:'rgba(196,30,30,0.10)',
+                            border:'1px solid rgba(196,30,30,0.3)',
+                            borderRadius:'12px',
+                            padding:'18px',
+                            color:'var(--text-primary)',
+                            marginTop:'18px'
+                        }}>
+                            ⚠ Bitte zuerst im Bereich <b>Sync</b> die Verbindung zum Firebase-Backend herstellen, sonst kann keine Baustelle freigegeben werden.
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="page-container" style={{padding:'16px', minHeight:'100vh'}}>
+                    <UnterseitenHeader
+                        icon="📡"
+                        titel="Baustellen aktivieren"
+                        untertitel={Object.keys(aktiveMap).length + ' aktiv · ' + drveBaustellen.length + ' verfuegbar'}
+                        onBack={onBack}
+                    />
+
+                    {fehler && (
+                        <div style={{
+                            background:'rgba(196,30,30,0.12)', border:'1px solid rgba(196,30,30,0.35)',
+                            borderRadius:'10px', padding:'12px 14px', color:'var(--text-primary)',
+                            marginTop:'12px', fontSize:'13px'
+                        }}>⚠ {fehler}</div>
+                    )}
+                    {info && (
+                        <div style={{
+                            background:'rgba(39,174,96,0.12)', border:'1px solid rgba(39,174,96,0.35)',
+                            borderRadius:'10px', padding:'12px 14px', color:'var(--text-primary)',
+                            marginTop:'12px', fontSize:'13px'
+                        }}>✓ {info}</div>
+                    )}
+
+                    {lade && (
+                        <div style={{padding:'40px', textAlign:'center', color:'var(--text-muted)'}}>
+                            Lade Baustellen-Liste …
+                        </div>
+                    )}
+
+                    {!lade && drveBaustellen.length === 0 && !fehler && (
+                        <div style={{padding:'30px', textAlign:'center', color:'var(--text-muted)'}}>
+                            Keine Baustellen im Google-Drive-Kundenordner gefunden.
+                        </div>
+                    )}
+
+                    {!lade && drveBaustellen.map(function(baustelle){
+                        var aktiv = findeAktivEintrag(baustelle);
+                        var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
+                        var istBusy = !!busy[slug];
+                        var istAktiv = !!aktiv;
+                        var freigaben = (aktiv && aktiv.data.freigegebene_geraete) || {};
+                        var freigabeCount = Object.keys(freigaben).length;
+                        var istExpandiert = !!expandiert[slug];
+
+                        return (
+                            <div key={baustelle.id || baustelle.name} style={{
+                                background: istAktiv ? 'rgba(39,174,96,0.06)' : 'var(--bg-secondary)',
+                                border: '1px solid ' + (istAktiv ? 'rgba(39,174,96,0.35)' : 'var(--border)'),
+                                borderRadius:'12px', padding:'14px', marginBottom:'10px'
+                            }}>
+                                <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+                                    <div style={{flex:1, minWidth:0}}>
+                                        <div style={{
+                                            fontFamily:"'Oswald',sans-serif", fontSize:'15px', fontWeight:600,
+                                            color:'var(--text-primary)', overflow:'hidden',
+                                            textOverflow:'ellipsis', whiteSpace:'nowrap'
+                                        }}>
+                                            {baustelle.name}
+                                        </div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'2px'}}>
+                                            {istAktiv
+                                                ? '📡 aktiv · ' + freigabeCount + ' Geraet(e) freigegeben'
+                                                : 'inaktiv · in Mitarbeiter-App nicht sichtbar'}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={function(){ istAktiv ? deaktiviere(baustelle) : aktiviere(baustelle); }}
+                                        disabled={istBusy}
+                                        style={{
+                                            padding:'8px 16px', borderRadius:'8px', border:'none',
+                                            fontFamily:"'Oswald',sans-serif", fontSize:'12px',
+                                            fontWeight:600, letterSpacing:'0.8px', textTransform:'uppercase',
+                                            cursor: istBusy ? 'wait' : 'pointer', touchAction:'manipulation',
+                                            background: istAktiv ? 'rgba(196,30,30,0.85)' : 'var(--accent-blue)',
+                                            color:'#fff', opacity: istBusy ? 0.6 : 1
+                                        }}
+                                    >
+                                        {istBusy ? '…' : (istAktiv ? 'Deaktivieren' : 'Aktivieren')}
+                                    </button>
+                                </div>
+
+                                {istAktiv && (
+                                    <div style={{marginTop:'10px', borderTop:'1px solid var(--border)', paddingTop:'10px'}}>
+                                        <button
+                                            onClick={function(){
+                                                setExpandiert(function(p){ var n=Object.assign({},p); n[slug]=!p[slug]; return n; });
+                                            }}
+                                            style={{
+                                                background:'none', border:'none', color:'var(--accent-blue)',
+                                                fontSize:'12px', cursor:'pointer', padding:'4px 0',
+                                                textAlign:'left', width:'100%', touchAction:'manipulation'
+                                            }}
+                                        >
+                                            {istExpandiert ? '▼' : '▶'} Geraete-Freigaben ({freigabeCount})
+                                        </button>
+                                        {istExpandiert && (
+                                            <div style={{marginTop:'8px', paddingLeft:'12px'}}>
+                                                {users.approved.length === 0 && (
+                                                    <div style={{fontSize:'12px', color:'var(--text-muted)'}}>
+                                                        Keine genehmigten Geraete vorhanden.
+                                                    </div>
+                                                )}
+                                                {users.approved.map(function(u){
+                                                    var freigegeben = !!freigaben[u.uid];
+                                                    var label = (u.profile && u.profile.name) || u.ma_id || u.uid.slice(0,8);
+                                                    return (
+                                                        <label key={u.uid} style={{
+                                                            display:'flex', alignItems:'center', gap:'10px',
+                                                            padding:'6px 0', fontSize:'13px', color:'var(--text-primary)',
+                                                            cursor:'pointer'
+                                                        }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={freigegeben}
+                                                                onChange={function(e){ toggleGeraet(slug, u.uid, e.target.checked); }}
+                                                                style={{width:'16px', height:'16px', cursor:'pointer'}}
+                                                            />
+                                                            <span style={{flex:1}}>{label}</span>
+                                                            {u.ma_id && (
+                                                                <span style={{
+                                                                    fontSize:'10px', color:'var(--text-muted)',
+                                                                    fontFamily:'monospace'
+                                                                }}>{u.ma_id}</span>
+                                                            )}
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
