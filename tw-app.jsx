@@ -1713,12 +1713,29 @@
                         setLoadProgress('🤖 KI-Ordneranalyse wird gestartet...');
 
                         // Ordner-Filter anwenden: nur ausgewaehlte Ordner an Engine uebergeben
+                        // Plus: Ordner mit einzeln markierten Dateien einbeziehen (gefilterte Datei-Liste)
                         var kundeForAnalysis = Object.assign({}, kunde);
-                        if (config.mode === 'ordner' && config.selectedFolders && config.selectedFolders.length > 0) {
-                            kundeForAnalysis.folders = (kunde.folders || []).filter(function(f) {
-                                return config.selectedFolders.indexOf(f.name) >= 0;
-                            });
-                            console.log('🔍 Gefilterte Ordner:', kundeForAnalysis.folders.map(function(f) { return f.name; }));
+                        var einzelIds = config.selectedFileIds || [];
+                        var einzelIdsSet = {};
+                        einzelIds.forEach(function(id){ einzelIdsSet[id] = true; });
+
+                        if (config.mode === 'ordner') {
+                            var selSet = (config.selectedFolders || []);
+                            kundeForAnalysis.folders = (kunde.folders || [])
+                                .filter(function(f) {
+                                    var folderSelected = selSet.indexOf(f.name) >= 0;
+                                    var hasEinzel = einzelIds.length > 0 && (f.files || []).some(function(file){ return file && file.id && einzelIdsSet[file.id]; });
+                                    return folderSelected || hasEinzel;
+                                })
+                                .map(function(f) {
+                                    var folderSelected = selSet.indexOf(f.name) >= 0;
+                                    if (folderSelected || einzelIds.length === 0) return f; // alle Dateien
+                                    // Ordner nicht komplett gewaehlt -> nur Einzeldateien dieses Ordners behalten
+                                    var copy = Object.assign({}, f);
+                                    copy.files = (f.files || []).filter(function(file){ return file && file.id && einzelIdsSet[file.id]; });
+                                    return copy;
+                                });
+                            console.log('🔍 Gefilterte Ordner:', kundeForAnalysis.folders.map(function(f) { return f.name + ' (' + (f.files||[]).length + ' Datei' + ((f.files||[]).length === 1 ? '' : 'en') + ')'; }));
                         }
                         if (!config.includeRootFiles) {
                             kundeForAnalysis.files = [];
@@ -2882,14 +2899,39 @@
                                         return;
                                     }
 
-                                    // Ordner filtern
-                                    var folders = kunde.folders || [];
+                                    // Ordner filtern: Wenn 'ordner'-Modus, behalte nur die ausgewaehlten Ordner
+                                    // ODER Ordner, die mind. eine einzeln ausgewaehlte Datei enthalten
+                                    var allFolders = kunde.folders || [];
                                     var sel = config.selectedFolders;
-                                    if (config.mode === 'ordner' && sel && sel.length > 0) {
-                                        folders = folders.filter(function(f) { return sel.indexOf(f.name) >= 0; });
+                                    var einzelIds = config.selectedFileIds || [];
+                                    var einzelIdsSet = {};
+                                    einzelIds.forEach(function(id){ einzelIdsSet[id] = true; });
+
+                                    var folders;
+                                    if (config.mode === 'ordner') {
+                                        folders = allFolders.filter(function(f) {
+                                            var folderSelected = sel && sel.indexOf(f.name) >= 0;
+                                            var hasEinzelDatei = einzelIds.length > 0 && (f.files || []).some(function(file){ return file && file.id && einzelIdsSet[file.id]; });
+                                            return folderSelected || hasEinzelDatei;
+                                        });
+                                    } else {
+                                        folders = allFolders;
                                     }
 
-                                    var totalDateien = folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0);
+                                    // Pro Ordner Datei-Liste filtern: wenn der Ordner NICHT komplett gewaehlt ist,
+                                    // nur die einzeln markierten Dateien herunterladen
+                                    var folderHatEinzelfilter = function(folderName) {
+                                        if (config.mode !== 'ordner') return false;
+                                        if (sel && sel.indexOf(folderName) >= 0) return false; // Ordner komplett -> alle Dateien
+                                        return einzelIds.length > 0;
+                                    };
+                                    var dateienFuerOrdner = function(folder) {
+                                        var alle = folder.files || [];
+                                        if (!folderHatEinzelfilter(folder.name)) return alle;
+                                        return alle.filter(function(file){ return file && file.id && einzelIdsSet[file.id]; });
+                                    };
+
+                                    var totalDateien = folders.reduce(function(s, f) { return s + dateienFuerOrdner(f).length; }, 0);
                                     var geladen = 0;
                                     var geladeneDateien = [];
 
@@ -2897,7 +2939,7 @@
 
                                     for (var fi = 0; fi < folders.length; fi++) {
                                         var folder = folders[fi];
-                                        var files = folder.files || [];
+                                        var files = dateienFuerOrdner(folder);
                                         for (var di = 0; di < files.length; di++) {
                                             var file = files[di];
                                             geladen++;

@@ -1979,6 +1979,20 @@
             const [vorabAkteMode, setVorabAkteMode] = useState(false);
             const [vorabAkteFile, setVorabAkteFile] = useState(null);
             const [vorabAkteLoading, setVorabAkteLoading] = useState(false);
+            // Einzeldatei-Auswahl (zusaetzlich zu Ordner-Auswahl)
+            const [selectedFileIds, setSelectedFileIds] = useState({});
+
+            // Einzelne Datei toggeln (unabhaengig von Ordner-Auswahl)
+            var toggleFile = function(file, e) {
+                if (e) e.stopPropagation();
+                if (!file || !file.id) return;
+                setSelectedFileIds(function(prev) {
+                    var n = Object.assign({}, prev);
+                    if (n[file.id]) delete n[file.id];
+                    else n[file.id] = true;
+                    return n;
+                });
+            };
 
             // Ordner aufklappen/zuklappen
             var toggleExpand = function(folderName, e) {
@@ -2064,21 +2078,35 @@
                 var n = {};
                 folders.forEach(function(f) { n[f.name] = true; });
                 setSelectedFolders(n);
+                // Bei "Alle Ordner" auch Einzeldatei-Auswahl zuruecksetzen (Ordner gewinnt sowieso)
+                setSelectedFileIds({});
             };
 
             var deselectAll = function() {
                 setSelectedFolders({});
+                // Auch Einzeldatei-Auswahl auf 0 setzen
+                setSelectedFileIds({});
             };
 
             var allSelected = folders.length > 0 && folders.every(function(f) { return !!selectedFolders[f.name]; });
 
             var selectedCount = Object.values(selectedFolders).filter(Boolean).length;
             var totalFiles = folders.reduce(function(s, f) { return s + (f.files || []).length; }, 0) + rootFiles.length;
-            var selectedFiles = 0;
+            var selectedFilesCount = 0;
             folders.forEach(function(f) {
-                if (selectedFolders[f.name]) selectedFiles += (f.files || []).length;
+                if (selectedFolders[f.name]) selectedFilesCount += (f.files || []).length;
             });
-            if (includeRootFiles) selectedFiles += rootFiles.length;
+            if (includeRootFiles) selectedFilesCount += rootFiles.length;
+            // Einzeldateien zaehlen (nur die, deren Ordner NICHT komplett ausgewaehlt ist -- sonst doppelt)
+            var einzelDateienCount = 0;
+            folders.forEach(function(f) {
+                if (!selectedFolders[f.name]) {
+                    (f.files || []).forEach(function(file) {
+                        if (file && file.id && selectedFileIds[file.id]) einzelDateienCount++;
+                    });
+                }
+            });
+            var totalSelectedCount = selectedFilesCount + einzelDateienCount;
 
             // Ordner-Icons
             var getOrdnerIcon = function(name) {
@@ -2097,26 +2125,37 @@
             // ── Daten aus ausgewaehlten Ordnern laden (ruft echte Drive-Lade-Logik auf) ──
             var handleDatenLaden = function() {
                 window._kiDisabled = true; // KI deaktivieren -- nur Daten laden, keine KI-Analyse
-                if (selectedCount === 0 && !includeRootFiles) {
+
+                // Einzeldatei-IDs einsammeln (nur fuer Ordner die NICHT komplett gewaehlt sind)
+                var einzelIds = [];
+                folders.forEach(function(f) {
+                    if (!selectedFolders[f.name]) {
+                        (f.files || []).forEach(function(file) {
+                            if (file && file.id && selectedFileIds[file.id]) einzelIds.push(file.id);
+                        });
+                    }
+                });
+
+                if (selectedCount === 0 && einzelIds.length === 0 && !includeRootFiles) {
                     // Alle Ordner laden
                     if (onDatenLaden) {
-                        onDatenLaden({ mode: 'komplett', selectedFolders: null, includeRootFiles: true });
+                        onDatenLaden({ mode: 'komplett', selectedFolders: null, includeRootFiles: true, selectedFileIds: null });
                     } else {
-                        onStart({ mode: 'komplett', selectedFolders: null, includeRootFiles: true });
+                        onStart({ mode: 'komplett', selectedFolders: null, includeRootFiles: true, selectedFileIds: null });
                     }
                 } else {
                     var sel = [];
                     Object.keys(selectedFolders).forEach(function(k) {
                         if (selectedFolders[k]) sel.push(k);
                     });
-                    if (sel.length === 0 && !includeRootFiles) {
-                        alert('Bitte mindestens einen Ordner auswählen!');
+                    if (sel.length === 0 && einzelIds.length === 0 && !includeRootFiles) {
+                        alert('Bitte mindestens einen Ordner oder eine einzelne Datei auswählen!');
                         return;
                     }
                     if (onDatenLaden) {
-                        onDatenLaden({ mode: 'ordner', selectedFolders: sel, includeRootFiles: includeRootFiles });
+                        onDatenLaden({ mode: 'ordner', selectedFolders: sel, includeRootFiles: includeRootFiles, selectedFileIds: einzelIds });
                     } else {
-                        onStart({ mode: 'ordner', selectedFolders: sel, includeRootFiles: includeRootFiles });
+                        onStart({ mode: 'ordner', selectedFolders: sel, includeRootFiles: includeRootFiles, selectedFileIds: einzelIds });
                     }
                 }
             };
@@ -2124,19 +2163,30 @@
             // ── KI-Analyse starten (ruft echte Analyse-Logik auf) ──
             var handleAnalyse = function() {
                 window._kiDisabled = false; // KI aktivieren!
-                if (selectedCount === 0 && !includeRootFiles) {
+
+                // Einzeldatei-IDs einsammeln (auch fuer KI-Analyse)
+                var einzelIds = [];
+                folders.forEach(function(f) {
+                    if (!selectedFolders[f.name]) {
+                        (f.files || []).forEach(function(file) {
+                            if (file && file.id && selectedFileIds[file.id]) einzelIds.push(file.id);
+                        });
+                    }
+                });
+
+                if (selectedCount === 0 && einzelIds.length === 0 && !includeRootFiles) {
                     // Alle Ordner analysieren
-                    onStart({ mode: 'komplett', selectedFolders: null, includeRootFiles: true });
+                    onStart({ mode: 'komplett', selectedFolders: null, includeRootFiles: true, selectedFileIds: null });
                 } else {
                     var sel = [];
                     Object.keys(selectedFolders).forEach(function(k) {
                         if (selectedFolders[k]) sel.push(k);
                     });
-                    if (sel.length === 0 && !includeRootFiles) {
-                        alert('Bitte mindestens einen Ordner auswählen!');
+                    if (sel.length === 0 && einzelIds.length === 0 && !includeRootFiles) {
+                        alert('Bitte mindestens einen Ordner oder eine einzelne Datei auswählen!');
                         return;
                     }
-                    onStart({ mode: 'ordner', selectedFolders: sel, includeRootFiles: includeRootFiles });
+                    onStart({ mode: 'ordner', selectedFolders: sel, includeRootFiles: includeRootFiles, selectedFileIds: einzelIds });
                 }
             };
 
@@ -2253,17 +2303,25 @@
                                                 maxHeight:'280px', overflowY:'auto'
                                             }}>
                                                 {folderFiles.map(function(file, fi) {
+                                                    var fileChecked = isSelected || (file && file.id && !!selectedFileIds[file.id]);
+                                                    var fileLocked = isSelected; // Wenn Ordner komplett gewaehlt -> Datei-Checkbox readonly
                                                     return (
                                                         <div key={fi} style={{
                                                             display:'flex', alignItems:'center', gap:'6px',
-                                                            padding:'6px 10px 6px 36px',
+                                                            padding:'6px 10px 6px 12px',
                                                             fontSize:'11px', color:'#c8d6e5',
                                                             borderBottom: fi < folderFiles.length - 1 ? '1px solid rgba(128,128,128,0.08)' : 'none',
+                                                            background: (!fileLocked && fileChecked) ? 'rgba(39,174,96,0.06)' : 'transparent',
                                                             cursor:'pointer',
                                                             transition:'background 0.15s'
                                                         }}
-                                                        onMouseEnter={function(e){ e.currentTarget.style.background= vorabAkteMode ? 'rgba(233,30,99,0.1)' : 'rgba(30,136,229,0.06)'; }}
-                                                        onMouseLeave={function(e){ e.currentTarget.style.background='transparent'; }}
+                                                        onMouseEnter={function(e){
+                                                            if (!fileLocked && fileChecked) return; // selected behaelt highlight
+                                                            e.currentTarget.style.background= vorabAkteMode ? 'rgba(233,30,99,0.1)' : 'rgba(30,136,229,0.06)';
+                                                        }}
+                                                        onMouseLeave={function(e){
+                                                            e.currentTarget.style.background = (!fileLocked && fileChecked) ? 'rgba(39,174,96,0.06)' : 'transparent';
+                                                        }}
                                                         onClick={function(e){
                                                             if (vorabAkteMode) {
                                                                 e.stopPropagation();
@@ -2272,9 +2330,24 @@
                                                                 handleOpenFile(file, e);
                                                             }
                                                         }}>
+                                                            {/* Datei-Checkbox -- toggelt einzelne Datei (nur wenn Ordner NICHT komplett gewaehlt) */}
+                                                            <span onClick={function(e){
+                                                                e.stopPropagation();
+                                                                if (fileLocked) return; // Ordner-Master ist aktiv -- nichts tun
+                                                                if (vorabAkteMode) return; // im VorabAkte-Modus nicht togglen
+                                                                toggleFile(file, e);
+                                                            }}
+                                                                title={fileLocked ? 'Ordner ist komplett ausgewählt – Datei wird mit synchronisiert' : (fileChecked ? 'Datei abwählen' : 'Datei einzeln auswählen')}
+                                                                style={{
+                                                                    fontSize:'14px', width:'18px', textAlign:'center', flexShrink:0,
+                                                                    cursor: (fileLocked || vorabAkteMode) ? 'default' : 'pointer',
+                                                                    opacity: fileLocked ? 0.55 : 1
+                                                                }}>
+                                                                {fileChecked ? '✅' : '⬜'}
+                                                            </span>
                                                             <span style={{fontSize:'13px', flexShrink:0}}>{getFileIcon(file.name)}</span>
                                                             <div style={{flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:'500',
-                                                                color: vorabAkteFile && vorabAkteFile.id === file.id ? '#E91E63' : 'inherit'}}>
+                                                                color: vorabAkteFile && vorabAkteFile.id === file.id ? '#E91E63' : ((!fileLocked && fileChecked) ? '#4ade80' : 'inherit')}}>
                                                                 {file.name}
                                                             </div>
                                                             {file.size && (
@@ -2371,7 +2444,14 @@
 
                             {/* Info */}
                             <div style={{marginTop:'8px', fontSize:'11px', color:'var(--text-muted)', textAlign:'center'}}>
-                                {selectedCount > 0 ? selectedCount + ' Ordner ausgewählt (' + selectedFiles + ' Dateien)' : 'Ordner auswählen oder auf ▶ tippen zum Aufklappen'}
+                                {(selectedCount > 0 || einzelDateienCount > 0)
+                                    ? (
+                                        (selectedCount > 0 ? selectedCount + ' Ordner' : '') +
+                                        (selectedCount > 0 && einzelDateienCount > 0 ? ' + ' : '') +
+                                        (einzelDateienCount > 0 ? einzelDateienCount + ' Einzeldatei' + (einzelDateienCount === 1 ? '' : 'en') : '') +
+                                        ' ausgewählt (' + totalSelectedCount + ' Datei' + (totalSelectedCount === 1 ? '' : 'en') + ')'
+                                      )
+                                    : 'Ordner auswählen oder auf ▶ tippen zum Aufklappen'}
                             </div>
                         </div>
 
@@ -2386,7 +2466,11 @@
                                     boxShadow:'0 4px 12px rgba(39,174,96,0.3)'}}>
                                 📥 Daten aus Ordnern laden + synchronisieren
                                 <div style={{fontSize:'10px', fontWeight:'400', marginTop:'4px', opacity:0.8}}>
-                                    {selectedCount > 0 ? 'Nur ausgewählte Ordner (' + selectedCount + ')' : 'Alle Ordner'}
+                                    {(selectedCount > 0 || einzelDateienCount > 0)
+                                        ? ((selectedCount > 0 ? selectedCount + ' Ordner' : '') +
+                                           (selectedCount > 0 && einzelDateienCount > 0 ? ' + ' : '') +
+                                           (einzelDateienCount > 0 ? einzelDateienCount + ' Einzeldatei' + (einzelDateienCount === 1 ? '' : 'en') : ''))
+                                        : 'Alle Ordner'}
                                 </div>
                             </button>
 
@@ -2398,7 +2482,7 @@
                                     boxShadow:'0 4px 12px rgba(142,68,173,0.3)'}}>
                                 🤖 Akte wählen und KI-Analyse starten
                                 <div style={{fontSize:'10px', fontWeight:'400', marginTop:'4px', opacity:0.8}}>
-                                    {selectedCount > 0 ? 'Nur ausgewählte Ordner' : 'Komplette Akte'}
+                                    {(selectedCount > 0 || einzelDateienCount > 0) ? 'Nur ausgewählte Inhalte' : 'Komplette Akte'}
                                 </div>
                             </button>
 
