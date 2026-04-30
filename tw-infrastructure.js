@@ -2850,6 +2850,87 @@
             return Object.keys(freigaben).length;
         },
 
+        // ─────────────────────────────────────────────────────────
+        // RAEUME-SYNC (Master-App ↔ Baustellen-App, Etappe 6.5c)
+        // ─────────────────────────────────────────────────────────
+        // Pfad: /aktive_baustellen/{baustelleId}/raeume/{raumId}/
+        //   ├ id              (string, Echo des Schluessels)
+        //   ├ bezeichnung     (string, z.B. "Bad Erdgeschoss")
+        //   ├ nummer          (string, optional, z.B. "0.12")
+        //   ├ geschoss        ("KG"|"EG"|"OG"|"DG")
+        //   ├ wandzahl        (number 3-8, default 4)
+        //   ├ hatBoden        (boolean, default true)
+        //   ├ hatDecke        (boolean, default false)
+        //   ├ erstellt_am     (Timestamp ms)
+        //   ├ erstellt_von    ("master-app" | "ma:device-uuid")
+        //   └ geaendert_am    (Server-Timestamp)
+        // Die Baustellen-App liest GENAU diesen Pfad und merged in lokale
+        // IndexedDB mit Marker aus_firebase=true (read-only fuer den MA).
+
+        // Schreibt komplette Raumliste fuer eine Baustelle (overwrite).
+        // raeume = Array von Raum-Objekten mit mind. {id, bezeichnung}.
+        async pushRaeumeListe(baustelleId, raeume) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId) throw new Error('baustelleId fehlt');
+            var ref = this.db.ref('aktive_baustellen/'+baustelleId+'/raeume');
+            var data = {};
+            (raeume || []).forEach(function(r){
+                if (r && r.id) {
+                    data[r.id] = Object.assign({}, r, {
+                        geaendert_am: firebase.database.ServerValue.TIMESTAMP
+                    });
+                }
+            });
+            // set: ueberschreibt komplett, entfernt damit auch geloeschte Raeume
+            await ref.set(data);
+            return Object.keys(data).length;
+        },
+
+        // Schreibt einen einzelnen Raum (Update, behaelt andere Raeume).
+        async pushRaum(baustelleId, raumId, payload) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !raumId) throw new Error('baustelleId/raumId fehlen');
+            var ref = this.db.ref('aktive_baustellen/'+baustelleId+'/raeume/'+raumId);
+            var data = Object.assign({}, payload, {
+                id: raumId,
+                geaendert_am: firebase.database.ServerValue.TIMESTAMP
+            });
+            await ref.update(data);
+            return raumId;
+        },
+
+        // Loescht einen einzelnen Raum.
+        async removeRaum(baustelleId, raumId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId || !raumId) throw new Error('baustelleId/raumId fehlen');
+            await this.db.ref('aktive_baustellen/'+baustelleId+'/raeume/'+raumId).remove();
+        },
+
+        // Live-Subscription auf alle Raeume einer Baustelle.
+        // Callback erhaelt: { raumId1: {bezeichnung,...}, raumId2: {...} }
+        subscribeRaeume(baustelleId, callback) {
+            if(!this.db || !baustelleId) return function(){};
+            var ref = this.db.ref('aktive_baustellen/'+baustelleId+'/raeume');
+            var h = ref.on('value', function(snap){
+                callback(snap.val() || {});
+            });
+            return function(){ ref.off('value', h); };
+        },
+
+        // Einmaliges Lesen aller Raeume einer Baustelle.
+        async getRaeume(baustelleId) {
+            if(!this.db || !baustelleId) return {};
+            var snap = await this.db.ref('aktive_baustellen/'+baustelleId+'/raeume').once('value');
+            return snap.val() || {};
+        },
+
+        // Loescht alle Raeume einer Baustelle (z.B. beim Deaktivieren).
+        async clearRaeume(baustelleId) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId) throw new Error('baustelleId fehlt');
+            await this.db.ref('aktive_baustellen/'+baustelleId+'/raeume').remove();
+        },
+
         async getSyncStatus() {
             if(!this.db) return {projects:0,users:0};
             var p=await this.db.ref('projects').once('value');

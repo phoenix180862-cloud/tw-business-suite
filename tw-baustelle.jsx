@@ -10766,7 +10766,34 @@
                 setBusy(function(p){ var n = Object.assign({}, p); if(val) n[slug]=true; else delete n[slug]; return n; });
             }
 
-            // ── Aktivieren: pushAktiveBaustelle + alle approved freigeben ──
+            // ── Helper (B6.5c): Mapping Master-App-Raum → Baustellen-App-Raum ──
+            // Master hat: { raumNr, bezeichnung, geschoss, flaeche, fliesenarbeiten }
+            // Baustellen-App braucht: { id, bezeichnung, nummer, geschoss, wandzahl, hatBoden, hatDecke }
+            function _mapRaumFuerBaustellenApp(r, idx) {
+                var raumNr = r.raumNr || '';
+                var bezeichnung = r.bezeichnung || ('Raum ' + (idx+1));
+                var geschoss = (r.geschoss || 'EG').toString().toUpperCase();
+                if (['KG','EG','OG','DG'].indexOf(geschoss) === -1) geschoss = 'EG';
+                // Stabile ID: Slug aus bezeichnung + nummer + geschoss
+                var slugSrc = bezeichnung + ' ' + raumNr + ' ' + geschoss;
+                var raumIdSlug = slugSrc.toLowerCase()
+                    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+                    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+                if (!raumIdSlug) raumIdSlug = 'raum-' + idx;
+                return {
+                    id: raumIdSlug,
+                    bezeichnung: bezeichnung,
+                    nummer: raumNr,
+                    geschoss: geschoss,
+                    wandzahl: 4,                            // Default; spaeter aus Raumblatt-Modul ueberschreibbar
+                    hatBoden: r.fliesenarbeiten === 'Ja',   // Bei Fliesenarbeiten = Boden vorhanden
+                    hatDecke: false,                         // Default; manuell durch MA setzbar
+                    erstellt_am: r.updatedAt ? new Date(r.updatedAt).getTime() : Date.now(),
+                    erstellt_von: 'master-app'
+                };
+            }
+
+            // ── Aktivieren: pushAktiveBaustelle + alle approved freigeben + Raeume-Sync (B6.5c) ──
             async function aktiviere(baustelle) {
                 if (!fbOk || !window.FirebaseService) return;
                 var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
@@ -10778,10 +10805,27 @@
                         staging_folder_id: baustelle.id || null
                     });
                     var n = await window.FirebaseService.freigebenAlleApproved(slug);
+
+                    // NEU (B6.5c): Raeume aus IndexedDB lesen + nach Firebase pushen
+                    var raeumeCount = 0;
+                    try {
+                        if (window.storage && window.storage.loadRaeume && baustelle.id) {
+                            var lokaleRaeume = await window.storage.loadRaeume(baustelle.id);
+                            if (lokaleRaeume && lokaleRaeume.length > 0) {
+                                var firebaseRaeume = lokaleRaeume.map(_mapRaumFuerBaustellenApp);
+                                raeumeCount = await window.FirebaseService.pushRaeumeListe(slug, firebaseRaeume);
+                            }
+                        }
+                    } catch (raeumeErr) {
+                        console.warn('[Aktiviere] Raeume-Sync fehlgeschlagen:', raeumeErr && raeumeErr.message);
+                    }
+
                     await window.FirebaseService.logAuditEvent('baustelle_aktiviert', {
-                        baustelle: baustelle.name, slug: slug, freigegeben_count: n
+                        baustelle: baustelle.name, slug: slug, freigegeben_count: n, raeume_count: raeumeCount
                     });
-                    setInfo('"' + baustelle.name + '" ist jetzt fuer ' + n + ' Geraet(e) sichtbar.');
+                    var msg = '"' + baustelle.name + '" ist jetzt fuer ' + n + ' Geraet(e) sichtbar.';
+                    if (raeumeCount > 0) msg += ' ' + raeumeCount + ' Raum/Raeume mitgepusht.';
+                    setInfo(msg);
                 } catch (e) {
                     setFehler('Aktivierung fehlgeschlagen: ' + (e && e.message || e));
                 }
