@@ -11242,6 +11242,60 @@
                                     </div>
                                 )}
 
+                                {/* Subtree-Listing: was existiert tatsaechlich in Firebase */}
+                                {inhaltsDiag.subtrees && (
+                                    <div style={{
+                                        background:'rgba(127,127,127,0.06)', border:'1px solid var(--border)',
+                                        borderRadius:'8px', padding:'10px 12px', marginBottom:'14px',
+                                        fontSize:'11px', color:'var(--text-primary)'
+                                    }}>
+                                        <div style={{
+                                            fontFamily:"'Oswald',sans-serif", fontWeight:600,
+                                            fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px',
+                                            color:'var(--text-secondary)', marginBottom:'8px'
+                                        }}>{'Vorhandene Knoten in Firebase'}</div>
+
+                                        {inhaltsDiag.subtrees.aktive && inhaltsDiag.subtrees.aktive.length > 0 && (
+                                            <div style={{marginBottom:'8px'}}>
+                                                <div style={{fontFamily:'monospace', fontSize:'10px', color:'var(--text-muted)', marginBottom:'4px'}}>
+                                                    {'aktive_baustellen/'}{inhaltsDiag.slug}{'/'}
+                                                </div>
+                                                {inhaltsDiag.subtrees.aktive.map(function(n,i){
+                                                    return (
+                                                        <div key={i} style={{paddingLeft:'12px', fontFamily:'monospace', fontSize:'11px'}}>
+                                                            {'\u2514 '}{n.key}
+                                                            {n.anzahl > 0 && <span style={{color:'var(--text-muted)'}}>{' ('}{n.anzahl}{' Eintrag/Eintraege)'}</span>}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {inhaltsDiag.subtrees.projects && inhaltsDiag.subtrees.projects.length > 0 && (
+                                            <div>
+                                                <div style={{fontFamily:'monospace', fontSize:'10px', color:'var(--text-muted)', marginBottom:'4px'}}>
+                                                    {'projects/'}{(inhaltsDiag.driveId||'').slice(0,12)}{'\u2026/'}
+                                                </div>
+                                                {inhaltsDiag.subtrees.projects.map(function(n,i){
+                                                    return (
+                                                        <div key={i} style={{paddingLeft:'12px', fontFamily:'monospace', fontSize:'11px'}}>
+                                                            {'\u2514 '}{n.key}
+                                                            {n.anzahl > 0 && <span style={{color:'var(--text-muted)'}}>{' ('}{n.anzahl}{' Eintrag/Eintraege)'}</span>}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {(!inhaltsDiag.subtrees.aktive || inhaltsDiag.subtrees.aktive.length === 0)
+                                            && (!inhaltsDiag.subtrees.projects || inhaltsDiag.subtrees.projects.length === 0) && (
+                                            <div style={{color:'var(--text-muted)', fontStyle:'italic'}}>
+                                                {'Keine Knoten gefunden. Sync laeuft noch nicht oder Pfad existiert nicht.'}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
                                     <button onClick={function(){ setInhaltsDiag(null); }} style={{
                                         padding:'9px 16px', borderRadius:'8px', border:'1px solid var(--border)',

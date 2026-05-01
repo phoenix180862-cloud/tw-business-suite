@@ -1288,6 +1288,10 @@
                 slug: slug || '',
                 driveId: projectId || '',
                 subordner: {},
+                subtrees: {
+                    aktive: [],     // Top-Level-Keys unter aktive_baustellen/{slug}/
+                    projects: []    // Top-Level-Keys unter projects/{driveId}/
+                },
                 fehler: []
             };
 
@@ -1351,32 +1355,74 @@
                         ergebnis.fehler.push({ subname: '*', quelle: 'fb_aktive', fehler: eFb2.message });
                     }
                 }
+
+                // 4. Subtree-Listing: alle Top-Level-Knoten unter beiden Pfaden
+                //    Damit sehen wir, ob die MA-App einen unbekannten Knoten schreibt/liest.
+                if (slug) {
+                    try {
+                        var snap3 = await window.FirebaseService.db
+                            .ref('aktive_baustellen/' + slug).once('value');
+                        var d3 = snap3.val() || {};
+                        ergebnis.subtrees.aktive = Object.keys(d3).map(function(k){
+                            var v = d3[k];
+                            var typ = typeof v;
+                            var anzahl = (v && typ === 'object') ? Object.keys(v).length : 0;
+                            return { key: k, typ: typ, anzahl: anzahl };
+                        });
+                    } catch (eSt1) {
+                        ergebnis.fehler.push({ subname: '*', quelle: 'subtree_aktive', fehler: eSt1.message });
+                    }
+                }
+                if (projectId) {
+                    try {
+                        var snap4 = await window.FirebaseService.db
+                            .ref('projects/' + projectId).once('value');
+                        var d4 = snap4.val() || {};
+                        ergebnis.subtrees.projects = Object.keys(d4).map(function(k){
+                            var v = d4[k];
+                            var typ = typeof v;
+                            var anzahl = (v && typ === 'object') ? Object.keys(v).length : 0;
+                            return { key: k, typ: typ, anzahl: anzahl };
+                        });
+                    } catch (eSt2) {
+                        ergebnis.fehler.push({ subname: '*', quelle: 'subtree_projects', fehler: eSt2.message });
+                    }
+                }
             }
 
             return ergebnis;
         }
 
         // ─────────────────────────────────────────────────────────
-        // DUAL-PATH-SYNC (Fix 01.05.2026)
+        // QUAD-PATH-SYNC (Fix 01.05.2026, Iteration 2)
         // ─────────────────────────────────────────────────────────
-        // Erweiterung von syncStagingNachFirebase: schreibt zusaetzlich nach
-        // 'aktive_baustellen/{slug}/dateien/{subname}/{fileId}'. Das ist der
-        // Pfad, den die Baustellen-App vermutlich liest (parallel zum
-        // bestehenden 'projects/{driveId}/staging/'-Pfad).
+        // Erweiterung von syncStagingNachFirebase: schreibt zusaetzlich an
+        // 3 weitere plausible Lese-Pfade der MA-App. Insgesamt werden also
+        // VIER Pfade pro Datei beschrieben:
+        //   1. projects/{driveId}/staging/{subname}/{fileId}      (Original)
+        //   2. aktive_baustellen/{slug}/dateien/{subname}/{fileId} (NEU)
+        //   3. projects/{slug}/staging/{subname}/{fileId}          (NEU - slug statt driveId)
+        //   4. aktive_baustellen/{slug}/staging/{subname}/{fileId} (NEU - 'staging' statt 'dateien')
         async function syncStagingDualPath(baustelleName, projectId, slug) {
-            // Erst der bestehende Sync zum projects-Pfad
+            // Erst der bestehende Sync zum projects/{driveId}/-Pfad
             var ergebnis = await syncStagingNachFirebase(baustelleName, projectId);
 
-            // Dann zusaetzlich der Dual-Path nach aktive_baustellen/{slug}/dateien
-            if (!slug) return ergebnis;
             if (!window.FirebaseService || !window.FirebaseService.db) return ergebnis;
+            if (!slug) return ergebnis;
 
             try {
                 var info = await getStagingInfo(baustelleName);
                 var subfolderNames = (window.STAGING_CONFIG && window.STAGING_CONFIG.SUBFOLDERS)
                     || ['Zeichnungen','Anweisungen','Baustellendaten','Fotos','Stunden'];
                 var permissions = (window.STAGING_CONFIG && window.STAGING_CONFIG.SUBFOLDER_PERMISSIONS) || {};
-                ergebnis.dual_path = { schluessel: 'aktive_baustellen/'+slug+'/dateien/', unterordner: {} };
+                ergebnis.dual_path = {
+                    pfade: [
+                        'aktive_baustellen/'+slug+'/dateien/{subname}/',
+                        'projects/'+slug+'/staging/{subname}/',
+                        'aktive_baustellen/'+slug+'/staging/{subname}/'
+                    ],
+                    unterordner: {}
+                };
 
                 for (var i = 0; i < subfolderNames.length; i++) {
                     var subname = subfolderNames[i];
@@ -1396,8 +1442,15 @@
                                 permission: permissions[subname] || 'readonly'
                             };
                         }
-                        var pfad = 'aktive_baustellen/' + slug + '/dateien/' + subname;
-                        await window.FirebaseService.db.ref(pfad).set(fbMap);
+                        // Schreibe die SAME Map an alle 3 zusaetzlichen Pfade parallel
+                        var pfadA = 'aktive_baustellen/' + slug + '/dateien/' + subname;
+                        var pfadB = 'projects/' + slug + '/staging/' + subname;
+                        var pfadC = 'aktive_baustellen/' + slug + '/staging/' + subname;
+                        await Promise.all([
+                            window.FirebaseService.db.ref(pfadA).set(fbMap),
+                            window.FirebaseService.db.ref(pfadB).set(fbMap),
+                            window.FirebaseService.db.ref(pfadC).set(fbMap)
+                        ]);
                         ergebnis.dual_path.unterordner[subname] = {
                             ok: true, anzahl: dateien.length
                         };
