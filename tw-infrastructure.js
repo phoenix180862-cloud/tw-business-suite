@@ -3514,6 +3514,176 @@
             };
             await this.db.ref('freigaben/stunden/'+pdfId).update(updates);
             return updates;
+        },
+
+        // ─────────────────────────────────────────────────────────
+        // BAUSTELLEN-FREIGABE-DIAGNOSE & MIGRATION (Fix 01.05.2026)
+        // ─────────────────────────────────────────────────────────
+        // Hintergrund: Nach Crash-Rollback besteht Verdacht, dass die
+        // Master-App in 'aktive_baustellen/{bid}/freigegebene_geraete/'
+        // wieder unter Geraete-UUID-Schluesseln statt unter Auth-UID
+        // schreibt. Folge: Baustellen-App-Login klappt, aber Liste leer.
+        //
+        // Diese Methoden liefern Diagnose-Daten, eine kuratierte Liste
+        // aktiver Mitarbeiter-User und ein Migrations-Werkzeug.
+
+        // Liefert alle approved, nicht-gelockten Mitarbeiter-User mit
+        // lesbarem Namen. Admins werden ausgeschlossen.
+        async gibAktiveMaUsers() {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            var snap = await this.db.ref('users').once('value');
+            var users = [];
+            snap.forEach(function(c){
+                var d = c.val();
+                if (!d) return;
+                if (!d.approved) return;
+                if (d.locked) return;
+                var rolle = d.role || (d.profile && d.profile.role) || 'mitarbeiter';
+                if (rolle === 'admin') return;
+                var name = (d.profile && d.profile.name) || d.ma_id || c.key.slice(0,8);
+                users.push({
+                    uid: c.key,
+                    name: name,
+                    ma_id: d.ma_id || null,
+                    ma_id_skipped: !!d.ma_id_skipped,
+                    rolle: rolle
+                });
+            });
+            users.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+            return users;
+        },
+
+        // Diagnose-Lauf: laedt aktive_baustellen + users, klassifiziert
+        // jeden Eintrag in freigegebene_geraete und gibt strukturiert zurueck.
+        // Klassifikationen pro Eintrag:
+        //   - 'ok'           : Key existiert in users/ und hat Profil
+        //   - 'uuid_legacy'  : Format sieht aus wie alte Geraete-UUID
+        //                      (Praefix 'device-' oder UUID-v4-Format)
+        //   - 'unknown_uid'  : 28-Zeichen-Auth-UID-Format, aber kein User dazu
+        //   - 'admin'        : Key gehoert zu Admin-User (z.B. Thomas)
+        // Pro Baustelle wird ein Gesamt-Status berechnet:
+        //   - 'ok'           : alle Eintraege ok ODER admin
+        //   - 'leer'         : keine Eintraege
+        //   - 'uuid_legacy'  : mind. ein UUID-Eintrag
+        //   - 'unknown_uid'  : mind. ein unbekannter UID-Eintrag
+        async getFreigabeDiagnose() {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            var aktSnap = await this.db.ref('aktive_baustellen').once('value');
+            var userSnap = await this.db.ref('users').once('value');
+
+            var usersMap = {};
+            userSnap.forEach(function(c){
+                var d = c.val();
+                if (!d) return;
+                var rolle = d.role || (d.profile && d.profile.role) || 'mitarbeiter';
+                usersMap[c.key] = {
+                    uid: c.key,
+                    name: (d.profile && d.profile.name) || d.ma_id || c.key.slice(0,8),
+                    rolle: rolle,
+                    ma_id: d.ma_id || null,
+                    approved: !!d.approved,
+                    locked: !!d.locked
+                };
+            });
+
+            function klassifiziere(key) {
+                if (!key) return 'unknown_uid';
+                var u = usersMap[key];
+                if (u) {
+                    if (u.rolle === 'admin') return 'admin';
+                    return 'ok';
+                }
+                if (/^device-/i.test(key)) return 'uuid_legacy';
+                if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) return 'uuid_legacy';
+                // Sonst: sieht aus wie Auth-UID-Format aber nicht aufloesbar
+                return 'unknown_uid';
+            }
+
+            var ergebnis = [];
+            aktSnap.forEach(function(b){
+                var data = b.val() || {};
+                var freigaben = data.freigegebene_geraete || {};
+                var keys = Object.keys(freigaben).filter(function(k){
+                    return freigaben[k] === true;
+                });
+                var eintraege = keys.map(function(k){
+                    var typ = klassifiziere(k);
+                    var u = usersMap[k] || null;
+                    return {
+                        key: k,
+                        typ: typ,
+                        name: u ? u.name : null,
+                        ma_id: u ? u.ma_id : null,
+                        rolle: u ? u.rolle : null
+                    };
+                });
+
+                var hatLegacy = eintraege.some(function(e){ return e.typ === 'uuid_legacy'; });
+                var hatUnknown = eintraege.some(function(e){ return e.typ === 'unknown_uid'; });
+                var hatOk = eintraege.some(function(e){ return e.typ === 'ok'; });
+
+                var status;
+                if (keys.length === 0) status = 'leer';
+                else if (hatLegacy) status = 'uuid_legacy';
+                else if (hatUnknown && !hatOk) status = 'unknown_uid';
+                else if (hatUnknown && hatOk) status = 'gemischt';
+                else status = 'ok';
+
+                ergebnis.push({
+                    slug: b.key,
+                    name: data.name || b.key,
+                    status_baustelle: data.status || 'unbekannt',
+                    letzter_push: data.letzter_push || null,
+                    anzahl_freigaben: keys.length,
+                    eintraege: eintraege,
+                    status_diagnose: status
+                });
+            });
+
+            ergebnis.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+            // Aktive MA-Liste fuer das Reparatur-Dropdown
+            var aktiveMa = [];
+            Object.keys(usersMap).forEach(function(uid){
+                var u = usersMap[uid];
+                if (u.rolle === 'admin') return;
+                if (!u.approved) return;
+                if (u.locked) return;
+                aktiveMa.push({ uid: uid, name: u.name, ma_id: u.ma_id });
+            });
+            aktiveMa.sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+            return {
+                baustellen: ergebnis,
+                mitarbeiter: aktiveMa,
+                erstellt_am: Date.now()
+            };
+        },
+
+        // Migration: Schreibt true fuer alle uebergebenen UIDs, loescht
+        // alle uebergebenen alten Keys in einem atomaren multi-path update.
+        // Schreibt zusaetzlich einen Audit-Log-Eintrag.
+        async migriereBaustelleFreigaben(baustelleId, neueUids, alteKeys) {
+            if(!this.db) throw new Error('Firebase nicht initialisiert');
+            if(!baustelleId) throw new Error('baustelleId fehlt');
+            var ref = this.db.ref('aktive_baustellen/'+baustelleId+'/freigegebene_geraete');
+            var updates = {};
+            (neueUids||[]).forEach(function(uid){
+                if (uid && typeof uid === 'string') updates[uid] = true;
+            });
+            (alteKeys||[]).forEach(function(k){
+                if (k && typeof k === 'string' && updates[k] !== true) updates[k] = null;
+            });
+            if (Object.keys(updates).length === 0) {
+                return { gesetzt: 0, geloescht: 0 };
+            }
+            await ref.update(updates);
+            return {
+                gesetzt: (neueUids||[]).filter(Boolean).length,
+                geloescht: (alteKeys||[]).filter(function(k){
+                    return k && (neueUids||[]).indexOf(k) === -1;
+                }).length
+            };
         }
     };
 

@@ -310,6 +310,12 @@
                     onBack={function(){ setSubpage('start'); }}
                 />;
             }
+            if (subpage === 'freigabeDiagnose') {
+                return <FreigabeDiagnoseView
+                    fbOk={fbOk}
+                    onBack={function(){ setSubpage('start'); }}
+                />;
+            }
 
             // ════════════════════════════════════════════════════
             // STARTSEITE: 7 grosse blaue Buttons
@@ -326,6 +332,7 @@
                 onFreigaben={function(){ setSubpage('freigaben'); }}
                 onNachrichten={function(){ setSubpage('nachrichten'); }}
                 onAktivBaustellen={function(){ setSubpage('aktivBaustellen'); }}
+                onFreigabeDiagnose={function(){ setSubpage('freigabeDiagnose'); }}
                 onBack={onBack}
             />;
         }
@@ -336,7 +343,7 @@
         //   BAUSTELLEN - TEAM - SYNC - HAUPTKALENDER - FREIGABEN
         // HAUPTKALENDER kam in B7 dazu, FREIGABEN in B9.
         // ═══════════════════════════════════════════════════════
-        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onAktivBaustellen, onBack }) {
+        function BaustellenAppStartseite({ kunde, fbOk, pendingCount, onBaustellen, onTeam, onSync, onHauptkalender, onFreigaben, onNachrichten, onAktivBaustellen, onFreigabeDiagnose, onBack }) {
             // Wartende Foto-Freigaben zaehlen (Live-Listener, fuer Badge)
             const [fotoPending, setFotoPending] = useState(0);
             useEffect(function(){
@@ -434,6 +441,14 @@
                     title: 'Baustellen aktivieren',
                     desc: 'Welche Baustellen sind in der Mitarbeiter-App sichtbar? Aktivieren, deaktivieren, Geraete-Freigaben.',
                     onClick: onAktivBaustellen,
+                    badge: null
+                },
+                {
+                    id: 'freigabe-diagnose',
+                    icon: '🔧',
+                    title: 'Freigabe-Diagnose',
+                    desc: 'Pruefe, ob aktive Baustellen korrekt mit Auth-UIDs freigegeben sind. Reparatur-Werkzeug fuer fehlerhafte Eintraege.',
+                    onClick: onFreigabeDiagnose,
                     badge: null
                 }
             ];
@@ -11027,6 +11042,413 @@
                             </div>
                         );
                     })}
+                </div>
+            );
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // FREIGABE-DIAGNOSE & MIGRATION (Fix 01.05.2026)
+        // ═══════════════════════════════════════════════════════════════════
+        // Ziel: Symptom "MA-App-Login klappt aber Baustellen-Liste leer"
+        // diagnostizieren und reparieren. Pruefe pro aktiver Baustelle, ob
+        // die Schluessel in 'freigegebene_geraete' gueltige Auth-UIDs sind
+        // oder noch dem alten Geraete-UUID-Schema entsprechen.
+        function FreigabeDiagnoseView({ fbOk, onBack }) {
+            const [lade, setLade] = useState(true);
+            const [daten, setDaten] = useState(null);
+            const [fehler, setFehler] = useState(null);
+            const [info, setInfo] = useState(null);
+            const [reparaturBaustelle, setReparaturBaustelle] = useState(null);
+            const [auswahl, setAuswahl] = useState({});
+            const [busy, setBusy] = useState(false);
+
+            function ladeDiagnose() {
+                if (!fbOk || !window.FirebaseService || !window.FirebaseService.getFreigabeDiagnose) {
+                    setLade(false);
+                    return;
+                }
+                setLade(true); setFehler(null);
+                window.FirebaseService.getFreigabeDiagnose()
+                    .then(function(d){ setDaten(d); setLade(false); })
+                    .catch(function(e){
+                        setFehler('Diagnose fehlgeschlagen: ' + (e && e.message || e));
+                        setLade(false);
+                    });
+            }
+
+            useEffect(function(){ ladeDiagnose(); }, [fbOk]);
+
+            function startReparatur(b) {
+                // Vorauswahl: alle bereits korrekt aufgeloesten 'ok'-Eintraege
+                var sel = {};
+                (b.eintraege||[]).forEach(function(e){
+                    if (e.typ === 'ok') sel[e.key] = true;
+                });
+                setAuswahl(sel);
+                setReparaturBaustelle(b);
+            }
+
+            async function reparaturAusfuehren() {
+                if (!reparaturBaustelle) return;
+                setBusy(true); setFehler(null); setInfo(null);
+                try {
+                    var b = reparaturBaustelle;
+                    var neueUids = Object.keys(auswahl).filter(function(uid){ return auswahl[uid]; });
+                    // Alle bisherigen Eintraege, die NICHT in der neuen Auswahl sind, werden geloescht
+                    var alteKeys = (b.eintraege||[])
+                        .filter(function(e){ return !auswahl[e.key]; })
+                        .map(function(e){ return e.key; });
+                    var r = await window.FirebaseService.migriereBaustelleFreigaben(b.slug, neueUids, alteKeys);
+                    try {
+                        await window.FirebaseService.logAuditEvent('baustelle_freigabe_repariert', {
+                            baustelle: b.name, slug: b.slug,
+                            neue_anzahl: r.gesetzt, geloeschte_anzahl: r.geloescht
+                        });
+                    } catch (auditErr) {
+                        console.warn('[Freigabe-Diagnose] Audit-Log fehlgeschlagen:', auditErr && auditErr.message);
+                    }
+                    setInfo('Baustelle "' + b.name + '" repariert: ' + r.gesetzt + ' freigegeben, ' + r.geloescht + ' alte Eintraege entfernt.');
+                    setReparaturBaustelle(null);
+                    ladeDiagnose();
+                } catch (e) {
+                    setFehler('Reparatur fehlgeschlagen: ' + (e && e.message || e));
+                }
+                setBusy(false);
+            }
+
+            function berichtKopieren() {
+                if (!daten) return;
+                var lines = [];
+                lines.push('=== TW Baustellen-Freigabe-Diagnose ===');
+                lines.push('Erstellt: ' + new Date(daten.erstellt_am || Date.now()).toLocaleString('de-DE'));
+                lines.push('Aktive Baustellen: ' + daten.baustellen.length);
+                lines.push('Aktive Mitarbeiter: ' + daten.mitarbeiter.length);
+                lines.push('');
+                daten.baustellen.forEach(function(b){
+                    var statusLabel = b.status_diagnose === 'ok' ? 'OK' :
+                                       b.status_diagnose === 'leer' ? 'LEER' :
+                                       b.status_diagnose === 'uuid_legacy' ? 'UUID-SCHEMA (alt)' :
+                                       b.status_diagnose === 'unknown_uid' ? 'UNBEKANNTE UIDS' :
+                                       b.status_diagnose === 'gemischt' ? 'GEMISCHT' : b.status_diagnose;
+                    lines.push('- ' + b.name + ' [' + statusLabel + ']');
+                    if (b.eintraege.length === 0) {
+                        lines.push('   (keine Eintraege in freigegebene_geraete)');
+                    } else {
+                        b.eintraege.forEach(function(e){
+                            var z = '   * ';
+                            if (e.typ === 'ok') z += 'OK: ' + e.name;
+                            else if (e.typ === 'admin') z += 'Admin: ' + e.name;
+                            else if (e.typ === 'uuid_legacy') z += 'UUID-Schema (alt): ' + e.key.slice(0,12) + '...';
+                            else if (e.typ === 'unknown_uid') z += 'Unbekannte UID: ' + e.key.slice(0,8) + '...';
+                            else z += e.typ + ': ' + e.key.slice(0,8) + '...';
+                            lines.push(z);
+                        });
+                    }
+                });
+                lines.push('');
+                lines.push('Aktive Mitarbeiter:');
+                daten.mitarbeiter.forEach(function(m){
+                    lines.push('  - ' + m.name + (m.ma_id ? ' (ma_id: '+m.ma_id+')' : ''));
+                });
+                var text = lines.join('\n');
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(function(){
+                        setInfo('Bericht in Zwischenablage kopiert.');
+                    }, function(){
+                        try { window.prompt('Bericht (kopieren):', text); } catch(_) {}
+                        setInfo('Bericht erstellt - bitte manuell kopieren.');
+                    });
+                } else {
+                    try { window.prompt('Bericht (kopieren):', text); } catch(_) {}
+                    setInfo('Bericht erstellt - bitte manuell kopieren.');
+                }
+            }
+
+            // Status-Pille (farblich kodiert)
+            function StatusPille({ status }) {
+                var cfg;
+                if (status === 'ok') cfg = { label:'OK', bg:'rgba(39,174,96,0.18)', border:'rgba(39,174,96,0.45)', col:'#27AE60' };
+                else if (status === 'leer') cfg = { label:'Leer', bg:'rgba(127,127,127,0.18)', border:'rgba(127,127,127,0.45)', col:'#888' };
+                else if (status === 'uuid_legacy') cfg = { label:'UUID-Schema (alt)', bg:'rgba(255,165,0,0.18)', border:'rgba(255,165,0,0.45)', col:'#FFA500' };
+                else if (status === 'unknown_uid') cfg = { label:'Unbekannte UID', bg:'rgba(196,30,30,0.18)', border:'rgba(196,30,30,0.45)', col:'#E74C3C' };
+                else if (status === 'gemischt') cfg = { label:'Gemischt', bg:'rgba(255,165,0,0.18)', border:'rgba(255,165,0,0.45)', col:'#FFA500' };
+                else cfg = { label: status, bg:'rgba(127,127,127,0.18)', border:'rgba(127,127,127,0.45)', col:'#888' };
+                return (
+                    <span style={{
+                        display:'inline-block', padding:'3px 10px', borderRadius:'10px',
+                        background: cfg.bg, border:'1px solid '+cfg.border,
+                        color: cfg.col, fontSize:'11px', fontWeight:600,
+                        fontFamily:"'Oswald',sans-serif", textTransform:'uppercase', letterSpacing:'0.6px'
+                    }}>{cfg.label}</span>
+                );
+            }
+
+            // Ohne Firebase: Hinweis-Screen
+            if (!fbOk) {
+                return (
+                    <div className="page-container" style={{padding:'16px'}}>
+                        <UnterseitenHeader
+                            icon={'\uD83D\uDD27'}
+                            titel={'Freigabe-Diagnose'}
+                            untertitel={'Firebase nicht verbunden'}
+                            onBack={onBack}
+                        />
+                        <div style={{
+                            background:'rgba(196,30,30,0.10)',
+                            border:'1px solid rgba(196,30,30,0.3)',
+                            borderRadius:'12px',
+                            padding:'18px',
+                            color:'var(--text-primary)',
+                            marginTop:'18px'
+                        }}>
+                            {'\u26A0 Bitte zuerst im Bereich '}<b>{'Sync'}</b>{' die Verbindung zum Firebase-Backend herstellen.'}
+                        </div>
+                    </div>
+                );
+            }
+
+            var anzahlOk = daten ? daten.baustellen.filter(function(b){ return b.status_diagnose==='ok'; }).length : 0;
+            var anzahlProblem = daten ? daten.baustellen.length - anzahlOk : 0;
+
+            return (
+                <div className="page-container" style={{padding:'16px', minHeight:'100vh'}}>
+                    <UnterseitenHeader
+                        icon={'\uD83D\uDD27'}
+                        titel={'Freigabe-Diagnose'}
+                        untertitel={daten ? (daten.baustellen.length + ' Baustellen \u00B7 ' + anzahlOk + ' OK \u00B7 ' + anzahlProblem + ' zu pruefen') : 'Lade ...'}
+                        onBack={onBack}
+                    />
+
+                    {fehler && (
+                        <div style={{
+                            background:'rgba(196,30,30,0.12)', border:'1px solid rgba(196,30,30,0.35)',
+                            borderRadius:'10px', padding:'12px 14px', color:'var(--text-primary)',
+                            marginTop:'12px', fontSize:'13px'
+                        }}>{'\u26A0 '}{fehler}</div>
+                    )}
+                    {info && (
+                        <div style={{
+                            background:'rgba(39,174,96,0.12)', border:'1px solid rgba(39,174,96,0.35)',
+                            borderRadius:'10px', padding:'12px 14px', color:'var(--text-primary)',
+                            marginTop:'12px', fontSize:'13px'
+                        }}>{'\u2713 '}{info}</div>
+                    )}
+
+                    {/* Action-Bar: Neu laden + Bericht kopieren */}
+                    <div style={{
+                        display:'flex', gap:'10px', marginTop:'14px', marginBottom:'14px',
+                        flexWrap:'wrap'
+                    }}>
+                        <button onClick={ladeDiagnose} disabled={lade} style={{
+                            padding:'8px 14px', borderRadius:'8px', border:'none',
+                            background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                            color:'#fff', fontFamily:"'Oswald',sans-serif", fontSize:'12px',
+                            fontWeight:600, letterSpacing:'0.7px', textTransform:'uppercase',
+                            cursor: lade ? 'wait' : 'pointer',
+                            boxShadow:'0 4px 12px rgba(30,136,229,0.30)',
+                            opacity: lade ? 0.6 : 1
+                        }}>{'\u21BB Neu laden'}</button>
+                        <button onClick={berichtKopieren} disabled={!daten || lade} style={{
+                            padding:'8px 14px', borderRadius:'8px', border:'1px solid var(--border)',
+                            background:'var(--bg-secondary)', color:'var(--text-primary)',
+                            fontFamily:"'Oswald',sans-serif", fontSize:'12px', fontWeight:600,
+                            letterSpacing:'0.7px', textTransform:'uppercase',
+                            cursor:'pointer', opacity:(!daten||lade) ? 0.5 : 1
+                        }}>{'\uD83D\uDCCB Bericht kopieren'}</button>
+                    </div>
+
+                    {lade && (
+                        <div style={{padding:'40px', textAlign:'center', color:'var(--text-muted)'}}>
+                            {'Lade Diagnose-Daten ...'}
+                        </div>
+                    )}
+
+                    {!lade && daten && daten.baustellen.length === 0 && (
+                        <div style={{padding:'30px', textAlign:'center', color:'var(--text-muted)'}}>
+                            {'Keine aktiven Baustellen vorhanden.'}
+                        </div>
+                    )}
+
+                    {!lade && daten && daten.baustellen.map(function(b){
+                        var brauchtReparatur = (b.status_diagnose !== 'ok');
+                        return (
+                            <div key={b.slug} style={{
+                                background: brauchtReparatur ? 'rgba(255,165,0,0.05)' : 'var(--bg-secondary)',
+                                border:'1px solid '+(brauchtReparatur ? 'rgba(255,165,0,0.35)' : 'var(--border)'),
+                                borderRadius:'12px', padding:'14px', marginBottom:'10px'
+                            }}>
+                                <div style={{display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap'}}>
+                                    <div style={{flex:1, minWidth:0}}>
+                                        <div style={{
+                                            fontFamily:"'Oswald',sans-serif", fontSize:'15px', fontWeight:600,
+                                            color:'var(--text-primary)'
+                                        }}>{b.name}</div>
+                                        <div style={{fontSize:'11px', color:'var(--text-muted)', marginTop:'3px'}}>
+                                            {b.anzahl_freigaben}{' Eintrag/Eintraege in freigegebene_geraete'}
+                                        </div>
+                                    </div>
+                                    <StatusPille status={b.status_diagnose} />
+                                    {brauchtReparatur && (
+                                        <button onClick={function(){ startReparatur(b); }} style={{
+                                            padding:'7px 14px', borderRadius:'8px', border:'none',
+                                            background:'linear-gradient(135deg, #FFA500, #E67E22)',
+                                            color:'#fff', fontFamily:"'Oswald',sans-serif", fontSize:'12px',
+                                            fontWeight:600, letterSpacing:'0.7px', textTransform:'uppercase',
+                                            cursor:'pointer', boxShadow:'0 3px 10px rgba(255,165,0,0.30)'
+                                        }}>{'\uD83D\uDD27 Reparieren'}</button>
+                                    )}
+                                </div>
+
+                                {b.eintraege.length > 0 && (
+                                    <div style={{
+                                        marginTop:'10px', paddingTop:'10px',
+                                        borderTop:'1px solid var(--border)'
+                                    }}>
+                                        {b.eintraege.map(function(e, i){
+                                            var farbe;
+                                            if (e.typ === 'ok') farbe = '#27AE60';
+                                            else if (e.typ === 'admin') farbe = '#888';
+                                            else if (e.typ === 'uuid_legacy') farbe = '#FFA500';
+                                            else farbe = '#E74C3C';
+                                            var labelText;
+                                            if (e.typ === 'ok' || e.typ === 'admin') {
+                                                labelText = e.name + (e.ma_id ? ' \u00B7 ma_id: '+e.ma_id : '');
+                                            } else if (e.typ === 'uuid_legacy') {
+                                                labelText = 'Veraltetes Geraete-UUID-Format';
+                                            } else {
+                                                labelText = 'UID nicht aufloesbar';
+                                            }
+                                            return (
+                                                <div key={i} style={{
+                                                    display:'flex', alignItems:'center', gap:'10px',
+                                                    padding:'5px 0', fontSize:'12px'
+                                                }}>
+                                                    <span style={{
+                                                        display:'inline-block', width:'8px', height:'8px',
+                                                        borderRadius:'50%', background: farbe, flexShrink:0
+                                                    }}></span>
+                                                    <span style={{color:'var(--text-primary)', flex:1, minWidth:0}}>
+                                                        {labelText}
+                                                    </span>
+                                                    <span style={{
+                                                        fontFamily:'monospace', fontSize:'10px',
+                                                        color:'var(--text-muted)'
+                                                    }}>{e.key.length > 16 ? (e.key.slice(0,8)+'\u2026'+e.key.slice(-4)) : e.key}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    {/* Reparatur-Modal (G3) */}
+                    {reparaturBaustelle && (
+                        <div style={{
+                            position:'fixed', top:0, left:0, right:0, bottom:0,
+                            background:'rgba(0,0,0,0.65)', zIndex:9999,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            padding:'16px'
+                        }} onClick={function(e){ if(e.target===e.currentTarget) setReparaturBaustelle(null); }}>
+                            <div style={{
+                                background:'var(--bg-primary)',
+                                border:'1px solid var(--border)',
+                                borderRadius:'14px', padding:'20px',
+                                maxWidth:'520px', width:'100%',
+                                maxHeight:'85vh', overflow:'auto',
+                                boxShadow:'0 12px 40px rgba(0,0,0,0.5)'
+                            }}>
+                                <div style={{
+                                    fontFamily:"'Oswald',sans-serif", fontSize:'18px', fontWeight:600,
+                                    color:'var(--text-primary)', marginBottom:'4px'
+                                }}>{'\uD83D\uDD27 Freigabe reparieren'}</div>
+                                <div style={{
+                                    fontSize:'13px', color:'var(--text-muted)', marginBottom:'14px'
+                                }}>{reparaturBaustelle.name}</div>
+
+                                <div style={{
+                                    fontSize:'12px', color:'var(--text-secondary)',
+                                    marginBottom:'10px', lineHeight:1.5
+                                }}>
+                                    {'Waehle aus, welche Mitarbeiter Zugriff auf diese Baustelle bekommen sollen. Alte UID-Eintraege werden automatisch entfernt.'}
+                                </div>
+
+                                <div style={{
+                                    border:'1px solid var(--border)', borderRadius:'10px',
+                                    padding:'10px', marginBottom:'14px',
+                                    maxHeight:'300px', overflowY:'auto'
+                                }}>
+                                    {(daten && daten.mitarbeiter || []).length === 0 && (
+                                        <div style={{
+                                            padding:'12px', fontSize:'12px',
+                                            color:'var(--text-muted)', textAlign:'center'
+                                        }}>{'Keine aktiven Mitarbeiter verfuegbar.'}</div>
+                                    )}
+                                    {(daten && daten.mitarbeiter || []).map(function(m){
+                                        var checked = !!auswahl[m.uid];
+                                        return (
+                                            <label key={m.uid} style={{
+                                                display:'flex', alignItems:'center', gap:'10px',
+                                                padding:'7px 4px', fontSize:'13px',
+                                                color:'var(--text-primary)', cursor:'pointer',
+                                                borderBottom:'1px solid var(--border)'
+                                            }}>
+                                                <input
+                                                    type={'checkbox'}
+                                                    checked={checked}
+                                                    onChange={function(e){
+                                                        var v = e.target.checked;
+                                                        setAuswahl(function(p){
+                                                            var n = Object.assign({}, p);
+                                                            if (v) n[m.uid] = true; else delete n[m.uid];
+                                                            return n;
+                                                        });
+                                                    }}
+                                                    style={{width:'16px', height:'16px', cursor:'pointer'}}
+                                                />
+                                                <span style={{flex:1}}>{m.name}</span>
+                                                {m.ma_id && (
+                                                    <span style={{
+                                                        fontSize:'10px', color:'var(--text-muted)',
+                                                        fontFamily:'monospace'
+                                                    }}>{m.ma_id}</span>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+
+                                <div style={{
+                                    background:'rgba(255,165,0,0.08)', border:'1px solid rgba(255,165,0,0.30)',
+                                    borderRadius:'8px', padding:'10px 12px', marginBottom:'14px',
+                                    fontSize:'11px', color:'var(--text-secondary)', lineHeight:1.5
+                                }}>
+                                    {'Aktuelle Eintraege: '}{reparaturBaustelle.eintraege.length}{' \u00B7 '}
+                                    {'Nach Reparatur: '}{Object.keys(auswahl).filter(function(k){return auswahl[k];}).length}
+                                </div>
+
+                                <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+                                    <button onClick={function(){ setReparaturBaustelle(null); }} disabled={busy} style={{
+                                        padding:'9px 16px', borderRadius:'8px', border:'1px solid var(--border)',
+                                        background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                        fontFamily:"'Oswald',sans-serif", fontSize:'12px', fontWeight:600,
+                                        letterSpacing:'0.7px', textTransform:'uppercase',
+                                        cursor: busy ? 'wait' : 'pointer'
+                                    }}>{'Abbrechen'}</button>
+                                    <button onClick={reparaturAusfuehren} disabled={busy} style={{
+                                        padding:'9px 16px', borderRadius:'8px', border:'none',
+                                        background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                        color:'#fff', fontFamily:"'Oswald',sans-serif", fontSize:'12px',
+                                        fontWeight:600, letterSpacing:'0.7px', textTransform:'uppercase',
+                                        cursor: busy ? 'wait' : 'pointer',
+                                        boxShadow:'0 4px 12px rgba(30,136,229,0.30)',
+                                        opacity: busy ? 0.6 : 1
+                                    }}>{busy ? '...' : 'Zuordnen'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
