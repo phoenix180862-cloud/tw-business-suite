@@ -1297,6 +1297,8 @@
                     excel_count: 0,
                     excel_datei: null,    // { name, parentName }
                     firebase_count: 0,
+                    firebase_sample: [],  // Erste 3 Raeume mit allen Feldern (Inspektor)
+                    firebase_pfad: '',    // Voller Firebase-Pfad fuer Tablet-Vergleich
                     headers: [],          // Erkannte Header-Zeile (fuer Diagnose)
                     sample: [],           // Erste 8 Zeilen als Array-of-Arrays
                     headerZeile: -1,      // Index der erkannten Header-Zeile (0-basiert)
@@ -1443,7 +1445,15 @@
                     var snapR = await window.FirebaseService.db
                         .ref('aktive_baustellen/' + slug + '/raeume').once('value');
                     var dataR = snapR.val() || {};
-                    ergebnis.raeume.firebase_count = Object.keys(dataR).length;
+                    var keysR = Object.keys(dataR);
+                    ergebnis.raeume.firebase_count = keysR.length;
+                    // Inspektor: erste 3 Raeume mit allen Feldern fuer 1:1-Vergleich mit Tablet
+                    var sampleFB = [];
+                    for (var ki = 0; ki < Math.min(3, keysR.length); ki++) {
+                        sampleFB.push({ key: keysR[ki], data: dataR[keysR[ki]] });
+                    }
+                    ergebnis.raeume.firebase_sample = sampleFB;
+                    ergebnis.raeume.firebase_pfad = 'aktive_baustellen/' + slug + '/raeume';
                 }
             } catch (eRaeume) {
                 ergebnis.raeume.fehler = (eRaeume && eRaeume.message) || String(eRaeume);

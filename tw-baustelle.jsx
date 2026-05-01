@@ -11422,6 +11422,50 @@
                                                 {'\u26A0 '}{inhaltsDiag.raeume.fehler}
                                             </div>
                                         )}
+
+                                        {/* Firebase-Inspektor: Was steht WIRKLICH unter raeume/? */}
+                                        {inhaltsDiag.raeume.firebase_sample && inhaltsDiag.raeume.firebase_sample.length > 0 && (
+                                            <div style={{marginTop:'10px', paddingTop:'8px', borderTop:'1px dashed var(--border)'}}>
+                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginBottom:'4px', fontFamily:"'Oswald',sans-serif", textTransform:'uppercase', letterSpacing:'0.4px'}}>
+                                                    {'Firebase-Inspektor (was Tablet lesen sollte)'}
+                                                </div>
+                                                {inhaltsDiag.raeume.firebase_pfad && (
+                                                    <div style={{fontSize:'10px', color:'var(--text-secondary)', marginBottom:'6px', fontFamily:'monospace', wordBreak:'break-all'}}>
+                                                        {'Pfad: '}<b>{inhaltsDiag.raeume.firebase_pfad}</b>
+                                                    </div>
+                                                )}
+                                                <div style={{
+                                                    background:'var(--bg-primary)', border:'1px solid var(--border)',
+                                                    borderRadius:'6px', padding:'8px', overflow:'auto',
+                                                    fontFamily:'monospace', fontSize:'10px', maxHeight:'200px'
+                                                }}>
+                                                    {inhaltsDiag.raeume.firebase_sample.map(function(r, i){
+                                                        var d = r.data || {};
+                                                        return (
+                                                            <div key={i} style={{
+                                                                marginBottom:'8px', paddingBottom:'6px',
+                                                                borderBottom: i < inhaltsDiag.raeume.firebase_sample.length - 1 ? '1px solid rgba(127,127,127,0.15)' : 'none'
+                                                            }}>
+                                                                <div style={{color:'#27AE60', fontWeight:600, marginBottom:'2px'}}>
+                                                                    {'\u251C\u2500 '}{r.key}
+                                                                </div>
+                                                                <div style={{paddingLeft:'14px', color:'var(--text-primary)', lineHeight:1.6}}>
+                                                                    <div>{'bezeichnung: '}<span style={{color:'#3498DB'}}>{'"'}{String(d.bezeichnung || '')}{'"'}</span></div>
+                                                                    <div>{'nummer:      '}<span style={{color:'#3498DB'}}>{'"'}{String(d.nummer || '')}{'"'}</span></div>
+                                                                    <div>{'geschoss:    '}<span style={{color:'#3498DB'}}>{'"'}{String(d.geschoss || '')}{'"'}</span></div>
+                                                                    <div>{'wandzahl:    '}<span style={{color:'#E67E22'}}>{String(d.wandzahl)}</span>{' ('}{typeof d.wandzahl}{')'}</div>
+                                                                    <div>{'hatBoden:    '}<span style={{color:'#E67E22'}}>{String(d.hatBoden)}</span>{' ('}{typeof d.hatBoden}{')'}</div>
+                                                                    <div>{'hatDecke:    '}<span style={{color:'#E67E22'}}>{String(d.hatDecke)}</span>{' ('}{typeof d.hatDecke}{')'}</div>
+                                                                    <div>{'erstellt_am: '}<span style={{color:'var(--text-muted)'}}>{String(d.erstellt_am || '')}</span></div>
+                                                                    <div>{'erstellt_von:'}<span style={{color:'var(--text-muted)'}}>{' "'}{String(d.erstellt_von || '')}{'"'}</span></div>
+                                                                    <div>{'geaendert_am:'}<span style={{color:'var(--text-muted)'}}>{' '}{String(d.geaendert_am || '')}</span></div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
