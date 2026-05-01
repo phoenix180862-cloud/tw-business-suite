@@ -11298,8 +11298,27 @@
                                         <div style={{
                                             fontFamily:"'Oswald',sans-serif", fontWeight:600,
                                             fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px',
-                                            color:'var(--text-secondary)', marginBottom:'6px'
-                                        }}>{'Raumliste (Baustellen-App-Foto-Modul)'}</div>
+                                            color:'var(--text-secondary)', marginBottom:'6px',
+                                            display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'
+                                        }}>
+                                            <span>{'Raumliste (Baustellen-App-Foto-Modul)'}</span>
+                                            {inhaltsDiag.raeume.parser_version && (
+                                                <span style={{
+                                                    background:'rgba(39,174,96,0.20)', color:'#27AE60',
+                                                    padding:'2px 8px', borderRadius:'10px',
+                                                    fontSize:'10px', letterSpacing:'0.3px',
+                                                    fontFamily:'monospace', textTransform:'none', fontWeight:600
+                                                }}>{'Parser: '}{inhaltsDiag.raeume.parser_version}</span>
+                                            )}
+                                            {!inhaltsDiag.raeume.parser_version && inhaltsDiag.raeume.excel_datei && (
+                                                <span style={{
+                                                    background:'rgba(231,126,34,0.20)', color:'#E67E22',
+                                                    padding:'2px 8px', borderRadius:'10px',
+                                                    fontSize:'10px', letterSpacing:'0.3px',
+                                                    fontFamily:'monospace', textTransform:'none', fontWeight:600
+                                                }}>{'\u26A0 Alte Parser-Version (tw-staging.js veraltet)'}</span>
+                                            )}
+                                        </div>
                                         {inhaltsDiag.raeume.excel_datei ? (
                                             <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'6px', fontFamily:'monospace'}}>
                                                 {'\uD83D\uDCC4 '}{inhaltsDiag.raeume.excel_datei.name}
@@ -11328,6 +11347,76 @@
                                                 }
                                             </span>
                                         </div>
+
+                                        {/* Header-Erkennung-Diagnose */}
+                                        {inhaltsDiag.raeume.excel_datei && (
+                                            <div style={{marginTop:'10px', paddingTop:'8px', borderTop:'1px dashed var(--border)'}}>
+                                                <div style={{fontSize:'10px', color:'var(--text-muted)', marginBottom:'4px', fontFamily:"'Oswald',sans-serif", textTransform:'uppercase', letterSpacing:'0.4px'}}>
+                                                    {'Header-Erkennung'}
+                                                </div>
+                                                {inhaltsDiag.raeume.headerZeile >= 0 ? (
+                                                    <div style={{fontSize:'11px', color:'var(--text-secondary)', marginBottom:'6px'}}>
+                                                        {'Header-Zeile: '}<b>{'Zeile '}{inhaltsDiag.raeume.headerZeile + 1}</b>
+                                                        {' \u2022 '}<b>{inhaltsDiag.raeume.totalRows}</b>{' Zeilen total'}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{fontSize:'11px', color:'#E67E22', marginBottom:'6px'}}>
+                                                        {'\u26A0 Keine Header-Zeile erkannt (kein "Raum"/"Bezeichnung"/"Nr" gefunden)'}
+                                                    </div>
+                                                )}
+                                                {inhaltsDiag.raeume.headers && inhaltsDiag.raeume.headers.length > 0 && (
+                                                    <div style={{fontSize:'11px', color:'var(--text-primary)', marginBottom:'6px', fontFamily:'monospace', lineHeight:1.5}}>
+                                                        {'Erkannte Header: '}
+                                                        {inhaltsDiag.raeume.headers.filter(function(h){return h;}).map(function(h, i){
+                                                            return (
+                                                                <span key={i} style={{
+                                                                    display:'inline-block',
+                                                                    background:'var(--bg-secondary)',
+                                                                    padding:'2px 6px', margin:'2px 4px 2px 0',
+                                                                    borderRadius:'4px', fontSize:'10px'
+                                                                }}>{h}</span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                                {inhaltsDiag.raeume.sample && inhaltsDiag.raeume.sample.length > 0 && (
+                                                    <div style={{marginTop:'4px'}}>
+                                                        <div style={{fontSize:'10px', color:'var(--text-muted)', marginBottom:'4px'}}>
+                                                            {'Erste Zeilen der Datei:'}
+                                                        </div>
+                                                        <div style={{
+                                                            background:'var(--bg-primary)', border:'1px solid var(--border)',
+                                                            borderRadius:'6px', padding:'6px 8px', overflow:'auto',
+                                                            fontFamily:'monospace', fontSize:'10px', maxHeight:'160px'
+                                                        }}>
+                                                            {inhaltsDiag.raeume.sample.map(function(zeile, zi){
+                                                                var istHeader = (zi === inhaltsDiag.raeume.headerZeile);
+                                                                return (
+                                                                    <div key={zi} style={{
+                                                                        display:'flex', gap:'8px',
+                                                                        padding:'2px 0',
+                                                                        borderBottom: zi < inhaltsDiag.raeume.sample.length - 1 ? '1px solid rgba(127,127,127,0.15)' : 'none',
+                                                                        background: istHeader ? 'rgba(39,174,96,0.10)' : 'transparent',
+                                                                        fontWeight: istHeader ? 600 : 400
+                                                                    }}>
+                                                                        <span style={{
+                                                                            color:'var(--text-muted)', minWidth:'20px',
+                                                                            textAlign:'right', flexShrink:0
+                                                                        }}>{(zi+1)}{':'}</span>
+                                                                        <span style={{flex:1, color:'var(--text-primary)', wordBreak:'break-word'}}>
+                                                                            {(zeile || []).map(function(z, zj){
+                                                                                return (z !== undefined && z !== null && String(z).trim() !== '') ? String(z) : '\u2014';
+                                                                            }).join(' | ')}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {inhaltsDiag.raeume.fehler && (
                                             <div style={{marginTop:'6px', color:'#E74C3C', fontSize:'11px'}}>
                                                 {'\u26A0 '}{inhaltsDiag.raeume.fehler}

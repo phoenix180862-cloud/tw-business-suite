@@ -1297,6 +1297,11 @@
                     excel_count: 0,
                     excel_datei: null,    // { name, parentName }
                     firebase_count: 0,
+                    headers: [],          // Erkannte Header-Zeile (fuer Diagnose)
+                    sample: [],           // Erste 8 Zeilen als Array-of-Arrays
+                    headerZeile: -1,      // Index der erkannten Header-Zeile (0-basiert)
+                    totalRows: 0,
+                    parser_version: null, // Versions-Marker des Parsers (fuer Cache-Diagnose)
                     fehler: null
                 },
                 fehler: []
@@ -1406,13 +1411,26 @@
                             name: excelMeta.name,
                             parentName: excelMeta.parentName
                         };
-                        // Schnell-Parse fuer Zaehlung (komplettes Mapping nicht noetig)
+                        // Schnell-Parse fuer Zaehlung + Header-Anzeige
                         try {
-                            var rows = await _ladeUndParseRaumliste(excelMeta.id);
-                            // Nur Zeilen mit Bezeichnung zaehlen
+                            var parsedDiag = await _ladeUndParseRaumliste(excelMeta.id);
+                            ergebnis.raeume.headers = (parsedDiag && parsedDiag.headers) || [];
+                            ergebnis.raeume.sample = (parsedDiag && parsedDiag.debug && parsedDiag.debug.ersteZeilen) || [];
+                            ergebnis.raeume.headerZeile = (parsedDiag && parsedDiag.debug && parsedDiag.debug.headerZeile);
+                            ergebnis.raeume.totalRows = (parsedDiag && parsedDiag.debug && parsedDiag.debug.totalRows) || 0;
+                            ergebnis.raeume.parser_version = (parsedDiag && parsedDiag.debug && parsedDiag.debug.parser_version) || 'unbekannt';
+                            if (parsedDiag && parsedDiag.debug && parsedDiag.debug.warnung) {
+                                ergebnis.raeume.fehler = parsedDiag.debug.warnung;
+                            }
+                            // Nur Zeilen mit Bezeichnung (in irgendeinem Alias) zaehlen
+                            var rows = (parsedDiag && parsedDiag.rows) || [];
                             var valid = 0;
                             for (var ri = 0; ri < rows.length; ri++) {
-                                var bz = _zelle(rows[ri], ['Bezeichnung','Raumbezeichnung','Raum','Name','bezeichnung']);
+                                var bz = _zelle(rows[ri], [
+                                    'Bezeichnung', 'Raumbezeichnung', 'Raumname', 'Raum-Name', 'Raum',
+                                    'Name', 'Beschreibung', 'Raumbeschreibung',
+                                    'bezeichnung', 'raumbezeichnung', 'raumname', 'raum', 'name', 'beschreibung'
+                                ]);
                                 if (bz) valid++;
                             }
                             ergebnis.raeume.excel_count = valid;
@@ -1632,7 +1650,9 @@
             return null;
         }
 
-        // ── Excel runterladen und parsen ──
+        // ── Excel runterladen und parsen — robust gegen Titel-Vorspann ──
+        // Returns: { rows: [{header: wert, ...}], headers: [...], debug: {...} }
+        var PARSER_VERSION = 'v3-2026-05-01';
         async function _ladeUndParseRaumliste(fileId) {
             if (typeof XLSX === 'undefined') {
                 throw new Error('SheetJS (XLSX) nicht geladen');
@@ -1646,23 +1666,143 @@
             if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
                 throw new Error('Excel hat keine Sheets');
             }
-            // Erstes Sheet nehmen — die Liste3-Excels haben in der Regel nur eines
             var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            var rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-            return rows;
+
+            // Array-of-Arrays Mode — Zeilen als Arrays statt Objekte.
+            // Damit erkennen wir die Header-Zeile selbst und ueberspringen
+            // einen evtl. vorhandenen Titel/Vorspann (bei NotebookLM-Exports
+            // typisch).
+            var aoa = XLSX.utils.sheet_to_json(firstSheet, {
+                header: 1, defval: '', blankrows: false, raw: false
+            });
+            if (!aoa || aoa.length === 0) {
+                return { rows: [], headers: [], debug: { totalRows: 0, ersteZeilen: [] } };
+            }
+
+            // Heuristisch Header-Zeile in den ersten 10 Zeilen finden:
+            // Die Zeile mit dem hoechsten Score an Header-Schluesselwoertern gewinnt.
+            var headerKandidaten = [
+                'raum', 'bezeichnung', 'beschreibung', 'name',
+                'nummer', 'pos', 'geschoss', 'etage', 'stock', 'ebene',
+                'flaeche', 'fläche', 'flache', 'm²', 'm2', 'qm',
+                'fliesen', 'wand', 'boden', 'decke'
+            ];
+            var headerIdx = -1;
+            var maxScore = 0;
+            var maxSearchRows = Math.min(10, aoa.length);
+            for (var i = 0; i < maxSearchRows; i++) {
+                var zeile = aoa[i] || [];
+                var score = 0;
+                var nichtLeer = 0;
+                for (var j = 0; j < zeile.length; j++) {
+                    var raw = String(zeile[j] || '').trim();
+                    if (!raw) continue;
+                    nichtLeer++;
+                    var z = raw.toLowerCase().replace(/[\s\-_.()]+/g, '');
+                    if (z.length < 2 || z.length > 40) continue;
+                    for (var k = 0; k < headerKandidaten.length; k++) {
+                        if (z.indexOf(headerKandidaten[k].replace(/[\s\-_.()]+/g, '')) !== -1) {
+                            score++;
+                            break;
+                        }
+                    }
+                }
+                // Bevorzuge Zeilen mit mind. 1 Header-Treffer UND mind. 3 nicht-leeren Zellen.
+                // (Lockerer als zuvor — eine Zeile mit "Raum-Nr." allein und 5 weiteren
+                // Spalten ist sehr wahrscheinlich der echte Header, auch wenn nur 1 Wort matcht.)
+                if (score >= 1 && nichtLeer >= 3 && score > maxScore) {
+                    maxScore = score;
+                    headerIdx = i;
+                }
+            }
+
+            // Sample-Zeilen fuer Diagnose
+            var sample = aoa.slice(0, Math.min(8, aoa.length)).map(function(r){
+                return (r || []).slice(0, 10).map(function(v){ return String(v == null ? '' : v); });
+            });
+
+            if (headerIdx === -1) {
+                // Fallback: keine Header-Zeile erkannt — gib Roh-Sample zurueck
+                return {
+                    rows: [],
+                    headers: [],
+                    debug: {
+                        parser_version: PARSER_VERSION,
+                        totalRows: aoa.length,
+                        headerZeile: -1,
+                        headerScore: 0,
+                        ersteZeilen: sample,
+                        warnung: 'Keine Header-Zeile erkannt (kein "Raum"/"Bezeichnung"/"Nr" gefunden)'
+                    }
+                };
+            }
+
+            var headers = (aoa[headerIdx] || []).map(function(h){
+                return String(h == null ? '' : h).trim();
+            });
+            var rows = [];
+            for (var r = headerIdx + 1; r < aoa.length; r++) {
+                var rowArr = aoa[r] || [];
+                var rowObj = {};
+                var hasContent = false;
+                for (var c = 0; c < headers.length; c++) {
+                    var key = headers[c];
+                    if (!key) continue;
+                    var val = rowArr[c];
+                    if (val !== undefined && val !== null && String(val).trim() !== '') {
+                        hasContent = true;
+                    }
+                    rowObj[key] = val !== undefined && val !== null ? val : '';
+                }
+                if (hasContent) rows.push(rowObj);
+            }
+
+            return {
+                rows: rows,
+                headers: headers,
+                debug: {
+                    parser_version: PARSER_VERSION,
+                    totalRows: aoa.length,
+                    headerZeile: headerIdx,
+                    headerScore: maxScore,
+                    ersteZeilen: sample
+                }
+            };
         }
 
         // ── Excel-Zeile → Firebase-Raum-Objekt ──
         function _excelZeileZuRaum(row, idx) {
-            var bezeichnung = _zelle(row, ['Bezeichnung', 'Raumbezeichnung', 'Raum', 'Name', 'bezeichnung']);
+            var bezeichnung = _zelle(row, [
+                'Bezeichnung', 'Raumbezeichnung', 'Raumname', 'Raum-Name', 'Raum',
+                'Name', 'Beschreibung', 'Raumbeschreibung',
+                'bezeichnung', 'raumbezeichnung', 'raumname', 'raum', 'name', 'beschreibung'
+            ]);
             if (!bezeichnung) return null; // Zeile ohne Bezeichnung ignorieren
 
-            var raumNr      = _zelle(row, ['Raum-Nr.', 'Raum-Nr', 'RaumNr', 'Pos', 'Pos.', 'Nr', 'Nummer', 'nummer']);
-            var geschossRaw = _zelle(row, ['Geschoss', 'Etage', 'Stock', 'geschoss']);
-            var wandzahlStr = _zelle(row, ['Wände', 'Anzahl Wände', 'Waende', 'Anzahl Waende', 'wandzahl']);
-            var bodenStr    = _zelle(row, ['Boden', 'Hat Boden', 'hatBoden']);
-            var deckeStr    = _zelle(row, ['Decke', 'Hat Decke', 'hatDecke']);
-            var fliesenStr  = _zelle(row, ['Fliesenarbeiten', 'Fliesen', 'fliesenarbeiten']);
+            var raumNr = _zelle(row, [
+                'Raum-Nr.', 'Raum-Nr', 'Raum Nr.', 'Raum Nr', 'RaumNr',
+                'Pos.', 'Pos', 'Pos.-Nr.', 'Pos.-Nr', 'Pos-Nr',
+                'Nr.', 'Nr', 'Nummer',
+                'raum-nr', 'raum-nr.', 'pos', 'pos.', 'nr', 'nr.', 'nummer'
+            ]);
+            var geschossRaw = _zelle(row, [
+                'Geschoss', 'Etage', 'Stock', 'Ebene',
+                'geschoss', 'etage', 'stock', 'ebene'
+            ]);
+            var wandzahlStr = _zelle(row, [
+                'Wände', 'Anzahl Wände', 'Waende', 'Anzahl Waende', 'Wandzahl',
+                'wandzahl', 'wände', 'waende'
+            ]);
+            var bodenStr = _zelle(row, [
+                'Boden', 'Hat Boden', 'hatBoden', 'boden'
+            ]);
+            var deckeStr = _zelle(row, [
+                'Decke', 'Hat Decke', 'hatDecke', 'decke'
+            ]);
+            var fliesenStr = _zelle(row, [
+                'Fliesenarbeiten', 'Fliesen', 'Fliesenleger',
+                'fliesenarbeiten', 'fliesen'
+            ]);
 
             // Defaults laut Auftrag
             var wandzahl = parseInt(wandzahlStr, 10);
@@ -1721,6 +1861,8 @@
                 raeume_firebase_nachher: 0,
                 geloescht: 0,
                 uebersprungen: 0,
+                headers: [],
+                debug: null,
                 fehler: null
             };
 
@@ -1753,9 +1895,21 @@
                 };
 
                 // 2. Parsen
-                var rows = await _ladeUndParseRaumliste(excel.id);
+                var parsed = await _ladeUndParseRaumliste(excel.id);
+                var rows = (parsed && parsed.rows) || [];
+                ergebnis.headers = (parsed && parsed.headers) || [];
+                ergebnis.debug = (parsed && parsed.debug) || null;
+
                 if (!rows || rows.length === 0) {
-                    ergebnis.fehler = 'Excel "' + excel.name + '" enthaelt keine Datenzeilen';
+                    var grund = '';
+                    if (parsed && parsed.debug && parsed.debug.warnung) {
+                        grund = parsed.debug.warnung;
+                    } else if (parsed && parsed.headers && parsed.headers.length > 0) {
+                        grund = 'Header gefunden (' + parsed.headers.join(', ') + '), aber keine Datenzeilen';
+                    } else {
+                        grund = 'Keine Daten in Excel';
+                    }
+                    ergebnis.fehler = 'Excel "' + excel.name + '": ' + grund;
                     return ergebnis;
                 }
 
