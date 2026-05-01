@@ -1276,6 +1276,146 @@
         }
 
         // ── Exporte ──
+        // ─────────────────────────────────────────────────────────
+        // INHALTS-DIAGNOSE (Fix 01.05.2026)
+        // ─────────────────────────────────────────────────────────
+        // Liefert pro Subordner einen Vergleich Drive vs. Firebase, um zu
+        // verstehen, ob der Sync ueberhaupt durchgelaufen ist und ob die
+        // Daten dort liegen, wo die MA-App sie erwartet.
+        async function pruefeStagingInhalte(baustelleName, projectId, slug) {
+            var ergebnis = {
+                baustelle: baustelleName,
+                slug: slug || '',
+                driveId: projectId || '',
+                subordner: {},
+                fehler: []
+            };
+
+            // 1. Drive-Inhalte sammeln
+            try {
+                var info = await getStagingInfo(baustelleName);
+                var subfolderNames = (window.STAGING_CONFIG && window.STAGING_CONFIG.SUBFOLDERS)
+                    || ['Zeichnungen','Anweisungen','Baustellendaten','Fotos','Stunden'];
+                for (var i = 0; i < subfolderNames.length; i++) {
+                    var subname = subfolderNames[i];
+                    ergebnis.subordner[subname] = {
+                        drive_count: 0, drive_files: [],
+                        fb_projects_count: 0,
+                        fb_aktive_count: 0,
+                        fehlt_in_drive: false
+                    };
+                    var sub = info && info.unterordner && info.unterordner[subname];
+                    if (!sub || !sub.id) {
+                        ergebnis.subordner[subname].fehlt_in_drive = true;
+                        continue;
+                    }
+                    try {
+                        var dateien = await listDateienInOrdner(sub.id);
+                        ergebnis.subordner[subname].drive_count = dateien.length;
+                        ergebnis.subordner[subname].drive_files = dateien.slice(0, 10).map(function(d){
+                            return { name: d.name, id: d.id };
+                        });
+                    } catch (eDateien) {
+                        ergebnis.fehler.push({ subname: subname, quelle: 'drive', fehler: eDateien.message });
+                    }
+                }
+            } catch (eInfo) {
+                ergebnis.fehler.push({ subname: '*', quelle: 'drive_info', fehler: eInfo.message });
+            }
+
+            // 2. Firebase: projects/{driveId}/staging/{subname}
+            if (projectId && window.FirebaseService && window.FirebaseService.db) {
+                try {
+                    var snap1 = await window.FirebaseService.db
+                        .ref('projects/' + projectId + '/staging').once('value');
+                    var data1 = snap1.val() || {};
+                    Object.keys(ergebnis.subordner).forEach(function(subname){
+                        var sub = data1[subname] || {};
+                        ergebnis.subordner[subname].fb_projects_count = Object.keys(sub).length;
+                    });
+                } catch (eFb1) {
+                    ergebnis.fehler.push({ subname: '*', quelle: 'fb_projects', fehler: eFb1.message });
+                }
+
+                // 3. Firebase: aktive_baustellen/{slug}/dateien/{subname}
+                if (slug) {
+                    try {
+                        var snap2 = await window.FirebaseService.db
+                            .ref('aktive_baustellen/' + slug + '/dateien').once('value');
+                        var data2 = snap2.val() || {};
+                        Object.keys(ergebnis.subordner).forEach(function(subname){
+                            var sub = data2[subname] || {};
+                            ergebnis.subordner[subname].fb_aktive_count = Object.keys(sub).length;
+                        });
+                    } catch (eFb2) {
+                        ergebnis.fehler.push({ subname: '*', quelle: 'fb_aktive', fehler: eFb2.message });
+                    }
+                }
+            }
+
+            return ergebnis;
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // DUAL-PATH-SYNC (Fix 01.05.2026)
+        // ─────────────────────────────────────────────────────────
+        // Erweiterung von syncStagingNachFirebase: schreibt zusaetzlich nach
+        // 'aktive_baustellen/{slug}/dateien/{subname}/{fileId}'. Das ist der
+        // Pfad, den die Baustellen-App vermutlich liest (parallel zum
+        // bestehenden 'projects/{driveId}/staging/'-Pfad).
+        async function syncStagingDualPath(baustelleName, projectId, slug) {
+            // Erst der bestehende Sync zum projects-Pfad
+            var ergebnis = await syncStagingNachFirebase(baustelleName, projectId);
+
+            // Dann zusaetzlich der Dual-Path nach aktive_baustellen/{slug}/dateien
+            if (!slug) return ergebnis;
+            if (!window.FirebaseService || !window.FirebaseService.db) return ergebnis;
+
+            try {
+                var info = await getStagingInfo(baustelleName);
+                var subfolderNames = (window.STAGING_CONFIG && window.STAGING_CONFIG.SUBFOLDERS)
+                    || ['Zeichnungen','Anweisungen','Baustellendaten','Fotos','Stunden'];
+                var permissions = (window.STAGING_CONFIG && window.STAGING_CONFIG.SUBFOLDER_PERMISSIONS) || {};
+                ergebnis.dual_path = { schluessel: 'aktive_baustellen/'+slug+'/dateien/', unterordner: {} };
+
+                for (var i = 0; i < subfolderNames.length; i++) {
+                    var subname = subfolderNames[i];
+                    var subInfo = info && info.unterordner && info.unterordner[subname];
+                    if (!subInfo || !subInfo.id) continue;
+                    try {
+                        var dateien = await listDateienInOrdner(subInfo.id);
+                        var fbMap = {};
+                        for (var j = 0; j < dateien.length; j++) {
+                            var d = dateien[j];
+                            fbMap[d.id] = {
+                                name: d.name || '',
+                                mimeType: d.mimeType || '',
+                                size: parseInt(d.size, 10) || 0,
+                                modifiedTime: d.modifiedTime || null,
+                                driveUrl: 'https://drive.google.com/file/d/' + d.id + '/view',
+                                permission: permissions[subname] || 'readonly'
+                            };
+                        }
+                        var pfad = 'aktive_baustellen/' + slug + '/dateien/' + subname;
+                        await window.FirebaseService.db.ref(pfad).set(fbMap);
+                        ergebnis.dual_path.unterordner[subname] = {
+                            ok: true, anzahl: dateien.length
+                        };
+                    } catch (eSub) {
+                        ergebnis.dual_path.unterordner[subname] = {
+                            ok: false, fehler: eSub.message
+                        };
+                    }
+                }
+            } catch (e) {
+                ergebnis.dual_path = { fehler: e.message };
+            }
+
+            return ergebnis;
+        }
+
+        // ────────────────────────────────────────────────────────────────
+
         window.TWStaging = {
             ensureRootFolder: ensureRootFolder,
             createStagingBaustelle: createStagingBaustelle,
@@ -1283,6 +1423,9 @@
             isStagingBereitgestellt: isStagingBereitgestellt,
             getStagingSubfolder: getStagingSubfolder,
             getStagingInfo: getStagingInfo,
+            // Fix 01.05.2026: Inhalts-Diagnose + Dual-Path-Sync
+            pruefeStagingInhalte: pruefeStagingInhalte,
+            syncStagingDualPath: syncStagingDualPath,
             // Etappe 4: Copy-API
             listOriginaleKundenOrdner: listOriginaleKundenOrdner,
             listDateienInOrdner: listDateienInOrdner,

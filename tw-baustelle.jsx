@@ -10751,6 +10751,7 @@
             const [fehler, setFehler] = useState(null);
             const [info, setInfo] = useState(null);
             const [expandiert, setExpandiert] = useState({}); // { slug: true } = Mitarbeiter-Liste sichtbar
+            const [inhaltsDiag, setInhaltsDiag] = useState(null); // Diagnose-Modal-Daten oder null
 
             // ── 1. Drive-Kundenordner laden (potenzielle Baustellen) ──
             useEffect(function(){
@@ -10837,13 +10838,13 @@
                     }
 
                     // NEU (Fix 01.05.2026): Staging-Inhalte automatisch nach Firebase syncen,
-                    // damit die Baustellen-App-Ordner sofort gefuellt sind. Sync-Fehler werden
-                    // geloggt aber nicht eskaliert — die Aktivierung selbst war bereits erfolgreich.
+                    // damit die Baustellen-App-Ordner sofort gefuellt sind. Dual-Path-Schreibung:
+                    // sowohl 'projects/{driveId}/staging/' als auch 'aktive_baustellen/{slug}/dateien/'.
                     var stagingDateien = 0;
                     var stagingFehler = null;
                     try {
-                        if (window.TWStaging && window.TWStaging.syncStagingNachFirebase && baustelle.id) {
-                            var sErg = await window.TWStaging.syncStagingNachFirebase(baustelle.name, baustelle.id);
+                        if (window.TWStaging && window.TWStaging.syncStagingDualPath && baustelle.id) {
+                            var sErg = await window.TWStaging.syncStagingDualPath(baustelle.name, baustelle.id, slug);
                             stagingDateien = (sErg && sErg.gesamt) || 0;
                             try {
                                 await window.FirebaseService.logAuditEvent('staging_sync_aktivierung', {
@@ -10902,10 +10903,11 @@
             }
 
             // ── Manueller Re-Sync: Staging-Inhalte fuer bereits aktive Baustelle (Fix 01.05.2026) ──
+            // Nutzt Dual-Path: schreibt nach projects/{driveId}/staging/ UND aktive_baustellen/{slug}/dateien/
             async function syncJetzt(baustelle) {
                 if (!fbOk || !window.FirebaseService) return;
                 var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
-                if (!window.TWStaging || !window.TWStaging.syncStagingNachFirebase) {
+                if (!window.TWStaging || !window.TWStaging.syncStagingDualPath) {
                     setFehler('TWStaging nicht verfuegbar.'); return;
                 }
                 if (!baustelle.id) {
@@ -10913,16 +10915,37 @@
                 }
                 setBusyFor(slug, true); setFehler(null); setInfo(null);
                 try {
-                    var sErg = await window.TWStaging.syncStagingNachFirebase(baustelle.name, baustelle.id);
+                    var sErg = await window.TWStaging.syncStagingDualPath(baustelle.name, baustelle.id, slug);
                     var dateien = (sErg && sErg.gesamt) || 0;
+                    var dualOk = sErg && sErg.dual_path && !sErg.dual_path.fehler;
                     try {
                         await window.FirebaseService.logAuditEvent('staging_sync_manuell', {
-                            baustelle: baustelle.name, slug: slug, dateien: dateien
+                            baustelle: baustelle.name, slug: slug, dateien: dateien,
+                            dual_path_ok: !!dualOk
                         });
                     } catch(_) {}
-                    setInfo('"' + baustelle.name + '" synchronisiert: ' + dateien + ' Datei(en) in Firebase.');
+                    var msg = '"' + baustelle.name + '" synchronisiert: ' + dateien + ' Datei(en) (Dual-Path: '
+                        + (dualOk ? 'OK' : 'FEHLER') + ').';
+                    setInfo(msg);
                 } catch (e) {
                     setFehler('Sync fehlgeschlagen: ' + (e && e.message || e));
+                }
+                setBusyFor(slug, false);
+            }
+
+            // ── Inhalts-Diagnose pro Baustelle (Fix 01.05.2026) ──
+            async function pruefeInhalte(baustelle) {
+                if (!fbOk || !window.FirebaseService) return;
+                var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
+                if (!window.TWStaging || !window.TWStaging.pruefeStagingInhalte) {
+                    setFehler('TWStaging nicht verfuegbar.'); return;
+                }
+                setBusyFor(slug, true); setFehler(null); setInfo(null);
+                try {
+                    var diag = await window.TWStaging.pruefeStagingInhalte(baustelle.name, baustelle.id, slug);
+                    setInhaltsDiag(diag);
+                } catch (e) {
+                    setFehler('Diagnose fehlgeschlagen: ' + (e && e.message || e));
                 }
                 setBusyFor(slug, false);
             }
@@ -11026,6 +11049,21 @@
                                     </div>
                                     {istAktiv && (
                                         <button
+                                            onClick={function(){ pruefeInhalte(baustelle); }}
+                                            disabled={istBusy}
+                                            title={'Inhalts-Diagnose: Drive-Dateien vs. Firebase-Eintraege'}
+                                            style={{
+                                                padding:'8px 12px', borderRadius:'8px', border:'1px solid var(--border)',
+                                                fontFamily:"'Oswald',sans-serif", fontSize:'12px',
+                                                fontWeight:600, letterSpacing:'0.8px', textTransform:'uppercase',
+                                                cursor: istBusy ? 'wait' : 'pointer', touchAction:'manipulation',
+                                                background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                                opacity: istBusy ? 0.6 : 1
+                                            }}
+                                        >{'\uD83D\uDD0D Diag.'}</button>
+                                    )}
+                                    {istAktiv && (
+                                        <button
                                             onClick={function(){ syncJetzt(baustelle); }}
                                             disabled={istBusy}
                                             title={'Staging-Inhalte (Zeichnungen, Anweisungen, ...) jetzt nach Firebase synchronisieren'}
@@ -11109,12 +11147,116 @@
                             </div>
                         );
                     })}
+
+                    {/* ── Inhalts-Diagnose-Modal (Fix 01.05.2026) ── */}
+                    {inhaltsDiag && (
+                        <div style={{
+                            position:'fixed', top:0, left:0, right:0, bottom:0,
+                            background:'rgba(0,0,0,0.65)', zIndex:9999,
+                            display:'flex', alignItems:'center', justifyContent:'center',
+                            padding:'16px'
+                        }} onClick={function(e){ if(e.target===e.currentTarget) setInhaltsDiag(null); }}>
+                            <div style={{
+                                background:'var(--bg-primary)',
+                                border:'1px solid var(--border)',
+                                borderRadius:'14px', padding:'20px',
+                                maxWidth:'640px', width:'100%',
+                                maxHeight:'88vh', overflow:'auto',
+                                boxShadow:'0 12px 40px rgba(0,0,0,0.5)'
+                            }}>
+                                <div style={{
+                                    fontFamily:"'Oswald',sans-serif", fontSize:'18px', fontWeight:600,
+                                    color:'var(--text-primary)', marginBottom:'4px'
+                                }}>{'\uD83D\uDD0D Inhalts-Diagnose'}</div>
+                                <div style={{
+                                    fontSize:'13px', color:'var(--text-muted)', marginBottom:'14px'
+                                }}>{inhaltsDiag.baustelle}</div>
+
+                                <div style={{
+                                    fontSize:'11px', color:'var(--text-secondary)',
+                                    marginBottom:'8px', lineHeight:1.5
+                                }}>
+                                    {'Vergleich: '}<b>{'Drive'}</b>{' (Was tatsaechlich im Staging-Ordner liegt) gegen '}
+                                    <b>{'Firebase'}</b>{' (Was die Mitarbeiter-App lesen kann).'}
+                                </div>
+
+                                <table style={{
+                                    width:'100%', borderCollapse:'collapse',
+                                    fontSize:'12px', marginBottom:'14px'
+                                }}>
+                                    <thead>
+                                        <tr style={{borderBottom:'2px solid var(--border)'}}>
+                                            <th style={{textAlign:'left', padding:'8px 6px', fontFamily:"'Oswald',sans-serif", color:'var(--text-secondary)', textTransform:'uppercase', fontSize:'10px', letterSpacing:'0.5px'}}>{'Ordner'}</th>
+                                            <th style={{textAlign:'right', padding:'8px 6px', fontFamily:"'Oswald',sans-serif", color:'var(--text-secondary)', textTransform:'uppercase', fontSize:'10px', letterSpacing:'0.5px'}}>{'Drive'}</th>
+                                            <th style={{textAlign:'right', padding:'8px 6px', fontFamily:"'Oswald',sans-serif", color:'var(--text-secondary)', textTransform:'uppercase', fontSize:'10px', letterSpacing:'0.5px'}}>{'FB projects'}</th>
+                                            <th style={{textAlign:'right', padding:'8px 6px', fontFamily:"'Oswald',sans-serif", color:'var(--text-secondary)', textTransform:'uppercase', fontSize:'10px', letterSpacing:'0.5px'}}>{'FB aktive'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Object.keys(inhaltsDiag.subordner).map(function(subname){
+                                            var s = inhaltsDiag.subordner[subname];
+                                            var driveOk = s.drive_count > 0;
+                                            var fb1Ok = s.fb_projects_count > 0;
+                                            var fb2Ok = s.fb_aktive_count > 0;
+                                            var rowBg = (!driveOk) ? 'transparent'
+                                                : (!fb1Ok && !fb2Ok) ? 'rgba(196,30,30,0.08)'
+                                                : (fb1Ok && fb2Ok) ? 'rgba(39,174,96,0.06)'
+                                                : 'rgba(255,165,0,0.06)';
+                                            return (
+                                                <tr key={subname} style={{
+                                                    borderBottom:'1px solid var(--border)',
+                                                    background: rowBg
+                                                }}>
+                                                    <td style={{padding:'8px 6px', color:'var(--text-primary)', fontWeight:500}}>{subname}</td>
+                                                    <td style={{padding:'8px 6px', textAlign:'right', color: driveOk ? '#27AE60' : 'var(--text-muted)', fontFamily:'monospace'}}>{s.drive_count}</td>
+                                                    <td style={{padding:'8px 6px', textAlign:'right', color: fb1Ok ? '#27AE60' : '#E74C3C', fontFamily:'monospace'}}>{s.fb_projects_count}</td>
+                                                    <td style={{padding:'8px 6px', textAlign:'right', color: fb2Ok ? '#27AE60' : '#E74C3C', fontFamily:'monospace'}}>{s.fb_aktive_count}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+
+                                <div style={{
+                                    background:'rgba(30,136,229,0.08)', border:'1px solid rgba(30,136,229,0.30)',
+                                    borderRadius:'8px', padding:'10px 12px', marginBottom:'14px',
+                                    fontSize:'11px', color:'var(--text-secondary)', lineHeight:1.5
+                                }}>
+                                    <b>{'Lesehilfe:'}</b><br/>
+                                    {'\u2022 Drive > 0, beide FB = 0 \u2192 Sync ist gar nicht gelaufen.'}<br/>
+                                    {'\u2022 Drive = FB projects, FB aktive = 0 \u2192 alter Pfad-only, MA-App liest woanders.'}<br/>
+                                    {'\u2022 Beide FB > 0 \u2192 Dual-Path-Sync ist durch, MA-App muesste die Inhalte sehen.'}<br/>
+                                    {'\u2022 Drive = 0 \u2192 Staging-Ordner sind leer, Daten zuerst dort hochladen.'}
+                                </div>
+
+                                {inhaltsDiag.fehler && inhaltsDiag.fehler.length > 0 && (
+                                    <div style={{
+                                        background:'rgba(196,30,30,0.10)', border:'1px solid rgba(196,30,30,0.35)',
+                                        borderRadius:'8px', padding:'10px 12px', marginBottom:'14px',
+                                        fontSize:'11px', color:'var(--text-primary)'
+                                    }}>
+                                        <b>{'Fehler beim Pruefen:'}</b>
+                                        {inhaltsDiag.fehler.map(function(f, i){
+                                            return <div key={i} style={{marginTop:'4px'}}>{'\u2022 '}{f.subname}{' / '}{f.quelle}{': '}{f.fehler}</div>;
+                                        })}
+                                    </div>
+                                )}
+
+                                <div style={{display:'flex', gap:'10px', justifyContent:'flex-end'}}>
+                                    <button onClick={function(){ setInhaltsDiag(null); }} style={{
+                                        padding:'9px 16px', borderRadius:'8px', border:'1px solid var(--border)',
+                                        background:'var(--bg-secondary)', color:'var(--text-primary)',
+                                        fontFamily:"'Oswald',sans-serif", fontSize:'12px', fontWeight:600,
+                                        letterSpacing:'0.7px', textTransform:'uppercase', cursor:'pointer'
+                                    }}>{'Schliessen'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // FREIGABE-DIAGNOSE & MIGRATION (Fix 01.05.2026)
         // ═══════════════════════════════════════════════════════════════════
         // Ziel: Symptom "MA-App-Login klappt aber Baustellen-Liste leer"
         // diagnostizieren und reparieren. Pruefe pro aktiver Baustelle, ob
