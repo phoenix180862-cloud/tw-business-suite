@@ -10824,13 +10824,29 @@
                     var n = await window.FirebaseService.freigebenAlleApproved(slug);
 
                     // NEU (B6.5c): Raeume aus IndexedDB lesen + nach Firebase pushen
+                    // Auftrag 01.05.2026: Excel-Raumliste hat Vorrang vor IndexedDB.
                     var raeumeCount = 0;
+                    var raeumeQuelle = '';
+                    var raeumeExcelMeta = null;
                     try {
-                        if (window.storage && window.storage.loadRaeume && baustelle.id) {
+                        // 1. PRIORITY: Liste3_Raumliste*.xlsx aus Drive
+                        if (window.TWStaging && window.TWStaging.pushRaeumeAusExcel && baustelle.id) {
+                            var excelErg = await window.TWStaging.pushRaeumeAusExcel(baustelle.name, baustelle.id, slug);
+                            if (excelErg && excelErg.gefunden && !excelErg.fehler) {
+                                raeumeCount = excelErg.raeume_firebase_nachher || 0;
+                                raeumeQuelle = 'Excel';
+                                raeumeExcelMeta = excelErg;
+                            } else if (excelErg && excelErg.fehler) {
+                                console.warn('[Aktiviere] Excel-Raumliste-Fehler:', excelErg.fehler);
+                            }
+                        }
+                        // 2. FALLBACK: IndexedDB-Raeume, falls keine Excel da
+                        if (raeumeCount === 0 && window.storage && window.storage.loadRaeume && baustelle.id) {
                             var lokaleRaeume = await window.storage.loadRaeume(baustelle.id);
                             if (lokaleRaeume && lokaleRaeume.length > 0) {
                                 var firebaseRaeume = lokaleRaeume.map(_mapRaumFuerBaustellenApp);
                                 raeumeCount = await window.FirebaseService.pushRaeumeListe(slug, firebaseRaeume);
+                                raeumeQuelle = 'IndexedDB';
                             }
                         }
                     } catch (raeumeErr) {
@@ -10860,10 +10876,21 @@
                     await window.FirebaseService.logAuditEvent('baustelle_aktiviert', {
                         baustelle: baustelle.name, slug: slug,
                         freigegeben_count: n, raeume_count: raeumeCount,
+                        raeume_quelle: raeumeQuelle || 'keine',
                         staging_dateien: stagingDateien
                     });
                     var msg = '"' + baustelle.name + '" ist jetzt fuer ' + n + ' Geraet(e) sichtbar.';
-                    if (raeumeCount > 0) msg += ' ' + raeumeCount + ' Raum/Raeume mitgepusht.';
+                    if (raeumeCount > 0) {
+                        if (raeumeQuelle === 'Excel' && raeumeExcelMeta && raeumeExcelMeta.datei) {
+                            msg += ' ' + raeumeCount + ' Raum/Raeume aus "' + raeumeExcelMeta.datei.name + '" gepusht';
+                            if (raeumeExcelMeta.geloescht > 0) {
+                                msg += ' (' + raeumeExcelMeta.geloescht + ' Karteileiche(n) entfernt)';
+                            }
+                            msg += '.';
+                        } else {
+                            msg += ' ' + raeumeCount + ' Raum/Raeume mitgepusht.';
+                        }
+                    }
                     if (stagingDateien > 0) msg += ' ' + stagingDateien + ' Datei(en) synchronisiert.';
                     if (stagingFehler) msg += ' (Hinweis: Staging-Sync-Fehler — bitte manuell synchronisieren.)';
                     setInfo(msg);
@@ -10904,6 +10931,7 @@
 
             // ── Manueller Re-Sync: Staging-Inhalte fuer bereits aktive Baustelle (Fix 01.05.2026) ──
             // Nutzt Dual-Path: schreibt nach projects/{driveId}/staging/ UND aktive_baustellen/{slug}/dateien/
+            // Auftrag 01.05.2026: pusht zusaetzlich Liste3_Raumliste*.xlsx nach aktive_baustellen/{slug}/raeume/
             async function syncJetzt(baustelle) {
                 if (!fbOk || !window.FirebaseService) return;
                 var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
@@ -10918,6 +10946,26 @@
                     var sErg = await window.TWStaging.syncStagingDualPath(baustelle.name, baustelle.id, slug);
                     var dateien = (sErg && sErg.gesamt) || 0;
                     var dualOk = sErg && sErg.dual_path && !sErg.dual_path.fehler;
+
+                    // Auftrag 01.05.2026: Raumliste aus Excel pushen
+                    var raeumeMsg = '';
+                    try {
+                        if (window.TWStaging.pushRaeumeAusExcel) {
+                            var rErg = await window.TWStaging.pushRaeumeAusExcel(baustelle.name, baustelle.id, slug);
+                            if (rErg && rErg.gefunden && !rErg.fehler) {
+                                raeumeMsg = ' ' + rErg.raeume_firebase_nachher + ' Raum/Raeume aus "'
+                                    + (rErg.datei && rErg.datei.name) + '" gepusht';
+                                if (rErg.geloescht > 0) raeumeMsg += ' (' + rErg.geloescht + ' Karteileiche(n) entfernt)';
+                                raeumeMsg += '.';
+                            } else if (rErg && rErg.fehler) {
+                                raeumeMsg = ' (Raumliste: ' + rErg.fehler + ')';
+                            }
+                        }
+                    } catch (eR) {
+                        console.warn('[syncJetzt] Raumliste-Push fehlgeschlagen:', eR && eR.message);
+                        raeumeMsg = ' (Raumliste: ' + ((eR && eR.message) || eR) + ')';
+                    }
+
                     try {
                         await window.FirebaseService.logAuditEvent('staging_sync_manuell', {
                             baustelle: baustelle.name, slug: slug, dateien: dateien,
@@ -10925,7 +10973,7 @@
                         });
                     } catch(_) {}
                     var msg = '"' + baustelle.name + '" synchronisiert: ' + dateien + ' Datei(en) (Dual-Path: '
-                        + (dualOk ? 'OK' : 'FEHLER') + ').';
+                        + (dualOk ? 'OK' : 'FEHLER') + ').' + raeumeMsg;
                     setInfo(msg);
                 } catch (e) {
                     setFehler('Sync fehlgeschlagen: ' + (e && e.message || e));
@@ -11228,6 +11276,65 @@
                                     {'\u2022 Beide FB > 0 \u2192 Dual-Path-Sync ist durch, MA-App muesste die Inhalte sehen.'}<br/>
                                     {'\u2022 Drive = 0 \u2192 Staging-Ordner sind leer, Daten zuerst dort hochladen.'}
                                 </div>
+
+                                {/* Auftrag 01.05.2026: Raeume-Bilanz Excel <-> Firebase */}
+                                {inhaltsDiag.raeume && (
+                                    <div style={{
+                                        background: (inhaltsDiag.raeume.excel_count > 0 && inhaltsDiag.raeume.excel_count === inhaltsDiag.raeume.firebase_count)
+                                            ? 'rgba(39,174,96,0.08)'
+                                            : (inhaltsDiag.raeume.excel_count > 0)
+                                                ? 'rgba(255,165,0,0.08)'
+                                                : 'rgba(127,127,127,0.06)',
+                                        border: '1px solid '+ (
+                                            (inhaltsDiag.raeume.excel_count > 0 && inhaltsDiag.raeume.excel_count === inhaltsDiag.raeume.firebase_count)
+                                                ? 'rgba(39,174,96,0.30)'
+                                                : (inhaltsDiag.raeume.excel_count > 0)
+                                                    ? 'rgba(255,165,0,0.30)'
+                                                    : 'var(--border)'
+                                        ),
+                                        borderRadius:'8px', padding:'10px 12px', marginBottom:'14px',
+                                        fontSize:'12px', color:'var(--text-primary)'
+                                    }}>
+                                        <div style={{
+                                            fontFamily:"'Oswald',sans-serif", fontWeight:600,
+                                            fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px',
+                                            color:'var(--text-secondary)', marginBottom:'6px'
+                                        }}>{'Raumliste (Baustellen-App-Foto-Modul)'}</div>
+                                        {inhaltsDiag.raeume.excel_datei ? (
+                                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'6px', fontFamily:'monospace'}}>
+                                                {'\uD83D\uDCC4 '}{inhaltsDiag.raeume.excel_datei.name}
+                                                {' \u2022 '}{inhaltsDiag.raeume.excel_datei.parentName}
+                                            </div>
+                                        ) : (
+                                            <div style={{fontSize:'11px', color:'var(--text-muted)', marginBottom:'6px', fontStyle:'italic'}}>
+                                                {'Keine Liste3_Raumliste*.xlsx im Drive-Ordner gefunden.'}
+                                            </div>
+                                        )}
+                                        <div style={{display:'flex', gap:'18px', alignItems:'center', flexWrap:'wrap'}}>
+                                            <span>
+                                                {'Raeume:'}
+                                                {' '}
+                                                <b style={{fontFamily:'monospace'}}>{'Excel='}{inhaltsDiag.raeume.excel_count}</b>
+                                                {'  '}
+                                                <b style={{fontFamily:'monospace'}}>{'Firebase='}{inhaltsDiag.raeume.firebase_count}</b>
+                                                {'  '}
+                                                {(inhaltsDiag.raeume.excel_count === inhaltsDiag.raeume.firebase_count && inhaltsDiag.raeume.excel_count > 0)
+                                                    ? <span style={{color:'#27AE60'}}>{'\u2713'}</span>
+                                                    : (inhaltsDiag.raeume.excel_count > 0)
+                                                        ? <span style={{color:'#E67E22'}}>{'\u26A0 Sync ausstehend'}</span>
+                                                        : (inhaltsDiag.raeume.firebase_count > 0)
+                                                            ? <span style={{color:'var(--text-muted)'}}>{'(Quelle: IndexedDB)'}</span>
+                                                            : <span style={{color:'var(--text-muted)'}}>{'\u2013'}</span>
+                                                }
+                                            </span>
+                                        </div>
+                                        {inhaltsDiag.raeume.fehler && (
+                                            <div style={{marginTop:'6px', color:'#E74C3C', fontSize:'11px'}}>
+                                                {'\u26A0 '}{inhaltsDiag.raeume.fehler}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {inhaltsDiag.fehler && inhaltsDiag.fehler.length > 0 && (
                                     <div style={{

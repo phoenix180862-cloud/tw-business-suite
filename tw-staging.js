@@ -1292,6 +1292,13 @@
                     aktive: [],     // Top-Level-Keys unter aktive_baustellen/{slug}/
                     projects: []    // Top-Level-Keys unter projects/{driveId}/
                 },
+                raeume: {
+                    // Auftrag 01.05.2026: Excel ↔ Firebase Raumliste-Bilanz
+                    excel_count: 0,
+                    excel_datei: null,    // { name, parentName }
+                    firebase_count: 0,
+                    fehler: null
+                },
                 fehler: []
             };
 
@@ -1390,6 +1397,40 @@
                 }
             }
 
+            // 5. Auftrag 01.05.2026: Raeume-Bilanz Excel ↔ Firebase
+            try {
+                if (projectId) {
+                    var excelMeta = await findeRaumlisteExcel(projectId);
+                    if (excelMeta) {
+                        ergebnis.raeume.excel_datei = {
+                            name: excelMeta.name,
+                            parentName: excelMeta.parentName
+                        };
+                        // Schnell-Parse fuer Zaehlung (komplettes Mapping nicht noetig)
+                        try {
+                            var rows = await _ladeUndParseRaumliste(excelMeta.id);
+                            // Nur Zeilen mit Bezeichnung zaehlen
+                            var valid = 0;
+                            for (var ri = 0; ri < rows.length; ri++) {
+                                var bz = _zelle(rows[ri], ['Bezeichnung','Raumbezeichnung','Raum','Name','bezeichnung']);
+                                if (bz) valid++;
+                            }
+                            ergebnis.raeume.excel_count = valid;
+                        } catch (eParse) {
+                            ergebnis.raeume.fehler = 'Excel-Parse: ' + eParse.message;
+                        }
+                    }
+                }
+                if (slug && window.FirebaseService && window.FirebaseService.db) {
+                    var snapR = await window.FirebaseService.db
+                        .ref('aktive_baustellen/' + slug + '/raeume').once('value');
+                    var dataR = snapR.val() || {};
+                    ergebnis.raeume.firebase_count = Object.keys(dataR).length;
+                }
+            } catch (eRaeume) {
+                ergebnis.raeume.fehler = (eRaeume && eRaeume.message) || String(eRaeume);
+            }
+
             return ergebnis;
         }
 
@@ -1467,6 +1508,306 @@
             return ergebnis;
         }
 
+        // ═══════════════════════════════════════════════════════
+        // RAEUME-PUSH AUS EXCEL (Auftrag 01.05.2026)
+        // ═══════════════════════════════════════════════════════
+        // Liest die Datei "Liste3_Raumliste_*.xlsx" aus dem Staging-Drive-
+        // Ordner einer Baustelle (oder aus deren direkten Unterordnern),
+        // parst sie mit SheetJS und pusht die Raumliste nach Firebase
+        // unter aktive_baustellen/{slug}/raeume/. Ueberschreibt komplett —
+        // Raeume die NICHT mehr in der Excel sind, werden in Firebase
+        // geloescht (gewollt, damit keine Karteileichen entstehen).
+        // Vom Mitarbeiter selbst angelegte Raeume liegen in einem anderen
+        // Knoten und sind davon nicht betroffen.
+        // ═══════════════════════════════════════════════════════
+
+        // ── Hilfsfunktion: Excel-Zelle aus Zeile holen, mehrere Header-Varianten ──
+        function _zelle(row, varianten) {
+            for (var i = 0; i < varianten.length; i++) {
+                var key = varianten[i];
+                if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+                    return String(row[key]).trim();
+                }
+                // Case-insensitive Match als Fallback
+                var lc = key.toLowerCase();
+                var keys = Object.keys(row);
+                for (var j = 0; j < keys.length; j++) {
+                    if (keys[j].toLowerCase() === lc) {
+                        var v = row[keys[j]];
+                        if (v !== undefined && v !== null && String(v).trim() !== '') {
+                            return String(v).trim();
+                        }
+                    }
+                }
+            }
+            return '';
+        }
+
+        // ── Hilfsfunktion: "Ja"/"true"/"x"/"1" → true; "Nein"/"false"/leer → false ──
+        function _zellenBoolean(s) {
+            if (!s) return null;
+            var v = String(s).trim().toLowerCase();
+            if (v === '' || v === '-' || v === '—') return null;
+            if (v === 'ja' || v === 'yes' || v === 'true' || v === 'x' || v === '1' || v === 'wahr') return true;
+            if (v === 'nein' || v === 'no' || v === 'false' || v === '0' || v === 'falsch') return false;
+            return null;
+        }
+
+        // ── Hilfsfunktion: Geschoss normalisieren ──
+        function _normGeschoss(s) {
+            if (!s) return 'EG';
+            var v = String(s).trim().toUpperCase();
+            if (['KG','EG','OG','DG','UG'].indexOf(v) !== -1) return v === 'UG' ? 'KG' : v;
+            // Spezialfaelle
+            if (/KELLER|UNTERGESCHOSS/i.test(s)) return 'KG';
+            if (/ERDGESCHOSS/i.test(s)) return 'EG';
+            if (/DACHGESCHOSS/i.test(s)) return 'DG';
+            if (/OBERGESCHOSS/i.test(s)) return 'OG';
+            // Erstes Vorkommen 1.OG, 2.OG etc → OG
+            if (/OG/i.test(s)) return 'OG';
+            return 'EG';
+        }
+
+        // ── Hilfsfunktion: stabiler Slug aus bezeichnung+nummer ──
+        function _raumSlug(bezeichnung, nummer, fallbackIdx) {
+            var src = (bezeichnung || '') + ' ' + (nummer || '');
+            var slug = src.toLowerCase()
+                .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+                .replace(/[^a-z0-9]+/g,'-')
+                .replace(/^-+|-+$/g,'')
+                .slice(0, 80);
+            if (!slug) slug = 'raum-' + (fallbackIdx + 1);
+            return slug;
+        }
+
+        // ── Sucht Liste3_Raumliste*.xlsx im Staging-Ordner + 1-Ebene-Subfolders ──
+        // Returns: { id, name, modifiedTime, parentName } oder null
+        async function findeRaumlisteExcel(stagingFolderId) {
+            assertDriveReady();
+            if (!stagingFolderId) return null;
+
+            // 1. Direkt im Staging-Ordner suchen
+            var topQ = "'" + stagingFolderId + "' in parents and trashed=false and name contains 'Liste3_Raumliste'";
+            var topRes = await gapi.client.drive.files.list({
+                q: topQ,
+                fields: 'files(id, name, mimeType, size, modifiedTime, parents)',
+                orderBy: 'modifiedTime desc',
+                pageSize: 50,
+                spaces: 'drive'
+            });
+            var topFiles = (topRes && topRes.result && topRes.result.files) || [];
+            var direkt = topFiles.filter(function(f){
+                var n = String(f.name || '');
+                return /\.xlsx$/i.test(n) && /^Liste3_Raumliste/i.test(n);
+            });
+            if (direkt.length > 0) {
+                return { id: direkt[0].id, name: direkt[0].name, modifiedTime: direkt[0].modifiedTime, parentName: '(Wurzel)' };
+            }
+
+            // 2. In direkten Unterordnern suchen
+            var subFolders = await listChildFolders(stagingFolderId);
+            for (var i = 0; i < subFolders.length; i++) {
+                var sub = subFolders[i];
+                try {
+                    var subQ = "'" + sub.id + "' in parents and trashed=false and name contains 'Liste3_Raumliste'";
+                    var subRes = await gapi.client.drive.files.list({
+                        q: subQ,
+                        fields: 'files(id, name, mimeType, size, modifiedTime)',
+                        orderBy: 'modifiedTime desc',
+                        pageSize: 50,
+                        spaces: 'drive'
+                    });
+                    var subFiles = (subRes && subRes.result && subRes.result.files) || [];
+                    var match = subFiles.filter(function(f){
+                        var n = String(f.name || '');
+                        return /\.xlsx$/i.test(n) && /^Liste3_Raumliste/i.test(n);
+                    });
+                    if (match.length > 0) {
+                        return { id: match[0].id, name: match[0].name, modifiedTime: match[0].modifiedTime, parentName: sub.name };
+                    }
+                } catch (e) {
+                    // Subordner unzugaenglich — weitersuchen
+                }
+            }
+            return null;
+        }
+
+        // ── Excel runterladen und parsen ──
+        async function _ladeUndParseRaumliste(fileId) {
+            if (typeof XLSX === 'undefined') {
+                throw new Error('SheetJS (XLSX) nicht geladen');
+            }
+            if (!window.GoogleDriveService || !window.GoogleDriveService.downloadFile) {
+                throw new Error('GoogleDriveService.downloadFile nicht verfuegbar');
+            }
+            var blob = await window.GoogleDriveService.downloadFile(fileId);
+            var buffer = await blob.arrayBuffer();
+            var workbook = XLSX.read(buffer, { type: 'array' });
+            if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+                throw new Error('Excel hat keine Sheets');
+            }
+            // Erstes Sheet nehmen — die Liste3-Excels haben in der Regel nur eines
+            var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            var rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+            return rows;
+        }
+
+        // ── Excel-Zeile → Firebase-Raum-Objekt ──
+        function _excelZeileZuRaum(row, idx) {
+            var bezeichnung = _zelle(row, ['Bezeichnung', 'Raumbezeichnung', 'Raum', 'Name', 'bezeichnung']);
+            if (!bezeichnung) return null; // Zeile ohne Bezeichnung ignorieren
+
+            var raumNr      = _zelle(row, ['Raum-Nr.', 'Raum-Nr', 'RaumNr', 'Pos', 'Pos.', 'Nr', 'Nummer', 'nummer']);
+            var geschossRaw = _zelle(row, ['Geschoss', 'Etage', 'Stock', 'geschoss']);
+            var wandzahlStr = _zelle(row, ['Wände', 'Anzahl Wände', 'Waende', 'Anzahl Waende', 'wandzahl']);
+            var bodenStr    = _zelle(row, ['Boden', 'Hat Boden', 'hatBoden']);
+            var deckeStr    = _zelle(row, ['Decke', 'Hat Decke', 'hatDecke']);
+            var fliesenStr  = _zelle(row, ['Fliesenarbeiten', 'Fliesen', 'fliesenarbeiten']);
+
+            // Defaults laut Auftrag
+            var wandzahl = parseInt(wandzahlStr, 10);
+            if (!wandzahl || isNaN(wandzahl) || wandzahl < 3 || wandzahl > 12) wandzahl = 4;
+
+            // hatBoden: explizite Spalte hat Vorrang, sonst aus Fliesenarbeiten ableiten,
+            // sonst Default true (laut Auftrag)
+            var bodenExpl = _zellenBoolean(bodenStr);
+            var fliesenExpl = _zellenBoolean(fliesenStr);
+            var hatBoden;
+            if (bodenExpl !== null) {
+                hatBoden = bodenExpl;
+            } else if (fliesenExpl !== null) {
+                hatBoden = fliesenExpl;
+            } else {
+                hatBoden = true;
+            }
+
+            // hatDecke: Default false
+            var deckeExpl = _zellenBoolean(deckeStr);
+            var hatDecke = (deckeExpl !== null) ? deckeExpl : false;
+
+            var geschoss = _normGeschoss(geschossRaw);
+            var slug = _raumSlug(bezeichnung, raumNr, idx);
+
+            return {
+                id: slug,
+                bezeichnung: bezeichnung,
+                nummer: raumNr || '',
+                geschoss: geschoss,
+                wandzahl: wandzahl,
+                hatBoden: !!hatBoden,
+                hatDecke: !!hatDecke,
+                erstellt_am: Date.now(),
+                erstellt_von: 'master-app'
+            };
+        }
+
+        // ── Hauptfunktion: Excel finden, parsen, nach Firebase pushen ──
+        // Returns: {
+        //   gefunden: bool,
+        //   datei: { name, parentName, modifiedTime } | null,
+        //   raeume_excel: number,        // Zeilen aus Excel uebernommen
+        //   raeume_firebase_vorher: number,
+        //   raeume_firebase_nachher: number,
+        //   geloescht: number,           // Anzahl entfernter Karteileichen
+        //   uebersprungen: number,       // Zeilen ohne Bezeichnung
+        //   fehler: string | null
+        // }
+        async function pushRaeumeAusExcel(baustelleName, projectId, slug) {
+            var ergebnis = {
+                gefunden: false,
+                datei: null,
+                raeume_excel: 0,
+                raeume_firebase_vorher: 0,
+                raeume_firebase_nachher: 0,
+                geloescht: 0,
+                uebersprungen: 0,
+                fehler: null
+            };
+
+            try {
+                if (!projectId) throw new Error('Drive-Folder-ID (projectId) fehlt');
+                if (!slug) throw new Error('Baustellen-Slug fehlt');
+                if (!window.FirebaseService || !window.FirebaseService.pushRaeumeListe) {
+                    throw new Error('FirebaseService.pushRaeumeListe nicht verfuegbar');
+                }
+
+                // Vorher-Stand merken (fuer Diff-Anzeige)
+                try {
+                    var vorher = await window.FirebaseService.getRaeume(slug);
+                    ergebnis.raeume_firebase_vorher = Object.keys(vorher || {}).length;
+                } catch (eVor) {
+                    // Nicht kritisch — Vorher-Stand bleibt 0
+                }
+
+                // 1. Excel finden
+                var excel = await findeRaumlisteExcel(projectId);
+                if (!excel) {
+                    ergebnis.fehler = null; // kein Fehler — Datei existiert einfach nicht
+                    return ergebnis;
+                }
+                ergebnis.gefunden = true;
+                ergebnis.datei = {
+                    name: excel.name,
+                    parentName: excel.parentName,
+                    modifiedTime: excel.modifiedTime
+                };
+
+                // 2. Parsen
+                var rows = await _ladeUndParseRaumliste(excel.id);
+                if (!rows || rows.length === 0) {
+                    ergebnis.fehler = 'Excel "' + excel.name + '" enthaelt keine Datenzeilen';
+                    return ergebnis;
+                }
+
+                // 3. Mappen
+                var raeume = [];
+                var seenIds = {};
+                for (var i = 0; i < rows.length; i++) {
+                    var raum = _excelZeileZuRaum(rows[i], i);
+                    if (!raum) {
+                        ergebnis.uebersprungen++;
+                        continue;
+                    }
+                    // Duplikat-Schutz: gleiche ID → letzter gewinnt
+                    if (seenIds[raum.id]) {
+                        // Slug eindeutig machen
+                        raum.id = raum.id + '-' + i;
+                    }
+                    seenIds[raum.id] = true;
+                    raeume.push(raum);
+                }
+                ergebnis.raeume_excel = raeume.length;
+
+                // 4. Pushen — ueberschreibt Knoten komplett (Karteileichen verschwinden)
+                var anzahl = await window.FirebaseService.pushRaeumeListe(slug, raeume);
+                ergebnis.raeume_firebase_nachher = anzahl;
+                ergebnis.geloescht = Math.max(0,
+                    ergebnis.raeume_firebase_vorher - ergebnis.raeume_firebase_nachher
+                );
+
+                // 5. Audit
+                try {
+                    if (window.FirebaseService.logAuditEvent) {
+                        await window.FirebaseService.logAuditEvent('raeume_excel_push', {
+                            baustelle: baustelleName,
+                            slug: slug,
+                            datei: excel.name,
+                            parent: excel.parentName,
+                            excel: ergebnis.raeume_excel,
+                            firebase: ergebnis.raeume_firebase_nachher,
+                            uebersprungen: ergebnis.uebersprungen
+                        });
+                    }
+                } catch(_) {}
+
+                return ergebnis;
+            } catch (e) {
+                ergebnis.fehler = (e && e.message) || String(e);
+                console.warn('[pushRaeumeAusExcel] Fehler:', ergebnis.fehler);
+                return ergebnis;
+            }
+        }
+
         // ────────────────────────────────────────────────────────────────
 
         window.TWStaging = {
@@ -1509,7 +1850,10 @@
             // Etappe F: Staging -> Original Sammel-Sync
             analysiereStagingNachOriginal: analysiereStagingNachOriginal,
             uebertrageStagingNachOriginal: uebertrageStagingNachOriginal,
-            analysiereAlleStagingsNachOriginal: analysiereAlleStagingsNachOriginal
+            analysiereAlleStagingsNachOriginal: analysiereAlleStagingsNachOriginal,
+            // Auftrag 01.05.2026: Excel-Raumliste -> Firebase
+            findeRaumlisteExcel: findeRaumlisteExcel,
+            pushRaeumeAusExcel: pushRaeumeAusExcel
         };
 
     })();
