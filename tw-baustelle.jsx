@@ -10808,7 +10808,8 @@
                 };
             }
 
-            // ── Aktivieren: pushAktiveBaustelle + alle approved freigeben + Raeume-Sync (B6.5c) ──
+            // ── Aktivieren: pushAktiveBaustelle + alle approved freigeben + Raeume-Sync (B6.5c)
+            //    + Staging-Inhalte nach Firebase syncen (Fix 01.05.2026) ──
             async function aktiviere(baustelle) {
                 if (!fbOk || !window.FirebaseService) return;
                 var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
@@ -10835,11 +10836,35 @@
                         console.warn('[Aktiviere] Raeume-Sync fehlgeschlagen:', raeumeErr && raeumeErr.message);
                     }
 
+                    // NEU (Fix 01.05.2026): Staging-Inhalte automatisch nach Firebase syncen,
+                    // damit die Baustellen-App-Ordner sofort gefuellt sind. Sync-Fehler werden
+                    // geloggt aber nicht eskaliert — die Aktivierung selbst war bereits erfolgreich.
+                    var stagingDateien = 0;
+                    var stagingFehler = null;
+                    try {
+                        if (window.TWStaging && window.TWStaging.syncStagingNachFirebase && baustelle.id) {
+                            var sErg = await window.TWStaging.syncStagingNachFirebase(baustelle.name, baustelle.id);
+                            stagingDateien = (sErg && sErg.gesamt) || 0;
+                            try {
+                                await window.FirebaseService.logAuditEvent('staging_sync_aktivierung', {
+                                    baustelle: baustelle.name, slug: slug, dateien: stagingDateien
+                                });
+                            } catch(_) {}
+                        }
+                    } catch (syncErr) {
+                        stagingFehler = (syncErr && syncErr.message) || String(syncErr);
+                        console.warn('[Aktiviere] Staging-Sync fehlgeschlagen:', stagingFehler);
+                    }
+
                     await window.FirebaseService.logAuditEvent('baustelle_aktiviert', {
-                        baustelle: baustelle.name, slug: slug, freigegeben_count: n, raeume_count: raeumeCount
+                        baustelle: baustelle.name, slug: slug,
+                        freigegeben_count: n, raeume_count: raeumeCount,
+                        staging_dateien: stagingDateien
                     });
                     var msg = '"' + baustelle.name + '" ist jetzt fuer ' + n + ' Geraet(e) sichtbar.';
                     if (raeumeCount > 0) msg += ' ' + raeumeCount + ' Raum/Raeume mitgepusht.';
+                    if (stagingDateien > 0) msg += ' ' + stagingDateien + ' Datei(en) synchronisiert.';
+                    if (stagingFehler) msg += ' (Hinweis: Staging-Sync-Fehler — bitte manuell synchronisieren.)';
                     setInfo(msg);
                 } catch (e) {
                     setFehler('Aktivierung fehlgeschlagen: ' + (e && e.message || e));
@@ -10874,6 +10899,32 @@
                 } catch (e) {
                     setFehler('Geraete-Freigabe fehlgeschlagen: ' + (e && e.message || e));
                 }
+            }
+
+            // ── Manueller Re-Sync: Staging-Inhalte fuer bereits aktive Baustelle (Fix 01.05.2026) ──
+            async function syncJetzt(baustelle) {
+                if (!fbOk || !window.FirebaseService) return;
+                var slug = window.FirebaseService._slugifyBaustelle(baustelle.name);
+                if (!window.TWStaging || !window.TWStaging.syncStagingNachFirebase) {
+                    setFehler('TWStaging nicht verfuegbar.'); return;
+                }
+                if (!baustelle.id) {
+                    setFehler('Baustellen-Drive-ID fehlt.'); return;
+                }
+                setBusyFor(slug, true); setFehler(null); setInfo(null);
+                try {
+                    var sErg = await window.TWStaging.syncStagingNachFirebase(baustelle.name, baustelle.id);
+                    var dateien = (sErg && sErg.gesamt) || 0;
+                    try {
+                        await window.FirebaseService.logAuditEvent('staging_sync_manuell', {
+                            baustelle: baustelle.name, slug: slug, dateien: dateien
+                        });
+                    } catch(_) {}
+                    setInfo('"' + baustelle.name + '" synchronisiert: ' + dateien + ' Datei(en) in Firebase.');
+                } catch (e) {
+                    setFehler('Sync fehlgeschlagen: ' + (e && e.message || e));
+                }
+                setBusyFor(slug, false);
             }
 
             // ── Helper: ist diese Drive-Baustelle aktiv? ──
@@ -10973,6 +11024,22 @@
                                                 : 'inaktiv · in Mitarbeiter-App nicht sichtbar'}
                                         </div>
                                     </div>
+                                    {istAktiv && (
+                                        <button
+                                            onClick={function(){ syncJetzt(baustelle); }}
+                                            disabled={istBusy}
+                                            title={'Staging-Inhalte (Zeichnungen, Anweisungen, ...) jetzt nach Firebase synchronisieren'}
+                                            style={{
+                                                padding:'8px 14px', borderRadius:'8px', border:'none',
+                                                fontFamily:"'Oswald',sans-serif", fontSize:'12px',
+                                                fontWeight:600, letterSpacing:'0.8px', textTransform:'uppercase',
+                                                cursor: istBusy ? 'wait' : 'pointer', touchAction:'manipulation',
+                                                background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                                                color:'#fff', opacity: istBusy ? 0.6 : 1,
+                                                boxShadow:'0 4px 12px rgba(30,136,229,0.30)'
+                                            }}
+                                        >{'\u21BB Sync'}</button>
+                                    )}
                                     <button
                                         onClick={function(){ istAktiv ? deaktiviere(baustelle) : aktiviere(baustelle); }}
                                         disabled={istBusy}
